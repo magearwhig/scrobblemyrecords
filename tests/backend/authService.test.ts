@@ -21,128 +21,117 @@ describe('AuthService', () => {
     }
   });
 
-  describe('getUserSettings', () => {
-    it('should return default settings when no settings file exists', async () => {
-      const settings = await authService.getUserSettings();
-      
-      expect(settings).toEqual({
-        discogs: {},
-        lastfm: {},
-        preferences: {
-          defaultTimestamp: 'now',
-          batchSize: 50,
-          autoScrobble: false
-        }
-      });
+  describe('Discogs Authentication', () => {
+    it('should return undefined when no Discogs token exists', async () => {
+      const token = await authService.getDiscogsToken();
+      expect(token).toBeUndefined();
     });
 
-    it('should read existing settings', async () => {
+    it('should store and retrieve Discogs token', async () => {
+      const testToken = 'test-discogs-token';
+      const testUsername = 'testuser';
+      
+      await authService.setDiscogsToken(testToken, testUsername);
+      
+      const retrievedToken = await authService.getDiscogsToken();
+      expect(retrievedToken).toBe(testToken);
+      
+      const settings = await authService.getUserSettings();
+      expect(settings.discogs.username).toBe(testUsername);
+    });
+
+    it('should clear Discogs token', async () => {
+      await authService.setDiscogsToken('test-token', 'testuser');
+      await authService.clearTokens();
+      
+      const token = await authService.getDiscogsToken();
+      expect(token).toBeUndefined();
+    });
+
+    it('should handle OAuth token secret storage', async () => {
+      const testSecret = 'test-oauth-secret';
+      
+      await authService.storeOAuthTokenSecret(testSecret);
+      const retrievedSecret = await authService.getOAuthTokenSecret();
+      expect(retrievedSecret).toBe(testSecret);
+      
+      await authService.clearOAuthTokenSecret();
+      const clearedSecret = await authService.getOAuthTokenSecret();
+      expect(clearedSecret).toBeUndefined();
+    });
+  });
+
+  describe('Last.fm Authentication', () => {
+    it('should return undefined when no Last.fm credentials exist', async () => {
+      const credentials = await authService.getLastFmCredentials();
+      expect(credentials.apiKey).toBeUndefined();
+      expect(credentials.sessionKey).toBeUndefined();
+      expect(credentials.username).toBeUndefined();
+    });
+
+    it('should store and retrieve Last.fm credentials', async () => {
+      const apiKey = 'test-api-key';
+      const sessionKey = 'test-session-key';
+      const username = 'testuser';
+      
+      await authService.setLastFmCredentials(apiKey, sessionKey, username);
+      
+      const retrievedCredentials = await authService.getLastFmCredentials();
+      expect(retrievedCredentials.apiKey).toBe(apiKey);
+      expect(retrievedCredentials.sessionKey).toBe(sessionKey);
+      expect(retrievedCredentials.username).toBe(username);
+    });
+
+    it('should clear Last.fm credentials', async () => {
+      await authService.setLastFmCredentials('test-key', 'test-session', 'testuser');
+      await authService.clearTokens();
+      
+      const credentials = await authService.getLastFmCredentials();
+      expect(credentials.apiKey).toBeUndefined();
+      expect(credentials.sessionKey).toBeUndefined();
+      expect(credentials.username).toBeUndefined();
+    });
+
+    it('should handle partial Last.fm credentials', async () => {
+      await authService.setLastFmCredentials('test-key', '', 'testuser');
+      
+      const credentials = await authService.getLastFmCredentials();
+      expect(credentials.apiKey).toBe('test-key');
+      expect(credentials.sessionKey).toBe('');
+      expect(credentials.username).toBe('testuser');
+    });
+  });
+
+  describe('User Settings', () => {
+    it('should get default user settings', async () => {
+      const settings = await authService.getUserSettings();
+      expect(settings.preferences.defaultTimestamp).toBe('now');
+      expect(settings.preferences.batchSize).toBe(50);
+      expect(settings.preferences.autoScrobble).toBe(false);
+    });
+
+    it('should save and retrieve user settings', async () => {
       const testSettings = {
         discogs: { username: 'testuser' },
         lastfm: { username: 'testuser' },
         preferences: {
           defaultTimestamp: 'custom' as const,
-          batchSize: 100,
+          batchSize: 20,
           autoScrobble: true
         }
       };
+
+      await authService.saveUserSettings(testSettings);
       
-      await fileStorage.writeJSON('settings/user-settings.json', testSettings);
       const settings = await authService.getUserSettings();
-      
+      expect(settings.preferences.defaultTimestamp).toBe('custom');
+      expect(settings.preferences.batchSize).toBe(20);
+      expect(settings.preferences.autoScrobble).toBe(true);
       expect(settings.discogs.username).toBe('testuser');
-      expect(settings.lastfm.username).toBe('testuser');
-      expect(settings.preferences.batchSize).toBe(100);
     });
   });
 
-  describe('setDiscogsToken', () => {
-    it('should save Discogs token and username', async () => {
-      const token = 'test-token';
-      const username = 'testuser';
-      
-      await authService.setDiscogsToken(token, username);
-      
-      const settings = await authService.getUserSettings();
-      expect(settings.discogs.token).toBe(token);
-      expect(settings.discogs.username).toBe(username);
-    });
-
-    it('should save token without username', async () => {
-      const token = 'test-token';
-      
-      await authService.setDiscogsToken(token);
-      
-      const settings = await authService.getUserSettings();
-      expect(settings.discogs.token).toBe(token);
-      expect(settings.discogs.username).toBeUndefined();
-    });
-  });
-
-  describe('setLastFmCredentials', () => {
-    it('should save Last.fm credentials', async () => {
-      const apiKey = 'test-api-key';
-      const sessionKey = 'test-session-key';
-      const username = 'testuser';
-      
-      await authService.setLastFmCredentials(apiKey, sessionKey, username);
-      
-      const settings = await authService.getUserSettings();
-      expect(settings.lastfm.apiKey).toBe(apiKey);
-      expect(settings.lastfm.sessionKey).toBe(sessionKey);
-      expect(settings.lastfm.username).toBe(username);
-    });
-  });
-
-  describe('getDiscogsToken', () => {
-    it('should return stored Discogs token', async () => {
-      const token = 'test-token';
-      await authService.setDiscogsToken(token);
-      
-      const retrievedToken = await authService.getDiscogsToken();
-      expect(retrievedToken).toBe(token);
-    });
-
-    it('should return undefined when no token exists', async () => {
-      const token = await authService.getDiscogsToken();
-      expect(token).toBeUndefined();
-    });
-  });
-
-  describe('getLastFmCredentials', () => {
-    it('should return stored Last.fm credentials', async () => {
-      const apiKey = 'test-api-key';
-      const sessionKey = 'test-session-key';
-      const username = 'testuser';
-      
-      await authService.setLastFmCredentials(apiKey, sessionKey, username);
-      
-      const credentials = await authService.getLastFmCredentials();
-      expect(credentials.apiKey).toBe(apiKey);
-      expect(credentials.sessionKey).toBe(sessionKey);
-      expect(credentials.username).toBe(username);
-    });
-
-    it('should return empty object when no credentials exist', async () => {
-      const credentials = await authService.getLastFmCredentials();
-      expect(credentials).toEqual({});
-    });
-  });
-
-  describe('clearTokens', () => {
-    it('should clear all authentication tokens', async () => {
-      await authService.setDiscogsToken('test-token', 'user1');
-      await authService.setLastFmCredentials('api-key', 'session-key', 'user2');
-      
-      await authService.clearTokens();
-      
-      const settings = await authService.getUserSettings();
-      expect(settings.discogs).toEqual({});
-      expect(settings.lastfm).toEqual({});
-    });
-  });
-
-  describe('generateNonce', () => {
+  describe('Utility Methods', () => {
     it('should generate unique nonce values', () => {
       const nonce1 = authService.generateNonce();
       const nonce2 = authService.generateNonce();
@@ -152,14 +141,31 @@ describe('AuthService', () => {
       expect(nonce1).not.toBe(nonce2);
       expect(nonce1.length).toBe(32); // 16 bytes in hex
     });
-  });
 
-  describe('generateTimestamp', () => {
     it('should generate valid timestamp', () => {
       const timestamp = authService.generateTimestamp();
       const now = Math.floor(Date.now() / 1000);
       
       expect(parseInt(timestamp)).toBeCloseTo(now, -1);
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should handle file read errors by propagating them', async () => {
+      // Mock file storage to throw an error
+      jest.spyOn(fileStorage, 'readJSON').mockRejectedValue(new Error('File read error'));
+      
+      // AuthService doesn't catch errors, so they should propagate
+      await expect(authService.getDiscogsToken()).rejects.toThrow('File read error');
+      await expect(authService.getLastFmCredentials()).rejects.toThrow('File read error');
+    });
+
+    it('should handle file write errors by propagating them', async () => {
+      // Mock file storage to throw an error on write
+      jest.spyOn(fileStorage, 'writeJSON').mockRejectedValue(new Error('File write error'));
+      
+      // AuthService doesn't catch write errors, so they should propagate
+      await expect(authService.setDiscogsToken('test-token', 'testuser')).rejects.toThrow('File write error');
     });
   });
 });

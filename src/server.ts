@@ -3,6 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { FileStorage } from './backend/utils/fileStorage';
+import { AuthService } from './backend/services/authService';
+import { LastFmService } from './backend/services/lastfmService';
+import { DiscogsService } from './backend/services/discogsService';
 
 dotenv.config();
 
@@ -50,13 +53,18 @@ app.get('/health', (req, res) => {
 
 // Import route handlers
 import authRoutes from './backend/routes/auth';
-import collectionRoutes from './backend/routes/collection';
-import scrobbleRoutes from './backend/routes/scrobble';
+import createCollectionRouter from './backend/routes/collection';
+import createScrobbleRouter from './backend/routes/scrobble';
+
+// Initialize services
+const authService = new AuthService(fileStorage);
+const lastfmService = new LastFmService(fileStorage, authService);
+const discogsService = new DiscogsService(fileStorage, authService);
 
 // API routes
 app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/collection', collectionRoutes);
-app.use('/api/v1/scrobble', scrobbleRoutes);
+app.use('/api/v1/collection', createCollectionRouter(fileStorage, authService, discogsService));
+app.use('/api/v1/scrobble', createScrobbleRouter(fileStorage, authService, lastfmService));
 
 // API info endpoint
 app.get('/api/v1', (req, res) => {

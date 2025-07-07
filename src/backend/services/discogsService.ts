@@ -386,6 +386,12 @@ export class DiscogsService {
       const firstPage = await this.getUserCollection(username, 1, 50);
       if (!firstPage.success || !firstPage.pagination) {
         console.log('Failed to get first page for preloading');
+        // Mark as failed
+        await this.fileStorage.writeJSON(progressKey, {
+          username,
+          status: 'failed',
+          error: firstPage.error || 'Failed to get first page'
+        });
         return;
       }
 

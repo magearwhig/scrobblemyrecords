@@ -3,12 +3,13 @@ import { FileStorage } from '../utils/fileStorage';
 import { AuthService } from '../services/authService';
 import { DiscogsService } from '../services/discogsService';
 
-const router = express.Router();
-
-// Initialize services
-const fileStorage = new FileStorage();
-const authService = new AuthService(fileStorage);
-const discogsService = new DiscogsService(fileStorage, authService);
+// Create router factory function for dependency injection
+export default function createCollectionRouter(
+  fileStorage: FileStorage,
+  authService: AuthService,
+  discogsService: DiscogsService
+) {
+  const router = express.Router();
 
 // Get user's collection
 router.get('/:username', async (req: Request, res: Response) => {
@@ -45,7 +46,7 @@ router.get('/:username/all', async (req: Request, res: Response) => {
       const cacheKey = `collections/${username}-page-${pageNumber}.json`;
       const cached = await fileStorage.readJSON<any>(cacheKey);
       
-      if (!cached || !discogsService.isCacheValid(cached) || !cached.data) {
+      if (!cached || !cached.timestamp || (Date.now() - cached.timestamp) >= 86400000 || !cached.data) {
         break;
       }
       
@@ -223,4 +224,5 @@ router.get('/:username/progress', async (req: Request, res: Response) => {
   }
 });
 
-export default router;
+  return router;
+}

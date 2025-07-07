@@ -4,12 +4,13 @@ import { AuthService } from '../services/authService';
 import { LastFmService } from '../services/lastfmService';
 import { ScrobbleTrack, ScrobbleSession } from '../../shared/types';
 
-const router = express.Router();
-
-// Initialize services
-const fileStorage = new FileStorage();
-const authService = new AuthService(fileStorage);
-const lastfmService = new LastFmService(fileStorage, authService);
+// Create router factory function for dependency injection
+export default function createScrobbleRouter(
+  fileStorage: FileStorage,
+  authService: AuthService,
+  lastfmService: LastFmService
+) {
+  const router = express.Router();
 
 // Scrobble a single track
 router.post('/track', async (req: Request, res: Response) => {
@@ -101,7 +102,7 @@ router.get('/history', async (req: Request, res: Response) => {
     
     res.json({
       success: true,
-      data: sessions
+      data: sessions || []
     });
   } catch (error) {
     res.status(500).json({
@@ -240,6 +241,14 @@ router.get('/progress/:sessionId', async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
+    // Check if it's a file not found error
+    if (error instanceof Error && error.message.includes('File not found')) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found'
+      });
+    }
+    
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get progress'
@@ -247,4 +256,5 @@ router.get('/progress/:sessionId', async (req: Request, res: Response) => {
   }
 });
 
-export default router;
+  return router;
+}
