@@ -9,7 +9,7 @@ A modern web application that bridges your Discogs collection with Last.fm scrob
 - **Browse Your Collection**: View your entire Discogs vinyl collection with search and filtering
 - **Smart Scrobbling**: Select individual tracks or entire albums to scrobble
 - **Batch Operations**: Scrobble multiple albums at once with progress tracking
-- **Time Control**: Use current time or set custom timestamps for your scrobbles
+- **Time Control**: Auto timing (as if you just finished listening) or set custom timestamps for your scrobbles
 - **Local & Private**: Runs entirely in your browser - your data stays on your computer
 - **Caching**: 24-hour cache keeps your collection loading fast
 
@@ -74,7 +74,7 @@ npm run start:web
 - **Collection Browser**: Search and filter your Discogs collection
 - **Track Selection**: Choose individual tracks or entire albums
 - **Batch Scrobbling**: Scrobble multiple items with progress tracking
-- **Timestamp Control**: Use current time or set custom timestamps
+- **Smart Timing**: Auto timing (simulates just finishing listening) or custom timestamps
 - **History View**: See your scrobbling history and session details
 - **Cache Management**: Force reload collection data when needed
 - **Dark Mode**: Toggle between light and dark themes

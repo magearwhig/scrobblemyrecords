@@ -179,6 +179,36 @@ const ReleaseDetailsPage: React.FC = () => {
     return 180; // Default 3 minutes
   };
 
+  // Handle auto timing button - calculates timing so tracks end at current time
+  const handleAutoTiming = () => {
+    if (selectedTracks.size === 0) {
+      setStartTime('');
+      return;
+    }
+
+    // Calculate total duration of selected tracks
+    const selectedTrackIndices = Array.from(selectedTracks);
+    const selectedTracksList = selectedTrackIndices.map(i => release?.tracklist?.[i]).filter(Boolean);
+    const totalDuration = selectedTracksList.reduce((total, track) => {
+      const duration = track?.duration ? parseTrackDuration(track.duration) : 180;
+      return total + duration + 1; // +1 for gap between tracks
+    }, 0);
+
+    // Calculate start time so that scrobbles end at current time
+    const now = new Date();
+    const startDate = new Date(now.getTime() - (totalDuration * 1000));
+    
+    // Format for datetime-local input (YYYY-MM-DDTHH:MM)
+    const year = startDate.getFullYear();
+    const month = String(startDate.getMonth() + 1).padStart(2, '0');
+    const day = String(startDate.getDate()).padStart(2, '0');
+    const hours = String(startDate.getHours()).padStart(2, '0');
+    const minutes = String(startDate.getMinutes()).padStart(2, '0');
+    
+    const formattedTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+    setStartTime(formattedTime);
+  };
+
   const getLastfmProfileUrl = () => {
     if (authStatus.lastfm.username) {
       return `https://www.last.fm/user/${authStatus.lastfm.username}`;
@@ -405,13 +435,25 @@ const ReleaseDetailsPage: React.FC = () => {
                     style={{ fontSize: '0.9rem' }}
                   />
                 </div>
-                <button
-                  className="btn btn-small btn-secondary"
-                  onClick={() => setStartTime('')}
-                  style={{ marginTop: '1.5rem' }}
-                >
-                  Use Auto Timing
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem' }}>
+                  <button
+                    className="btn btn-small btn-secondary"
+                    onClick={handleAutoTiming}
+                    disabled={selectedTracks.size === 0}
+                    title={selectedTracks.size === 0 ? "Select tracks first" : "Set timing so tracks end at current time"}
+                  >
+                    Auto Timing (Just Finished)
+                  </button>
+                  {startTime && (
+                    <button
+                      className="btn btn-small btn-outline"
+                      onClick={() => setStartTime('')}
+                      title="Clear custom timing"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
               </div>
               {startTime && (
                 <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
@@ -421,6 +463,11 @@ const ReleaseDetailsPage: React.FC = () => {
               {!startTime && selectedTracks.size > 0 && (
                 <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                   Tracks will be scrobbled with realistic timing (as if you just finished listening)
+                </div>
+              )}
+              {startTime && selectedTracks.size > 0 && (
+                <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--success-color)' }}>
+                  Auto timing: Tracks will end at current time (as if you just finished listening)
                 </div>
               )}
             </div>
