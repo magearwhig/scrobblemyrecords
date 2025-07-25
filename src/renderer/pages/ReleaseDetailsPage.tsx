@@ -85,6 +85,108 @@ const ReleaseDetailsPage: React.FC = () => {
     }
   };
 
+  // Parse track positions to determine sides and groups
+  const parseSides = () => {
+    if (!release?.tracklist) return { sides: [], discs: [] };
+    
+    const sides: string[] = [];
+    const discs: { [key: string]: string[] } = {};
+    
+    release.tracklist.forEach((track, index) => {
+      const position = track.position.trim();
+      
+      // Check for letter-number format (A1, B1, C1, etc.)
+      const letterMatch = position.match(/^([A-Z])(\d+)$/);
+      if (letterMatch) {
+        const side = letterMatch[1];
+        if (!sides.includes(side)) {
+          sides.push(side);
+        }
+        
+        // Group sides into discs (A&B = Disc 1, C&D = Disc 2, etc.)
+        const discNumber = Math.floor((side.charCodeAt(0) - 65) / 2) + 1;
+        const discKey = `Disc ${discNumber}`;
+        if (!discs[discKey]) {
+          discs[discKey] = [];
+        }
+        if (!discs[discKey].includes(side)) {
+          discs[discKey].push(side);
+        }
+      }
+    });
+    
+    // Sort sides alphabetically
+    sides.sort();
+    
+    // Sort disc sides
+    Object.keys(discs).forEach(disc => {
+      discs[disc].sort();
+    });
+    
+    return { sides, discs };
+  };
+
+  const getSideTrackIndices = (side: string): number[] => {
+    if (!release?.tracklist) return [];
+    
+    return release.tracklist
+      .map((track, index) => ({ track, index }))
+      .filter(({ track }) => track.position.startsWith(side))
+      .map(({ index }) => index);
+  };
+
+  const getDiscTrackIndices = (sides: string[]): number[] => {
+    const allIndices: number[] = [];
+    sides.forEach(side => {
+      allIndices.push(...getSideTrackIndices(side));
+    });
+    return allIndices;
+  };
+
+  const handleSideToggle = (side: string) => {
+    const sideIndices = getSideTrackIndices(side);
+    const allSelected = sideIndices.every(index => selectedTracks.has(index));
+    
+    const newSelected = new Set(selectedTracks);
+    
+    if (allSelected) {
+      // Deselect all tracks from this side
+      sideIndices.forEach(index => newSelected.delete(index));
+    } else {
+      // Select all tracks from this side
+      sideIndices.forEach(index => newSelected.add(index));
+    }
+    
+    setSelectedTracks(newSelected);
+  };
+
+  const handleDiscToggle = (discSides: string[]) => {
+    const discIndices = getDiscTrackIndices(discSides);
+    const allSelected = discIndices.every(index => selectedTracks.has(index));
+    
+    const newSelected = new Set(selectedTracks);
+    
+    if (allSelected) {
+      // Deselect all tracks from this disc
+      discIndices.forEach(index => newSelected.delete(index));
+    } else {
+      // Select all tracks from this disc
+      discIndices.forEach(index => newSelected.add(index));
+    }
+    
+    setSelectedTracks(newSelected);
+  };
+
+  const isSideSelected = (side: string): boolean => {
+    const sideIndices = getSideTrackIndices(side);
+    return sideIndices.length > 0 && sideIndices.every(index => selectedTracks.has(index));
+  };
+
+  const isDiscSelected = (sides: string[]): boolean => {
+    const discIndices = getDiscTrackIndices(sides);
+    return discIndices.length > 0 && discIndices.every(index => selectedTracks.has(index));
+  };
+
   const handleScrobble = async () => {
     if (!release || selectedTracks.size === 0) return;
 
@@ -417,6 +519,58 @@ const ReleaseDetailsPage: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* Side Selection Buttons */}
+          {(() => {
+            const { sides, discs } = parseSides();
+            if (sides.length > 1) {
+              return (
+                <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <h5 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', fontWeight: '600' }}>Select by Side</h5>
+                  
+                  {/* Disc-level buttons for multi-disc albums */}
+                  {Object.keys(discs).length > 1 && (
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>By Disc:</div>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {Object.entries(discs).map(([discName, discSides]) => (
+                          <button
+                            key={discName}
+                            className={`btn btn-small ${isDiscSelected(discSides) ? 'btn-primary' : 'btn-outline'}`}
+                            onClick={() => handleDiscToggle(discSides)}
+                            style={{ fontSize: '0.85rem' }}
+                          >
+                            {discName} ({discSides.join('/')})
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Individual side buttons */}
+                  <div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>By Side:</div>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      {sides.map(side => {
+                        const sideTrackCount = getSideTrackIndices(side).length;
+                        return (
+                          <button
+                            key={side}
+                            className={`btn btn-small ${isSideSelected(side) ? 'btn-primary' : 'btn-outline'}`}
+                            onClick={() => handleSideToggle(side)}
+                            style={{ fontSize: '0.85rem' }}
+                          >
+                            Side {side} ({sideTrackCount})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
 
           {selectedTracks.size > 0 && (
             <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
