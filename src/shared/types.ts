@@ -22,8 +22,10 @@ export interface Track {
 export interface CollectionItem {
   id: number;
   release: DiscogsRelease;
-  folder_id: number;
+  folder_id?: number;
   date_added: string;
+  rating?: number;
+  notes?: any[];
   selected?: boolean;
 }
 

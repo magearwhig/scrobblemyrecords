@@ -31,16 +31,19 @@ const CollectionPage: React.FC = () => {
   const [cacheRefreshing, setCacheRefreshing] = useState<boolean>(false);
   const [infoMessage, setInfoMessage] = useState<string>('');
   const [cacheMonitoring, setCacheMonitoring] = useState<boolean>(false);
+  const [checkingForNewItems, setCheckingForNewItems] = useState<boolean>(false);
+  const [newItemsResult, setNewItemsResult] = useState<{newItemsCount: number; latestCacheDate?: string} | null>(null);
+  const [updatingWithNewItems, setUpdatingWithNewItems] = useState<boolean>(false);
 
   const api = getApiService(state.serverUrl);
   const itemsPerPage = 50;
 
   useEffect(() => {
-    console.log('🔍 useEffect triggered:', { 
-      authenticated: authStatus.discogs.authenticated, 
+    console.log('🔍 useEffect triggered:', {
+      authenticated: authStatus.discogs.authenticated,
       username: authStatus.discogs.username
     });
-    
+
     if (authStatus.discogs.authenticated && authStatus.discogs.username) {
       console.log('✅ Starting collection load...');
       loadCollection();
@@ -80,13 +83,13 @@ const CollectionPage: React.FC = () => {
   }, [isSearchMode, searchQuery]);
 
   useEffect(() => {
-    console.log('🔄 Sorting useEffect triggered:', { 
-      collectionLength: entireCollection.length, 
-      isSearchMode, 
-      sortBy, 
-      sortOrder 
+    console.log('🔄 Sorting useEffect triggered:', {
+      collectionLength: entireCollection.length,
+      isSearchMode,
+      sortBy,
+      sortOrder
     });
-    
+
     // Only use local filtering if not in search mode
     if (!isSearchMode && entireCollection.length > 0) {
       const sorted = sortCollection(entireCollection);
@@ -123,7 +126,7 @@ const CollectionPage: React.FC = () => {
         const responseCacheStatus = (response as any).cacheStatus || 'unknown';
         const isRefreshing = (response as any).refreshing || false;
         const message = (response as any).message;
-        
+
         console.log(`📦 Setting entire collection data: ${response.data?.length || 0} items (cache: ${responseCacheStatus}, refreshing: ${isRefreshing})`);
         // Update cache status state
         setCacheStatus(responseCacheStatus);
@@ -146,12 +149,12 @@ const CollectionPage: React.FC = () => {
           setEntireCollection([]);
           setTotalPages(1);
         }
-        
+
         // Check if we used cache based on response time (cache should be much faster)
         const responseTime = Date.now() - startTime;
         const wasFromCache = responseTime < 100; // Cache responses should be under 100ms
         setUsingCache(wasFromCache);
-        
+
         if (wasFromCache) {
           console.log(`✅ Loaded entire collection from cache (${responseTime}ms)`);
         } else {
@@ -214,7 +217,7 @@ const CollectionPage: React.FC = () => {
 
     setLoading(true);
     setError('');
-    
+
     try {
       const results = await api.searchCollectionPaginated(authStatus.discogs.username, query, page, itemsPerPage);
       console.log(`🔍 Search results: ${results.items.length} items found`);
@@ -234,7 +237,7 @@ const CollectionPage: React.FC = () => {
     if (!authStatus.discogs.username) return;
 
     setSearchQuery(query);
-    
+
     if (query.trim()) {
       setIsSearchMode(true);
       setSearchPage(1);
@@ -299,7 +302,7 @@ const CollectionPage: React.FC = () => {
       try {
         const progress = await api.getCacheProgress(authStatus.discogs.username!);
         setCacheProgress(progress);
-        
+
         // Continue monitoring if still loading
         if (progress && progress.status === 'loading') {
           setTimeout(monitorProgress, 2000); // Check every 2 seconds
@@ -323,6 +326,77 @@ const CollectionPage: React.FC = () => {
     };
 
     monitorProgress();
+  };
+
+  const handleCheckForNewItems = async () => {
+    if (!authStatus.discogs.username) return;
+
+    setCheckingForNewItems(true);
+    setError('');
+
+    try {
+      const result = await api.checkForNewItems(authStatus.discogs.username);
+
+      if (result.success && result.data) {
+        setNewItemsResult({
+          newItemsCount: result.data.newItemsCount,
+          latestCacheDate: result.data.latestCacheDate
+        });
+
+        if (result.data.newItemsCount > 0) {
+          setInfoMessage(`Found ${result.data.newItemsCount} new items! Use "Update with New Items" to add them.`);
+        } else {
+          setInfoMessage('Your collection is up to date - no new items found.');
+        }
+
+        // Clear the message after 15 seconds
+        setTimeout(() => {
+          setInfoMessage('');
+          setNewItemsResult(null);
+        }, 15000);
+      } else {
+        setError(result.error || 'Failed to check for new items');
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to check for new items');
+    } finally {
+      setCheckingForNewItems(false);
+    }
+  };
+
+  const handleUpdateWithNewItems = async () => {
+    if (!authStatus.discogs.username) return;
+
+    setUpdatingWithNewItems(true);
+    setError('');
+
+    try {
+      const result = await api.updateCacheWithNewItems(authStatus.discogs.username);
+
+      if (result.success && result.data) {
+        if (result.data.newItemsAdded > 0) {
+          setInfoMessage(`Successfully added ${result.data.newItemsAdded} new items to your cache!`);
+          // Reload the collection to show the new items
+          await loadCollection();
+        } else {
+          setInfoMessage('No new items were found to add.');
+        }
+
+        // Clear the result state since we've updated
+        setNewItemsResult(null);
+
+        // Clear the message after 10 seconds
+        setTimeout(() => {
+          setInfoMessage('');
+        }, 10000);
+      } else {
+        setError(result.error || 'Failed to update cache with new items');
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to update cache with new items');
+    } finally {
+      setUpdatingWithNewItems(false);
+    }
   };
 
   const sortCollection = (items: CollectionItem[]): CollectionItem[] => {
@@ -371,7 +445,7 @@ const CollectionPage: React.FC = () => {
     if (isSearchMode) {
       return filteredCollection;
     }
-    
+
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return filteredCollection.slice(startIndex, endIndex);
@@ -394,118 +468,198 @@ const CollectionPage: React.FC = () => {
   return (
     <div>
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h2>Browse Collection</h2>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              {selectedAlbums.size} selected
-            </span>
-            {preloading && (
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                Preloading collection...
-              </span>
-            )}
-            {cacheProgress && cacheProgress.status === 'loading' && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.8rem',
-                color: 'var(--text-secondary)',
-                padding: '0.25rem 0.5rem',
-                backgroundColor: 'var(--bg-tertiary)',
-                borderRadius: '4px'
-              }}>
-                <div className="spinner" style={{ width: '12px', height: '12px' }}></div>
-                Caching: {cacheProgress.currentPage}/{cacheProgress.totalPages} pages
-                ({Math.round((cacheProgress.currentPage / cacheProgress.totalPages) * 100)}%)
-              </div>
-            )}
-            {cacheProgress && cacheProgress.status === 'completed' && (
-              <div style={{
-                fontSize: '0.8rem',
-                color: 'var(--success-color)',
-                padding: '0.25rem 0.5rem',
-                backgroundColor: 'var(--bg-tertiary)',
-                borderRadius: '4px'
-              }}>
-                ✓ Cache complete ({cacheProgress.totalPages} pages) - Using cached data
-              </div>
-            )}
-            {usingCache && !cacheRefreshing && cacheStatus === 'valid' && (
-              <div style={{
-                fontSize: '0.8rem',
-                color: 'var(--success-color)',
-                padding: '0.25rem 0.5rem',
-                backgroundColor: 'var(--bg-tertiary)',
-                borderRadius: '4px'
-              }}>
-                ⚡ Using cached data
-              </div>
-            )}
-            {cacheStatus === 'expired' && cacheRefreshing && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.8rem',
-                color: 'var(--warning-color)',
-                padding: '0.25rem 0.5rem',
-                backgroundColor: 'var(--bg-tertiary)',
-                borderRadius: '4px'
-              }}>
-                <div className="spinner" style={{ width: '12px', height: '12px' }}></div>
-                ⏰ Cache expired - Refreshing in background...
-              </div>
-            )}
-            {cacheStatus === 'partially_expired' && cacheRefreshing && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.8rem',
-                color: 'var(--warning-color)',
-                padding: '0.25rem 0.5rem',
-                backgroundColor: 'var(--bg-tertiary)',
-                borderRadius: '4px'
-              }}>
-                <div className="spinner" style={{ width: '12px', height: '12px' }}></div>
-                ⚠️ Some cache expired - Refreshing...
-              </div>
-            )}
-            {infoMessage && (
-              <div style={{
-                fontSize: '0.8rem',
-                color: 'var(--text-secondary)',
-                padding: '0.25rem 0.5rem',
-                backgroundColor: 'var(--bg-tertiary)',
-                borderRadius: '4px'
-              }}>
-                ℹ️ {infoMessage}
-              </div>
-            )}
-            <button
-              className="btn btn-small btn-secondary"
-              onClick={handleForceReloadCache}
-              disabled={loading}
-            >
-              Force Reload Cache
-            </button>
-            <button
-              className="btn btn-small btn-secondary"
-              onClick={handleClearCache}
-              disabled={loading}
-            >
-              Clear Cache
-            </button>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+          <div>
+            <h2 style={{ margin: '0 0 0.5rem 0' }}>Browse Collection</h2>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+              <span>{selectedAlbums.size} selected</span>
+              {entireCollection.length > 0 && (
+                <span>{entireCollection.length} total items</span>
+              )}
+            </div>
+          </div>
+
+          {/* Cache Management */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+            {/* Status Indicators */}
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              {preloading && (
+                <div style={{
+                  fontSize: '0.8rem',
+                  color: 'var(--text-secondary)',
+                  padding: '0.25rem 0.5rem',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  borderRadius: '4px'
+                }}>
+                  Preloading...
+                </div>
+              )}
+
+              {cacheProgress && cacheProgress.status === 'loading' && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.8rem',
+                  color: 'var(--text-secondary)',
+                  padding: '0.25rem 0.5rem',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  borderRadius: '4px'
+                }}>
+                  <div className="spinner" style={{ width: '12px', height: '12px' }}></div>
+                  Caching: {cacheProgress.currentPage}/{cacheProgress.totalPages} pages
+                  ({Math.round((cacheProgress.currentPage / cacheProgress.totalPages) * 100)}%)
+                </div>
+              )}
+
+              {cacheProgress && cacheProgress.status === 'completed' && (
+                <div style={{
+                  fontSize: '0.8rem',
+                  color: 'var(--success-color)',
+                  padding: '0.25rem 0.5rem',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  borderRadius: '4px'
+                }}>
+                  ✓ Cache complete ({cacheProgress.totalPages} pages)
+                </div>
+              )}
+
+              {usingCache && !cacheRefreshing && cacheStatus === 'valid' && (
+                <div style={{
+                  fontSize: '0.8rem',
+                  color: 'var(--success-color)',
+                  padding: '0.25rem 0.5rem',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  borderRadius: '4px'
+                }}>
+                  ⚡ Using cached data
+                </div>
+              )}
+
+              {cacheStatus === 'expired' && cacheRefreshing && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.8rem',
+                  color: 'var(--warning-color)',
+                  padding: '0.25rem 0.5rem',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  borderRadius: '4px'
+                }}>
+                  <div className="spinner" style={{ width: '12px', height: '12px' }}></div>
+                  ⏰ Cache expired - Refreshing...
+                </div>
+              )}
+
+              {cacheStatus === 'partially_expired' && cacheRefreshing && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.8rem',
+                  color: 'var(--warning-color)',
+                  padding: '0.25rem 0.5rem',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  borderRadius: '4px'
+                }}>
+                  <div className="spinner" style={{ width: '12px', height: '12px' }}></div>
+                  ⚠️ Some cache expired - Refreshing...
+                </div>
+              )}
+
+              {checkingForNewItems && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.8rem',
+                  color: 'var(--text-secondary)',
+                  padding: '0.25rem 0.5rem',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  borderRadius: '4px'
+                }}>
+                  <div className="spinner" style={{ width: '12px', height: '12px' }}></div>
+                  Checking for new items...
+                </div>
+              )}
+
+              {updatingWithNewItems && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.8rem',
+                  color: 'var(--text-secondary)',
+                  padding: '0.25rem 0.5rem',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  borderRadius: '4px'
+                }}>
+                  <div className="spinner" style={{ width: '12px', height: '12px' }}></div>
+                  Adding new items to cache...
+                </div>
+              )}
+
+              {infoMessage && (
+                <div style={{
+                  fontSize: '0.8rem',
+                  color: newItemsResult?.newItemsCount ? 'var(--warning-color)' : 'var(--success-color)',
+                  padding: '0.25rem 0.5rem',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  borderRadius: '4px',
+                  maxWidth: '300px'
+                }}>
+                  {newItemsResult?.newItemsCount ? '⚠️' : 'ℹ️'} {infoMessage}
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-small btn-secondary"
+                onClick={handleCheckForNewItems}
+                disabled={loading || checkingForNewItems || updatingWithNewItems}
+                title="Check if new items have been added to your Discogs collection"
+              >
+                {checkingForNewItems ? 'Checking...' : 'Check for New Items'}
+              </button>
+              {newItemsResult && newItemsResult.newItemsCount > 0 && (
+                <button
+                  className="btn btn-small btn-primary"
+                  onClick={handleUpdateWithNewItems}
+                  disabled={loading || checkingForNewItems || updatingWithNewItems}
+                  title="Add only the new items to your cache without refreshing everything"
+                >
+                  {updatingWithNewItems ? 'Adding...' : `Update with New Items (${newItemsResult.newItemsCount})`}
+                </button>
+              )}
+              <button
+                className="btn btn-small btn-secondary"
+                onClick={handleForceReloadCache}
+                disabled={loading || updatingWithNewItems}
+                title="Force reload the entire cache from Discogs"
+              >
+                Force Reload
+              </button>
+              <button
+                className="btn btn-small btn-secondary"
+                onClick={handleClearCache}
+                disabled={loading || updatingWithNewItems}
+                title="Clear the local cache"
+              >
+                Clear Cache
+              </button>
+            </div>
           </div>
         </div>
 
         {error && (
           <div className="error-message">
             {error}
-            <button 
-              className="btn btn-small" 
+            <button
+              className="btn btn-small"
               onClick={() => loadCollection()}
               style={{ marginLeft: '1rem' }}
             >
@@ -586,13 +740,13 @@ const CollectionPage: React.FC = () => {
             >
               {selectedAlbums.size === filteredCollection.length ? 'Deselect All' : 'Select All'}
             </button>
-            
+
             {selectedAlbums.size > 0 && (
               <button
                 className="btn btn-small"
                 onClick={() => {
                   // Navigate to scrobble page with selected albums
-                  const selectedItems = filteredCollection.filter(item => 
+                  const selectedItems = filteredCollection.filter(item =>
                     selectedAlbums.has(item.release.id)
                   );
                   // Store selected items in localStorage for now

@@ -182,6 +182,30 @@ class ApiService {
     await this.api.delete('/collection/cache');
   }
 
+  async checkForNewItems(username: string): Promise<{
+    success: boolean;
+    data?: {
+      newItemsCount: number;
+      latestCacheDate?: string;
+      latestDiscogsDate?: string;
+    };
+    error?: string;
+  }> {
+    const response = await this.api.get(`/collection/${username}/check-new`);
+    return response.data;
+  }
+
+  async updateCacheWithNewItems(username: string): Promise<{
+    success: boolean;
+    data?: {
+      newItemsAdded: number;
+    };
+    error?: string;
+  }> {
+    const response = await this.api.post(`/collection/${username}/update-new`);
+    return response.data;
+  }
+
   // Scrobbling methods
   async scrobbleTrack(track: ScrobbleTrack): Promise<void> {
     await this.api.post('/scrobble/track', track);
