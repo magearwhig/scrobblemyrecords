@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
+
+import {
+  CollectionItem,
+  ScrobbleTrack,
+  ScrobbleProgress,
+} from '../../shared/types';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
-import { CollectionItem, DiscogsRelease, ScrobbleTrack, ScrobbleProgress } from '../../shared/types';
 import { formatLocalTimeClean } from '../utils/dateUtils';
 
 const ScrobblePage: React.FC = () => {
@@ -35,7 +40,7 @@ const ScrobblePage: React.FC = () => {
         const albums = JSON.parse(stored);
         setSelectedAlbums(albums);
         prepareTracks(albums);
-      } catch (error) {
+      } catch {
         setError('Failed to load selected albums');
       }
     }
@@ -60,15 +65,20 @@ const ScrobblePage: React.FC = () => {
       for (const album of albums) {
         const releaseDetails = await api.getReleaseDetails(album.release.id);
         if (releaseDetails.tracklist) {
-          const trackTimestamp = useCurrentTime ? undefined : 
-            customTimestamp ? new Date(customTimestamp).getTime() / 1000 : undefined;
+          const trackTimestamp = useCurrentTime
+            ? undefined
+            : customTimestamp
+              ? new Date(customTimestamp).getTime() / 1000
+              : undefined;
 
-          const albumTracks = releaseDetails.tracklist.map((track, index) => ({
+          const albumTracks = releaseDetails.tracklist.map((track, _index) => ({
             artist: track.artist || releaseDetails.artist,
             track: track.title,
             album: releaseDetails.title,
             timestamp: trackTimestamp,
-            duration: track.duration ? parseInt(track.duration.replace(':', '')) : undefined
+            duration: track.duration
+              ? parseInt(track.duration.replace(':', ''))
+              : undefined,
           }));
 
           allTracks.push(...albumTracks);
@@ -78,8 +88,10 @@ const ScrobblePage: React.FC = () => {
       setPreparedTracks(allTracks);
       // Select all tracks by default
       setSelectedTracks(new Set(allTracks.map((_, index) => index)));
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to prepare tracks');
+    } catch (_error) {
+      setError(
+        _error instanceof Error ? _error.message : 'Failed to prepare tracks'
+      );
     }
   };
 
@@ -112,25 +124,29 @@ const ScrobblePage: React.FC = () => {
     setResults(null);
 
     try {
-      const tracksToScrobble = preparedTracks.filter((_, index) => 
+      const tracksToScrobble = preparedTracks.filter((_, index) =>
         selectedTracks.has(index)
       );
 
       setProgress({
         current: 0,
         total: tracksToScrobble.length,
-        status: 'preparing'
+        status: 'preparing',
       });
 
-      const baseTimestamp = useCurrentTime ? 
-        Math.floor(Date.now() / 1000) : 
-        customTimestamp ? Math.floor(new Date(customTimestamp).getTime() / 1000) : undefined;
+      const baseTimestamp = useCurrentTime
+        ? Math.floor(Date.now() / 1000)
+        : customTimestamp
+          ? Math.floor(new Date(customTimestamp).getTime() / 1000)
+          : undefined;
 
-      setProgress(prev => prev ? { ...prev, status: 'scrobbling' } : null);
+      setProgress(prev => (prev ? { ...prev, status: 'scrobbling' } : null));
 
       const result = await api.scrobbleBatch(tracksToScrobble, baseTimestamp);
-      
-      setProgress(prev => prev ? { ...prev, status: 'completed', current: prev.total } : null);
+
+      setProgress(prev =>
+        prev ? { ...prev, status: 'completed', current: prev.total } : null
+      );
       setResults(result);
 
       if (result.success > 0) {
@@ -138,7 +154,7 @@ const ScrobblePage: React.FC = () => {
         localStorage.removeItem('selectedAlbums');
       }
     } catch (error) {
-      setProgress(prev => prev ? { ...prev, status: 'error' } : null);
+      setProgress(prev => (prev ? { ...prev, status: 'error' } : null));
       setError(error instanceof Error ? error.message : 'Scrobbling failed');
     } finally {
       setScrobbling(false);
@@ -156,11 +172,15 @@ const ScrobblePage: React.FC = () => {
 
   if (!authStatus.discogs.authenticated || !authStatus.lastfm.authenticated) {
     return (
-      <div className="card">
+      <div className='card'>
         <h2>Scrobble Tracks</h2>
-        <p>Please authenticate with both Discogs and Last.fm to scrobble tracks.</p>
+        <p>
+          Please authenticate with both Discogs and Last.fm to scrobble tracks.
+        </p>
         <div style={{ marginTop: '1rem' }}>
-          <a href="#setup" className="btn">Go to Setup</a>
+          <a href='#setup' className='btn'>
+            Go to Setup
+          </a>
         </div>
       </div>
     );
@@ -168,11 +188,16 @@ const ScrobblePage: React.FC = () => {
 
   if (selectedAlbums.length === 0) {
     return (
-      <div className="card">
+      <div className='card'>
         <h2>Scrobble Tracks</h2>
-        <p>No albums selected for scrobbling. Please go to the collection page and select some albums first.</p>
+        <p>
+          No albums selected for scrobbling. Please go to the collection page
+          and select some albums first.
+        </p>
         <div style={{ marginTop: '1rem' }}>
-          <a href="#collection" className="btn">Browse Collection</a>
+          <a href='#collection' className='btn'>
+            Browse Collection
+          </a>
         </div>
       </div>
     );
@@ -180,26 +205,22 @@ const ScrobblePage: React.FC = () => {
 
   return (
     <div>
-      <div className="card">
+      <div className='card'>
         <h2>Scrobble Tracks</h2>
-        
-        {error && (
-          <div className="error-message">
-            {error}
-          </div>
-        )}
+
+        {error && <div className='error-message'>{error}</div>}
 
         <div style={{ marginBottom: '1.5rem' }}>
           <h3>Selected Albums ({selectedAlbums.length})</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
             {selectedAlbums.map((album, index) => (
-              <div 
+              <div
                 key={index}
                 style={{
                   background: '#f0f0f0',
                   padding: '0.5rem 1rem',
                   borderRadius: '20px',
-                  fontSize: '0.85rem'
+                  fontSize: '0.85rem',
                 }}
               >
                 {album.release.artist} - {album.release.title}
@@ -210,35 +231,41 @@ const ScrobblePage: React.FC = () => {
 
         <div style={{ marginBottom: '1.5rem' }}>
           <h3>Timestamp Settings</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div
+            style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+          >
+            <label
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
               <input
-                type="radio"
+                type='radio'
                 checked={useCurrentTime}
                 onChange={() => setUseCurrentTime(true)}
               />
               Use current time
             </label>
-            
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+
+            <label
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
               <input
-                type="radio"
+                type='radio'
                 checked={!useCurrentTime}
                 onChange={() => setUseCurrentTime(false)}
               />
               Use custom time
             </label>
-            
+
             {!useCurrentTime && (
               <input
-                type="datetime-local"
-                className="form-input"
+                type='datetime-local'
+                className='form-input'
                 value={customTimestamp}
-                onChange={(e) => setCustomTimestamp(e.target.value)}
+                onChange={e => setCustomTimestamp(e.target.value)}
                 style={{ maxWidth: '300px' }}
               />
             )}
-            
+
             <div style={{ fontSize: '0.9rem', color: '#666' }}>
               Scrobble time: {formatTimestamp()}
             </div>
@@ -247,29 +274,44 @@ const ScrobblePage: React.FC = () => {
 
         {preparedTracks.length > 0 && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '1rem',
+              }}
+            >
               <h3>Tracks ({preparedTracks.length})</h3>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
-                  className="btn btn-small"
+                  className='btn btn-small'
                   onClick={handleSelectAll}
                   disabled={scrobbling}
                 >
-                  {selectedTracks.size === preparedTracks.length ? 'Deselect All' : 'Select All'}
+                  {selectedTracks.size === preparedTracks.length
+                    ? 'Deselect All'
+                    : 'Select All'}
                 </button>
-                <span style={{ fontSize: '0.9rem', color: '#666', lineHeight: '2rem' }}>
+                <span
+                  style={{
+                    fontSize: '0.9rem',
+                    color: '#666',
+                    lineHeight: '2rem',
+                  }}
+                >
                   {selectedTracks.size} selected
                 </span>
               </div>
             </div>
 
-            <div 
-              style={{ 
-                maxHeight: '400px', 
-                overflowY: 'auto', 
-                border: '1px solid #e0e0e0', 
+            <div
+              style={{
+                maxHeight: '400px',
+                overflowY: 'auto',
+                border: '1px solid #e0e0e0',
                 borderRadius: '8px',
-                marginBottom: '1.5rem'
+                marginBottom: '1.5rem',
               }}
             >
               {preparedTracks.map((track, index) => (
@@ -279,12 +321,17 @@ const ScrobblePage: React.FC = () => {
                     display: 'flex',
                     alignItems: 'center',
                     padding: '0.75rem',
-                    borderBottom: index < preparedTracks.length - 1 ? '1px solid #f0f0f0' : 'none',
-                    backgroundColor: selectedTracks.has(index) ? '#f0fff4' : 'white'
+                    borderBottom:
+                      index < preparedTracks.length - 1
+                        ? '1px solid #f0f0f0'
+                        : 'none',
+                    backgroundColor: selectedTracks.has(index)
+                      ? '#f0fff4'
+                      : 'white',
                   }}
                 >
                   <input
-                    type="checkbox"
+                    type='checkbox'
                     checked={selectedTracks.has(index)}
                     onChange={() => handleTrackSelection(index)}
                     disabled={scrobbling}
@@ -305,33 +352,43 @@ const ScrobblePage: React.FC = () => {
         )}
 
         {progress && (
-          <div className="card" style={{ backgroundColor: '#f8f9fa', margin: '1rem 0' }}>
+          <div
+            className='card'
+            style={{ backgroundColor: '#f8f9fa', margin: '1rem 0' }}
+          >
             <h4>Scrobbling Progress</h4>
             <div style={{ marginBottom: '1rem' }}>
-              <div style={{ 
-                background: '#e0e0e0', 
-                borderRadius: '10px', 
-                height: '20px',
-                overflow: 'hidden'
-              }}>
-                <div 
+              <div
+                style={{
+                  background: '#e0e0e0',
+                  borderRadius: '10px',
+                  height: '20px',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
                   style={{
-                    background: progress.status === 'error' ? '#dc3545' : '#1db954',
+                    background:
+                      progress.status === 'error' ? '#dc3545' : '#1db954',
                     height: '100%',
                     width: `${(progress.current / progress.total) * 100}%`,
-                    transition: 'width 0.3s ease'
+                    transition: 'width 0.3s ease',
                   }}
                 />
               </div>
               <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
-                {progress.current} of {progress.total} tracks • {progress.status}
+                {progress.current} of {progress.total} tracks •{' '}
+                {progress.status}
               </div>
             </div>
           </div>
         )}
 
         {results && (
-          <div className="card" style={{ backgroundColor: '#d4edda', marginBottom: '1rem' }}>
+          <div
+            className='card'
+            style={{ backgroundColor: '#d4edda', marginBottom: '1rem' }}
+          >
             <h4>Scrobbling Results</h4>
             <div>
               <div>✅ Successfully scrobbled: {results.success} tracks</div>
@@ -343,7 +400,10 @@ const ScrobblePage: React.FC = () => {
                   <summary>View Errors</summary>
                   <ul style={{ marginTop: '0.5rem' }}>
                     {results.errors.map((error: string, index: number) => (
-                      <li key={index} style={{ fontSize: '0.85rem', color: '#721c24' }}>
+                      <li
+                        key={index}
+                        style={{ fontSize: '0.85rem', color: '#721c24' }}
+                      >
                         {error}
                       </li>
                     ))}
@@ -356,15 +416,17 @@ const ScrobblePage: React.FC = () => {
 
         <div style={{ display: 'flex', gap: '1rem' }}>
           <button
-            className="btn"
+            className='btn'
             onClick={handleScrobble}
             disabled={scrobbling || selectedTracks.size === 0}
           >
-            {scrobbling ? 'Scrobbling...' : `Scrobble ${selectedTracks.size} Tracks`}
+            {scrobbling
+              ? 'Scrobbling...'
+              : `Scrobble ${selectedTracks.size} Tracks`}
           </button>
-          
+
           <button
-            className="btn btn-secondary"
+            className='btn btn-secondary'
             onClick={() => window.history.back()}
             disabled={scrobbling}
           >

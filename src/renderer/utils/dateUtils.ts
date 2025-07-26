@@ -13,7 +13,7 @@ export const formatLocalTime = (
   options: Intl.DateTimeFormatOptions = {}
 ): string => {
   const date = typeof timestamp === 'number' ? new Date(timestamp) : timestamp;
-  
+
   const defaultOptions: Intl.DateTimeFormatOptions = {
     year: 'numeric',
     month: 'short',
@@ -22,7 +22,7 @@ export const formatLocalTime = (
     minute: '2-digit',
     second: '2-digit',
     timeZoneName: 'short',
-    ...options
+    ...options,
   };
 
   return date.toLocaleString(undefined, defaultOptions);
@@ -39,14 +39,14 @@ export const formatLocalTimeClean = (
   options: Intl.DateTimeFormatOptions = {}
 ): string => {
   const date = typeof timestamp === 'number' ? new Date(timestamp) : timestamp;
-  
+
   const defaultOptions: Intl.DateTimeFormatOptions = {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    ...options
+    ...options,
   };
 
   return date.toLocaleString(undefined, defaultOptions);
@@ -59,12 +59,12 @@ export const formatLocalTimeClean = (
  */
 export const formatLocalTimeOnly = (timestamp: number | Date): string => {
   const date = typeof timestamp === 'number' ? new Date(timestamp) : timestamp;
-  
+
   return date.toLocaleTimeString(undefined, {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-    timeZoneName: 'short'
+    timeZoneName: 'short',
   });
 };
 
@@ -75,11 +75,11 @@ export const formatLocalTimeOnly = (timestamp: number | Date): string => {
  */
 export const formatLocalDateOnly = (timestamp: number | Date): string => {
   const date = typeof timestamp === 'number' ? new Date(timestamp) : timestamp;
-  
+
   return date.toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'short',
-    day: 'numeric'
+    day: 'numeric',
   });
 };
 
@@ -95,7 +95,7 @@ export const formatUTCToLocal = (
 ): string => {
   // Create a new Date object from the UTC timestamp
   const date = new Date(utcTimestamp);
-  
+
   const defaultOptions: Intl.DateTimeFormatOptions = {
     year: 'numeric',
     month: 'short',
@@ -104,7 +104,7 @@ export const formatUTCToLocal = (
     minute: '2-digit',
     second: '2-digit',
     timeZoneName: 'short',
-    ...options
+    ...options,
   };
 
   return date.toLocaleString(undefined, defaultOptions);
@@ -119,9 +119,9 @@ export const getTimezoneOffset = (): string => {
   const hours = Math.abs(Math.floor(offset / 60));
   const minutes = Math.abs(offset % 60);
   const sign = offset <= 0 ? '+' : '-';
-  
+
   if (minutes === 0) {
     return `UTC${sign}${hours}`;
   }
   return `UTC${sign}${hours}:${minutes.toString().padStart(2, '0')}`;
-}; 
+};

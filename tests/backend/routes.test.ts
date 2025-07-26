@@ -1,13 +1,12 @@
 import request from 'supertest';
+
 import app from '../../src/server';
 
 describe('API Routes', () => {
   describe('GET /api/v1', () => {
     it('should return API information', async () => {
-      const response = await request(app)
-        .get('/api/v1')
-        .expect(200);
-      
+      const response = await request(app).get('/api/v1').expect(200);
+
       expect(response.body.message).toBe('Discogs to Last.fm Scrobbler API');
       expect(response.body.version).toBe('1.0.0');
       expect(response.body.endpoints).toBeDefined();
@@ -16,10 +15,8 @@ describe('API Routes', () => {
 
   describe('Health Check', () => {
     it('should return health status', async () => {
-      const response = await request(app)
-        .get('/health')
-        .expect(200);
-      
+      const response = await request(app).get('/health').expect(200);
+
       expect(response.body.status).toBe('ok');
       expect(response.body.timestamp).toBeDefined();
     });
@@ -28,9 +25,8 @@ describe('API Routes', () => {
   describe('Authentication Routes', () => {
     describe('GET /api/v1/auth/status', () => {
       it('should return authentication status structure', async () => {
-        const response = await request(app)
-          .get('/api/v1/auth/status');
-        
+        const response = await request(app).get('/api/v1/auth/status');
+
         // Should respond (whether 200 or 500) with proper structure
         expect(response.body).toHaveProperty('success');
         if (response.body.success) {
@@ -48,7 +44,7 @@ describe('API Routes', () => {
           .post('/api/v1/auth/discogs/token')
           .send({})
           .expect(400);
-        
+
         expect(response.body.success).toBe(false);
         expect(response.body.error).toBe('Token is required');
       });
@@ -57,9 +53,9 @@ describe('API Routes', () => {
         const response = await request(app)
           .post('/api/v1/auth/discogs/token')
           .send({
-            token: 'invalid-format'
+            token: 'invalid-format',
           });
-        
+
         expect(response.body.success).toBe(false);
         if (response.status === 400) {
           expect(response.body.error).toContain('Invalid token format');
@@ -69,12 +65,13 @@ describe('API Routes', () => {
 
     describe('POST /api/v1/auth/clear', () => {
       it('should handle clear request', async () => {
-        const response = await request(app)
-          .post('/api/v1/auth/clear');
-        
+        const response = await request(app).post('/api/v1/auth/clear');
+
         expect(response.body).toHaveProperty('success');
         if (response.body.success) {
-          expect(response.body.data.message).toBe('All authentication data cleared');
+          expect(response.body.data.message).toBe(
+            'All authentication data cleared'
+          );
         }
       });
     });

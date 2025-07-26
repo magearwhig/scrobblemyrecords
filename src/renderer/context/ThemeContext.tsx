@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
 
 interface ThemeContextType {
   isDarkMode: boolean;
@@ -32,10 +38,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
   useEffect(() => {
     console.log('Theme changed to:', isDarkMode ? 'dark' : 'light');
-    
+
     // Save preference to localStorage
     localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
-    
+
     // Apply theme to document
     if (isDarkMode) {
       document.documentElement.classList.add('dark-mode');
@@ -56,4 +62,4 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       {children}
     </ThemeContext.Provider>
   );
-}; 
+};

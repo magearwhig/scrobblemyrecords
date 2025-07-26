@@ -1,4 +1,5 @@
 import React, { createContext, useContext, ReactNode } from 'react';
+
 import { AuthStatus } from '../../shared/types';
 
 interface AuthContextType {
@@ -8,15 +9,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ 
-  children: ReactNode; 
+export const AuthProvider: React.FC<{
+  children: ReactNode;
   value: AuthContextType;
 }> = ({ children, value }) => {
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {

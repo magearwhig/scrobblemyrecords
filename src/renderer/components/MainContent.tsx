@@ -1,11 +1,12 @@
 import React from 'react';
-import HomePage from '../pages/HomePage';
-import SetupPage from '../pages/SetupPage';
+
 import CollectionPage from '../pages/CollectionPage';
-import ScrobblePage from '../pages/ScrobblePage';
 import HistoryPage from '../pages/HistoryPage';
-import SettingsPage from '../pages/SettingsPage';
+import HomePage from '../pages/HomePage';
 import ReleaseDetailsPage from '../pages/ReleaseDetailsPage';
+import ScrobblePage from '../pages/ScrobblePage';
+import SettingsPage from '../pages/SettingsPage';
+import SetupPage from '../pages/SetupPage';
 
 interface MainContentProps {
   currentPage: string;

@@ -5,3 +5,4 @@
 - always make sure there are no whitespace issues in `git diff` results
 - make sure code is safe to commit to public repo, no secrets or api keys
 - make sure code compiles successfully
+- make sure you remove any temporary debugging code

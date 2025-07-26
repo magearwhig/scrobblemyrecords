@@ -1,9 +1,10 @@
-import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import React from 'react';
+
 import '@testing-library/jest-dom';
-import ReleaseDetailsPage from '../../../src/renderer/pages/ReleaseDetailsPage';
-import { AuthProvider } from '../../../src/renderer/context/AuthContext';
 import { AppProvider } from '../../../src/renderer/context/AppContext';
+import { AuthProvider } from '../../../src/renderer/context/AuthContext';
+import ReleaseDetailsPage from '../../../src/renderer/pages/ReleaseDetailsPage';
 
 // Mock the API service
 const mockApiService = {
@@ -12,22 +13,46 @@ const mockApiService = {
   prepareTracksFromRelease: jest.fn(),
   scrobbleBatch: jest.fn(),
   getScrobbleProgress: jest.fn(),
-  getReleaseDetails: jest.fn()
+  getReleaseDetails: jest.fn(),
 };
 
 jest.mock('../../../src/renderer/services/api', () => ({
-  getApiService: () => mockApiService
+  getApiService: () => mockApiService,
 }));
 
-// Mock localStorage
-const mockLocalStorage = {
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  removeItem: jest.fn()
+// Create a robust localStorage mock
+let localStorageStore: { [key: string]: string } = {};
+
+const localStorageMock = {
+  getItem: (key: string): string | null => {
+    return localStorageStore[key] || null;
+  },
+  setItem: (key: string, value: string): void => {
+    localStorageStore[key] = value;
+  },
+  removeItem: (key: string): void => {
+    delete localStorageStore[key];
+  },
+  clear: (): void => {
+    localStorageStore = {};
+  },
+  length: 0,
+  key: (index: number): string | null => null,
 };
-Object.defineProperty(window, 'localStorage', {
-  value: mockLocalStorage
+
+// Set up the mock as a global
+Object.defineProperty(global, 'localStorage', {
+  value: localStorageMock,
+  writable: true,
 });
+
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
+  writable: true,
+});
+
+// Export for use in tests
+const mockLocalStorage = localStorageMock;
 
 // Mock release data
 const mockRelease = {
@@ -41,8 +66,8 @@ const mockRelease = {
   tracklist: [
     { position: '1', title: 'Track 1', duration: '3:30' },
     { position: '2', title: 'Track 2', duration: '4:00' },
-    { position: '3', title: 'Track 3', duration: '2:45' }
-  ]
+    { position: '3', title: 'Track 3', duration: '2:45' },
+  ],
 };
 
 // Mock multi-side release data
@@ -62,34 +87,58 @@ const mockMultiSideRelease = {
     { position: 'C1', title: 'Side C Track 1', duration: '3:45' },
     { position: 'C2', title: 'Side C Track 2', duration: '4:30' },
     { position: 'D1', title: 'Side D Track 1', duration: '3:00' },
-    { position: 'D2', title: 'Side D Track 2', duration: '2:30' }
-  ]
+    { position: 'D2', title: 'Side D Track 2', duration: '2:30' },
+  ],
 };
 
 const mockAuthContext = {
   authStatus: {
     lastfm: { authenticated: true, username: 'testuser' },
-    discogs: { authenticated: true, username: 'testuser' }
+    discogs: { authenticated: true, username: 'testuser' },
   },
-  setAuthStatus: jest.fn()
+  setAuthStatus: jest.fn(),
 };
 
 const renderWithProviders = (component: React.ReactElement) => {
   return render(
     <AuthProvider value={mockAuthContext}>
-      <AppProvider>
-        {component}
-      </AppProvider>
+      <AppProvider>{component}</AppProvider>
     </AuthProvider>
   );
 };
 
+// Global setup to ensure localStorage is always available
+beforeAll(() => {
+  // Ensure localStorage mock is available on both global and window
+  if (!global.localStorage) {
+    Object.defineProperty(global, 'localStorage', {
+      value: localStorageMock,
+      writable: true,
+    });
+  }
+  if (!window.localStorage) {
+    Object.defineProperty(window, 'localStorage', {
+      value: localStorageMock,
+      writable: true,
+    });
+  }
+});
+
 describe('ReleaseDetailsPage Auto Timing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockRelease));
+
+    // Ensure localStorage mock is set up for this test
+    Object.defineProperty(window, 'localStorage', {
+      value: localStorageMock,
+      writable: true,
+      configurable: true,
+    });
+
+    mockLocalStorage.clear();
+    mockLocalStorage.setItem('selectedRelease', JSON.stringify(mockRelease));
     mockApiService.getReleaseDetails.mockResolvedValue(mockRelease);
-    
+
     // Mock Date.now() for consistent testing
     jest.spyOn(Date, 'now').mockReturnValue(1640995200000); // 2022-01-01 00:00:00 UTC
   });
@@ -128,13 +177,15 @@ describe('ReleaseDetailsPage Auto Timing', () => {
 
     // Check if the datetime-local input has been populated with any value (timing calculation should have worked)
     await waitFor(() => {
-      const startTimeInput = screen.getByDisplayValue(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+      const startTimeInput = screen.getByDisplayValue(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/
+      );
       expect(startTimeInput).toBeInTheDocument();
     });
 
     // The calculation should be:
     // Track 1: 3:30 = 210 seconds
-    // Track 2: 4:00 = 240 seconds  
+    // Track 2: 4:00 = 240 seconds
     // Total with gaps: 210 + 1 + 240 + 1 = 452 seconds
     // Start time should be current time (1640995200000) minus 452000ms
     // Which equals 1640994748000 = 2021-12-31T23:52:28
@@ -157,7 +208,9 @@ describe('ReleaseDetailsPage Auto Timing', () => {
 
     // Timing section should not be visible when no tracks are selected
     expect(screen.queryByText('Scrobble Timing')).not.toBeInTheDocument();
-    expect(screen.queryByText('Auto Timing (Just Finished)')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Auto Timing (Just Finished)')
+    ).not.toBeInTheDocument();
   });
 
   it('should show clear button when start time is set', async () => {
@@ -170,7 +223,7 @@ describe('ReleaseDetailsPage Auto Timing', () => {
     // First deselect all tracks, then select one track
     const deselectAllButton = screen.getByText('Deselect All');
     fireEvent.click(deselectAllButton);
-    
+
     // Select one track
     const trackContainers = screen.getAllByRole('checkbox');
     fireEvent.click(trackContainers[0]); // Track 1
@@ -187,7 +240,9 @@ describe('ReleaseDetailsPage Auto Timing', () => {
 
     // Start time should be cleared
     const startTimeInputs = screen.getAllByDisplayValue('');
-    const startTimeInput = startTimeInputs.find(input => input.getAttribute('type') === 'datetime-local');
+    const startTimeInput = startTimeInputs.find(
+      input => input.getAttribute('type') === 'datetime-local'
+    );
     expect(startTimeInput).toHaveValue('');
   });
 
@@ -201,26 +256,39 @@ describe('ReleaseDetailsPage Auto Timing', () => {
     // First deselect all tracks, then select one track
     const deselectAllButton = screen.getByText('Deselect All');
     fireEvent.click(deselectAllButton);
-    
+
     // Select a track
     const trackContainers = screen.getAllByRole('checkbox');
     fireEvent.click(trackContainers[0]); // Track 1
 
     // Initially should show default timing message
-    expect(screen.getByText(/Tracks will be scrobbled with realistic timing/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Tracks will be scrobbled with realistic timing/)
+    ).toBeInTheDocument();
 
     // Use auto timing
     const autoTimingButton = screen.getByText('Auto Timing (Just Finished)');
     fireEvent.click(autoTimingButton);
 
     // Should show auto timing message
-    expect(screen.getByText(/Auto timing: Tracks will end at current time/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Auto timing: Tracks will end at current time/)
+    ).toBeInTheDocument();
   });
 });
 
 describe('ReleaseDetailsPage Side Selection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Ensure localStorage mock is set up for this test
+    Object.defineProperty(window, 'localStorage', {
+      value: localStorageMock,
+      writable: true,
+      configurable: true,
+    });
+
+    mockLocalStorage.clear();
     jest.spyOn(Date, 'now').mockReturnValue(1640995200000);
   });
 
@@ -229,7 +297,7 @@ describe('ReleaseDetailsPage Side Selection', () => {
   });
 
   it('should not show side selection buttons for single-side albums', async () => {
-    mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockRelease));
+    mockLocalStorage.setItem('selectedRelease', JSON.stringify(mockRelease));
     mockApiService.getReleaseDetails.mockResolvedValue(mockRelease);
     renderWithProviders(<ReleaseDetailsPage />);
 
@@ -243,23 +311,28 @@ describe('ReleaseDetailsPage Side Selection', () => {
   });
 
   it('should show side selection buttons for multi-side albums', async () => {
-    mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockMultiSideRelease));
+    mockLocalStorage.setItem(
+      'selectedRelease',
+      JSON.stringify(mockMultiSideRelease)
+    );
     mockApiService.getReleaseDetails.mockResolvedValue(mockMultiSideRelease);
     renderWithProviders(<ReleaseDetailsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Double Album')).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: /Double Album/i })
+      ).toBeInTheDocument();
     });
 
     // Should show side selection section
     expect(screen.getByText('Select by Side')).toBeInTheDocument();
-    
+
     // Should show individual side buttons
     expect(screen.getByText('Side A (2)')).toBeInTheDocument();
     expect(screen.getByText('Side B (2)')).toBeInTheDocument();
     expect(screen.getByText('Side C (2)')).toBeInTheDocument();
     expect(screen.getByText('Side D (2)')).toBeInTheDocument();
-    
+
     // Should show disc buttons for multi-disc album
     expect(screen.getByText('By Disc:')).toBeInTheDocument();
     expect(screen.getByText('Disc 1 (A/B)')).toBeInTheDocument();
@@ -267,12 +340,17 @@ describe('ReleaseDetailsPage Side Selection', () => {
   });
 
   it('should select/deselect tracks when side button is clicked', async () => {
-    mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockMultiSideRelease));
+    mockLocalStorage.setItem(
+      'selectedRelease',
+      JSON.stringify(mockMultiSideRelease)
+    );
     mockApiService.getReleaseDetails.mockResolvedValue(mockMultiSideRelease);
     renderWithProviders(<ReleaseDetailsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Double Album')).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: /Double Album/i })
+      ).toBeInTheDocument();
     });
 
     // Initially all tracks should be selected (8 tracks)
@@ -297,12 +375,17 @@ describe('ReleaseDetailsPage Side Selection', () => {
   });
 
   it('should select/deselect tracks when disc button is clicked', async () => {
-    mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockMultiSideRelease));
+    mockLocalStorage.setItem(
+      'selectedRelease',
+      JSON.stringify(mockMultiSideRelease)
+    );
     mockApiService.getReleaseDetails.mockResolvedValue(mockMultiSideRelease);
     renderWithProviders(<ReleaseDetailsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Double Album')).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: /Double Album/i })
+      ).toBeInTheDocument();
     });
 
     // Initially all tracks should be selected (8 tracks)
@@ -327,16 +410,29 @@ describe('ReleaseDetailsPage Side Selection', () => {
   });
 
   it('should update button appearance based on selection state', async () => {
-    mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockMultiSideRelease));
+    // Ensure localStorage is set before rendering
+    mockLocalStorage.setItem(
+      'selectedRelease',
+      JSON.stringify(mockMultiSideRelease)
+    );
+
+    // Verify the data was stored
+    expect(mockLocalStorage.getItem('selectedRelease')).toBeTruthy();
+    expect(JSON.parse(mockLocalStorage.getItem('selectedRelease')!).title).toBe(
+      'Double Album'
+    );
+
     mockApiService.getReleaseDetails.mockResolvedValue(mockMultiSideRelease);
     renderWithProviders(<ReleaseDetailsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Double Album')).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: /Double Album/i })
+      ).toBeInTheDocument();
     });
 
     const sideAButton = screen.getByText('Side A (2)');
-    
+
     // Initially selected - should have primary styling
     expect(sideAButton).toHaveClass('btn-primary');
 

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
+
+import { DiscogsRelease } from '../../shared/types';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
-import { DiscogsRelease, ScrobbleTrack } from '../../shared/types';
 import { formatLocalTimeClean } from '../utils/dateUtils';
 
 const ReleaseDetailsPage: React.FC = () => {
@@ -29,7 +30,6 @@ const ReleaseDetailsPage: React.FC = () => {
     failed: number;
     ignored: number;
   } | null>(null);
-  const [currentSessionId, setCurrentSessionId] = useState<string>('');
 
   const api = getApiService(state.serverUrl);
 
@@ -50,17 +50,21 @@ const ReleaseDetailsPage: React.FC = () => {
       }
 
       const releaseInfo = JSON.parse(releaseData);
-      
+
       // Fetch full release details from API
       const fullRelease = await api.getReleaseDetails(releaseInfo.id);
       setRelease(fullRelease);
-      
+
       // Select all tracks by default
-      const allTrackIndices = fullRelease.tracklist?.map((_, index) => index) || [];
+      const allTrackIndices =
+        fullRelease.tracklist?.map((_, index) => index) || [];
       setSelectedTracks(new Set(allTrackIndices));
-      
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to load release details');
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to load release details'
+      );
     } finally {
       setLoading(false);
     }
@@ -80,7 +84,8 @@ const ReleaseDetailsPage: React.FC = () => {
     if (selectedTracks.size === (release?.tracklist?.length || 0)) {
       setSelectedTracks(new Set());
     } else {
-      const allTrackIndices = release?.tracklist?.map((_, index) => index) || [];
+      const allTrackIndices =
+        release?.tracklist?.map((_, index) => index) || [];
       setSelectedTracks(new Set(allTrackIndices));
     }
   };
@@ -88,13 +93,13 @@ const ReleaseDetailsPage: React.FC = () => {
   // Parse track positions to determine sides and groups
   const parseSides = () => {
     if (!release?.tracklist) return { sides: [], discs: [] };
-    
+
     const sides: string[] = [];
     const discs: { [key: string]: string[] } = {};
-    
-    release.tracklist.forEach((track, index) => {
+
+    release.tracklist.forEach((track, _index) => {
       const position = track.position.trim();
-      
+
       // Check for letter-number format (A1, B1, C1, etc.)
       const letterMatch = position.match(/^([A-Z])(\d+)$/);
       if (letterMatch) {
@@ -102,7 +107,7 @@ const ReleaseDetailsPage: React.FC = () => {
         if (!sides.includes(side)) {
           sides.push(side);
         }
-        
+
         // Group sides into discs (A&B = Disc 1, C&D = Disc 2, etc.)
         const discNumber = Math.floor((side.charCodeAt(0) - 65) / 2) + 1;
         const discKey = `Disc ${discNumber}`;
@@ -114,21 +119,21 @@ const ReleaseDetailsPage: React.FC = () => {
         }
       }
     });
-    
+
     // Sort sides alphabetically
     sides.sort();
-    
+
     // Sort disc sides
     Object.keys(discs).forEach(disc => {
       discs[disc].sort();
     });
-    
+
     return { sides, discs };
   };
 
   const getSideTrackIndices = (side: string): number[] => {
     if (!release?.tracklist) return [];
-    
+
     return release.tracklist
       .map((track, index) => ({ track, index }))
       .filter(({ track }) => track.position.startsWith(side))
@@ -146,9 +151,9 @@ const ReleaseDetailsPage: React.FC = () => {
   const handleSideToggle = (side: string) => {
     const sideIndices = getSideTrackIndices(side);
     const allSelected = sideIndices.every(index => selectedTracks.has(index));
-    
+
     const newSelected = new Set(selectedTracks);
-    
+
     if (allSelected) {
       // Deselect all tracks from this side
       sideIndices.forEach(index => newSelected.delete(index));
@@ -156,16 +161,16 @@ const ReleaseDetailsPage: React.FC = () => {
       // Select all tracks from this side
       sideIndices.forEach(index => newSelected.add(index));
     }
-    
+
     setSelectedTracks(newSelected);
   };
 
   const handleDiscToggle = (discSides: string[]) => {
     const discIndices = getDiscTrackIndices(discSides);
     const allSelected = discIndices.every(index => selectedTracks.has(index));
-    
+
     const newSelected = new Set(selectedTracks);
-    
+
     if (allSelected) {
       // Deselect all tracks from this disc
       discIndices.forEach(index => newSelected.delete(index));
@@ -173,18 +178,24 @@ const ReleaseDetailsPage: React.FC = () => {
       // Select all tracks from this disc
       discIndices.forEach(index => newSelected.add(index));
     }
-    
+
     setSelectedTracks(newSelected);
   };
 
   const isSideSelected = (side: string): boolean => {
     const sideIndices = getSideTrackIndices(side);
-    return sideIndices.length > 0 && sideIndices.every(index => selectedTracks.has(index));
+    return (
+      sideIndices.length > 0 &&
+      sideIndices.every(index => selectedTracks.has(index))
+    );
   };
 
   const isDiscSelected = (sides: string[]): boolean => {
     const discIndices = getDiscTrackIndices(sides);
-    return discIndices.length > 0 && discIndices.every(index => selectedTracks.has(index));
+    return (
+      discIndices.length > 0 &&
+      discIndices.every(index => selectedTracks.has(index))
+    );
   };
 
   const handleScrobble = async () => {
@@ -204,9 +215,13 @@ const ReleaseDetailsPage: React.FC = () => {
       } else {
         // Default to current time minus total duration of selected tracks
         const selectedTrackIndices = Array.from(selectedTracks);
-        const selectedTracksList = selectedTrackIndices.map(i => release.tracklist?.[i]).filter(Boolean);
+        const selectedTracksList = selectedTrackIndices
+          .map(i => release.tracklist?.[i])
+          .filter(Boolean);
         const totalDuration = selectedTracksList.reduce((total, track) => {
-          const duration = track?.duration ? parseTrackDuration(track.duration) : 180;
+          const duration = track?.duration
+            ? parseTrackDuration(track.duration)
+            : 180;
           return total + duration + 1; // +1 for gap between tracks
         }, 0);
         startTimestamp = Math.floor(Date.now() / 1000) - totalDuration;
@@ -214,38 +229,48 @@ const ReleaseDetailsPage: React.FC = () => {
 
       // Prepare tracks for scrobbling with proper timing
       const selectedTrackIndices = Array.from(selectedTracks);
-      const result = await api.prepareTracksFromRelease(release, selectedTrackIndices, startTimestamp);
-      
-      console.log('Prepared tracks with timing:', result.tracks.map(t => ({
-        track: t.track,
-                        timestamp: t.timestamp ? formatLocalTimeClean(t.timestamp * 1000) : 'No timestamp',
-        duration: t.duration
-      })));
-      
+      const result = await api.prepareTracksFromRelease(
+        release,
+        selectedTrackIndices,
+        startTimestamp
+      );
+
+      console.log(
+        'Prepared tracks with timing:',
+        result.tracks.map(t => ({
+          track: t.track,
+          timestamp: t.timestamp
+            ? formatLocalTimeClean(t.timestamp * 1000)
+            : 'No timestamp',
+          duration: t.duration,
+        }))
+      );
+
       // Start scrobbling and get session ID
       const scrobbleResult = await api.scrobbleBatch(result.tracks);
-      setCurrentSessionId(scrobbleResult.sessionId);
-      
+
       // Start polling for progress
       const pollProgress = async () => {
         try {
-          const progress = await api.getScrobbleProgress(scrobbleResult.sessionId);
+          const progress = await api.getScrobbleProgress(
+            scrobbleResult.sessionId
+          );
           if (progress.progress) {
             setScrobbleProgress(progress.progress);
           }
-          
+
           if (progress.status === 'completed' || progress.status === 'failed') {
             setScrobbleResult({
               success: progress.progress?.success || 0,
               failed: progress.progress?.failed || 0,
               ignored: progress.progress?.ignored || 0,
-              errors: progress.error ? [progress.error] : []
+              errors: progress.error ? [progress.error] : [],
             });
             setScrobbling(false);
             setScrobbleProgress(null);
             return;
           }
-          
+
           // Continue polling
           setTimeout(pollProgress, 1000);
         } catch (error) {
@@ -253,12 +278,13 @@ const ReleaseDetailsPage: React.FC = () => {
           setScrobbling(false);
         }
       };
-      
+
       // Start polling after a short delay
       setTimeout(pollProgress, 500);
-
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to scrobble tracks');
+      setError(
+        error instanceof Error ? error.message : 'Failed to scrobble tracks'
+      );
       setScrobbling(false);
     }
   };
@@ -268,7 +294,7 @@ const ReleaseDetailsPage: React.FC = () => {
     if (typeof duration === 'number') {
       return duration;
     }
-    
+
     if (typeof duration === 'string') {
       const parts = duration.split(':');
       if (parts.length === 2) {
@@ -277,7 +303,7 @@ const ReleaseDetailsPage: React.FC = () => {
         return minutes * 60 + seconds;
       }
     }
-    
+
     return 180; // Default 3 minutes
   };
 
@@ -290,23 +316,27 @@ const ReleaseDetailsPage: React.FC = () => {
 
     // Calculate total duration of selected tracks
     const selectedTrackIndices = Array.from(selectedTracks);
-    const selectedTracksList = selectedTrackIndices.map(i => release?.tracklist?.[i]).filter(Boolean);
+    const selectedTracksList = selectedTrackIndices
+      .map(i => release?.tracklist?.[i])
+      .filter(Boolean);
     const totalDuration = selectedTracksList.reduce((total, track) => {
-      const duration = track?.duration ? parseTrackDuration(track.duration) : 180;
+      const duration = track?.duration
+        ? parseTrackDuration(track.duration)
+        : 180;
       return total + duration + 1; // +1 for gap between tracks
     }, 0);
 
     // Calculate start time so that scrobbles end at current time
     const now = new Date();
-    const startDate = new Date(now.getTime() - (totalDuration * 1000));
-    
+    const startDate = new Date(now.getTime() - totalDuration * 1000);
+
     // Format for datetime-local input (YYYY-MM-DDTHH:MM)
     const year = startDate.getFullYear();
     const month = String(startDate.getMonth() + 1).padStart(2, '0');
     const day = String(startDate.getDate()).padStart(2, '0');
     const hours = String(startDate.getHours()).padStart(2, '0');
     const minutes = String(startDate.getMinutes()).padStart(2, '0');
-    
+
     const formattedTime = `${year}-${month}-${day}T${hours}:${minutes}`;
     setStartTime(formattedTime);
   };
@@ -325,7 +355,8 @@ const ReleaseDetailsPage: React.FC = () => {
     } catch (error) {
       setConnectionTest({
         success: false,
-        message: error instanceof Error ? error.message : 'Connection test failed'
+        message:
+          error instanceof Error ? error.message : 'Connection test failed',
       });
     }
   };
@@ -335,15 +366,17 @@ const ReleaseDetailsPage: React.FC = () => {
       const result = await api.getLastfmSessionKey();
       setSessionKey(result.sessionKey);
     } catch (error) {
-      setSessionKey('Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      setSessionKey(
+        `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   };
 
   if (loading) {
     return (
-      <div className="card">
-        <div className="loading">
-          <div className="spinner"></div>
+      <div className='card'>
+        <div className='loading'>
+          <div className='spinner'></div>
           Loading release details...
         </div>
       </div>
@@ -352,12 +385,12 @@ const ReleaseDetailsPage: React.FC = () => {
 
   if (error) {
     return (
-      <div className="card">
-        <div className="error-message">
+      <div className='card'>
+        <div className='error-message'>
           {error}
-          <button 
-            className="btn btn-small" 
-            onClick={() => window.location.hash = '#collection'}
+          <button
+            className='btn btn-small'
+            onClick={() => (window.location.hash = '#collection')}
             style={{ marginLeft: '1rem' }}
           >
             Back to Collection
@@ -369,12 +402,12 @@ const ReleaseDetailsPage: React.FC = () => {
 
   if (!release) {
     return (
-      <div className="card">
-        <div className="error-message">
+      <div className='card'>
+        <div className='error-message'>
           No release data available
-          <button 
-            className="btn btn-small" 
-            onClick={() => window.location.hash = '#collection'}
+          <button
+            className='btn btn-small'
+            onClick={() => (window.location.hash = '#collection')}
             style={{ marginLeft: '1rem' }}
           >
             Back to Collection
@@ -386,12 +419,19 @@ const ReleaseDetailsPage: React.FC = () => {
 
   return (
     <div>
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+      <div className='card'>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '1rem',
+          }}
+        >
           <h2>Release Details</h2>
           <button
-            className="btn btn-small btn-secondary"
-            onClick={() => window.location.hash = '#collection'}
+            className='btn btn-small btn-secondary'
+            onClick={() => (window.location.hash = '#collection')}
           >
             Back to Collection
           </button>
@@ -399,24 +439,30 @@ const ReleaseDetailsPage: React.FC = () => {
 
         <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem' }}>
           <div style={{ flexShrink: 0 }}>
-            <img 
-              src={release.cover_image} 
+            <img
+              src={release.cover_image}
               alt={release.title}
-              style={{ 
-                width: '200px', 
-                height: '200px', 
+              style={{
+                width: '200px',
+                height: '200px',
                 objectFit: 'cover',
                 borderRadius: '8px',
-                border: '1px solid var(--border-color)'
+                border: '1px solid var(--border-color)',
               }}
             />
           </div>
-          
+
           <div style={{ flex: 1 }}>
             <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.5rem' }}>
               {release.title}
             </h3>
-            <p style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem', color: 'var(--text-secondary)' }}>
+            <p
+              style={{
+                margin: '0 0 0.5rem 0',
+                fontSize: '1.1rem',
+                color: 'var(--text-secondary)',
+              }}
+            >
               {release.artist}
             </p>
             <p style={{ margin: '0 0 0.5rem 0', color: 'var(--text-muted)' }}>
@@ -436,41 +482,72 @@ const ReleaseDetailsPage: React.FC = () => {
         </div>
 
         {scrobbleProgress && (
-          <div className="message info" style={{ marginBottom: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <div className='message info' style={{ marginBottom: '1rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '0.5rem',
+              }}
+            >
               <strong>Scrobbling Progress:</strong>
-              <span>{scrobbleProgress.current} / {scrobbleProgress.total}</span>
+              <span>
+                {scrobbleProgress.current} / {scrobbleProgress.total}
+              </span>
             </div>
-            <div style={{ 
-              width: '100%', 
-              height: '8px', 
-              backgroundColor: 'var(--border-color)', 
-              borderRadius: '4px',
-              overflow: 'hidden',
-              marginBottom: '0.5rem'
-            }}>
-              <div style={{
-                width: `${(scrobbleProgress.current / scrobbleProgress.total) * 100}%`,
-                height: '100%',
-                backgroundColor: 'var(--accent-color)',
-                transition: 'width 0.3s ease'
-              }} />
+            <div
+              style={{
+                width: '100%',
+                height: '8px',
+                backgroundColor: 'var(--border-color)',
+                borderRadius: '4px',
+                overflow: 'hidden',
+                marginBottom: '0.5rem',
+              }}
+            >
+              <div
+                style={{
+                  width: `${(scrobbleProgress.current / scrobbleProgress.total) * 100}%`,
+                  height: '100%',
+                  backgroundColor: 'var(--accent-color)',
+                  transition: 'width 0.3s ease',
+                }}
+              />
             </div>
             <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              ✅ {scrobbleProgress.success} successful • 
-              ⚠️ {scrobbleProgress.ignored} ignored • 
-              ❌ {scrobbleProgress.failed} failed
+              ✅ {scrobbleProgress.success} successful • ⚠️{' '}
+              {scrobbleProgress.ignored} ignored • ❌ {scrobbleProgress.failed}{' '}
+              failed
             </div>
           </div>
         )}
 
         {scrobbleResult && (
-          <div className={`message ${scrobbleResult.failed === 0 && scrobbleResult.ignored === 0 ? 'success' : scrobbleResult.failed > 0 ? 'error' : 'warning'}`} style={{ marginBottom: '1rem' }}>
-            <strong>Scrobble Results:</strong> 
-            {scrobbleResult.success > 0 && <span style={{ color: 'var(--success-color)' }}> {scrobbleResult.success} successful</span>}
-            {scrobbleResult.ignored > 0 && <span style={{ color: 'var(--warning-color)' }}> {scrobbleResult.ignored} ignored</span>}
-            {scrobbleResult.failed > 0 && <span style={{ color: 'var(--error-color)' }}> {scrobbleResult.failed} failed</span>}
-            
+          <div
+            className={`message ${scrobbleResult.failed === 0 && scrobbleResult.ignored === 0 ? 'success' : scrobbleResult.failed > 0 ? 'error' : 'warning'}`}
+            style={{ marginBottom: '1rem' }}
+          >
+            <strong>Scrobble Results:</strong>
+            {scrobbleResult.success > 0 && (
+              <span style={{ color: 'var(--success-color)' }}>
+                {' '}
+                {scrobbleResult.success} successful
+              </span>
+            )}
+            {scrobbleResult.ignored > 0 && (
+              <span style={{ color: 'var(--warning-color)' }}>
+                {' '}
+                {scrobbleResult.ignored} ignored
+              </span>
+            )}
+            {scrobbleResult.failed > 0 && (
+              <span style={{ color: 'var(--error-color)' }}>
+                {' '}
+                {scrobbleResult.failed} failed
+              </span>
+            )}
+
             {scrobbleResult.errors.length > 0 && (
               <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
                 <strong>Details:</strong>
@@ -481,16 +558,28 @@ const ReleaseDetailsPage: React.FC = () => {
                 </ul>
               </div>
             )}
-            
+
             {scrobbleResult.ignored > 0 && (
-              <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: 'var(--warning-color)' }}>
-                <strong>Note:</strong> Ignored scrobbles usually mean the track was scrobbled too recently or is a duplicate.
+              <div
+                style={{
+                  marginTop: '0.5rem',
+                  fontSize: '0.9rem',
+                  color: 'var(--warning-color)',
+                }}
+              >
+                <strong>Note:</strong> Ignored scrobbles usually mean the track
+                was scrobbled too recently or is a duplicate.
               </div>
             )}
-            
+
             {getLastfmProfileUrl() && (
               <div style={{ marginTop: '0.5rem' }}>
-                <a href={getLastfmProfileUrl()} target="_blank" rel="noopener noreferrer" className="btn btn-small">
+                <a
+                  href={getLastfmProfileUrl()}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='btn btn-small'
+                >
                   View on Last.fm
                 </a>
               </div>
@@ -499,23 +588,42 @@ const ReleaseDetailsPage: React.FC = () => {
         )}
 
         <div style={{ marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <h4 style={{ margin: 0 }}>Tracks ({selectedTracks.size} selected)</h4>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '0.5rem',
+            }}
+          >
+            <h4 style={{ margin: 0 }}>
+              Tracks ({selectedTracks.size} selected)
+            </h4>
+            <div
+              style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}
+            >
               <button
-                className="btn btn-small"
+                className='btn btn-small'
                 onClick={handleSelectAllTracks}
                 disabled={!release.tracklist?.length}
               >
-                {selectedTracks.size === (release.tracklist?.length || 0) ? 'Deselect All' : 'Select All'}
+                {selectedTracks.size === (release.tracklist?.length || 0)
+                  ? 'Deselect All'
+                  : 'Select All'}
               </button>
-              
+
               <button
-                className="btn btn-primary"
+                className='btn btn-primary'
                 onClick={handleScrobble}
-                disabled={selectedTracks.size === 0 || scrobbling || !authStatus.lastfm.authenticated}
+                disabled={
+                  selectedTracks.size === 0 ||
+                  scrobbling ||
+                  !authStatus.lastfm.authenticated
+                }
               >
-                {scrobbling ? 'Scrobbling...' : `Scrobble ${selectedTracks.size} Track${selectedTracks.size !== 1 ? 's' : ''}`}
+                {scrobbling
+                  ? 'Scrobbling...'
+                  : `Scrobble ${selectedTracks.size} Track${selectedTracks.size !== 1 ? 's' : ''}`}
               </button>
             </div>
           </div>
@@ -525,14 +633,44 @@ const ReleaseDetailsPage: React.FC = () => {
             const { sides, discs } = parseSides();
             if (sides.length > 1) {
               return (
-                <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <h5 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', fontWeight: '600' }}>Select by Side</h5>
-                  
+                <div
+                  style={{
+                    marginBottom: '1rem',
+                    padding: '1rem',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)',
+                  }}
+                >
+                  <h5
+                    style={{
+                      margin: '0 0 0.75rem 0',
+                      fontSize: '0.95rem',
+                      fontWeight: '600',
+                    }}
+                  >
+                    Select by Side
+                  </h5>
+
                   {/* Disc-level buttons for multi-disc albums */}
                   {Object.keys(discs).length > 1 && (
                     <div style={{ marginBottom: '0.75rem' }}>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>By Disc:</div>
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <div
+                        style={{
+                          fontSize: '0.85rem',
+                          color: 'var(--text-secondary)',
+                          marginBottom: '0.5rem',
+                        }}
+                      >
+                        By Disc:
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: '0.5rem',
+                          flexWrap: 'wrap',
+                        }}
+                      >
                         {Object.entries(discs).map(([discName, discSides]) => (
                           <button
                             key={discName}
@@ -546,11 +684,25 @@ const ReleaseDetailsPage: React.FC = () => {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Individual side buttons */}
                   <div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>By Side:</div>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <div
+                      style={{
+                        fontSize: '0.85rem',
+                        color: 'var(--text-secondary)',
+                        marginBottom: '0.5rem',
+                      }}
+                    >
+                      By Side:
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '0.5rem',
+                        flexWrap: 'wrap',
+                      }}
+                    >
                       {sides.map(side => {
                         const sideTrackCount = getSideTrackIndices(side).length;
                         return (
@@ -573,36 +725,65 @@ const ReleaseDetailsPage: React.FC = () => {
           })()}
 
           {selectedTracks.size > 0 && (
-            <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <div
+              style={{
+                marginBottom: '1rem',
+                padding: '1rem',
+                backgroundColor: 'var(--bg-tertiary)',
+                borderRadius: '8px',
+                border: '1px solid var(--border-color)',
+              }}
+            >
               <h5 style={{ margin: '0 0 0.5rem 0' }}>Scrobble Timing</h5>
-              <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                Set when you started listening to the first track, or leave empty to use realistic timing.
+              <p
+                style={{
+                  margin: '0 0 0.5rem 0',
+                  fontSize: '0.9rem',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                Set when you started listening to the first track, or leave
+                empty to use realistic timing.
               </p>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                <div className="form-group" style={{ margin: 0, flex: 1 }}>
-                  <label className="form-label" style={{ fontSize: '0.9rem' }}>Start Time:</label>
+              <div
+                style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}
+              >
+                <div className='form-group' style={{ margin: 0, flex: 1 }}>
+                  <label className='form-label' style={{ fontSize: '0.9rem' }}>
+                    Start Time:
+                  </label>
                   <input
-                    type="datetime-local"
-                    className="form-input"
+                    type='datetime-local'
+                    className='form-input'
                     value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
+                    onChange={e => setStartTime(e.target.value)}
                     style={{ fontSize: '0.9rem' }}
                   />
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '0.5rem',
+                    marginTop: '1.5rem',
+                  }}
+                >
                   <button
-                    className="btn btn-small btn-secondary"
+                    className='btn btn-small btn-secondary'
                     onClick={handleAutoTiming}
                     disabled={selectedTracks.size === 0}
-                    title={selectedTracks.size === 0 ? "Select tracks first" : "Set timing so tracks end at current time"}
+                    title={
+                      selectedTracks.size === 0
+                        ? 'Select tracks first'
+                        : 'Set timing so tracks end at current time'
+                    }
                   >
                     Auto Timing (Just Finished)
                   </button>
                   {startTime && (
                     <button
-                      className="btn btn-small btn-outline"
+                      className='btn btn-small btn-outline'
                       onClick={() => setStartTime('')}
-                      title="Clear custom timing"
+                      title='Clear custom timing'
                     >
                       Clear
                     </button>
@@ -610,29 +791,50 @@ const ReleaseDetailsPage: React.FC = () => {
                 </div>
               </div>
               {startTime && (
-                <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Tracks will be scrobbled starting from: {formatLocalTimeClean(new Date(startTime))}
+                <div
+                  style={{
+                    marginTop: '0.5rem',
+                    fontSize: '0.8rem',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  Tracks will be scrobbled starting from:{' '}
+                  {formatLocalTimeClean(new Date(startTime))}
                 </div>
               )}
               {!startTime && selectedTracks.size > 0 && (
-                <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Tracks will be scrobbled with realistic timing (as if you just finished listening)
+                <div
+                  style={{
+                    marginTop: '0.5rem',
+                    fontSize: '0.8rem',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  Tracks will be scrobbled with realistic timing (as if you just
+                  finished listening)
                 </div>
               )}
               {startTime && selectedTracks.size > 0 && (
-                <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--success-color)' }}>
-                  Auto timing: Tracks will end at current time (as if you just finished listening)
+                <div
+                  style={{
+                    marginTop: '0.5rem',
+                    fontSize: '0.8rem',
+                    color: 'var(--success-color)',
+                  }}
+                >
+                  Auto timing: Tracks will end at current time (as if you just
+                  finished listening)
                 </div>
               )}
             </div>
           )}
 
           {!authStatus.lastfm.authenticated && (
-            <div className="warning-message" style={{ marginBottom: '1rem' }}>
+            <div className='warning-message' style={{ marginBottom: '1rem' }}>
               Please authenticate with Last.fm to scrobble tracks.
-              <button 
-                className="btn btn-small" 
-                onClick={() => window.location.hash = '#setup'}
+              <button
+                className='btn btn-small'
+                onClick={() => (window.location.hash = '#setup')}
                 style={{ marginLeft: '1rem' }}
               >
                 Go to Setup
@@ -643,26 +845,31 @@ const ReleaseDetailsPage: React.FC = () => {
           {authStatus.lastfm.authenticated && (
             <div style={{ marginBottom: '1rem' }}>
               <button
-                className="btn btn-small btn-secondary"
+                className='btn btn-small btn-secondary'
                 onClick={testLastfmConnection}
                 style={{ marginRight: '0.5rem' }}
               >
                 Test Last.fm Connection
               </button>
               <button
-                className="btn btn-small btn-secondary"
+                className='btn btn-small btn-secondary'
                 onClick={getSessionKey}
                 style={{ marginRight: '0.5rem' }}
               >
                 Get Session Key
               </button>
               {connectionTest && (
-                <div className={`message ${connectionTest.success ? 'success' : 'warning'}`}>
+                <div
+                  className={`message ${connectionTest.success ? 'success' : 'warning'}`}
+                >
                   {connectionTest.message}
                 </div>
               )}
               {sessionKey && (
-                <div className="message info" style={{ marginTop: '0.5rem', fontSize: '0.8rem' }}>
+                <div
+                  className='message info'
+                  style={{ marginTop: '0.5rem', fontSize: '0.8rem' }}
+                >
                   <strong>Session Key:</strong> {sessionKey}
                   <br />
                   <small>Use this in the debug script to test scrobbling</small>
@@ -672,38 +879,57 @@ const ReleaseDetailsPage: React.FC = () => {
           )}
         </div>
 
-        <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '4px' }}>
+        <div
+          style={{
+            maxHeight: '400px',
+            overflowY: 'auto',
+            border: '1px solid var(--border-color)',
+            borderRadius: '4px',
+          }}
+        >
           {release.tracklist?.map((track, index) => (
-            <div 
+            <div
               key={index}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 padding: '0.75rem',
-                borderBottom: index < (release.tracklist?.length || 0) - 1 ? '1px solid var(--border-color)' : 'none',
-                backgroundColor: selectedTracks.has(index) ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
-                cursor: 'pointer'
+                borderBottom:
+                  index < (release.tracklist?.length || 0) - 1
+                    ? '1px solid var(--border-color)'
+                    : 'none',
+                backgroundColor: selectedTracks.has(index)
+                  ? 'var(--bg-tertiary)'
+                  : 'var(--bg-secondary)',
+                cursor: 'pointer',
               }}
               onClick={() => handleTrackToggle(index)}
             >
               <input
-                type="checkbox"
+                type='checkbox'
                 checked={selectedTracks.has(index)}
                 onChange={() => handleTrackToggle(index)}
                 style={{ marginRight: '1rem' }}
               />
-              
+
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: '500' }}>
                   {track.position} {track.title}
                 </div>
                 {track.artist && track.artist !== release.artist && (
-                  <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                  <div
+                    style={{
+                      fontSize: '0.9rem',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
                     {track.artist}
                   </div>
                 )}
                 {track.duration && (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  <div
+                    style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}
+                  >
                     {track.duration}
                   </div>
                 )}
@@ -716,4 +942,4 @@ const ReleaseDetailsPage: React.FC = () => {
   );
 };
 
-export default ReleaseDetailsPage; 
+export default ReleaseDetailsPage;

@@ -7,14 +7,16 @@ interface SearchBarProps {
   defaultValue?: string;
 }
 
-const SearchBar: React.FC<SearchBarProps> = ({ 
-  onSearch, 
-  placeholder = 'Search...', 
+const SearchBar: React.FC<SearchBarProps> = ({
+  onSearch,
+  placeholder = 'Search...',
   disabled = false,
-  defaultValue = ''
+  defaultValue = '',
 }) => {
   const [query, setQuery] = useState(defaultValue);
-  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(
+    null
+  );
 
   useEffect(() => {
     // Debounce search to avoid too many API calls
@@ -44,18 +46,18 @@ const SearchBar: React.FC<SearchBarProps> = ({
     <div style={{ position: 'relative', marginBottom: '1rem' }}>
       <div style={{ position: 'relative' }}>
         <input
-          type="text"
-          className="form-input"
+          type='text'
+          className='form-input'
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={e => setQuery(e.target.value)}
           placeholder={placeholder}
           disabled={disabled}
           style={{
             paddingLeft: '2.5rem',
-            paddingRight: query ? '2.5rem' : '1rem'
+            paddingRight: query ? '2.5rem' : '1rem',
           }}
         />
-        
+
         {/* Search icon */}
         <div
           style={{
@@ -65,7 +67,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
             transform: 'translateY(-50%)',
             color: '#666',
             fontSize: '1rem',
-            pointerEvents: 'none'
+            pointerEvents: 'none',
           }}
         >
           🔍
@@ -74,7 +76,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
         {/* Clear button */}
         {query && (
           <button
-            type="button"
+            type='button'
             onClick={handleClear}
             disabled={disabled}
             style={{
@@ -93,9 +95,9 @@ const SearchBar: React.FC<SearchBarProps> = ({
               height: '1.5rem',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
             }}
-            title="Clear search"
+            title='Clear search'
           >
             ✕
           </button>
@@ -112,7 +114,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
             bottom: 0,
             backgroundColor: 'rgba(255, 255, 255, 0.7)',
             borderRadius: '6px',
-            pointerEvents: 'none'
+            pointerEvents: 'none',
           }}
         />
       )}

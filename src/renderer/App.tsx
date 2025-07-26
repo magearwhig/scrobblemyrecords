@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
+
+import { AuthStatus } from '../shared/types';
+
+import Header from './components/Header';
+import MainContent from './components/MainContent';
+import Sidebar from './components/Sidebar';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
-import Header from './components/Header';
-import Sidebar from './components/Sidebar';
-import MainContent from './components/MainContent';
-import { AuthStatus } from '../shared/types';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<string>('home');
   const [authStatus, setAuthStatus] = useState<AuthStatus>({
     discogs: { authenticated: false },
-    lastfm: { authenticated: false }
+    lastfm: { authenticated: false },
   });
 
   useEffect(() => {
@@ -36,11 +38,14 @@ const App: React.FC = () => {
     <ThemeProvider>
       <AppProvider>
         <AuthProvider value={{ authStatus, setAuthStatus }}>
-          <div className="app">
+          <div className='app'>
             <Header />
-            <div className="main-content">
-              <Sidebar currentPage={currentPage} onPageChange={setCurrentPage} />
-              <div className="content">
+            <div className='main-content'>
+              <Sidebar
+                currentPage={currentPage}
+                onPageChange={setCurrentPage}
+              />
+              <div className='content'>
                 <MainContent currentPage={currentPage} />
               </div>
             </div>

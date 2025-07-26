@@ -1,4 +1,5 @@
 import React from 'react';
+
 import { useAuth } from '../context/AuthContext';
 
 interface SidebarProps {
@@ -8,51 +9,52 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
   const { authStatus } = useAuth();
-  
+
   const menuItems = [
     {
       id: 'home',
       label: 'Home',
       icon: '🏠',
-      enabled: true
+      enabled: true,
     },
     {
       id: 'setup',
       label: 'Setup & Authentication',
       icon: '🔑',
-      enabled: true
+      enabled: true,
     },
     {
       id: 'collection',
       label: 'Browse Collection',
       icon: '💿',
-      enabled: authStatus.discogs.authenticated
+      enabled: authStatus.discogs.authenticated,
     },
     {
       id: 'scrobble',
       label: 'Scrobble Tracks',
       icon: '🎵',
-      enabled: authStatus.discogs.authenticated && authStatus.lastfm.authenticated
+      enabled:
+        authStatus.discogs.authenticated && authStatus.lastfm.authenticated,
     },
     {
       id: 'history',
       label: 'Scrobble History',
       icon: '📝',
-      enabled: authStatus.lastfm.authenticated
+      enabled: authStatus.lastfm.authenticated,
     },
     {
       id: 'settings',
       label: 'Settings',
       icon: '⚙️',
-      enabled: true
-    }
+      enabled: true,
+    },
   ];
 
   return (
-    <nav className="sidebar">
-      <ul className="nav-menu">
-        {menuItems.map((item) => (
-          <li key={item.id} className="nav-item">
+    <nav className='sidebar'>
+      <ul className='nav-menu'>
+        {menuItems.map(item => (
+          <li key={item.id} className='nav-item'>
             <button
               className={`nav-link ${currentPage === item.id ? 'active' : ''} ${!item.enabled ? 'disabled' : ''}`}
               onClick={() => {
@@ -68,7 +70,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
                 border: 'none',
                 background: 'none',
                 cursor: item.enabled ? 'pointer' : 'not-allowed',
-                opacity: item.enabled ? 1 : 0.5
+                opacity: item.enabled ? 1 : 0.5,
               }}
             >
               <span style={{ marginRight: '0.75rem' }}>{item.icon}</span>
@@ -77,17 +79,39 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
           </li>
         ))}
       </ul>
-      
-      <div style={{ marginTop: '2rem', padding: '1rem 0', borderTop: '1px solid #e0e0e0' }}>
-        <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>
+
+      <div
+        style={{
+          marginTop: '2rem',
+          padding: '1rem 0',
+          borderTop: '1px solid #e0e0e0',
+        }}
+      >
+        <div
+          style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}
+        >
           <strong>Status:</strong>
         </div>
         <div style={{ fontSize: '0.8rem', lineHeight: '1.4' }}>
-          <div style={{ color: authStatus.discogs.authenticated ? '#28a745' : '#dc3545' }}>
-            Discogs: {authStatus.discogs.authenticated ? '✓ Connected' : '✗ Not connected'}
+          <div
+            style={{
+              color: authStatus.discogs.authenticated ? '#28a745' : '#dc3545',
+            }}
+          >
+            Discogs:{' '}
+            {authStatus.discogs.authenticated
+              ? '✓ Connected'
+              : '✗ Not connected'}
           </div>
-          <div style={{ color: authStatus.lastfm.authenticated ? '#28a745' : '#dc3545' }}>
-            Last.fm: {authStatus.lastfm.authenticated ? '✓ Connected' : '✗ Not connected'}
+          <div
+            style={{
+              color: authStatus.lastfm.authenticated ? '#28a745' : '#dc3545',
+            }}
+          >
+            Last.fm:{' '}
+            {authStatus.lastfm.authenticated
+              ? '✓ Connected'
+              : '✗ Not connected'}
           </div>
         </div>
       </div>

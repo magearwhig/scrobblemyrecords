@@ -1,10 +1,11 @@
-import request from 'supertest';
-import express from 'express';
 import cors from 'cors';
+import express from 'express';
 import helmet from 'helmet';
+import request from 'supertest';
+
 import createCollectionRouter from '../../../src/backend/routes/collection';
-import { DiscogsService } from '../../../src/backend/services/discogsService';
 import { AuthService } from '../../../src/backend/services/authService';
+import { DiscogsService } from '../../../src/backend/services/discogsService';
 import { FileStorage } from '../../../src/backend/utils/fileStorage';
 
 // Mock dependencies
@@ -12,7 +13,9 @@ jest.mock('../../../src/backend/services/discogsService');
 jest.mock('../../../src/backend/services/authService');
 jest.mock('../../../src/backend/utils/fileStorage');
 
-const MockedDiscogsService = DiscogsService as jest.MockedClass<typeof DiscogsService>;
+const MockedDiscogsService = DiscogsService as jest.MockedClass<
+  typeof DiscogsService
+>;
 const MockedAuthService = AuthService as jest.MockedClass<typeof AuthService>;
 const MockedFileStorage = FileStorage as jest.MockedClass<typeof FileStorage>;
 
@@ -27,9 +30,14 @@ describe('Collection Routes', () => {
 
     // Create mock instances
     mockFileStorage = new MockedFileStorage('test') as jest.Mocked<FileStorage>;
-    mockAuthService = new MockedAuthService(mockFileStorage) as jest.Mocked<AuthService>;
-    mockDiscogsService = new MockedDiscogsService(mockFileStorage, mockAuthService) as jest.Mocked<DiscogsService>;
-    
+    mockAuthService = new MockedAuthService(
+      mockFileStorage
+    ) as jest.Mocked<AuthService>;
+    mockDiscogsService = new MockedDiscogsService(
+      mockFileStorage,
+      mockAuthService
+    ) as jest.Mocked<DiscogsService>;
+
     // Setup mock methods
     mockDiscogsService.isCacheValid = jest.fn();
     mockDiscogsService.searchCollectionFromCache = jest.fn();
@@ -48,7 +56,14 @@ describe('Collection Routes', () => {
     app.locals.fileStorage = mockFileStorage;
 
     // Mount collection routes
-    app.use('/api/v1/collection', createCollectionRouter(mockFileStorage, mockAuthService, mockDiscogsService));
+    app.use(
+      '/api/v1/collection',
+      createCollectionRouter(
+        mockFileStorage,
+        mockAuthService,
+        mockDiscogsService
+      )
+    );
   });
 
   describe('GET /:username', () => {
@@ -64,18 +79,18 @@ describe('Collection Routes', () => {
               artist: 'Test Artist',
               format: ['Vinyl'],
               label: ['Test Label'],
-              resource_url: 'test-url'
+              resource_url: 'test-url',
             },
             folder_id: 1,
-            date_added: '2023-01-01'
-          }
+            date_added: '2023-01-01',
+          },
         ],
         pagination: {
           page: 1,
           pages: 1,
           per_page: 50,
-          items: 1
-        }
+          items: 1,
+        },
       };
 
       mockDiscogsService.getUserCollection.mockResolvedValue(mockCollection);
@@ -86,14 +101,19 @@ describe('Collection Routes', () => {
 
       expect(response.body.success).toBe(true);
       expect(response.body.data).toEqual(mockCollection.data);
-      expect(mockDiscogsService.getUserCollection).toHaveBeenCalledWith('testuser', 1, 50, false);
+      expect(mockDiscogsService.getUserCollection).toHaveBeenCalledWith(
+        'testuser',
+        1,
+        50,
+        false
+      );
     });
 
     it('should handle pagination parameters', async () => {
       const mockCollection = {
         success: true,
         data: [],
-        pagination: { page: 2, pages: 5, per_page: 25, items: 0 }
+        pagination: { page: 2, pages: 5, per_page: 25, items: 0 },
       };
 
       mockDiscogsService.getUserCollection.mockResolvedValue(mockCollection);
@@ -103,11 +123,18 @@ describe('Collection Routes', () => {
         .query({ page: 2, per_page: 25, force_reload: true })
         .expect(200);
 
-      expect(mockDiscogsService.getUserCollection).toHaveBeenCalledWith('testuser', 2, 25, true);
+      expect(mockDiscogsService.getUserCollection).toHaveBeenCalledWith(
+        'testuser',
+        2,
+        25,
+        true
+      );
     });
 
     it('should handle service errors', async () => {
-      mockDiscogsService.getUserCollection.mockRejectedValue(new Error('Collection error'));
+      mockDiscogsService.getUserCollection.mockRejectedValue(
+        new Error('Collection error')
+      );
 
       const response = await request(app)
         .get('/api/v1/collection/testuser')
@@ -137,12 +164,12 @@ describe('Collection Routes', () => {
               artist: 'Test Artist',
               format: ['Vinyl'],
               label: ['Test Label'],
-              resource_url: 'test-url'
+              resource_url: 'test-url',
             },
             folder_id: 1,
-            date_added: '2023-01-01'
-          }
-        ]
+            date_added: '2023-01-01',
+          },
+        ],
       };
 
       const mockCachedPage2 = {
@@ -153,19 +180,19 @@ describe('Collection Routes', () => {
             release: {
               id: 124,
               title: 'Test Album 2',
-              artist: 'Test Artist 2'
+              artist: 'Test Artist 2',
             },
             folder_id: 1,
-            date_added: '2023-01-02'
-          }
-        ]
+            date_added: '2023-01-02',
+          },
+        ],
       };
 
       // Mock file storage to return cached pages
       mockFileStorage.readJSON
-        .mockResolvedValueOnce(mockCachedPage1)  // page 1
-        .mockResolvedValueOnce(mockCachedPage2)  // page 2
-        .mockResolvedValueOnce(null);            // no more pages
+        .mockResolvedValueOnce(mockCachedPage1) // page 1
+        .mockResolvedValueOnce(mockCachedPage2) // page 2
+        .mockResolvedValueOnce(null); // no more pages
 
       // Mock isCacheValid to return true
       mockDiscogsService.isCacheValid.mockReturnValue(true);
@@ -205,11 +232,11 @@ describe('Collection Routes', () => {
             artist: 'Test Artist',
             format: ['Vinyl'],
             label: ['Test Label'],
-            resource_url: 'test-url'
+            resource_url: 'test-url',
           },
           folder_id: 1,
-          date_added: '2023-01-01'
-        }
+          date_added: '2023-01-01',
+        },
       ];
 
       mockDiscogsService.searchCollection.mockResolvedValue(mockSearchResults);
@@ -221,7 +248,10 @@ describe('Collection Routes', () => {
 
       expect(response.body.success).toBe(true);
       expect(response.body.data).toEqual(mockSearchResults);
-      expect(mockDiscogsService.searchCollection).toHaveBeenCalledWith('testuser', 'test query');
+      expect(mockDiscogsService.searchCollection).toHaveBeenCalledWith(
+        'testuser',
+        'test query'
+      );
     });
 
     it('should require search query', async () => {
@@ -256,19 +286,21 @@ describe('Collection Routes', () => {
               artist: 'Test Artist',
               format: ['Vinyl'],
               label: ['Test Label'],
-              resource_url: 'test-url'
+              resource_url: 'test-url',
             },
             folder_id: 1,
-            date_added: '2023-01-01'
-          }
+            date_added: '2023-01-01',
+          },
         ],
         total: 1,
         totalPages: 1,
         page: 1,
-        perPage: 10
+        perPage: 10,
       };
 
-      mockDiscogsService.searchCollectionFromCache.mockResolvedValue(mockPaginatedResults);
+      mockDiscogsService.searchCollectionFromCache.mockResolvedValue(
+        mockPaginatedResults
+      );
 
       const response = await request(app)
         .get('/api/v1/collection/testuser/search-paginated')
@@ -281,9 +313,14 @@ describe('Collection Routes', () => {
         page: 1,
         per_page: 10,
         total: 1,
-        pages: 1
+        pages: 1,
       });
-      expect(mockDiscogsService.searchCollectionFromCache).toHaveBeenCalledWith('testuser', 'test', 1, 10);
+      expect(mockDiscogsService.searchCollectionFromCache).toHaveBeenCalledWith(
+        'testuser',
+        'test',
+        1,
+        10
+      );
     });
 
     it('should use default pagination values', async () => {
@@ -292,17 +329,24 @@ describe('Collection Routes', () => {
         total: 0,
         totalPages: 0,
         page: 1,
-        perPage: 50
+        perPage: 50,
       };
 
-      mockDiscogsService.searchCollectionFromCache.mockResolvedValue(mockResults);
+      mockDiscogsService.searchCollectionFromCache.mockResolvedValue(
+        mockResults
+      );
 
       await request(app)
         .get('/api/v1/collection/testuser/search-paginated')
         .query({ q: 'test' })
         .expect(200);
 
-      expect(mockDiscogsService.searchCollectionFromCache).toHaveBeenCalledWith('testuser', 'test', 1, 50);
+      expect(mockDiscogsService.searchCollectionFromCache).toHaveBeenCalledWith(
+        'testuser',
+        'test',
+        1,
+        50
+      );
     });
   });
 
@@ -315,21 +359,29 @@ describe('Collection Routes', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data.message).toBe('Collection preloading started in background');
-      expect(mockDiscogsService.preloadAllCollectionPages).toHaveBeenCalledWith('testuser');
+      expect(response.body.data.message).toBe(
+        'Collection preloading started in background'
+      );
+      expect(mockDiscogsService.preloadAllCollectionPages).toHaveBeenCalledWith(
+        'testuser'
+      );
     });
 
     it('should handle preloading errors', async () => {
       // The preload method runs in background and doesn't throw errors to the client
       // The error is logged but the response is still successful
-      mockDiscogsService.preloadAllCollectionPages.mockRejectedValue(new Error('Preload error'));
+      mockDiscogsService.preloadAllCollectionPages.mockRejectedValue(
+        new Error('Preload error')
+      );
 
       const response = await request(app)
         .post('/api/v1/collection/testuser/preload')
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data.message).toBe('Collection preloading started in background');
+      expect(response.body.data.message).toBe(
+        'Collection preloading started in background'
+      );
     });
   });
 
@@ -339,7 +391,7 @@ describe('Collection Routes', () => {
         status: 'loading',
         totalPages: 10,
         currentPage: 5,
-        lastUpdated: Date.now()
+        lastUpdated: Date.now(),
       };
 
       mockDiscogsService.getCacheProgress.mockResolvedValue(mockProgress);
@@ -350,7 +402,9 @@ describe('Collection Routes', () => {
 
       expect(response.body.success).toBe(true);
       expect(response.body.data).toEqual(mockProgress);
-      expect(mockDiscogsService.getCacheProgress).toHaveBeenCalledWith('testuser');
+      expect(mockDiscogsService.getCacheProgress).toHaveBeenCalledWith(
+        'testuser'
+      );
     });
 
     it('should handle missing progress data', async () => {
@@ -373,11 +427,11 @@ describe('Collection Routes', () => {
         artist: 'Test Artist',
         tracklist: [
           { position: '1', title: 'Track 1' },
-          { position: '2', title: 'Track 2' }
+          { position: '2', title: 'Track 2' },
         ],
         format: ['Vinyl'],
         label: ['Test Label'],
-        resource_url: 'test-url'
+        resource_url: 'test-url',
       };
 
       mockDiscogsService.getReleaseDetails.mockResolvedValue(mockRelease);

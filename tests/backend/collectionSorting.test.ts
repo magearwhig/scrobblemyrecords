@@ -11,10 +11,10 @@ const mockCollectionItems: CollectionItem[] = [
       year: 2020,
       format: ['Vinyl'],
       label: ['Test Label'],
-      resource_url: 'https://api.discogs.com/releases/1'
+      resource_url: 'https://api.discogs.com/releases/1',
     },
     folder_id: 1,
-    date_added: '2023-01-01T00:00:00Z'
+    date_added: '2023-01-01T00:00:00Z',
   },
   {
     id: 2,
@@ -25,10 +25,10 @@ const mockCollectionItems: CollectionItem[] = [
       year: 2019,
       format: ['CD'],
       label: ['Another Label'],
-      resource_url: 'https://api.discogs.com/releases/2'
+      resource_url: 'https://api.discogs.com/releases/2',
     },
     folder_id: 1,
-    date_added: '2023-01-02T00:00:00Z'
+    date_added: '2023-01-02T00:00:00Z',
   },
   {
     id: 3,
@@ -39,16 +39,16 @@ const mockCollectionItems: CollectionItem[] = [
       year: 2021,
       format: ['Vinyl'],
       label: ['Test Label'],
-      resource_url: 'https://api.discogs.com/releases/3'
+      resource_url: 'https://api.discogs.com/releases/3',
     },
     folder_id: 1,
-    date_added: '2023-01-03T00:00:00Z'
-  }
+    date_added: '2023-01-03T00:00:00Z',
+  },
 ];
 
 // Sorting function (copied from CollectionPage)
 const sortCollection = (
-  items: CollectionItem[], 
+  items: CollectionItem[],
   sortBy: 'artist' | 'title' | 'year' | 'date_added' = 'artist',
   sortOrder: 'asc' | 'desc' = 'asc'
 ): CollectionItem[] => {
@@ -136,10 +136,10 @@ describe('Collection Sorting', () => {
           year: undefined,
           format: ['Vinyl'],
           label: ['Label'],
-          resource_url: 'https://api.discogs.com/releases/1'
+          resource_url: 'https://api.discogs.com/releases/1',
         },
         folder_id: 1,
-        date_added: ''
+        date_added: '',
       },
       {
         id: 2,
@@ -150,15 +150,15 @@ describe('Collection Sorting', () => {
           year: 2020,
           format: ['CD'],
           label: ['Label'],
-          resource_url: 'https://api.discogs.com/releases/2'
+          resource_url: 'https://api.discogs.com/releases/2',
         },
         folder_id: 1,
-        date_added: '2023-01-01T00:00:00Z'
-      }
+        date_added: '2023-01-01T00:00:00Z',
+      },
     ];
 
     const sorted = sortCollection(itemsWithMissingData, 'artist', 'asc');
     expect(sorted[0].release.artist).toBe(''); // Empty string should come first
     expect(sorted[1].release.artist).toBe('Artist');
   });
-}); 
+});

@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useReducer,
+  ReactNode,
+  useEffect,
+} from 'react';
+
 import { AppState } from '../../shared/types';
 
 interface AppAction {
@@ -9,13 +16,16 @@ interface AppAction {
 const initialState: AppState = {
   loading: false,
   error: null,
-  serverUrl: 'http://localhost:3001'
+  serverUrl: 'http://localhost:3001',
 };
 
-const AppContext = createContext<{
-  state: AppState;
-  dispatch: React.Dispatch<AppAction>;
-} | undefined>(undefined);
+const AppContext = createContext<
+  | {
+      state: AppState;
+      dispatch: React.Dispatch<AppAction>;
+    }
+  | undefined
+>(undefined);
 
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
@@ -32,7 +42,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
   }
 }
 
-export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const AppProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
   useEffect(() => {

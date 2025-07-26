@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+*.js
+*.d.ts
+public/
+data/
+test-data-discogs/
+release/
+package-lock.json
+*.md 

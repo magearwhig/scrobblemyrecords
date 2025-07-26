@@ -1,10 +1,11 @@
-import request from 'supertest';
-import express from 'express';
 import cors from 'cors';
+import express from 'express';
 import helmet from 'helmet';
+import request from 'supertest';
+
 import createScrobbleRouter from '../../../src/backend/routes/scrobble';
-import { LastFmService } from '../../../src/backend/services/lastfmService';
 import { AuthService } from '../../../src/backend/services/authService';
+import { LastFmService } from '../../../src/backend/services/lastfmService';
 import { FileStorage } from '../../../src/backend/utils/fileStorage';
 
 // Mock dependencies
@@ -12,7 +13,9 @@ jest.mock('../../../src/backend/services/lastfmService');
 jest.mock('../../../src/backend/services/authService');
 jest.mock('../../../src/backend/utils/fileStorage');
 
-const MockedLastFmService = LastFmService as jest.MockedClass<typeof LastFmService>;
+const MockedLastFmService = LastFmService as jest.MockedClass<
+  typeof LastFmService
+>;
 const MockedAuthService = AuthService as jest.MockedClass<typeof AuthService>;
 const MockedFileStorage = FileStorage as jest.MockedClass<typeof FileStorage>;
 
@@ -27,9 +30,14 @@ describe('Scrobble Routes', () => {
 
     // Create mock instances
     mockFileStorage = new MockedFileStorage('test') as jest.Mocked<FileStorage>;
-    mockAuthService = new MockedAuthService(mockFileStorage) as jest.Mocked<AuthService>;
-    mockLastFmService = new MockedLastFmService(mockFileStorage, mockAuthService) as jest.Mocked<LastFmService>;
-    
+    mockAuthService = new MockedAuthService(
+      mockFileStorage
+    ) as jest.Mocked<AuthService>;
+    mockLastFmService = new MockedLastFmService(
+      mockFileStorage,
+      mockAuthService
+    ) as jest.Mocked<LastFmService>;
+
     // Setup mock methods
     mockLastFmService.getScrobbleHistory = jest.fn();
 
@@ -44,7 +52,10 @@ describe('Scrobble Routes', () => {
     app.locals.authService = mockAuthService;
 
     // Mount scrobble routes
-    app.use('/api/v1/scrobble', createScrobbleRouter(mockFileStorage, mockAuthService, mockLastFmService));
+    app.use(
+      '/api/v1/scrobble',
+      createScrobbleRouter(mockFileStorage, mockAuthService, mockLastFmService)
+    );
   });
 
   describe('POST /track', () => {
@@ -52,7 +63,7 @@ describe('Scrobble Routes', () => {
       artist: 'Test Artist',
       track: 'Test Track',
       album: 'Test Album',
-      timestamp: 1234567890
+      timestamp: 1234567890,
     };
 
     it('should scrobble a single track successfully', async () => {
@@ -60,7 +71,7 @@ describe('Scrobble Routes', () => {
         success: true,
         accepted: 1,
         ignored: 0,
-        message: 'Successfully scrobbled Test Artist - Test Track'
+        message: 'Successfully scrobbled Test Artist - Test Track',
       };
 
       mockLastFmService.scrobbleTrack.mockResolvedValue(mockResult);
@@ -86,7 +97,9 @@ describe('Scrobble Routes', () => {
     });
 
     it('should handle scrobbling errors', async () => {
-      mockLastFmService.scrobbleTrack.mockRejectedValue(new Error('Scrobble failed'));
+      mockLastFmService.scrobbleTrack.mockRejectedValue(
+        new Error('Scrobble failed')
+      );
 
       const response = await request(app)
         .post('/api/v1/scrobble/track')
@@ -100,14 +113,14 @@ describe('Scrobble Routes', () => {
     it('should use current timestamp if not provided', async () => {
       const trackWithoutTimestamp = {
         artist: 'Test Artist',
-        track: 'Test Track'
+        track: 'Test Track',
       };
 
       const mockResult = {
         success: true,
         accepted: 1,
         ignored: 0,
-        message: 'Successfully scrobbled'
+        message: 'Successfully scrobbled',
       };
 
       mockLastFmService.scrobbleTrack.mockResolvedValue(mockResult);
@@ -121,7 +134,7 @@ describe('Scrobble Routes', () => {
         expect.objectContaining({
           artist: 'Test Artist',
           track: 'Test Track',
-          timestamp: expect.any(Number)
+          timestamp: expect.any(Number),
         })
       );
     });
@@ -130,7 +143,7 @@ describe('Scrobble Routes', () => {
   describe('POST /batch', () => {
     const mockTracks = [
       { artist: 'Artist 1', track: 'Track 1', timestamp: 1234567890 },
-      { artist: 'Artist 2', track: 'Track 2', timestamp: 1234567891 }
+      { artist: 'Artist 2', track: 'Track 2', timestamp: 1234567891 },
     ];
 
     it('should scrobble batch of tracks successfully', async () => {
@@ -139,7 +152,7 @@ describe('Scrobble Routes', () => {
         failed: 0,
         ignored: 0,
         errors: [],
-        sessionId: 'session-123'
+        sessionId: 'session-123',
       };
 
       mockLastFmService.scrobbleBatch.mockResolvedValue(mockResult);
@@ -161,7 +174,9 @@ describe('Scrobble Routes', () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toBe('Tracks array is required and must not be empty');
+      expect(response.body.error).toBe(
+        'Tracks array is required and must not be empty'
+      );
     });
 
     it('should require non-empty tracks array', async () => {
@@ -171,13 +186,15 @@ describe('Scrobble Routes', () => {
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toBe('Tracks array is required and must not be empty');
+      expect(response.body.error).toBe(
+        'Tracks array is required and must not be empty'
+      );
     });
 
     it('should generate timestamps if not provided', async () => {
       const tracksWithoutTimestamp = [
         { artist: 'Artist 1', track: 'Track 1' },
-        { artist: 'Artist 2', track: 'Track 2' }
+        { artist: 'Artist 2', track: 'Track 2' },
       ];
 
       const mockResult = {
@@ -185,7 +202,7 @@ describe('Scrobble Routes', () => {
         failed: 0,
         ignored: 0,
         errors: [],
-        sessionId: 'session-123'
+        sessionId: 'session-123',
       };
 
       mockLastFmService.scrobbleBatch.mockResolvedValue(mockResult);
@@ -200,19 +217,21 @@ describe('Scrobble Routes', () => {
           expect.objectContaining({
             artist: 'Artist 1',
             track: 'Track 1',
-            timestamp: expect.any(Number)
+            timestamp: expect.any(Number),
           }),
           expect.objectContaining({
             artist: 'Artist 2',
             track: 'Track 2',
-            timestamp: expect.any(Number)
-          })
+            timestamp: expect.any(Number),
+          }),
         ])
       );
     });
 
     it('should handle batch scrobbling errors', async () => {
-      mockLastFmService.scrobbleBatch.mockRejectedValue(new Error('Batch failed'));
+      mockLastFmService.scrobbleBatch.mockRejectedValue(
+        new Error('Batch failed')
+      );
 
       const response = await request(app)
         .post('/api/v1/scrobble/batch')
@@ -234,8 +253,8 @@ describe('Scrobble Routes', () => {
           total: 10,
           success: 4,
           failed: 1,
-          ignored: 0
-        }
+          ignored: 0,
+        },
       };
 
       mockFileStorage.readJSON.mockResolvedValue(mockProgress);
@@ -246,7 +265,9 @@ describe('Scrobble Routes', () => {
 
       expect(response.body.success).toBe(true);
       expect(response.body.data).toEqual(mockProgress);
-      expect(mockFileStorage.readJSON).toHaveBeenCalledWith('scrobbles/session-session-123.json');
+      expect(mockFileStorage.readJSON).toHaveBeenCalledWith(
+        'scrobbles/session-session-123.json'
+      );
     });
 
     it('should handle session not found', async () => {
@@ -274,11 +295,11 @@ describe('Scrobble Routes', () => {
       artist: 'Test Artist',
       tracklist: [
         { position: '1', title: 'Track 1', duration: '3:30' },
-        { position: '2', title: 'Track 2', duration: '4:00' }
+        { position: '2', title: 'Track 2', duration: '4:00' },
       ],
       format: ['Vinyl'],
       label: ['Test Label'],
-      resource_url: 'test-url'
+      resource_url: 'test-url',
     };
 
     it('should prepare tracks from release', async () => {
@@ -289,19 +310,19 @@ describe('Scrobble Routes', () => {
             track: 'Track 1',
             album: 'Test Album',
             timestamp: 1234567890,
-            duration: 210
+            duration: 210,
           },
           {
             artist: 'Test Artist',
             track: 'Track 2',
             album: 'Test Album',
             timestamp: 1234568100,
-            duration: 240
-          }
+            duration: 240,
+          },
         ],
         release: mockRelease,
         startTime: 1234567890,
-        totalDuration: 450
+        totalDuration: 450,
       };
 
       const response = await request(app)
@@ -309,7 +330,7 @@ describe('Scrobble Routes', () => {
         .send({
           release: mockRelease,
           selectedTracks: [0, 1],
-          startTime: 1234567890
+          startTime: 1234567890,
         })
         .expect(200);
 
@@ -318,7 +339,7 @@ describe('Scrobble Routes', () => {
       expect(response.body.data.tracks[0]).toMatchObject({
         artist: 'Test Artist',
         track: 'Track 1',
-        album: 'Test Album'
+        album: 'Test Album',
       });
     });
 
@@ -345,14 +366,14 @@ describe('Scrobble Routes', () => {
     it('should handle release without tracklist', async () => {
       const releaseWithoutTracks = {
         ...mockRelease,
-        tracklist: undefined
+        tracklist: undefined,
       };
 
       const response = await request(app)
         .post('/api/v1/scrobble/prepare-from-release')
         .send({
           release: releaseWithoutTracks,
-          selectedTracks: [0]
+          selectedTracks: [0],
         })
         .expect(400);
 
@@ -365,7 +386,7 @@ describe('Scrobble Routes', () => {
         .post('/api/v1/scrobble/prepare-from-release')
         .send({
           release: mockRelease,
-          selectedTracks: [0, 5] // Index 5 doesn't exist
+          selectedTracks: [0, 5], // Index 5 doesn't exist
         })
         .expect(200);
 
@@ -378,7 +399,7 @@ describe('Scrobble Routes', () => {
         .post('/api/v1/scrobble/prepare-from-release')
         .send({
           release: mockRelease,
-          selectedTracks: [0]
+          selectedTracks: [0],
         })
         .expect(200);
 
@@ -394,14 +415,14 @@ describe('Scrobble Routes', () => {
           id: 'session-1',
           tracks: [{ artist: 'Artist 1', track: 'Track 1' }],
           timestamp: 1234567890,
-          status: 'completed' as const
+          status: 'completed' as const,
         },
         {
           id: 'session-2',
           tracks: [{ artist: 'Artist 2', track: 'Track 2' }],
           timestamp: 1234567891,
-          status: 'failed' as const
-        }
+          status: 'failed' as const,
+        },
       ];
 
       mockLastFmService.getScrobbleHistory.mockResolvedValue(mockHistory);
@@ -427,7 +448,9 @@ describe('Scrobble Routes', () => {
     });
 
     it('should handle file read errors gracefully', async () => {
-      mockLastFmService.getScrobbleHistory.mockRejectedValue(new Error('Read error'));
+      mockLastFmService.getScrobbleHistory.mockRejectedValue(
+        new Error('Read error')
+      );
 
       const response = await request(app)
         .get('/api/v1/scrobble/history')

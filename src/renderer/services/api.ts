@@ -1,5 +1,13 @@
 import axios, { AxiosInstance } from 'axios';
-import { ApiResponse, AuthStatus, CollectionItem, DiscogsRelease, ScrobbleTrack, ScrobbleSession } from '../../shared/types';
+
+import {
+  ApiResponse,
+  AuthStatus,
+  CollectionItem,
+  DiscogsRelease,
+  ScrobbleTrack,
+  ScrobbleSession,
+} from '../../shared/types';
 
 class ApiService {
   private api: AxiosInstance;
@@ -11,17 +19,19 @@ class ApiService {
       baseURL: `${baseUrl}/api/v1`,
       timeout: 30000,
       headers: {
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+      },
     });
 
     // Request interceptor for logging
     this.api.interceptors.request.use(
-      (config) => {
-        console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
+      config => {
+        console.log(
+          `API Request: ${config.method?.toUpperCase()} ${config.url}`
+        );
         return config;
       },
-      (error) => {
+      error => {
         console.error('API Request Error:', error);
         return Promise.reject(error);
       }
@@ -29,13 +39,15 @@ class ApiService {
 
     // Response interceptor for error handling
     this.api.interceptors.response.use(
-      (response) => {
+      response => {
         return response;
       },
-      (error) => {
+      error => {
         console.error('API Response Error:', error);
         if (error.code === 'ECONNREFUSED') {
-          throw new Error('Unable to connect to server. Please ensure the backend is running.');
+          throw new Error(
+            'Unable to connect to server. Please ensure the backend is running.'
+          );
         }
         throw error;
       }
@@ -67,7 +79,7 @@ class ApiService {
   async getLastfmAuthUrl(apiKey?: string): Promise<string> {
     const params = apiKey ? { apiKey } : {};
     const response = await this.api.get('/auth/lastfm/auth-url', {
-      params
+      params,
     });
     return response.data.data.authUrl;
   }
@@ -89,21 +101,27 @@ class ApiService {
 
   async getLastfmRecentScrobbles(limit: number = 10): Promise<any[]> {
     const response = await this.api.get('/auth/lastfm/recent-scrobbles', {
-      params: { limit }
+      params: { limit },
     });
     return response.data.data;
   }
 
-  async getLastfmTopTracks(period: string = '7day', limit: number = 10): Promise<any[]> {
+  async getLastfmTopTracks(
+    period: string = '7day',
+    limit: number = 10
+  ): Promise<any[]> {
     const response = await this.api.get('/auth/lastfm/top-tracks', {
-      params: { period, limit }
+      params: { period, limit },
     });
     return response.data.data;
   }
 
-  async getLastfmTopArtists(period: string = '7day', limit: number = 10): Promise<any[]> {
+  async getLastfmTopArtists(
+    period: string = '7day',
+    limit: number = 10
+  ): Promise<any[]> {
     const response = await this.api.get('/auth/lastfm/top-artists', {
-      params: { period, limit }
+      params: { period, limit },
     });
     return response.data.data;
   }
@@ -119,48 +137,67 @@ class ApiService {
   }
 
   // Collection methods
-  async getUserCollection(username: string, page: number = 1, perPage: number = 50, forceReload: boolean = false): Promise<ApiResponse<CollectionItem[]>> {
+  async getUserCollection(
+    username: string,
+    page: number = 1,
+    perPage: number = 50,
+    forceReload: boolean = false
+  ): Promise<ApiResponse<CollectionItem[]>> {
     const response = await this.api.get(`/collection/${username}`, {
-      params: { page, per_page: perPage, force_reload: forceReload }
+      params: { page, per_page: perPage, force_reload: forceReload },
     });
     return response.data;
   }
 
-  async getEntireCollection(username: string, forceReload: boolean = false): Promise<{
+  async getEntireCollection(
+    username: string,
+    forceReload: boolean = false
+  ): Promise<{
     success: boolean;
     data: CollectionItem[];
     total: number;
     timestamp: number;
   }> {
     const response = await this.api.get(`/collection/${username}/all`, {
-      params: { force_reload: forceReload }
+      params: { force_reload: forceReload },
     });
     return response.data;
   }
 
-  async searchCollection(username: string, query: string): Promise<CollectionItem[]> {
+  async searchCollection(
+    username: string,
+    query: string
+  ): Promise<CollectionItem[]> {
     const response = await this.api.get(`/collection/${username}/search`, {
-      params: { q: query }
+      params: { q: query },
     });
     return response.data.data;
   }
 
-  async searchCollectionPaginated(username: string, query: string, page: number = 1, perPage: number = 50): Promise<{
+  async searchCollectionPaginated(
+    username: string,
+    query: string,
+    page: number = 1,
+    perPage: number = 50
+  ): Promise<{
     items: CollectionItem[];
     total: number;
     totalPages: number;
     page: number;
     perPage: number;
   }> {
-    const response = await this.api.get(`/collection/${username}/search-paginated`, {
-      params: { q: query, page, per_page: perPage }
-    });
+    const response = await this.api.get(
+      `/collection/${username}/search-paginated`,
+      {
+        params: { q: query, page, per_page: perPage },
+      }
+    );
     return {
       items: response.data.data,
       total: response.data.pagination.total,
       totalPages: response.data.pagination.pages,
       page: response.data.pagination.page,
-      perPage: response.data.pagination.per_page
+      perPage: response.data.pagination.per_page,
     };
   }
 
@@ -211,7 +248,10 @@ class ApiService {
     await this.api.post('/scrobble/track', track);
   }
 
-  async scrobbleBatch(tracks: ScrobbleTrack[], baseTimestamp?: number): Promise<{
+  async scrobbleBatch(
+    tracks: ScrobbleTrack[],
+    baseTimestamp?: number
+  ): Promise<{
     success: number;
     failed: number;
     ignored: number;
@@ -220,7 +260,7 @@ class ApiService {
   }> {
     const response = await this.api.post('/scrobble/batch', {
       tracks,
-      baseTimestamp
+      baseTimestamp,
     });
     return response.data.data.results;
   }
@@ -245,11 +285,16 @@ class ApiService {
     release: DiscogsRelease,
     selectedTracks?: number[],
     startTime?: number
-  ): Promise<{ tracks: ScrobbleTrack[]; release: any; startTime: number; totalDuration: number }> {
+  ): Promise<{
+    tracks: ScrobbleTrack[];
+    release: any;
+    startTime: number;
+    totalDuration: number;
+  }> {
     const response = await this.api.post('/scrobble/prepare-from-release', {
       release,
       selectedTracks,
-      startTime
+      startTime,
     });
     return response.data.data;
   }

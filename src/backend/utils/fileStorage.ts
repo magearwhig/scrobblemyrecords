@@ -11,7 +11,9 @@ export class FileStorage {
   async ensureDataDir(): Promise<void> {
     try {
       await fs.mkdir(this.dataDir, { recursive: true });
-      await fs.mkdir(path.join(this.dataDir, 'collections'), { recursive: true });
+      await fs.mkdir(path.join(this.dataDir, 'collections'), {
+        recursive: true,
+      });
       await fs.mkdir(path.join(this.dataDir, 'settings'), { recursive: true });
       await fs.mkdir(path.join(this.dataDir, 'scrobbles'), { recursive: true });
     } catch (error) {

@@ -1,8 +1,11 @@
-import axios, { AxiosInstance } from 'axios';
 import crypto from 'crypto';
-import { FileStorage } from '../utils/fileStorage';
-import { AuthService } from './authService';
+
+import axios, { AxiosInstance } from 'axios';
+
 import { ScrobbleTrack, ScrobbleSession } from '../../shared/types';
+import { FileStorage } from '../utils/fileStorage';
+
+import { AuthService } from './authService';
 
 export class LastFmService {
   private axios: AxiosInstance;
@@ -13,30 +16,37 @@ export class LastFmService {
   constructor(fileStorage: FileStorage, authService: AuthService) {
     this.fileStorage = fileStorage;
     this.authService = authService;
-    
+
     this.axios = axios.create({
       baseURL: this.baseUrl,
-      timeout: 10000
+      timeout: 10000,
     });
 
     // Rate limiting interceptor
-    this.axios.interceptors.request.use(async (config) => {
+    this.axios.interceptors.request.use(async config => {
       // Conservative rate limiting: 1 request per second
       await new Promise(resolve => setTimeout(resolve, 1000));
       return config;
     });
   }
 
-  private generateApiSig(params: Record<string, string>, secret: string): string {
+  private generateApiSig(
+    params: Record<string, string>,
+    secret: string
+  ): string {
     // Remove format from signature calculation as it's not part of the API signature
-    const { format, ...signatureParams } = params;
-    
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { format: _, ...signatureParams } = params;
+
     const sortedParams = Object.keys(signatureParams)
       .sort()
       .map(key => `${key}${signatureParams[key]}`)
       .join('');
-    
-    return crypto.createHash('md5').update(sortedParams + secret).digest('hex');
+
+    return crypto
+      .createHash('md5')
+      .update(sortedParams + secret)
+      .digest('hex');
   }
 
   async getAuthUrl(): Promise<string> {
@@ -45,54 +55,62 @@ export class LastFmService {
       throw new Error('Last.fm API key not configured');
     }
 
-    const callbackUrl = process.env.LASTFM_CALLBACK_URL || 'http://localhost:3001/api/v1/auth/lastfm/callback';
-    
+    const callbackUrl =
+      process.env.LASTFM_CALLBACK_URL ||
+      'http://localhost:3001/api/v1/auth/lastfm/callback';
+
     return `http://www.last.fm/api/auth/?api_key=${credentials.apiKey}&cb=${encodeURIComponent(callbackUrl)}`;
   }
 
-  async getSession(token: string): Promise<{ sessionKey: string; username: string }> {
+  async getSession(
+    token: string
+  ): Promise<{ sessionKey: string; username: string }> {
     try {
       console.log('Getting Last.fm session for token:', token);
       const credentials = await this.authService.getLastFmCredentials();
-      console.log('Last.fm credentials:', { apiKey: credentials.apiKey ? 'present' : 'missing' });
-      
+      console.log('Last.fm credentials:', {
+        apiKey: credentials.apiKey ? 'present' : 'missing',
+      });
+
       if (!credentials.apiKey) {
         throw new Error('Last.fm API key not configured');
       }
 
       const secret = process.env.LASTFM_SECRET || '';
       console.log('Last.fm secret:', secret ? 'present' : 'missing');
-      
+
       // Parameters for signature generation (exclude format)
       const signatureParams = {
         method: 'auth.getSession',
         api_key: credentials.apiKey,
-        token: token
+        token,
       };
 
       console.log('Last.fm signature params:', signatureParams);
       const apiSig = this.generateApiSig(signatureParams, secret);
       console.log('Generated API signature:', apiSig);
-      
+
       const response = await this.axios.post('', null, {
         params: {
           ...signatureParams,
           api_sig: apiSig,
-          format: 'json'  // Add format after signature generation
-        }
+          format: 'json', // Add format after signature generation
+        },
       });
-      
+
       console.log('Last.fm API response:', response.data);
 
       if (response.data.error) {
         console.error('Last.fm API error:', response.data);
-        throw new Error(`Last.fm API error ${response.data.error}: ${response.data.message || 'Unknown error'}`);
+        throw new Error(
+          `Last.fm API error ${response.data.error}: ${response.data.message || 'Unknown error'}`
+        );
       }
 
       const session = response.data.session;
       return {
         sessionKey: session.key,
-        username: session.name
+        username: session.name,
       };
     } catch (error: any) {
       console.error('Error getting Last.fm session:', error);
@@ -100,17 +118,22 @@ export class LastFmService {
         console.error('Last.fm API response error:', {
           status: error.response.status,
           data: error.response.data,
-          headers: error.response.headers
+          headers: error.response.headers,
         });
       }
       throw error;
     }
   }
 
-  async scrobbleTrack(track: ScrobbleTrack): Promise<{ success: boolean; accepted: number; ignored: number; message: string }> {
+  async scrobbleTrack(track: ScrobbleTrack): Promise<{
+    success: boolean;
+    accepted: number;
+    ignored: number;
+    message: string;
+  }> {
     try {
       console.log('Starting scrobble for track:', track);
-      
+
       const credentials = await this.authService.getLastFmCredentials();
       if (!credentials.apiKey || !credentials.sessionKey) {
         throw new Error('Last.fm credentials not configured');
@@ -118,7 +141,7 @@ export class LastFmService {
 
       console.log('Last.fm credentials found:', {
         apiKey: credentials.apiKey ? 'present' : 'missing',
-        sessionKey: credentials.sessionKey ? 'present' : 'missing'
+        sessionKey: credentials.sessionKey ? 'present' : 'missing',
       });
 
       const secret = process.env.LASTFM_SECRET || '';
@@ -126,20 +149,27 @@ export class LastFmService {
         console.error('LASTFM_SECRET environment variable is not set!');
         throw new Error('Last.fm API secret not configured');
       }
-      
+
       // Use provided timestamp or current time if not provided
       const timestamp = track.timestamp || Math.floor(Date.now() / 1000);
-      console.log('Using timestamp:', timestamp, 'for track:', track.artist, '-', track.track);
-      
+      console.log(
+        'Using timestamp:',
+        timestamp,
+        'for track:',
+        track.artist,
+        '-',
+        track.track
+      );
+
       // Clean and validate track data
       const cleanArtist = track.artist.trim();
       const cleanTrack = track.track.trim();
       const cleanAlbum = track.album ? track.album.trim() : '';
-      
+
       if (!cleanArtist || !cleanTrack) {
         throw new Error('Artist and track names are required');
       }
-      
+
       // Build parameters for signature generation (without format)
       const signatureParams: Record<string, string> = {
         method: 'track.scrobble',
@@ -147,7 +177,7 @@ export class LastFmService {
         sk: credentials.sessionKey,
         'artist[0]': cleanArtist,
         'track[0]': cleanTrack,
-        'timestamp[0]': timestamp.toString()
+        'timestamp[0]': timestamp.toString(),
       };
 
       if (cleanAlbum) {
@@ -163,18 +193,18 @@ export class LastFmService {
       // Generate signature
       const apiSig = this.generateApiSig(signatureParams, secret);
       console.log('Generated API signature:', apiSig);
-      
+
       // Add format for the actual request
       const requestParams = {
         ...signatureParams,
         api_sig: apiSig,
-        format: 'json'
+        format: 'json',
       };
 
       console.log('Sending request to Last.fm with params:', requestParams);
 
       const response = await this.axios.post('', null, {
-        params: requestParams
+        params: requestParams,
       });
 
       console.log('Last.fm scrobble response:', response.data);
@@ -188,17 +218,20 @@ export class LastFmService {
       const scrobble = response.data.scrobbles?.['@attr'];
       const accepted = scrobble?.accepted || 0;
       const ignored = scrobble?.ignored || 0;
-      
+
       if (scrobble) {
         console.log('Scrobble status:', scrobble);
         if (ignored > 0) {
-          console.warn(`Scrobble ignored: ${ignored} tracks ignored, ${accepted} accepted`);
+          console.warn(
+            `Scrobble ignored: ${ignored} tracks ignored, ${accepted} accepted`
+          );
         }
       }
 
-      const message = accepted > 0 
-        ? `Successfully scrobbled ${cleanArtist} - ${cleanTrack}`
-        : `Scrobble ignored: ${cleanArtist} - ${cleanTrack} (may be duplicate or invalid)`;
+      const message =
+        accepted > 0
+          ? `Successfully scrobbled ${cleanArtist} - ${cleanTrack}`
+          : `Scrobble ignored: ${cleanArtist} - ${cleanTrack} (may be duplicate or invalid)`;
 
       console.log('Scrobble result:', { accepted, ignored, message });
 
@@ -206,7 +239,7 @@ export class LastFmService {
         success: accepted > 0,
         accepted,
         ignored,
-        message
+        message,
       };
     } catch (error: any) {
       console.error('Error scrobbling track:', error);
@@ -214,30 +247,39 @@ export class LastFmService {
         console.error('Last.fm API response error:', {
           status: error.response.status,
           data: error.response.data,
-          headers: error.response.headers
+          headers: error.response.headers,
         });
       }
       throw error;
     }
   }
 
-  async scrobbleBatch(tracks: ScrobbleTrack[]): Promise<{ success: number; failed: number; ignored: number; errors: string[]; sessionId: string }> {
+  async scrobbleBatch(tracks: ScrobbleTrack[]): Promise<{
+    success: number;
+    failed: number;
+    ignored: number;
+    errors: string[];
+    sessionId: string;
+  }> {
     const results = {
       success: 0,
       failed: 0,
       ignored: 0,
-      errors: [] as string[]
+      errors: [] as string[],
     };
 
     // Create scrobble session
     const session: ScrobbleSession = {
       id: this.authService.generateNonce(),
-      tracks: tracks,
+      tracks,
       timestamp: Date.now(),
-      status: 'pending'
+      status: 'pending',
     };
 
-    await this.fileStorage.writeJSON(`scrobbles/session-${session.id}.json`, session);
+    await this.fileStorage.writeJSON(
+      `scrobbles/session-${session.id}.json`,
+      session
+    );
 
     try {
       for (let i = 0; i < tracks.length; i++) {
@@ -248,10 +290,14 @@ export class LastFmService {
             results.success++;
           } else if (scrobbleResult.ignored > 0) {
             results.ignored++;
-            results.errors.push(`${track.artist} - ${track.track}: ${scrobbleResult.message}`);
+            results.errors.push(
+              `${track.artist} - ${track.track}: ${scrobbleResult.message}`
+            );
           } else {
             results.failed++;
-            results.errors.push(`${track.artist} - ${track.track}: ${scrobbleResult.message}`);
+            results.errors.push(
+              `${track.artist} - ${track.track}: ${scrobbleResult.message}`
+            );
           }
 
           // Update session with progress
@@ -261,14 +307,18 @@ export class LastFmService {
             total: tracks.length,
             success: results.success,
             failed: results.failed,
-            ignored: results.ignored
+            ignored: results.ignored,
           };
-          await this.fileStorage.writeJSON(`scrobbles/session-${session.id}.json`, session);
-
+          await this.fileStorage.writeJSON(
+            `scrobbles/session-${session.id}.json`,
+            session
+          );
         } catch (error) {
           results.failed++;
-          results.errors.push(`${track.artist} - ${track.track}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          
+          results.errors.push(
+            `${track.artist} - ${track.track}: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+
           // Update session with error progress
           session.status = 'in-progress';
           session.progress = {
@@ -276,35 +326,45 @@ export class LastFmService {
             total: tracks.length,
             success: results.success,
             failed: results.failed,
-            ignored: results.ignored
+            ignored: results.ignored,
           };
-          await this.fileStorage.writeJSON(`scrobbles/session-${session.id}.json`, session);
+          await this.fileStorage.writeJSON(
+            `scrobbles/session-${session.id}.json`,
+            session
+          );
         }
       }
 
       // Update session status
       session.status = results.failed === 0 ? 'completed' : 'failed';
-      session.error = results.errors.length > 0 ? results.errors.join('; ') : undefined;
+      session.error =
+        results.errors.length > 0 ? results.errors.join('; ') : undefined;
       session.progress = {
         current: tracks.length,
         total: tracks.length,
         success: results.success,
         failed: results.failed,
-        ignored: results.ignored
+        ignored: results.ignored,
       };
-      await this.fileStorage.writeJSON(`scrobbles/session-${session.id}.json`, session);
+      await this.fileStorage.writeJSON(
+        `scrobbles/session-${session.id}.json`,
+        session
+      );
 
       return {
         success: results.success,
         failed: results.failed,
         ignored: results.ignored,
         errors: results.errors,
-        sessionId: session.id
+        sessionId: session.id,
       };
     } catch (error) {
       session.status = 'failed';
       session.error = error instanceof Error ? error.message : 'Unknown error';
-      await this.fileStorage.writeJSON(`scrobbles/session-${session.id}.json`, session);
+      await this.fileStorage.writeJSON(
+        `scrobbles/session-${session.id}.json`,
+        session
+      );
       throw error;
     }
   }
@@ -316,7 +376,9 @@ export class LastFmService {
 
       for (const file of files) {
         if (file.startsWith('session-')) {
-          const session = await this.fileStorage.readJSON<ScrobbleSession>(`scrobbles/${file}`);
+          const session = await this.fileStorage.readJSON<ScrobbleSession>(
+            `scrobbles/${file}`
+          );
           if (session) {
             sessions.push(session);
           }
@@ -330,15 +392,20 @@ export class LastFmService {
     }
   }
 
-  async testConnection(): Promise<{ success: boolean; message: string; userInfo?: any }> {
+  async testConnection(): Promise<{
+    success: boolean;
+    message: string;
+    userInfo?: any;
+  }> {
     try {
       console.log('Testing Last.fm connection...');
-      
+
       const credentials = await this.authService.getLastFmCredentials();
       if (!credentials.apiKey || !credentials.sessionKey) {
         return {
           success: false,
-          message: 'Last.fm credentials not configured. Please authenticate first.'
+          message:
+            'Last.fm credentials not configured. Please authenticate first.',
         };
       }
 
@@ -346,23 +413,24 @@ export class LastFmService {
       if (!secret) {
         return {
           success: false,
-          message: 'Last.fm API secret not configured. Please check your environment variables.'
+          message:
+            'Last.fm API secret not configured. Please check your environment variables.',
         };
       }
 
       // Test by getting user info
       const userInfo = await this.getUserInfo();
-      
+
       return {
         success: true,
         message: `Connected successfully to Last.fm as ${userInfo.name}`,
-        userInfo
+        userInfo,
       };
     } catch (error: any) {
       console.error('Last.fm connection test failed:', error);
       return {
         success: false,
-        message: error.message || 'Failed to connect to Last.fm'
+        message: error.message || 'Failed to connect to Last.fm',
       };
     }
   }
@@ -379,8 +447,8 @@ export class LastFmService {
           method: 'user.getInfo',
           api_key: credentials.apiKey,
           sk: credentials.sessionKey,
-          format: 'json'
-        }
+          format: 'json',
+        },
       });
 
       if (response.data.error) {
@@ -407,12 +475,14 @@ export class LastFmService {
           api_key: credentials.apiKey,
           user: credentials.username,
           limit: limit.toString(),
-          format: 'json'
-        }
+          format: 'json',
+        },
       });
 
       if (response.data.error) {
-        throw new Error(response.data.message || 'Failed to get recent scrobbles');
+        throw new Error(
+          response.data.message || 'Failed to get recent scrobbles'
+        );
       }
 
       return response.data.recenttracks.track || [];
@@ -422,7 +492,10 @@ export class LastFmService {
     }
   }
 
-  async getTopTracks(period: '7day' | '1month' | '3month' | '6month' | '12month' = '7day', limit: number = 10): Promise<any[]> {
+  async getTopTracks(
+    period: '7day' | '1month' | '3month' | '6month' | '12month' = '7day',
+    limit: number = 10
+  ): Promise<any[]> {
     try {
       const credentials = await this.authService.getLastFmCredentials();
       if (!credentials.apiKey || !credentials.username) {
@@ -434,10 +507,10 @@ export class LastFmService {
           method: 'user.getTopTracks',
           api_key: credentials.apiKey,
           user: credentials.username,
-          period: period,
+          period,
           limit: limit.toString(),
-          format: 'json'
-        }
+          format: 'json',
+        },
       });
 
       if (response.data.error) {
@@ -451,7 +524,10 @@ export class LastFmService {
     }
   }
 
-  async getTopArtists(period: '7day' | '1month' | '3month' | '6month' | '12month' = '7day', limit: number = 10): Promise<any[]> {
+  async getTopArtists(
+    period: '7day' | '1month' | '3month' | '6month' | '12month' = '7day',
+    limit: number = 10
+  ): Promise<any[]> {
     try {
       const credentials = await this.authService.getLastFmCredentials();
       if (!credentials.apiKey || !credentials.username) {
@@ -463,10 +539,10 @@ export class LastFmService {
           method: 'user.getTopArtists',
           api_key: credentials.apiKey,
           user: credentials.username,
-          period: period,
+          period,
           limit: limit.toString(),
-          format: 'json'
-        }
+          format: 'json',
+        },
       });
 
       if (response.data.error) {

@@ -1,8 +1,9 @@
 import express, { Request, Response } from 'express';
-import { FileStorage } from '../utils/fileStorage';
+
 import { AuthService } from '../services/authService';
 import { DiscogsService } from '../services/discogsService';
 import { LastFmService } from '../services/lastfmService';
+import { FileStorage } from '../utils/fileStorage';
 
 const router = express.Router();
 
@@ -16,24 +17,26 @@ const lastfmService = new LastFmService(fileStorage, authService);
 router.get('/status', async (req: Request, res: Response) => {
   try {
     const settings = await authService.getUserSettings();
-    
+
     res.json({
       success: true,
       data: {
         discogs: {
           authenticated: !!settings.discogs.token,
-          username: settings.discogs.username
+          username: settings.discogs.username,
         },
         lastfm: {
-          authenticated: !!(settings.lastfm.apiKey && settings.lastfm.sessionKey),
-          username: settings.lastfm.username
-        }
-      }
+          authenticated: !!(
+            settings.lastfm.apiKey && settings.lastfm.sessionKey
+          ),
+          username: settings.lastfm.username,
+        },
+      },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });
@@ -42,15 +45,18 @@ router.get('/status', async (req: Request, res: Response) => {
 router.get('/discogs/auth-url', async (req: Request, res: Response) => {
   try {
     const authUrl = await discogsService.getAuthUrl();
-    
+
     res.json({
       success: true,
-      data: { authUrl }
+      data: { authUrl },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to get Discogs auth URL'
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to get Discogs auth URL',
     });
   }
 });
@@ -60,7 +66,7 @@ router.get('/discogs/callback', async (req: Request, res: Response) => {
   try {
     console.log('Discogs callback received:', req.query);
     const { oauth_token, oauth_verifier } = req.query;
-    
+
     if (!oauth_token || !oauth_verifier) {
       console.log('Missing parameters in callback');
       return res.status(400).send(`
@@ -73,9 +79,12 @@ router.get('/discogs/callback', async (req: Request, res: Response) => {
     }
 
     console.log('Processing callback with:', { oauth_token, oauth_verifier });
-    const result = await discogsService.handleCallback(oauth_token as string, oauth_verifier as string);
+    const result = await discogsService.handleCallback(
+      oauth_token as string,
+      oauth_verifier as string
+    );
     console.log('Callback result:', result);
-    
+
     res.send(`
       <html><body>
         <h2>Discogs Authentication Successful!</h2>
@@ -102,11 +111,11 @@ router.get('/discogs/callback', async (req: Request, res: Response) => {
 router.post('/discogs/token', async (req: Request, res: Response) => {
   try {
     const { token, username } = req.body;
-    
+
     if (!token) {
       return res.status(400).json({
         success: false,
-        error: 'Token is required'
+        error: 'Token is required',
       });
     }
 
@@ -114,20 +123,20 @@ router.post('/discogs/token', async (req: Request, res: Response) => {
     if (!token.startsWith('Discogs token=')) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid token format. Should start with "Discogs token="'
+        error: 'Invalid token format. Should start with "Discogs token="',
       });
     }
 
     await authService.setDiscogsToken(token, username);
-    
+
     res.json({
       success: true,
-      data: { message: 'Discogs token saved successfully' }
+      data: { message: 'Discogs token saved successfully' },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });
@@ -136,19 +145,19 @@ router.post('/discogs/token', async (req: Request, res: Response) => {
 router.get('/discogs/test', async (req: Request, res: Response) => {
   try {
     const profile = await discogsService.getUserProfile();
-    
+
     res.json({
       success: true,
       data: {
         username: profile.username,
         id: profile.id,
-        resource_url: profile.resource_url
-      }
+        resource_url: profile.resource_url,
+      },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Authentication failed'
+      error: error instanceof Error ? error.message : 'Authentication failed',
     });
   }
 });
@@ -157,14 +166,15 @@ router.get('/discogs/test', async (req: Request, res: Response) => {
 router.get('/lastfm/auth-url', async (req: Request, res: Response) => {
   try {
     const { apiKey } = req.query;
-    
+
     // Use provided API key or fall back to environment variable
     const finalApiKey = (apiKey as string) || process.env.LASTFM_API_KEY;
-    
+
     if (!finalApiKey) {
       return res.status(400).json({
         success: false,
-        error: 'API key is required (either provide one or set LASTFM_API_KEY environment variable)'
+        error:
+          'API key is required (either provide one or set LASTFM_API_KEY environment variable)',
       });
     }
 
@@ -172,17 +182,17 @@ router.get('/lastfm/auth-url', async (req: Request, res: Response) => {
     const settings = await authService.getUserSettings();
     settings.lastfm.apiKey = finalApiKey;
     await authService.saveUserSettings(settings);
-    
+
     const authUrl = await lastfmService.getAuthUrl();
-    
+
     res.json({
       success: true,
-      data: { authUrl }
+      data: { authUrl },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });
@@ -191,7 +201,7 @@ router.get('/lastfm/auth-url', async (req: Request, res: Response) => {
 router.get('/lastfm/callback', async (req: Request, res: Response) => {
   try {
     const { token } = req.query;
-    
+
     if (!token) {
       return res.status(400).send(`
         <html><body>
@@ -203,8 +213,10 @@ router.get('/lastfm/callback', async (req: Request, res: Response) => {
     }
 
     console.log('Last.fm callback received token:', token);
-    const { sessionKey, username } = await lastfmService.getSession(token as string);
-    
+    const { sessionKey, username } = await lastfmService.getSession(
+      token as string
+    );
+
     // Get existing settings to preserve API key
     const settings = await authService.getUserSettings();
     await authService.setLastFmCredentials(
@@ -212,7 +224,7 @@ router.get('/lastfm/callback', async (req: Request, res: Response) => {
       sessionKey,
       username
     );
-    
+
     res.send(`
       <html><body>
         <h2>Last.fm Authentication Successful!</h2>
@@ -239,16 +251,16 @@ router.get('/lastfm/callback', async (req: Request, res: Response) => {
 router.post('/lastfm/callback', async (req: Request, res: Response) => {
   try {
     const { token } = req.body;
-    
+
     if (!token) {
       return res.status(400).json({
         success: false,
-        error: 'Token is required'
+        error: 'Token is required',
       });
     }
 
     const { sessionKey, username } = await lastfmService.getSession(token);
-    
+
     // Get existing settings to preserve API key
     const settings = await authService.getUserSettings();
     await authService.setLastFmCredentials(
@@ -256,62 +268,66 @@ router.post('/lastfm/callback', async (req: Request, res: Response) => {
       sessionKey,
       username
     );
-    
+
     res.json({
       success: true,
-      data: { 
+      data: {
         message: 'Last.fm authentication successful',
-        username 
-      }
+        username,
+      },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Authentication failed'
+      error: error instanceof Error ? error.message : 'Authentication failed',
     });
   }
 });
 
 // Test Last.fm session creation (for debugging)
-router.get('/lastfm/test-session/:token', async (req: Request, res: Response) => {
-  try {
-    const { token } = req.params;
-    console.log('Testing Last.fm session creation with token:', token);
-    
-    const { sessionKey, username } = await lastfmService.getSession(token);
-    
-    res.json({
-      success: true,
-      data: { 
-        sessionKey: sessionKey ? 'present' : 'missing',
-        username 
-      }
-    });
-  } catch (error) {
-    console.error('Last.fm session test error:', error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Session creation failed'
-    });
+router.get(
+  '/lastfm/test-session/:token',
+  async (req: Request, res: Response) => {
+    try {
+      const { token } = req.params;
+      console.log('Testing Last.fm session creation with token:', token);
+
+      const { sessionKey, username } = await lastfmService.getSession(token);
+
+      res.json({
+        success: true,
+        data: {
+          sessionKey: sessionKey ? 'present' : 'missing',
+          username,
+        },
+      });
+    } catch (error) {
+      console.error('Last.fm session test error:', error);
+      res.status(500).json({
+        success: false,
+        error:
+          error instanceof Error ? error.message : 'Session creation failed',
+      });
+    }
   }
-});
+);
 
 // Test Last.fm connection
 router.get('/lastfm/test', async (req: Request, res: Response) => {
   try {
     const result = await lastfmService.testConnection();
-    
+
     res.json({
       success: result.success,
       data: {
         message: result.message,
-        userInfo: result.userInfo
-      }
+        userInfo: result.userInfo,
+      },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Connection test failed'
+      error: error instanceof Error ? error.message : 'Connection test failed',
     });
   }
 });
@@ -320,11 +336,11 @@ router.get('/lastfm/test', async (req: Request, res: Response) => {
 router.get('/lastfm/session-key', async (req: Request, res: Response) => {
   try {
     const credentials = await authService.getLastFmCredentials();
-    
+
     if (!credentials.sessionKey) {
       return res.status(400).json({
         success: false,
-        error: 'No Last.fm session key found. Please authenticate first.'
+        error: 'No Last.fm session key found. Please authenticate first.',
       });
     }
 
@@ -332,13 +348,14 @@ router.get('/lastfm/session-key', async (req: Request, res: Response) => {
       success: true,
       data: {
         sessionKey: credentials.sessionKey,
-        username: credentials.username
-      }
+        username: credentials.username,
+      },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to get session key'
+      error:
+        error instanceof Error ? error.message : 'Failed to get session key',
     });
   }
 });
@@ -347,16 +364,21 @@ router.get('/lastfm/session-key', async (req: Request, res: Response) => {
 router.get('/lastfm/recent-scrobbles', async (req: Request, res: Response) => {
   try {
     const { limit } = req.query;
-    const scrobbles = await lastfmService.getRecentScrobbles(limit ? parseInt(limit as string) : 10);
-    
+    const scrobbles = await lastfmService.getRecentScrobbles(
+      limit ? parseInt(limit as string) : 10
+    );
+
     res.json({
       success: true,
-      data: scrobbles
+      data: scrobbles,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to get recent scrobbles'
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to get recent scrobbles',
     });
   }
 });
@@ -369,15 +391,16 @@ router.get('/lastfm/top-tracks', async (req: Request, res: Response) => {
       (period as any) || '7day',
       limit ? parseInt(limit as string) : 10
     );
-    
+
     res.json({
       success: true,
-      data: tracks
+      data: tracks,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to get top tracks'
+      error:
+        error instanceof Error ? error.message : 'Failed to get top tracks',
     });
   }
 });
@@ -390,15 +413,16 @@ router.get('/lastfm/top-artists', async (req: Request, res: Response) => {
       (period as any) || '7day',
       limit ? parseInt(limit as string) : 10
     );
-    
+
     res.json({
       success: true,
-      data: artists
+      data: artists,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to get top artists'
+      error:
+        error instanceof Error ? error.message : 'Failed to get top artists',
     });
   }
 });
@@ -407,15 +431,15 @@ router.get('/lastfm/top-artists', async (req: Request, res: Response) => {
 router.post('/clear', async (req: Request, res: Response) => {
   try {
     await authService.clearTokens();
-    
+
     res.json({
       success: true,
-      data: { message: 'All authentication data cleared' }
+      data: { message: 'All authentication data cleared' },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });

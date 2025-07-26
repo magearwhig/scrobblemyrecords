@@ -1,6 +1,7 @@
+import * as fs from 'fs/promises';
+
 import { AuthService } from '../../src/backend/services/authService';
 import { FileStorage } from '../../src/backend/utils/fileStorage';
-import * as fs from 'fs/promises';
 
 describe('AuthService', () => {
   let authService: AuthService;
@@ -30,12 +31,12 @@ describe('AuthService', () => {
     it('should store and retrieve Discogs token', async () => {
       const testToken = 'test-discogs-token';
       const testUsername = 'testuser';
-      
+
       await authService.setDiscogsToken(testToken, testUsername);
-      
+
       const retrievedToken = await authService.getDiscogsToken();
       expect(retrievedToken).toBe(testToken);
-      
+
       const settings = await authService.getUserSettings();
       expect(settings.discogs.username).toBe(testUsername);
     });
@@ -43,18 +44,18 @@ describe('AuthService', () => {
     it('should clear Discogs token', async () => {
       await authService.setDiscogsToken('test-token', 'testuser');
       await authService.clearTokens();
-      
+
       const token = await authService.getDiscogsToken();
       expect(token).toBeUndefined();
     });
 
     it('should handle OAuth token secret storage', async () => {
       const testSecret = 'test-oauth-secret';
-      
+
       await authService.storeOAuthTokenSecret(testSecret);
       const retrievedSecret = await authService.getOAuthTokenSecret();
       expect(retrievedSecret).toBe(testSecret);
-      
+
       await authService.clearOAuthTokenSecret();
       const clearedSecret = await authService.getOAuthTokenSecret();
       expect(clearedSecret).toBeUndefined();
@@ -73,9 +74,9 @@ describe('AuthService', () => {
       const apiKey = 'test-api-key';
       const sessionKey = 'test-session-key';
       const username = 'testuser';
-      
+
       await authService.setLastFmCredentials(apiKey, sessionKey, username);
-      
+
       const retrievedCredentials = await authService.getLastFmCredentials();
       expect(retrievedCredentials.apiKey).toBe(apiKey);
       expect(retrievedCredentials.sessionKey).toBe(sessionKey);
@@ -83,9 +84,13 @@ describe('AuthService', () => {
     });
 
     it('should clear Last.fm credentials', async () => {
-      await authService.setLastFmCredentials('test-key', 'test-session', 'testuser');
+      await authService.setLastFmCredentials(
+        'test-key',
+        'test-session',
+        'testuser'
+      );
       await authService.clearTokens();
-      
+
       const credentials = await authService.getLastFmCredentials();
       expect(credentials.apiKey).toBeUndefined();
       expect(credentials.sessionKey).toBeUndefined();
@@ -94,7 +99,7 @@ describe('AuthService', () => {
 
     it('should handle partial Last.fm credentials', async () => {
       await authService.setLastFmCredentials('test-key', '', 'testuser');
-      
+
       const credentials = await authService.getLastFmCredentials();
       expect(credentials.apiKey).toBe('test-key');
       expect(credentials.sessionKey).toBe('');
@@ -117,12 +122,12 @@ describe('AuthService', () => {
         preferences: {
           defaultTimestamp: 'custom' as const,
           batchSize: 20,
-          autoScrobble: true
-        }
+          autoScrobble: true,
+        },
       };
 
       await authService.saveUserSettings(testSettings);
-      
+
       const settings = await authService.getUserSettings();
       expect(settings.preferences.defaultTimestamp).toBe('custom');
       expect(settings.preferences.batchSize).toBe(20);
@@ -135,7 +140,7 @@ describe('AuthService', () => {
     it('should generate unique nonce values', () => {
       const nonce1 = authService.generateNonce();
       const nonce2 = authService.generateNonce();
-      
+
       expect(nonce1).toBeTruthy();
       expect(nonce2).toBeTruthy();
       expect(nonce1).not.toBe(nonce2);
@@ -145,7 +150,7 @@ describe('AuthService', () => {
     it('should generate valid timestamp', () => {
       const timestamp = authService.generateTimestamp();
       const now = Math.floor(Date.now() / 1000);
-      
+
       expect(parseInt(timestamp)).toBeCloseTo(now, -1);
     });
   });
@@ -153,19 +158,29 @@ describe('AuthService', () => {
   describe('Error Handling', () => {
     it('should handle file read errors by propagating them', async () => {
       // Mock file storage to throw an error
-      jest.spyOn(fileStorage, 'readJSON').mockRejectedValue(new Error('File read error'));
-      
+      jest
+        .spyOn(fileStorage, 'readJSON')
+        .mockRejectedValue(new Error('File read error'));
+
       // AuthService doesn't catch errors, so they should propagate
-      await expect(authService.getDiscogsToken()).rejects.toThrow('File read error');
-      await expect(authService.getLastFmCredentials()).rejects.toThrow('File read error');
+      await expect(authService.getDiscogsToken()).rejects.toThrow(
+        'File read error'
+      );
+      await expect(authService.getLastFmCredentials()).rejects.toThrow(
+        'File read error'
+      );
     });
 
     it('should handle file write errors by propagating them', async () => {
       // Mock file storage to throw an error on write
-      jest.spyOn(fileStorage, 'writeJSON').mockRejectedValue(new Error('File write error'));
-      
+      jest
+        .spyOn(fileStorage, 'writeJSON')
+        .mockRejectedValue(new Error('File write error'));
+
       // AuthService doesn't catch write errors, so they should propagate
-      await expect(authService.setDiscogsToken('test-token', 'testuser')).rejects.toThrow('File write error');
+      await expect(
+        authService.setDiscogsToken('test-token', 'testuser')
+      ).rejects.toThrow('File write error');
     });
   });
 });

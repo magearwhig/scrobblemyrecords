@@ -1,6 +1,7 @@
-import { FileStorage } from '../../src/backend/utils/fileStorage';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+
+import { FileStorage } from '../../src/backend/utils/fileStorage';
 
 describe('FileStorage', () => {
   let fileStorage: FileStorage;
@@ -23,11 +24,11 @@ describe('FileStorage', () => {
   describe('ensureDataDir', () => {
     it('should create data directories', async () => {
       await fileStorage.ensureDataDir();
-      
+
       const collectionsDir = path.join(testDataDir, 'collections');
       const settingsDir = path.join(testDataDir, 'settings');
       const scrobblesDir = path.join(testDataDir, 'scrobbles');
-      
+
       await expect(fs.access(collectionsDir)).resolves.toBeUndefined();
       await expect(fs.access(settingsDir)).resolves.toBeUndefined();
       await expect(fs.access(scrobblesDir)).resolves.toBeUndefined();
@@ -38,10 +39,10 @@ describe('FileStorage', () => {
     it('should write and read JSON data', async () => {
       const testData = { test: 'value', number: 42 };
       const filePath = 'test.json';
-      
+
       await fileStorage.writeJSON(filePath, testData);
       const result = await fileStorage.readJSON(filePath);
-      
+
       expect(result).toEqual(testData);
     });
 
@@ -56,15 +57,15 @@ describe('FileStorage', () => {
           name: 'Test User',
           settings: {
             theme: 'dark',
-            notifications: true
-          }
+            notifications: true,
+          },
         },
-        items: [1, 2, 3]
+        items: [1, 2, 3],
       };
-      
+
       await fileStorage.writeJSON('complex.json', testData);
       const result = await fileStorage.readJSON('complex.json');
-      
+
       expect(result).toEqual(testData);
     });
   });
@@ -85,18 +86,20 @@ describe('FileStorage', () => {
   describe('delete', () => {
     it('should delete existing files', async () => {
       await fileStorage.writeJSON('to-delete.json', { data: 'test' });
-      
+
       let exists = await fileStorage.exists('to-delete.json');
       expect(exists).toBe(true);
-      
+
       await fileStorage.delete('to-delete.json');
-      
+
       exists = await fileStorage.exists('to-delete.json');
       expect(exists).toBe(false);
     });
 
     it('should not throw error when deleting non-existent files', async () => {
-      await expect(fileStorage.delete('non-existent.json')).resolves.toBeUndefined();
+      await expect(
+        fileStorage.delete('non-existent.json')
+      ).resolves.toBeUndefined();
     });
   });
 
@@ -104,7 +107,7 @@ describe('FileStorage', () => {
     it('should list files in directory', async () => {
       await fileStorage.writeJSON('settings/file1.json', { data: 1 });
       await fileStorage.writeJSON('settings/file2.json', { data: 2 });
-      
+
       const files = await fileStorage.listFiles('settings');
       expect(files).toHaveLength(2);
       expect(files).toContain('file1.json');

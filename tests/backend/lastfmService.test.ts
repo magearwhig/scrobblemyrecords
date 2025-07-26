@@ -1,8 +1,10 @@
-import axios from 'axios';
 import crypto from 'crypto';
+
+import axios from 'axios';
+
+import { AuthService } from '../../src/backend/services/authService';
 import { LastFmService } from '../../src/backend/services/lastfmService';
 import { FileStorage } from '../../src/backend/utils/fileStorage';
-import { AuthService } from '../../src/backend/services/authService';
 import { ScrobbleTrack } from '../../src/shared/types';
 
 // Mock dependencies
@@ -27,30 +29,32 @@ describe('LastFmService', () => {
 
     // Mock FileStorage
     mockFileStorage = new FileStorage('test') as jest.Mocked<FileStorage>;
-    
+
     // Mock AuthService
-    mockAuthService = new AuthService(mockFileStorage) as jest.Mocked<AuthService>;
-    
+    mockAuthService = new AuthService(
+      mockFileStorage
+    ) as jest.Mocked<AuthService>;
+
     // Mock axios instance
     mockAxiosInstance = {
       get: jest.fn(),
       post: jest.fn(),
       interceptors: {
         request: {
-          use: jest.fn()
-        }
-      }
+          use: jest.fn(),
+        },
+      },
     };
-    
+
     mockedAxios.create.mockReturnValue(mockAxiosInstance);
-    
+
     // Mock crypto
     const mockHash = {
       update: jest.fn().mockReturnThis(),
-      digest: jest.fn().mockReturnValue('mockedhash')
+      digest: jest.fn().mockReturnValue('mockedhash'),
     };
     mockedCrypto.createHash.mockReturnValue(mockHash as any);
-    
+
     // Create service instance
     lastfmService = new LastFmService(mockFileStorage, mockAuthService);
   });
@@ -59,7 +63,7 @@ describe('LastFmService', () => {
     it('should create axios instance with correct configuration', () => {
       expect(mockedAxios.create).toHaveBeenCalledWith({
         baseURL: 'https://ws.audioscrobbler.com/2.0/',
-        timeout: 10000
+        timeout: 10000,
       });
     });
 
@@ -77,7 +81,7 @@ describe('LastFmService', () => {
         api_key: 'testkey',
         artist: 'Test Artist',
         track: 'Test Track',
-        format: 'json'
+        format: 'json',
       };
       const secret = 'testsecret';
 
@@ -91,7 +95,7 @@ describe('LastFmService', () => {
       const params = {
         method: 'track.scrobble',
         api_key: 'testkey',
-        format: 'json'
+        format: 'json',
       };
       const secret = 'testsecret';
 
@@ -107,7 +111,7 @@ describe('LastFmService', () => {
   describe('getAuthUrl', () => {
     it('should return correct auth URL with API key', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
-        apiKey: 'testkey'
+        apiKey: 'testkey',
       });
 
       const result = await lastfmService.getAuthUrl();
@@ -130,12 +134,14 @@ describe('LastFmService', () => {
       process.env.LASTFM_CALLBACK_URL = 'https://custom.callback.url';
 
       mockAuthService.getLastFmCredentials.mockResolvedValue({
-        apiKey: 'testkey'
+        apiKey: 'testkey',
       });
 
       const result = await lastfmService.getAuthUrl();
 
-      expect(result).toContain(encodeURIComponent('https://custom.callback.url'));
+      expect(result).toContain(
+        encodeURIComponent('https://custom.callback.url')
+      );
 
       // Restore original environment
       process.env.LASTFM_CALLBACK_URL = originalEnv;
@@ -148,19 +154,19 @@ describe('LastFmService', () => {
         data: {
           session: {
             name: 'testuser',
-            key: 'sessionkey'
-          }
-        }
+            key: 'sessionkey',
+          },
+        },
       };
 
       mockAuthService.getLastFmCredentials.mockResolvedValue({
-        apiKey: 'testkey'
+        apiKey: 'testkey',
       });
-      
+
       // Mock environment variable
       const originalSecret = process.env.LASTFM_SECRET;
       process.env.LASTFM_SECRET = 'testsecret';
-      
+
       mockAxiosInstance.post.mockResolvedValue(mockResponse);
 
       const result = await lastfmService.getSession('testtoken');
@@ -170,13 +176,13 @@ describe('LastFmService', () => {
           method: 'auth.getSession',
           api_key: 'testkey',
           token: 'testtoken',
-          format: 'json'
-        })
+          format: 'json',
+        }),
       });
 
-      expect(result).toEqual({ 
+      expect(result).toEqual({
         sessionKey: 'sessionkey',
-        username: 'testuser'
+        username: 'testuser',
       });
 
       // Restore environment
@@ -193,7 +199,7 @@ describe('LastFmService', () => {
 
     it('should handle Last.fm API errors', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
-        apiKey: 'testkey'
+        apiKey: 'testkey',
       });
 
       const originalSecret = process.env.LASTFM_SECRET;
@@ -202,8 +208,8 @@ describe('LastFmService', () => {
       const errorResponse = {
         data: {
           error: 4,
-          message: 'Invalid API key'
-        }
+          message: 'Invalid API key',
+        },
       };
 
       mockAxiosInstance.post.mockResolvedValue(errorResponse);
@@ -222,7 +228,7 @@ describe('LastFmService', () => {
       track: 'Test Track',
       album: 'Test Album',
       timestamp: 1234567890,
-      duration: 180
+      duration: 180,
     };
 
     beforeEach(() => {
@@ -237,7 +243,7 @@ describe('LastFmService', () => {
     it('should scrobble a track successfully', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       const mockResponse = {
@@ -245,10 +251,10 @@ describe('LastFmService', () => {
           scrobbles: {
             '@attr': {
               accepted: 1,
-              ignored: 0
-            }
-          }
-        }
+              ignored: 0,
+            },
+          },
+        },
       };
 
       mockAxiosInstance.post.mockResolvedValue(mockResponse);
@@ -265,15 +271,15 @@ describe('LastFmService', () => {
           'album[0]': 'Test Album',
           'timestamp[0]': '1234567890',
           'duration[0]': '180',
-          format: 'json'
-        })
+          format: 'json',
+        }),
       });
 
       expect(result).toEqual({
         success: true,
         accepted: 1,
         ignored: 0,
-        message: 'Successfully scrobbled Test Artist - Test Track'
+        message: 'Successfully scrobbled Test Artist - Test Track',
       });
     });
 
@@ -290,7 +296,7 @@ describe('LastFmService', () => {
 
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       await expect(lastfmService.scrobbleTrack(mockTrack)).rejects.toThrow(
@@ -301,7 +307,7 @@ describe('LastFmService', () => {
     it('should handle empty artist or track', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       const invalidTrack = { ...mockTrack, artist: '', track: 'Test Track' };
@@ -314,7 +320,7 @@ describe('LastFmService', () => {
     it('should handle ignored scrobbles', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       const mockResponse = {
@@ -322,10 +328,10 @@ describe('LastFmService', () => {
           scrobbles: {
             '@attr': {
               accepted: 0,
-              ignored: 1
-            }
-          }
-        }
+              ignored: 1,
+            },
+          },
+        },
       };
 
       mockAxiosInstance.post.mockResolvedValue(mockResponse);
@@ -336,21 +342,22 @@ describe('LastFmService', () => {
         success: false,
         accepted: 0,
         ignored: 1,
-        message: 'Scrobble ignored: Test Artist - Test Track (may be duplicate or invalid)'
+        message:
+          'Scrobble ignored: Test Artist - Test Track (may be duplicate or invalid)',
       });
     });
 
     it('should handle API errors', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       const errorResponse = {
         data: {
           error: 9,
-          message: 'Invalid session key'
-        }
+          message: 'Invalid session key',
+        },
       };
 
       mockAxiosInstance.post.mockResolvedValue(errorResponse);
@@ -363,12 +370,12 @@ describe('LastFmService', () => {
     it('should handle tracks without album or duration', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       const minimalTrack = {
         artist: 'Test Artist',
-        track: 'Test Track'
+        track: 'Test Track',
       };
 
       const mockResponse = {
@@ -376,10 +383,10 @@ describe('LastFmService', () => {
           scrobbles: {
             '@attr': {
               accepted: 1,
-              ignored: 0
-            }
-          }
-        }
+              ignored: 0,
+            },
+          },
+        },
       };
 
       mockAxiosInstance.post.mockResolvedValue(mockResponse);
@@ -390,8 +397,8 @@ describe('LastFmService', () => {
         params: expect.objectContaining({
           method: 'track.scrobble',
           'artist[0]': 'Test Artist',
-          'track[0]': 'Test Track'
-        })
+          'track[0]': 'Test Track',
+        }),
       });
 
       expect(result.success).toBe(true);
@@ -401,7 +408,7 @@ describe('LastFmService', () => {
   describe('scrobbleBatch', () => {
     const mockTracks = [
       { artist: 'Artist 1', track: 'Track 1', timestamp: 1234567890 },
-      { artist: 'Artist 2', track: 'Track 2', timestamp: 1234567891 }
+      { artist: 'Artist 2', track: 'Track 2', timestamp: 1234567891 },
     ];
 
     beforeEach(() => {
@@ -417,7 +424,7 @@ describe('LastFmService', () => {
     it('should scrobble multiple tracks successfully', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       const mockResponse = {
@@ -425,10 +432,10 @@ describe('LastFmService', () => {
           scrobbles: {
             '@attr': {
               accepted: 1,
-              ignored: 0
-            }
-          }
-        }
+              ignored: 0,
+            },
+          },
+        },
       };
 
       mockAxiosInstance.post.mockResolvedValue(mockResponse);
@@ -440,7 +447,7 @@ describe('LastFmService', () => {
         failed: 0,
         ignored: 0,
         errors: [],
-        sessionId: 'session-123'
+        sessionId: 'session-123',
       });
 
       expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
@@ -448,7 +455,7 @@ describe('LastFmService', () => {
         expect.objectContaining({
           id: 'session-123',
           tracks: mockTracks,
-          status: 'completed'
+          status: 'completed',
         })
       );
     });
@@ -456,7 +463,7 @@ describe('LastFmService', () => {
     it('should handle partial failures in batch', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       // First track succeeds, second fails
@@ -464,9 +471,9 @@ describe('LastFmService', () => {
         .mockResolvedValueOnce({
           data: {
             scrobbles: {
-              '@attr': { accepted: 1, ignored: 0 }
-            }
-          }
+              '@attr': { accepted: 1, ignored: 0 },
+            },
+          },
         })
         .mockRejectedValueOnce(new Error('Network error'));
 
@@ -477,7 +484,7 @@ describe('LastFmService', () => {
         failed: 1,
         ignored: 0,
         errors: ['Artist 2 - Track 2: Network error'],
-        sessionId: 'session-123'
+        sessionId: 'session-123',
       });
     });
 
@@ -489,7 +496,7 @@ describe('LastFmService', () => {
         failed: 0,
         ignored: 0,
         errors: [],
-        sessionId: 'session-123'
+        sessionId: 'session-123',
       });
     });
   });
@@ -501,7 +508,8 @@ describe('LastFmService', () => {
     it('should apply rate limiting to requests', async () => {
       jest.useFakeTimers();
 
-      const interceptor = mockAxiosInstance.interceptors.request.use.mock.calls[0][0];
+      const interceptor =
+        mockAxiosInstance.interceptors.request.use.mock.calls[0][0];
       const mockConfig = { url: '/test' };
 
       const promise = interceptor(mockConfig);
@@ -521,7 +529,7 @@ describe('LastFmService', () => {
     it('should test connection successfully', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       // Set environment variable for test
@@ -532,9 +540,9 @@ describe('LastFmService', () => {
         data: {
           user: {
             name: 'testuser',
-            playcount: '1000'
-          }
-        }
+            playcount: '1000',
+          },
+        },
       };
 
       mockAxiosInstance.get.mockResolvedValue(mockResponse);
@@ -551,7 +559,7 @@ describe('LastFmService', () => {
     it('should handle connection test failure', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       // Set environment variable for test
@@ -579,13 +587,11 @@ describe('LastFmService', () => {
     });
   });
 
-
-
   describe('scrobbleTrack edge cases', () => {
     it('should handle tracks with special characters', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       // Set environment variable for test
@@ -595,15 +601,15 @@ describe('LastFmService', () => {
       const specialTrack = {
         artist: 'Artist & Band',
         track: 'Track (Remix)',
-        album: 'Album: Special Edition'
+        album: 'Album: Special Edition',
       };
 
       const mockResponse = {
         data: {
           scrobbles: {
-            '@attr': { accepted: 1, ignored: 0 }
-          }
-        }
+            '@attr': { accepted: 1, ignored: 0 },
+          },
+        },
       };
 
       mockAxiosInstance.post.mockResolvedValue(mockResponse);
@@ -615,8 +621,8 @@ describe('LastFmService', () => {
         params: expect.objectContaining({
           'artist[0]': 'Artist & Band',
           'track[0]': 'Track (Remix)',
-          'album[0]': 'Album: Special Edition'
-        })
+          'album[0]': 'Album: Special Edition',
+        }),
       });
 
       // Restore environment
@@ -626,7 +632,7 @@ describe('LastFmService', () => {
     it('should handle very long track names', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       // Set environment variable for test
@@ -636,15 +642,15 @@ describe('LastFmService', () => {
       const longTrack = {
         artist: 'A'.repeat(100),
         track: 'T'.repeat(200),
-        album: 'L'.repeat(150)
+        album: 'L'.repeat(150),
       };
 
       const mockResponse = {
         data: {
           scrobbles: {
-            '@attr': { accepted: 1, ignored: 0 }
-          }
-        }
+            '@attr': { accepted: 1, ignored: 0 },
+          },
+        },
       };
 
       mockAxiosInstance.post.mockResolvedValue(mockResponse);
@@ -660,16 +666,23 @@ describe('LastFmService', () => {
     it('should handle network timeouts', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       // Set environment variable for test
       const originalSecret = process.env.LASTFM_SECRET;
       process.env.LASTFM_SECRET = 'testsecret';
 
-      mockAxiosInstance.post.mockRejectedValue(new Error('timeout of 10000ms exceeded'));
+      mockAxiosInstance.post.mockRejectedValue(
+        new Error('timeout of 10000ms exceeded')
+      );
 
-      await expect(lastfmService.scrobbleTrack({ artist: 'Test Artist', track: 'Test Track' })).rejects.toThrow('timeout of 10000ms exceeded');
+      await expect(
+        lastfmService.scrobbleTrack({
+          artist: 'Test Artist',
+          track: 'Test Track',
+        })
+      ).rejects.toThrow('timeout of 10000ms exceeded');
 
       // Restore environment
       process.env.LASTFM_SECRET = originalSecret;
@@ -678,7 +691,7 @@ describe('LastFmService', () => {
     it('should handle malformed API responses', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       // Set environment variable for test
@@ -687,13 +700,16 @@ describe('LastFmService', () => {
 
       const malformedResponse = {
         data: {
-          scrobbles: null
-        }
+          scrobbles: null,
+        },
       };
 
       mockAxiosInstance.post.mockResolvedValue(malformedResponse);
 
-      const result = await lastfmService.scrobbleTrack({ artist: 'Test Artist', track: 'Test Track' });
+      const result = await lastfmService.scrobbleTrack({
+        artist: 'Test Artist',
+        track: 'Test Track',
+      });
 
       expect(result.success).toBe(false);
       expect(result.accepted).toBe(0);
@@ -708,21 +724,21 @@ describe('LastFmService', () => {
     it('should handle large batches', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       const largeBatch = Array.from({ length: 100 }, (_, i) => ({
         artist: `Artist ${i}`,
         track: `Track ${i}`,
-        timestamp: 1234567890 + i
+        timestamp: 1234567890 + i,
       }));
 
       const mockResponse = {
         data: {
           scrobbles: {
-            '@attr': { accepted: 1, ignored: 0 }
-          }
-        }
+            '@attr': { accepted: 1, ignored: 0 },
+          },
+        },
       };
 
       mockAxiosInstance.post.mockResolvedValue(mockResponse);
@@ -736,7 +752,7 @@ describe('LastFmService', () => {
     it('should handle batch with all failures', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       // Set environment variable for test
@@ -747,7 +763,7 @@ describe('LastFmService', () => {
 
       const result = await lastfmService.scrobbleBatch([
         { artist: 'Artist 1', track: 'Track 1', timestamp: 1234567890 },
-        { artist: 'Artist 2', track: 'Track 2', timestamp: 1234567891 }
+        { artist: 'Artist 2', track: 'Track 2', timestamp: 1234567891 },
       ]);
 
       expect(result.success).toBe(0);
@@ -761,7 +777,7 @@ describe('LastFmService', () => {
     it('should handle batch with mixed ignored tracks', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       // Set environment variable for test
@@ -771,18 +787,18 @@ describe('LastFmService', () => {
       mockAxiosInstance.post
         .mockResolvedValueOnce({
           data: {
-            scrobbles: { '@attr': { accepted: 1, ignored: 0 } }
-          }
+            scrobbles: { '@attr': { accepted: 1, ignored: 0 } },
+          },
         })
         .mockResolvedValueOnce({
           data: {
-            scrobbles: { '@attr': { accepted: 0, ignored: 1 } }
-          }
+            scrobbles: { '@attr': { accepted: 0, ignored: 1 } },
+          },
         });
 
       const result = await lastfmService.scrobbleBatch([
         { artist: 'Artist 1', track: 'Track 1', timestamp: 1234567890 },
-        { artist: 'Artist 2', track: 'Track 2', timestamp: 1234567891 }
+        { artist: 'Artist 2', track: 'Track 2', timestamp: 1234567891 },
       ]);
 
       expect(result.success).toBe(1);
@@ -811,7 +827,7 @@ describe('LastFmService', () => {
         api_key: 'testkey',
         artist: null,
         track: undefined,
-        format: 'json'
+        format: 'json',
       };
       const secret = 'testsecret';
 
@@ -826,7 +842,7 @@ describe('LastFmService', () => {
         api_key: 'test&key',
         artist: 'Artist & Band',
         track: 'Track (Remix)',
-        format: 'json'
+        format: 'json',
       };
       const secret = 'test&secret';
 
@@ -840,7 +856,7 @@ describe('LastFmService', () => {
     it('should handle axios errors with response', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       // Set environment variable for test
@@ -850,12 +866,17 @@ describe('LastFmService', () => {
       const axiosError = new Error('Request failed') as any;
       axiosError.response = {
         status: 429,
-        data: { error: 'Rate limit exceeded' }
+        data: { error: 'Rate limit exceeded' },
       };
 
       mockAxiosInstance.post.mockRejectedValue(axiosError);
 
-      await expect(lastfmService.scrobbleTrack({ artist: 'Test Artist', track: 'Test Track' })).rejects.toThrow('Request failed');
+      await expect(
+        lastfmService.scrobbleTrack({
+          artist: 'Test Artist',
+          track: 'Test Track',
+        })
+      ).rejects.toThrow('Request failed');
 
       // Restore environment
       process.env.LASTFM_SECRET = originalSecret;
@@ -864,7 +885,7 @@ describe('LastFmService', () => {
     it('should handle axios errors without response', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
-        sessionKey: 'testsession'
+        sessionKey: 'testsession',
       });
 
       // Set environment variable for test
@@ -874,7 +895,12 @@ describe('LastFmService', () => {
       const axiosError = new Error('Network error');
       mockAxiosInstance.post.mockRejectedValue(axiosError);
 
-      await expect(lastfmService.scrobbleTrack({ artist: 'Test Artist', track: 'Test Track' })).rejects.toThrow('Network error');
+      await expect(
+        lastfmService.scrobbleTrack({
+          artist: 'Test Artist',
+          track: 'Test Track',
+        })
+      ).rejects.toThrow('Network error');
 
       // Restore environment
       process.env.LASTFM_SECRET = originalSecret;

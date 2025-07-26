@@ -1,9 +1,16 @@
+import crypto from 'crypto';
+
 import axios, { AxiosInstance } from 'axios';
 import OAuth from 'oauth-1.0a';
-import crypto from 'crypto';
+
+import {
+  CollectionItem,
+  DiscogsRelease,
+  ApiResponse,
+} from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
+
 import { AuthService } from './authService';
-import { CollectionItem, DiscogsRelease, ApiResponse } from '../../shared/types';
 
 export class DiscogsService {
   private axios: AxiosInstance;
@@ -19,24 +26,27 @@ export class DiscogsService {
     this.oauth = new OAuth({
       consumer: {
         key: process.env.DISCOGS_CLIENT_ID || '',
-        secret: process.env.DISCOGS_CLIENT_SECRET || ''
+        secret: process.env.DISCOGS_CLIENT_SECRET || '',
       },
       signature_method: 'HMAC-SHA1',
       hash_function(base_string, key) {
-        return crypto.createHmac('sha1', key).update(base_string).digest('base64');
-      }
+        return crypto
+          .createHmac('sha1', key)
+          .update(base_string)
+          .digest('base64');
+      },
     });
 
     this.axios = axios.create({
       baseURL: this.baseUrl,
       timeout: 10000,
       headers: {
-        'User-Agent': 'DiscogLastfmScrobbler/1.0'
-      }
+        'User-Agent': 'DiscogLastfmScrobbler/1.0',
+      },
     });
 
     // Rate limiting interceptor
-    this.axios.interceptors.request.use(async (config) => {
+    this.axios.interceptors.request.use(async config => {
       // Simple rate limiting: wait 1 second between requests
       await new Promise(resolve => setTimeout(resolve, 1000));
       return config;
@@ -51,13 +61,13 @@ export class DiscogsService {
     const clientSecret = process.env.DISCOGS_CLIENT_SECRET;
     console.log('Discogs credentials:', {
       clientId: clientId ? 'present' : 'missing',
-      clientSecret: clientSecret ? 'present' : 'missing'
+      clientSecret: clientSecret ? 'present' : 'missing',
     });
 
     // Step 1: Get request token
     const requestData = {
       url: `${this.baseUrl}/oauth/request_token`,
-      method: 'GET'
+      method: 'GET',
     };
 
     console.log('Request data for OAuth:', requestData);
@@ -66,7 +76,7 @@ export class DiscogsService {
 
     try {
       const response = await this.axios.get('/oauth/request_token', {
-        headers: authHeader as any
+        headers: authHeader as any,
       });
 
       console.log('Discogs request token response:', response.data);
@@ -76,7 +86,10 @@ export class DiscogsService {
       const oauthToken = params.get('oauth_token');
       const oauthTokenSecret = params.get('oauth_token_secret');
 
-      console.log('Parsed tokens:', { oauthToken, oauthTokenSecret: oauthTokenSecret ? 'present' : 'missing' });
+      console.log('Parsed tokens:', {
+        oauthToken,
+        oauthTokenSecret: oauthTokenSecret ? 'present' : 'missing',
+      });
 
       if (!oauthToken || !oauthTokenSecret) {
         throw new Error('Failed to get OAuth request token');
@@ -87,7 +100,9 @@ export class DiscogsService {
       console.log('Stored token secret for callback');
 
       // Return the authorization URL
-      const callbackUrl = process.env.DISCOGS_CALLBACK_URL || 'http://localhost:3001/api/v1/auth/discogs/callback';
+      const callbackUrl =
+        process.env.DISCOGS_CALLBACK_URL ||
+        'http://localhost:3001/api/v1/auth/discogs/callback';
 
       // Include the callback URL in the authorization URL
       const authUrl = `https://discogs.com/oauth/authorize?oauth_token=${oauthToken}&oauth_callback=${encodeURIComponent(callbackUrl)}`;
@@ -95,7 +110,6 @@ export class DiscogsService {
       console.log('Callback URL:', callbackUrl);
 
       return authUrl;
-
     } catch (error: any) {
       console.error('Discogs OAuth error:', error);
       if (error.response) {
@@ -106,32 +120,39 @@ export class DiscogsService {
     }
   }
 
-  async handleCallback(oauthToken: string, oauthVerifier: string): Promise<{ username: string }> {
+  async handleCallback(
+    oauthToken: string,
+    oauthVerifier: string
+  ): Promise<{ username: string }> {
     try {
       // Get the stored token secret
       const tokenSecret = await this.authService.getOAuthTokenSecret();
       if (!tokenSecret) {
-        throw new Error('OAuth token secret not found. Please restart the authentication flow.');
+        throw new Error(
+          'OAuth token secret not found. Please restart the authentication flow.'
+        );
       }
 
       // Step 2: Exchange for access token
       const requestData = {
         url: `${this.baseUrl}/oauth/access_token`,
-        method: 'POST'
+        method: 'POST',
       };
 
       const token = {
         key: oauthToken,
-        secret: tokenSecret
+        secret: tokenSecret,
       };
 
-      const authHeader = this.oauth.toHeader(this.oauth.authorize(requestData, token));
+      const authHeader = this.oauth.toHeader(
+        this.oauth.authorize(requestData, token)
+      );
 
       const response = await this.axios.post('/oauth/access_token', null, {
         headers: authHeader as any,
         params: {
-          oauth_verifier: oauthVerifier
-        }
+          oauth_verifier: oauthVerifier,
+        },
       });
 
       // Parse access token response
@@ -146,13 +167,13 @@ export class DiscogsService {
       // Store the access token
       const tokenData = JSON.stringify({
         key: accessToken,
-        secret: accessTokenSecret
+        secret: accessTokenSecret,
       });
 
       // Get user profile to get username
       const userProfile = await this.getUserProfileWithToken({
         key: accessToken,
-        secret: accessTokenSecret
+        secret: accessTokenSecret,
       });
 
       // Save the token and username
@@ -162,23 +183,27 @@ export class DiscogsService {
       await this.authService.clearOAuthTokenSecret();
 
       return { username: userProfile.username };
-
     } catch (error) {
       console.error('Discogs OAuth callback error:', error);
       throw new Error('Failed to complete Discogs OAuth flow');
     }
   }
 
-  private async getUserProfileWithToken(token: { key: string; secret: string }): Promise<any> {
+  private async getUserProfileWithToken(token: {
+    key: string;
+    secret: string;
+  }): Promise<any> {
     const requestData = {
       url: `${this.baseUrl}/oauth/identity`,
-      method: 'GET'
+      method: 'GET',
     };
 
-    const authHeader = this.oauth.toHeader(this.oauth.authorize(requestData, token));
+    const authHeader = this.oauth.toHeader(
+      this.oauth.authorize(requestData, token)
+    );
 
     const response = await this.axios.get('/oauth/identity', {
-      headers: authHeader as any
+      headers: authHeader as any,
     });
 
     return response.data;
@@ -194,14 +219,14 @@ export class DiscogsService {
     // For Personal Access Token (simpler approach)
     if (token.startsWith('Discogs token=')) {
       return {
-        'Authorization': token
+        Authorization: token,
       };
     }
 
     // For OAuth token
     const requestData = {
       url: this.baseUrl,
-      method: 'GET'
+      method: 'GET',
     };
 
     const tokenObj = JSON.parse(token);
@@ -213,28 +238,33 @@ export class DiscogsService {
       const token = await this.authService.getDiscogsToken();
 
       if (!token) {
-        throw new Error('No Discogs token available. Please authenticate first.');
+        throw new Error(
+          'No Discogs token available. Please authenticate first.'
+        );
       }
 
       // For Personal Access Token, we need to make a simple API call to get user info
       if (token.startsWith('Discogs token=')) {
         const headers = {
-          'Authorization': token,
-          'User-Agent': 'DiscogLastfmScrobbler/1.0'
+          Authorization: token,
+          'User-Agent': 'DiscogLastfmScrobbler/1.0',
         };
 
         // For personal tokens, we can use the /users/{username} endpoint
         // But first we need to get our own user info
         // Let's try a simple API call first to test the token
-        const response = await this.axios.get('/database/search?q=test&type=release&per_page=1', {
-          headers
-        });
+        await this.axios.get(
+          '/database/search?q=test&type=release&per_page=1',
+          {
+            headers,
+          }
+        );
 
         // If that works, the token is valid, but we still need username
         // For now, return a placeholder - in a real app you'd need to get username another way
         return {
           username: 'user', // Placeholder - we'd need to get this from somewhere else
-          id: 'unknown'
+          id: 'unknown',
         };
       }
 
@@ -245,25 +275,41 @@ export class DiscogsService {
     } catch (error: any) {
       console.error('Error fetching user profile:', error);
       if (error.response) {
-        console.error('Discogs API error:', error.response.status, error.response.data);
+        console.error(
+          'Discogs API error:',
+          error.response.status,
+          error.response.data
+        );
       }
       throw error;
     }
   }
 
-  async getUserCollection(username: string, page: number = 1, perPage: number = 50, forceReload: boolean = false): Promise<ApiResponse<CollectionItem[]>> {
+  async getUserCollection(
+    username: string,
+    page: number = 1,
+    perPage: number = 50,
+    forceReload: boolean = false
+  ): Promise<ApiResponse<CollectionItem[]>> {
     try {
       const cacheKey = `collections/${username}-page-${page}.json`;
 
       // Try cache first (unless force reload is requested)
       if (!forceReload) {
         console.log(`🔍 Checking cache for ${cacheKey}`);
-        const cached = await this.fileStorage.readJSON<ApiResponse<CollectionItem[]>>(cacheKey);
+        const cached =
+          await this.fileStorage.readJSON<ApiResponse<CollectionItem[]>>(
+            cacheKey
+          );
         if (cached && this.isCacheValid(cached)) {
-          console.log(`✅ Returning cached collection page ${page} for ${username} (cache age: ${Math.round((Date.now() - (cached.timestamp || 0)) / 1000 / 60)} minutes)`);
+          console.log(
+            `✅ Returning cached collection page ${page} for ${username} (cache age: ${Math.round((Date.now() - (cached.timestamp || 0)) / 1000 / 60)} minutes)`
+          );
           return cached;
         } else if (cached) {
-          console.log(`⏰ Cache expired for page ${page} (cache age: ${Math.round((Date.now() - (cached.timestamp || 0)) / 1000 / 60)} minutes)`);
+          console.log(
+            `⏰ Cache expired for page ${page} (cache age: ${Math.round((Date.now() - (cached.timestamp || 0)) / 1000 / 60)} minutes)`
+          );
         } else {
           console.log(`📁 No cache found for page ${page}`);
         }
@@ -271,42 +317,53 @@ export class DiscogsService {
         console.log(`🔄 Force reload requested for page ${page}`);
       }
 
-      console.log(`🌐 Fetching collection page ${page} for ${username} from API`);
+      console.log(
+        `🌐 Fetching collection page ${page} for ${username} from API`
+      );
 
       const headers = await this.getAuthHeaders();
-      const response = await this.axios.get(`/users/${username}/collection/folders/0/releases`, {
-        headers,
-        params: {
-          page,
-          per_page: perPage
+      const response = await this.axios.get(
+        `/users/${username}/collection/folders/0/releases`,
+        {
+          headers,
+          params: {
+            page,
+            per_page: perPage,
+          },
         }
-      });
+      );
 
       // Transform the response
-      const transformedReleases: CollectionItem[] = response.data.releases.map((item: any) => ({
-        id: item.id,
-        date_added: item.date_added,
-        rating: item.rating,
-        notes: item.notes,
-        release: {
-          id: item.basic_information.id,
-          master_id: item.basic_information.master_id,
-          title: item.basic_information.title,
-          artist: item.basic_information.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist',
-          year: item.basic_information.year,
-          format: item.basic_information.formats?.map((f: any) => f.name) || [],
-          label: item.basic_information.labels?.map((l: any) => l.name) || [],
-          catalog_number: item.basic_information.catalog_number,
-          cover_image: item.basic_information.cover_image,
-          resource_url: item.basic_information.resource_url
-        }
-      }));
+      const transformedReleases: CollectionItem[] = response.data.releases.map(
+        (item: any) => ({
+          id: item.id,
+          date_added: item.date_added,
+          rating: item.rating,
+          notes: item.notes,
+          release: {
+            id: item.basic_information.id,
+            master_id: item.basic_information.master_id,
+            title: item.basic_information.title,
+            artist:
+              item.basic_information.artists
+                ?.map((a: any) => a.name)
+                .join(', ') || 'Unknown Artist',
+            year: item.basic_information.year,
+            format:
+              item.basic_information.formats?.map((f: any) => f.name) || [],
+            label: item.basic_information.labels?.map((l: any) => l.name) || [],
+            catalog_number: item.basic_information.catalog_number,
+            cover_image: item.basic_information.cover_image,
+            resource_url: item.basic_information.resource_url,
+          },
+        })
+      );
 
       const result: ApiResponse<CollectionItem[]> = {
         success: true,
         data: transformedReleases,
         pagination: response.data.pagination,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // Cache the result
@@ -317,7 +374,7 @@ export class DiscogsService {
       console.error('Error fetching user collection:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -333,25 +390,30 @@ export class DiscogsService {
       }
 
       const headers = await this.getAuthHeaders();
-      const response = await this.axios.get(`/releases/${releaseId}`, { headers });
+      const response = await this.axios.get(`/releases/${releaseId}`, {
+        headers,
+      });
 
       const release: DiscogsRelease = {
         id: response.data.id,
         master_id: response.data.master_id,
         title: response.data.title,
-        artist: response.data.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist',
+        artist:
+          response.data.artists?.map((a: any) => a.name).join(', ') ||
+          'Unknown Artist',
         year: response.data.year,
         format: response.data.formats?.map((f: any) => f.name) || [],
         label: response.data.labels?.map((l: any) => l.name) || [],
         catalog_number: response.data.catalog_number,
         cover_image: response.data.images?.[0]?.uri,
         resource_url: response.data.resource_url,
-        tracklist: response.data.tracklist?.map((track: any) => ({
-          position: track.position,
-          title: track.title,
-          duration: track.duration,
-          artist: track.artists?.map((a: any) => a.name).join(', ')
-        })) || []
+        tracklist:
+          response.data.tracklist?.map((track: any) => ({
+            position: track.position,
+            title: track.title,
+            duration: track.duration,
+            artist: track.artists?.map((a: any) => a.name).join(', '),
+          })) || [],
       };
 
       // Cache the release
@@ -371,13 +433,17 @@ export class DiscogsService {
       console.log(`Starting progressive collection loading for: ${username}`);
 
       // Check if we already have a recent cache
-      const existingProgress = await this.fileStorage.readJSON<any>(progressKey);
+      const existingProgress =
+        await this.fileStorage.readJSON<any>(progressKey);
 
       if (existingProgress && existingProgress.status === 'completed') {
         // Check if the cache is still recent (less than 12 hours old)
         const cacheAge = Date.now() - (existingProgress.endTime || 0);
-        if (cacheAge < 43200000) { // 12 hours
-          console.log(`Cache is recent (${Math.round(cacheAge / 1000 / 60)} minutes old), skipping preload`);
+        if (cacheAge < 43200000) {
+          // 12 hours
+          console.log(
+            `Cache is recent (${Math.round(cacheAge / 1000 / 60)} minutes old), skipping preload`
+          );
           return;
         }
       }
@@ -390,13 +456,15 @@ export class DiscogsService {
         await this.fileStorage.writeJSON(progressKey, {
           username,
           status: 'failed',
-          error: firstPage.error || 'Failed to get first page'
+          error: firstPage.error || 'Failed to get first page',
         });
         return;
       }
 
       const totalPages = firstPage.pagination.pages;
-      console.log(`Collection has ${totalPages} pages, starting background loading...`);
+      console.log(
+        `Collection has ${totalPages} pages, starting background loading...`
+      );
 
       // Store progress information
       await this.fileStorage.writeJSON(progressKey, {
@@ -405,7 +473,7 @@ export class DiscogsService {
         currentPage: 1,
         completedPages: [1],
         startTime: Date.now(),
-        status: 'loading'
+        status: 'loading',
       });
 
       // Load remaining pages in background with rate limiting
@@ -419,7 +487,8 @@ export class DiscogsService {
             console.log(`Cached page ${page}/${totalPages}`);
 
             // Update progress
-            const progress = await this.fileStorage.readJSON<any>(progressKey) || {};
+            const progress =
+              (await this.fileStorage.readJSON<any>(progressKey)) || {};
             progress.currentPage = page;
             progress.completedPages = progress.completedPages || [];
             progress.completedPages.push(page);
@@ -441,7 +510,7 @@ export class DiscogsService {
         completedPages: Array.from({ length: totalPages }, (_, i) => i + 1),
         startTime: Date.now(),
         status: 'completed',
-        endTime: Date.now()
+        endTime: Date.now(),
       });
 
       console.log(`Finished preloading ${totalPages} pages for ${username}`);
@@ -449,14 +518,20 @@ export class DiscogsService {
       console.error('Error in preloadAllCollectionPages:', error);
 
       // Mark as failed
-      const progress = await this.fileStorage.readJSON<any>(progressKey) || {};
+      const progress =
+        (await this.fileStorage.readJSON<any>(progressKey)) || {};
       progress.status = 'failed';
       progress.error = error instanceof Error ? error.message : 'Unknown error';
       await this.fileStorage.writeJSON(progressKey, progress);
     }
   }
 
-  async searchCollectionFromCache(username: string, query: string, page: number = 1, perPage: number = 50): Promise<{ items: CollectionItem[], total: number, totalPages: number }> {
+  async searchCollectionFromCache(
+    username: string,
+    query: string,
+    page: number = 1,
+    perPage: number = 50
+  ): Promise<{ items: CollectionItem[]; total: number; totalPages: number }> {
     try {
       console.log(`Searching cached collection for: ${query} (page ${page})`);
 
@@ -466,7 +541,10 @@ export class DiscogsService {
 
       while (true) {
         const cacheKey = `collections/${username}-page-${pageNumber}.json`;
-        const cached = await this.fileStorage.readJSON<ApiResponse<CollectionItem[]>>(cacheKey);
+        const cached =
+          await this.fileStorage.readJSON<ApiResponse<CollectionItem[]>>(
+            cacheKey
+          );
 
         if (!cached || !this.isCacheValid(cached) || !cached.data) {
           break;
@@ -480,9 +558,10 @@ export class DiscogsService {
 
       // Filter results
       const lowerQuery = query.toLowerCase();
-      const filteredItems = allItems.filter(item =>
-        item.release.title.toLowerCase().includes(lowerQuery) ||
-        item.release.artist.toLowerCase().includes(lowerQuery)
+      const filteredItems = allItems.filter(
+        item =>
+          item.release.title.toLowerCase().includes(lowerQuery) ||
+          item.release.artist.toLowerCase().includes(lowerQuery)
       );
 
       // Apply pagination to filtered results
@@ -492,12 +571,14 @@ export class DiscogsService {
       const endIndex = startIndex + perPage;
       const paginatedItems = filteredItems.slice(startIndex, endIndex);
 
-      console.log(`Found ${total} results for "${query}", returning page ${page}/${totalPages} (${paginatedItems.length} items)`);
+      console.log(
+        `Found ${total} results for "${query}", returning page ${page}/${totalPages} (${paginatedItems.length} items)`
+      );
 
       return {
         items: paginatedItems,
         total,
-        totalPages
+        totalPages,
       };
     } catch (error) {
       console.error('Error searching collection from cache:', error);
@@ -505,12 +586,20 @@ export class DiscogsService {
     }
   }
 
-  async searchCollection(username: string, query: string): Promise<CollectionItem[]> {
+  async searchCollection(
+    username: string,
+    query: string
+  ): Promise<CollectionItem[]> {
     try {
       console.log(`Searching collection for: ${query}`);
 
       // Try to search from cache first
-      const cacheResult = await this.searchCollectionFromCache(username, query, 1, 100);
+      const cacheResult = await this.searchCollectionFromCache(
+        username,
+        query,
+        1,
+        100
+      );
       if (cacheResult.items.length > 0 || cacheResult.total > 0) {
         return cacheResult.items;
       }
@@ -528,9 +617,10 @@ export class DiscogsService {
 
       // Filter results
       const lowerQuery = query.toLowerCase();
-      const results = response.data.filter(item =>
-        item.release.title.toLowerCase().includes(lowerQuery) ||
-        item.release.artist.toLowerCase().includes(lowerQuery)
+      const results = response.data.filter(
+        item =>
+          item.release.title.toLowerCase().includes(lowerQuery) ||
+          item.release.artist.toLowerCase().includes(lowerQuery)
       );
 
       console.log(`Found ${results.length} results for "${query}"`);
@@ -545,7 +635,9 @@ export class DiscogsService {
     // Cache is valid for 24 hours
     const cacheAge = Date.now() - (cached.timestamp || 0);
     const isValid = cacheAge < 86400000; // 24 hours in milliseconds
-    console.log(`🔍 Cache validation: age=${Math.round(cacheAge / 1000 / 60)} minutes, valid=${isValid}`);
+    console.log(
+      `🔍 Cache validation: age=${Math.round(cacheAge / 1000 / 60)} minutes, valid=${isValid}`
+    );
     return isValid;
   }
 
@@ -572,7 +664,13 @@ export class DiscogsService {
     }
   }
 
-  async checkForNewItems(username: string): Promise<{ success: boolean; newItemsCount: number; latestCacheDate?: string; latestDiscogsDate?: string; error?: string }> {
+  async checkForNewItems(username: string): Promise<{
+    success: boolean;
+    newItemsCount: number;
+    latestCacheDate?: string;
+    latestDiscogsDate?: string;
+    error?: string;
+  }> {
     try {
       console.log(`🔍 Checking for new items in ${username}'s collection`);
 
@@ -582,7 +680,11 @@ export class DiscogsService {
 
       if (!cached || !cached.timestamp) {
         console.log('❌ No cached data found or no timestamp');
-        return { success: false, newItemsCount: 0, error: 'No cached data found' };
+        return {
+          success: false,
+          newItemsCount: 0,
+          error: 'No cached data found',
+        };
       }
 
       // Cache timestamp tells us when data was last fetched from Discogs
@@ -590,80 +692,115 @@ export class DiscogsService {
       console.log(`📅 Cache was last updated: ${cacheTimestamp.toISOString()}`);
 
       // Get the first page from Discogs sorted by date_added descending to get newest items first
-      console.log(`🌐 Fetching fresh collection data sorted by date_added from Discogs API`);
+      console.log(
+        `🌐 Fetching fresh collection data sorted by date_added from Discogs API`
+      );
       let response;
       let headers;
       try {
         headers = await this.getAuthHeaders();
-        response = await this.axios.get(`/users/${username}/collection/folders/0/releases`, {
-          headers,
-          params: {
-            page: 1,
-            per_page: 50,
-            sort: 'added',
-            sort_order: 'desc'
+        response = await this.axios.get(
+          `/users/${username}/collection/folders/0/releases`,
+          {
+            headers,
+            params: {
+              page: 1,
+              per_page: 50,
+              sort: 'added',
+              sort_order: 'desc',
+            },
           }
-        });
+        );
       } catch (apiError) {
         console.error(`❌ Authenticated API call failed:`, apiError);
         // Fallback to unauthenticated call for testing
         console.log(`🔄 Trying unauthenticated API call as fallback...`);
         headers = { 'User-Agent': 'DiscogLastfmScrobbler/1.0' };
-        response = await this.axios.get(`/users/${username}/collection/folders/0/releases`, {
-          headers,
-          params: {
-            page: 1,
-            per_page: 50,
-            sort: 'added',
-            sort_order: 'desc'
+        response = await this.axios.get(
+          `/users/${username}/collection/folders/0/releases`,
+          {
+            headers,
+            params: {
+              page: 1,
+              per_page: 50,
+              sort: 'added',
+              sort_order: 'desc',
+            },
           }
-        });
+        );
       }
 
       console.log(`📡 Discogs API Response Status: ${response.status}`);
-      console.log(`📡 First 3 items from Discogs:`, response.data.releases?.slice(0, 3).map((item: any) => ({
-        date_added: item.date_added,
-        title: item.basic_information.title,
-        artist: item.basic_information.artists[0]?.name
-      })) || 'No releases found');
+      console.log(
+        `📡 First 3 items from Discogs:`,
+        response.data.releases?.slice(0, 3).map((item: any) => ({
+          date_added: item.date_added,
+          title: item.basic_information.title,
+          artist: item.basic_information.artists[0]?.name,
+        })) || 'No releases found'
+      );
 
-
-      if (!response.data || !response.data.releases || response.data.releases.length === 0) {
+      if (
+        !response.data ||
+        !response.data.releases ||
+        response.data.releases.length === 0
+      ) {
         console.log('❌ Failed to get fresh collection data from Discogs');
-        return { success: false, newItemsCount: 0, error: 'Failed to get fresh collection data' };
+        return {
+          success: false,
+          newItemsCount: 0,
+          error: 'Failed to get fresh collection data',
+        };
       }
 
       // Transform the response to match our format
-      const freshItems: CollectionItem[] = response.data.releases.map((item: any) => ({
-        id: item.id,
-        date_added: item.date_added,
-        rating: item.rating,
-        release: {
-          id: item.basic_information.id,
-          master_id: item.basic_information.master_id,
-          title: item.basic_information.title,
-          artist: item.basic_information.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist',
-          year: item.basic_information.year,
-          format: item.basic_information.formats?.map((f: any) => f.name) || [],
-          label: item.basic_information.labels?.map((l: any) => l.name) || [],
-          cover_image: item.basic_information.cover_image,
-          resource_url: item.basic_information.resource_url
-        }
-      }));
+      const freshItems: CollectionItem[] = response.data.releases.map(
+        (item: any) => ({
+          id: item.id,
+          date_added: item.date_added,
+          rating: item.rating,
+          release: {
+            id: item.basic_information.id,
+            master_id: item.basic_information.master_id,
+            title: item.basic_information.title,
+            artist:
+              item.basic_information.artists
+                ?.map((a: any) => a.name)
+                .join(', ') || 'Unknown Artist',
+            year: item.basic_information.year,
+            format:
+              item.basic_information.formats?.map((f: any) => f.name) || [],
+            label: item.basic_information.labels?.map((l: any) => l.name) || [],
+            cover_image: item.basic_information.cover_image,
+            resource_url: item.basic_information.resource_url,
+          },
+        })
+      );
 
       // Get the most recent date_added from Discogs (first item since sorted by date desc)
-      const latestDiscogsDate = freshItems.length > 0 && freshItems[0].date_added ? freshItems[0].date_added : null;
+      const latestDiscogsDate =
+        freshItems.length > 0 && freshItems[0].date_added
+          ? freshItems[0].date_added
+          : null;
 
       if (!latestDiscogsDate) {
         console.log('❌ No date_added found in Discogs data');
-        return { success: false, newItemsCount: 0, error: 'No date information found' };
+        return {
+          success: false,
+          newItemsCount: 0,
+          error: 'No date information found',
+        };
       }
 
       console.log(`📅 Latest Discogs item date: ${latestDiscogsDate}`);
       const latestDiscogsTimestamp = new Date(latestDiscogsDate);
-      console.log(`📅 Latest Discogs item timestamp: ${latestDiscogsTimestamp.toISOString()}`);
+      console.log(
+        `📅 Latest Discogs item timestamp: ${latestDiscogsTimestamp.toISOString()}`
+      );
       console.log(`📅 Cache timestamp: ${cacheTimestamp.toISOString()}`);
-      console.log(`📅 Is item newer than cache? ${latestDiscogsTimestamp > cacheTimestamp}`);
+      console.log(
+        `📅 Is item newer than cache? ${latestDiscogsTimestamp > cacheTimestamp}`
+      );
 
       // Compare the newest item's date with when cache was last updated
       if (latestDiscogsTimestamp > cacheTimestamp) {
@@ -674,15 +811,18 @@ export class DiscogsService {
 
         while (checkPage <= checkLimit) {
           console.log(`📊 Checking page ${checkPage} for new items...`);
-          const pageResponse = await this.axios.get(`/users/${username}/collection/folders/0/releases`, {
-            headers,
-            params: {
-              page: checkPage,
-              per_page: 50,
-              sort: 'added',
-              sort_order: 'desc'
+          const pageResponse = await this.axios.get(
+            `/users/${username}/collection/folders/0/releases`,
+            {
+              headers,
+              params: {
+                page: checkPage,
+                per_page: 50,
+                sort: 'added',
+                sort_order: 'desc',
+              },
             }
-          });
+          );
 
           if (!pageResponse.data || !pageResponse.data.releases) {
             console.log(`❌ Failed to get page ${checkPage}`);
@@ -694,7 +834,9 @@ export class DiscogsService {
             const itemTimestamp = new Date(item.date_added);
             if (itemTimestamp > cacheTimestamp) {
               newItemsCount++;
-              console.log(`🆕 Found new item: ${item.basic_information.artists[0]?.name} - ${item.basic_information.title} (${item.date_added})`);
+              console.log(
+                `🆕 Found new item: ${item.basic_information.artists[0]?.name} - ${item.basic_information.title} (${item.date_added})`
+              );
             } else {
               foundOlderItem = true;
             }
@@ -702,7 +844,9 @@ export class DiscogsService {
 
           // If we found an older item, we can stop checking (since data is sorted by date desc)
           if (foundOlderItem) {
-            console.log(`⏹️ Found older items on page ${checkPage}, stopping search`);
+            console.log(
+              `⏹️ Found older items on page ${checkPage}, stopping search`
+            );
             break;
           }
 
@@ -714,12 +858,14 @@ export class DiscogsService {
           }
         }
 
-        console.log(`✅ Found ${newItemsCount} new items since cache was last updated`);
+        console.log(
+          `✅ Found ${newItemsCount} new items since cache was last updated`
+        );
         return {
           success: true,
           newItemsCount,
           latestCacheDate: cacheTimestamp.toISOString(),
-          latestDiscogsDate
+          latestDiscogsDate,
         };
       } else {
         console.log(`✅ No new items found. Collection is up to date.`);
@@ -727,21 +873,22 @@ export class DiscogsService {
           success: true,
           newItemsCount: 0,
           latestCacheDate: cacheTimestamp.toISOString(),
-          latestDiscogsDate
+          latestDiscogsDate,
         };
       }
-
     } catch (error) {
       console.error('❌ Error checking for new items:', error);
       return {
         success: false,
         newItemsCount: 0,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
 
-  async updateCacheWithNewItems(username: string): Promise<{ success: boolean; newItemsAdded: number; error?: string }> {
+  async updateCacheWithNewItems(
+    username: string
+  ): Promise<{ success: boolean; newItemsAdded: number; error?: string }> {
     try {
       console.log(`🔄 Starting incremental cache update for ${username}`);
 
@@ -750,8 +897,14 @@ export class DiscogsService {
       const cached = await this.fileStorage.readJSON<any>(cacheKey);
 
       if (!cached || !cached.timestamp) {
-        console.log('❌ No existing cache found - use full cache refresh instead');
-        return { success: false, newItemsAdded: 0, error: 'No existing cache found' };
+        console.log(
+          '❌ No existing cache found - use full cache refresh instead'
+        );
+        return {
+          success: false,
+          newItemsAdded: 0,
+          error: 'No existing cache found',
+        };
       }
 
       const cacheTimestamp = new Date(cached.timestamp);
@@ -773,15 +926,18 @@ export class DiscogsService {
 
       while (checkPage <= checkLimit) {
         console.log(`📊 Fetching page ${checkPage} for new items...`);
-        const response = await this.axios.get(`/users/${username}/collection/folders/0/releases`, {
-          headers,
-          params: {
-            page: checkPage,
-            per_page: 50,
-            sort: 'added',
-            sort_order: 'desc'
+        const response = await this.axios.get(
+          `/users/${username}/collection/folders/0/releases`,
+          {
+            headers,
+            params: {
+              page: checkPage,
+              per_page: 50,
+              sort: 'added',
+              sort_order: 'desc',
+            },
           }
-        });
+        );
 
         if (!response.data || !response.data.releases) {
           console.log(`❌ Failed to get page ${checkPage}`);
@@ -802,17 +958,24 @@ export class DiscogsService {
                 id: item.basic_information.id,
                 master_id: item.basic_information.master_id,
                 title: item.basic_information.title,
-                artist: item.basic_information.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist',
+                artist:
+                  item.basic_information.artists
+                    ?.map((a: any) => a.name)
+                    .join(', ') || 'Unknown Artist',
                 year: item.basic_information.year,
-                format: item.basic_information.formats?.map((f: any) => f.name) || [],
-                label: item.basic_information.labels?.map((l: any) => l.name) || [],
+                format:
+                  item.basic_information.formats?.map((f: any) => f.name) || [],
+                label:
+                  item.basic_information.labels?.map((l: any) => l.name) || [],
                 catalog_number: item.basic_information.catalog_number,
                 cover_image: item.basic_information.cover_image,
-                resource_url: item.basic_information.resource_url
-              }
+                resource_url: item.basic_information.resource_url,
+              },
             };
             newItems.push(transformedItem);
-            console.log(`🆕 Found new item: ${transformedItem.release.artist} - ${transformedItem.release.title} (${transformedItem.date_added})`);
+            console.log(
+              `🆕 Found new item: ${transformedItem.release.artist} - ${transformedItem.release.title} (${transformedItem.date_added})`
+            );
           } else {
             foundOlderItem = true;
           }
@@ -820,7 +983,9 @@ export class DiscogsService {
 
         // If we found an older item, stop checking (data is sorted by date desc)
         if (foundOlderItem) {
-          console.log(`⏹️ Found older items on page ${checkPage}, stopping search`);
+          console.log(
+            `⏹️ Found older items on page ${checkPage}, stopping search`
+          );
           break;
         }
 
@@ -855,7 +1020,9 @@ export class DiscogsService {
         pageNumber++;
       }
 
-      console.log(`📚 Loaded ${allExistingItems.length} existing items from cache`);
+      console.log(
+        `📚 Loaded ${allExistingItems.length} existing items from cache`
+      );
 
       // Merge new items with existing items (new items first since they're newest)
       const mergedItems = [...newItems, ...allExistingItems];
@@ -877,9 +1044,9 @@ export class DiscogsService {
             page,
             pages: totalPages,
             per_page: itemsPerPage,
-            items: mergedItems.length
+            items: mergedItems.length,
           },
-          timestamp: Date.now()
+          timestamp: Date.now(),
         };
 
         const pageKey = `collections/${username}-page-${page}.json`;
@@ -888,27 +1055,29 @@ export class DiscogsService {
 
       // Remove any old pages that are no longer needed
       let checkOldPages = totalPages + 1;
-      while (checkOldPages <= totalPages + 5) { // Check a few extra pages
+      while (checkOldPages <= totalPages + 5) {
+        // Check a few extra pages
         const oldPageKey = `collections/${username}-page-${checkOldPages}.json`;
         try {
           await this.fileStorage.delete(oldPageKey);
           console.log(`🗑️ Removed old cache page ${checkOldPages}`);
-        } catch (error) {
+        } catch {
           // Page doesn't exist, which is fine
           break;
         }
         checkOldPages++;
       }
 
-      console.log(`✅ Incremental cache update completed: added ${newItems.length} new items`);
+      console.log(
+        `✅ Incremental cache update completed: added ${newItems.length} new items`
+      );
       return { success: true, newItemsAdded: newItems.length };
-
     } catch (error) {
       console.error('❌ Error during incremental cache update:', error);
       return {
         success: false,
         newItemsAdded: 0,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }

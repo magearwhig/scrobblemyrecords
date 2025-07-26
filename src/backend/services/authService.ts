@@ -1,7 +1,9 @@
 import crypto from 'crypto';
+
 import CryptoJS from 'crypto-js';
-import { FileStorage } from '../utils/fileStorage';
+
 import { UserSettings } from '../../shared/types';
+import { FileStorage } from '../utils/fileStorage';
 
 export class AuthService {
   private fileStorage: FileStorage;
@@ -9,7 +11,8 @@ export class AuthService {
 
   constructor(fileStorage: FileStorage) {
     this.fileStorage = fileStorage;
-    this.encryptionKey = process.env.ENCRYPTION_KEY || 'default-encryption-key-change-me';
+    this.encryptionKey =
+      process.env.ENCRYPTION_KEY || 'default-encryption-key-change-me';
   }
 
   private encrypt(text: string): string {
@@ -22,8 +25,10 @@ export class AuthService {
   }
 
   async getUserSettings(): Promise<UserSettings> {
-    const settings = await this.fileStorage.readJSON<UserSettings>('settings/user-settings.json');
-    
+    const settings = await this.fileStorage.readJSON<UserSettings>(
+      'settings/user-settings.json'
+    );
+
     if (!settings) {
       const defaultSettings: UserSettings = {
         discogs: {},
@@ -31,8 +36,8 @@ export class AuthService {
         preferences: {
           defaultTimestamp: 'now',
           batchSize: 50,
-          autoScrobble: false
-        }
+          autoScrobble: false,
+        },
       };
       await this.saveUserSettings(defaultSettings);
       return defaultSettings;
@@ -55,18 +60,27 @@ export class AuthService {
   async saveUserSettings(settings: UserSettings): Promise<void> {
     // Encrypt sensitive data before saving
     const encryptedSettings = { ...settings };
-    
+
     if (encryptedSettings.discogs.token) {
-      encryptedSettings.discogs.token = this.encrypt(encryptedSettings.discogs.token);
+      encryptedSettings.discogs.token = this.encrypt(
+        encryptedSettings.discogs.token
+      );
     }
     if (encryptedSettings.lastfm.apiKey) {
-      encryptedSettings.lastfm.apiKey = this.encrypt(encryptedSettings.lastfm.apiKey);
+      encryptedSettings.lastfm.apiKey = this.encrypt(
+        encryptedSettings.lastfm.apiKey
+      );
     }
     if (encryptedSettings.lastfm.sessionKey) {
-      encryptedSettings.lastfm.sessionKey = this.encrypt(encryptedSettings.lastfm.sessionKey);
+      encryptedSettings.lastfm.sessionKey = this.encrypt(
+        encryptedSettings.lastfm.sessionKey
+      );
     }
 
-    await this.fileStorage.writeJSON('settings/user-settings.json', encryptedSettings);
+    await this.fileStorage.writeJSON(
+      'settings/user-settings.json',
+      encryptedSettings
+    );
   }
 
   async setDiscogsToken(token: string, username?: string): Promise<void> {
@@ -78,7 +92,11 @@ export class AuthService {
     await this.saveUserSettings(settings);
   }
 
-  async setLastFmCredentials(apiKey: string, sessionKey: string, username?: string): Promise<void> {
+  async setLastFmCredentials(
+    apiKey: string,
+    sessionKey: string,
+    username?: string
+  ): Promise<void> {
     const settings = await this.getUserSettings();
     settings.lastfm.apiKey = apiKey;
     settings.lastfm.sessionKey = sessionKey;
@@ -93,12 +111,16 @@ export class AuthService {
     return settings.discogs.token;
   }
 
-  async getLastFmCredentials(): Promise<{ apiKey?: string; sessionKey?: string; username?: string }> {
+  async getLastFmCredentials(): Promise<{
+    apiKey?: string;
+    sessionKey?: string;
+    username?: string;
+  }> {
     const settings = await this.getUserSettings();
     return {
       apiKey: settings.lastfm.apiKey,
       sessionKey: settings.lastfm.sessionKey,
-      username: settings.lastfm.username
+      username: settings.lastfm.username,
     };
   }
 
