@@ -41,25 +41,63 @@ router.get('/:username/all', async (req: Request, res: Response) => {
     // Get all cached pages
     const allItems: any[] = [];
     let pageNumber = 1;
+    let hasExpiredCache = false;
+    let hasValidCache = false;
     
     while (true) {
       const cacheKey = `collections/${username}-page-${pageNumber}.json`;
       const cached = await fileStorage.readJSON<any>(cacheKey);
       
-      if (!cached || !cached.timestamp || (Date.now() - cached.timestamp) >= 86400000 || !cached.data) {
+      if (!cached || !cached.data) {
+        // No cache file found
         break;
       }
       
+      // Check if cache is expired (24 hours = 86400000 ms)
+      const isExpired = !cached.timestamp || (Date.now() - cached.timestamp) >= 86400000;
+      if (isExpired && !forceReload) {
+        console.log(`⏰ Cache expired for page ${pageNumber} (age: ${cached.timestamp ? Math.round((Date.now() - cached.timestamp) / 1000 / 60) : 'unknown'} minutes)`);
+        hasExpiredCache = true;
+        // If this is the first page and it's expired, trigger automatic refresh
+        if (pageNumber === 1) {
+          console.log(`🔄 First page expired, starting background refresh for ${username}`);
+          // Start background preloading without waiting for it
+          discogsService.preloadAllCollectionPages(username).catch(error => {
+            console.error('Background refresh failed:', error);
+          });
+        }
+        // Still include expired cache data for now, but mark it as expired
+        allItems.push(...cached.data);
+        pageNumber++;
+        continue;
+      }
+      if (!isExpired) {
+        hasValidCache = true;
+      }
       allItems.push(...cached.data);
       pageNumber++;
     }
+    console.log(`📦 Loaded ${allItems.length} items from cache for ${username} (expired: ${hasExpiredCache}, valid: ${hasValidCache})`);
     
-    console.log(`📦 Loaded ${allItems.length} items from cache for ${username}`);
+    // If we have no items and expired cache was detected, return appropriate response
+    if (allItems.length === 0 && hasExpiredCache) {
+      return res.json({
+        success: true,
+        data: [],
+        total: 0,
+        cacheStatus: 'expired',
+        refreshing: true,
+        message: 'Cache expired, refreshing in background...',
+        timestamp: Date.now()
+      });
+    }
     
     res.json({
       success: true,
       data: allItems,
       total: allItems.length,
+      cacheStatus: hasExpiredCache ? (hasValidCache ? 'partially_expired' : 'expired') : 'valid',
+      refreshing: hasExpiredCache,
       timestamp: Date.now()
     });
   } catch (error) {

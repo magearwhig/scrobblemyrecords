@@ -27,6 +27,10 @@ const CollectionPage: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [usingCache, setUsingCache] = useState<boolean>(false);
   const [authChecked, setAuthChecked] = useState<boolean>(false);
+  const [cacheStatus, setCacheStatus] = useState<'valid' | 'expired' | 'partially_expired' | 'unknown'>('unknown');
+  const [cacheRefreshing, setCacheRefreshing] = useState<boolean>(false);
+  const [infoMessage, setInfoMessage] = useState<string>('');
+  const [cacheMonitoring, setCacheMonitoring] = useState<boolean>(false);
 
   const api = getApiService(state.serverUrl);
   const itemsPerPage = 50;
@@ -42,8 +46,6 @@ const CollectionPage: React.FC = () => {
       loadCollection();
       // Start preloading in background
       startPreloadingCollection();
-      // Start monitoring cache progress
-      startCacheProgressMonitoring();
     } else if (!authChecked) {
       console.log('❌ Not authenticated or no username - checking auth status...');
       checkAuthStatus();
@@ -116,20 +118,34 @@ const CollectionPage: React.FC = () => {
 
       console.log('📡 API Response:', response);
 
-      if (response.success && response.data) {
-        console.log(`📦 Setting entire collection data: ${response.data.length} items`);
-        console.log('📋 Sample items:', response.data.slice(0, 2).map(item => ({
-          id: item.id,
-          artist: item.release.artist,
-          title: item.release.title,
-          year: item.release.year
-        })));
-        setEntireCollection(response.data);
+      if (response.success) {
+        // Handle cache status information
+        const responseCacheStatus = (response as any).cacheStatus || 'unknown';
+        const isRefreshing = (response as any).refreshing || false;
+        const message = (response as any).message;
         
-        // Calculate total pages based on items per page
-        const totalPages = Math.ceil(response.data.length / itemsPerPage);
-        setTotalPages(totalPages);
-        console.log(`📄 Total pages: ${totalPages} (${response.data.length} items, ${itemsPerPage} per page)`);
+        console.log(`📦 Setting entire collection data: ${response.data?.length || 0} items (cache: ${responseCacheStatus}, refreshing: ${isRefreshing})`);
+        // Update cache status state
+        setCacheStatus(responseCacheStatus);
+        setCacheRefreshing(isRefreshing);
+        setInfoMessage(message || '');
+        if (response.data && response.data.length > 0) {
+          console.log('📋 Sample items:', response.data.slice(0, 2).map(item => ({
+            id: item.id,
+            artist: item.release.artist,
+            title: item.release.title,
+            year: item.release.year
+          })));
+          setEntireCollection(response.data);
+          // Calculate total pages based on items per page
+          const totalPages = Math.ceil(response.data.length / itemsPerPage);
+          setTotalPages(totalPages);
+          console.log(`📄 Total pages: ${totalPages} (${response.data.length} items, ${itemsPerPage} per page)`);
+        } else {
+          // Empty collection or expired cache
+          setEntireCollection([]);
+          setTotalPages(1);
+        }
         
         // Check if we used cache based on response time (cache should be much faster)
         const responseTime = Date.now() - startTime;
@@ -142,8 +158,17 @@ const CollectionPage: React.FC = () => {
           console.log(`🌐 Loaded entire collection from API (${responseTime}ms)`);
         }
 
-        // Check if we have a complete cache
-        if (response.data.length < 100) { // Likely incomplete cache
+        // Handle different cache statuses
+        if (responseCacheStatus === 'expired' && isRefreshing) {
+          console.log('⏰ Cache expired, background refresh started');
+          setPreloading(true);
+          startCacheProgressMonitoring();
+        } else if (responseCacheStatus === 'partially_expired' && isRefreshing) {
+          console.log('⚠️ Some cache expired, background refresh started');
+          setPreloading(true);
+          startCacheProgressMonitoring();
+        } else if (response.data && response.data.length < 100) {
+          // Likely incomplete cache
           console.log('⚠️ Collection appears incomplete, starting background preloading');
           startPreloadingCollection();
         }
@@ -263,7 +288,12 @@ const CollectionPage: React.FC = () => {
   };
 
   const startCacheProgressMonitoring = async () => {
-    if (!authStatus.discogs.username) return;
+    if (!authStatus.discogs.username || cacheMonitoring) {
+      console.log('Cache monitoring already in progress or no username, skipping');
+      return;
+    }
+
+    setCacheMonitoring(true);
 
     const monitorProgress = async () => {
       try {
@@ -275,11 +305,20 @@ const CollectionPage: React.FC = () => {
           setTimeout(monitorProgress, 2000); // Check every 2 seconds
         } else if (progress && progress.status === 'completed') {
           console.log('Cache monitoring completed');
-          // Reload collection after cache completion
-          await loadCollection();
+          // Reset cache refreshing state and info message when complete
+          setCacheRefreshing(false);
+          setInfoMessage('');
+          setCacheStatus('valid');
+          setPreloading(false);
+          setCacheMonitoring(false);
+          console.log('✅ Cache refresh completed - collection should now have fresh data');
+        } else {
+          // If status is failed or other, stop monitoring
+          setCacheMonitoring(false);
         }
       } catch (error) {
         console.error('Error monitoring cache progress:', error);
+        setCacheMonitoring(false);
       }
     };
 
@@ -367,9 +406,9 @@ const CollectionPage: React.FC = () => {
               </span>
             )}
             {cacheProgress && cacheProgress.status === 'loading' && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
                 gap: '0.5rem',
                 fontSize: '0.8rem',
                 color: 'var(--text-secondary)',
@@ -383,7 +422,7 @@ const CollectionPage: React.FC = () => {
               </div>
             )}
             {cacheProgress && cacheProgress.status === 'completed' && (
-              <div style={{ 
+              <div style={{
                 fontSize: '0.8rem',
                 color: 'var(--success-color)',
                 padding: '0.25rem 0.5rem',
@@ -393,8 +432,8 @@ const CollectionPage: React.FC = () => {
                 ✓ Cache complete ({cacheProgress.totalPages} pages) - Using cached data
               </div>
             )}
-            {usingCache && (
-              <div style={{ 
+            {usingCache && !cacheRefreshing && cacheStatus === 'valid' && (
+              <div style={{
                 fontSize: '0.8rem',
                 color: 'var(--success-color)',
                 padding: '0.25rem 0.5rem',
@@ -402,6 +441,47 @@ const CollectionPage: React.FC = () => {
                 borderRadius: '4px'
               }}>
                 ⚡ Using cached data
+              </div>
+            )}
+            {cacheStatus === 'expired' && cacheRefreshing && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.8rem',
+                color: 'var(--warning-color)',
+                padding: '0.25rem 0.5rem',
+                backgroundColor: 'var(--bg-tertiary)',
+                borderRadius: '4px'
+              }}>
+                <div className="spinner" style={{ width: '12px', height: '12px' }}></div>
+                ⏰ Cache expired - Refreshing in background...
+              </div>
+            )}
+            {cacheStatus === 'partially_expired' && cacheRefreshing && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.8rem',
+                color: 'var(--warning-color)',
+                padding: '0.25rem 0.5rem',
+                backgroundColor: 'var(--bg-tertiary)',
+                borderRadius: '4px'
+              }}>
+                <div className="spinner" style={{ width: '12px', height: '12px' }}></div>
+                ⚠️ Some cache expired - Refreshing...
+              </div>
+            )}
+            {infoMessage && (
+              <div style={{
+                fontSize: '0.8rem',
+                color: 'var(--text-secondary)',
+                padding: '0.25rem 0.5rem',
+                backgroundColor: 'var(--bg-tertiary)',
+                borderRadius: '4px'
+              }}>
+                ℹ️ {infoMessage}
               </div>
             )}
             <button
