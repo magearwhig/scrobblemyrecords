@@ -16,7 +16,7 @@ interface AppAction {
 const initialState: AppState = {
   loading: false,
   error: null,
-  serverUrl: 'http://localhost:3001',
+  serverUrl: `http://localhost:${process.env.REACT_APP_BACKEND_PORT || '3001'}`,
 };
 
 const AppContext = createContext<
@@ -48,8 +48,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   const [state, dispatch] = useReducer(appReducer, initialState);
 
   useEffect(() => {
-    // For web app, server URL is fixed to localhost:3001
-    dispatch({ type: 'SET_SERVER_URL', payload: 'http://localhost:3001' });
+    // For web app, server URL is based on environment variable
+    dispatch({
+      type: 'SET_SERVER_URL',
+      payload: `http://localhost:${process.env.REACT_APP_BACKEND_PORT || '3001'}`,
+    });
   }, []);
 
   return (

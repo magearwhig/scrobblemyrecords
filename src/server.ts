@@ -3,10 +3,21 @@ import dotenv from 'dotenv';
 import express from 'express';
 import helmet from 'helmet';
 
+import authRoutes from './backend/routes/auth';
+import createCollectionRouter from './backend/routes/collection';
+import createScrobbleRouter from './backend/routes/scrobble';
+import { AuthService } from './backend/services/authService';
+import { DiscogsService } from './backend/services/discogsService';
+import { LastFmService } from './backend/services/lastfmService';
+import { FileStorage } from './backend/utils/fileStorage';
+
 dotenv.config();
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '3001', 10);
+const PORT = parseInt(
+  process.env.BACKEND_PORT || process.env.PORT || '3001',
+  10
+);
 
 // Initialize file storage
 const fileStorage = new FileStorage();
@@ -51,15 +62,6 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
-
-// Import route handlers
-import authRoutes from './backend/routes/auth';
-import createCollectionRouter from './backend/routes/collection';
-import createScrobbleRouter from './backend/routes/scrobble';
-import { AuthService } from './backend/services/authService';
-import { DiscogsService } from './backend/services/discogsService';
-import { LastFmService } from './backend/services/lastfmService';
-import { FileStorage } from './backend/utils/fileStorage';
 
 // Initialize services
 const authService = new AuthService(fileStorage);

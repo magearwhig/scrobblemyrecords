@@ -100,9 +100,11 @@ export class DiscogsService {
       console.log('Stored token secret for callback');
 
       // Return the authorization URL
+      const backendPort =
+        process.env.BACKEND_PORT || process.env.PORT || '3001';
       const callbackUrl =
         process.env.DISCOGS_CALLBACK_URL ||
-        'http://localhost:3001/api/v1/auth/discogs/callback';
+        `http://localhost:${backendPort}/api/v1/auth/discogs/callback`;
 
       // Include the callback URL in the authorization URL
       const authUrl = `https://discogs.com/oauth/authorize?oauth_token=${oauthToken}&oauth_callback=${encodeURIComponent(callbackUrl)}`;

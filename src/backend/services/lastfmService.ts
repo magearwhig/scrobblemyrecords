@@ -55,9 +55,10 @@ export class LastFmService {
       throw new Error('Last.fm API key not configured');
     }
 
+    const backendPort = process.env.BACKEND_PORT || process.env.PORT || '3001';
     const callbackUrl =
       process.env.LASTFM_CALLBACK_URL ||
-      'http://localhost:3001/api/v1/auth/lastfm/callback';
+      `http://localhost:${backendPort}/api/v1/auth/lastfm/callback`;
 
     return `http://www.last.fm/api/auth/?api_key=${credentials.apiKey}&cb=${encodeURIComponent(callbackUrl)}`;
   }
