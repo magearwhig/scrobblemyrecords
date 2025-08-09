@@ -122,3 +122,58 @@ mac-arm64/
 
 # TypeScript
 *.tsbuildinfo 
+
+logs
+dev-debug.log
+# Environment variables
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# OS specific
+
+# Task files
+# tasks.json
+# tasks/ 
+
+# AI/Development tool directories
+.claude/
+.cursor/
+.kiro/
+.windsurf/
+.bolt/
+
+# MCP configuration (may contain sensitive data)
+.mcp.json
+
+# Documentation and analysis files (project-specific)
+potential_tasks.md
+security.md
+dev_plan.md
+dev_prompt.md
+
+# Command history and debug files
+grep
+history
+debug-output.txt
+
+# Task Master generated files (uncomment if you don't want to track)
+.taskmaster/
+
+# Additional security-sensitive files
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+auth-tokens.json
+secrets.json
+
+# Temporary analysis/research files
+analysis-*.md
+research-*.md
+notes-*.txt
