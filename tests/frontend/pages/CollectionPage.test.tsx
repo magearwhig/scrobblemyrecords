@@ -497,6 +497,11 @@ describe('CollectionPage', () => {
       const selectButton = screen.getAllByText('Select')[0];
       await user.click(selectButton);
 
+      // Wait for the scrobble button to appear after selection
+      await waitFor(() => {
+        expect(screen.getByText('Scrobble Selected (1)')).toBeInTheDocument();
+      });
+
       const scrobbleButton = screen.getByText('Scrobble Selected (1)');
       await user.click(scrobbleButton);
 

@@ -192,6 +192,9 @@ describe('ScrobblePage', () => {
       // Clear localStorage mock
       mockLocalStorage.getItem.mockClear();
       mockLocalStorage.setItem.mockClear();
+
+      // Set default return value to null (no albums selected)
+      mockLocalStorage.getItem.mockReturnValue(null);
     });
 
     it('shows no albums message when none are selected', () => {
