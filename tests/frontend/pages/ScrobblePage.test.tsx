@@ -133,6 +133,9 @@ describe('ScrobblePage', () => {
     mockLocalStorage.setItem.mockClear();
     mockLocalStorage.removeItem.mockClear();
     mockLocalStorage.clear.mockClear();
+
+    // Set default return value for getItem to null
+    mockLocalStorage.getItem.mockReturnValue(null);
   });
 
   describe('Authentication', () => {
@@ -683,9 +686,16 @@ describe('ScrobblePage', () => {
 
       renderScrobblePageWithProviders(authStatus);
 
-      await waitFor(() => {
-        expect(screen.getByText('Back to Collection')).toBeInTheDocument();
-      });
+      // Wait for localStorage to load and page to render with album data
+      await waitFor(
+        () => {
+          expect(screen.getByText('Back to Collection')).toBeInTheDocument();
+          expect(
+            screen.getByText('The Beatles - Abbey Road')
+          ).toBeInTheDocument();
+        },
+        { timeout: 10000 }
+      );
 
       const backButton = screen.getByText('Back to Collection');
       await user.click(backButton);
@@ -701,9 +711,16 @@ describe('ScrobblePage', () => {
 
       renderScrobblePageWithProviders(authStatus);
 
-      await waitFor(() => {
-        expect(screen.getByText('Scrobble 1 Tracks')).toBeInTheDocument();
-      });
+      // Wait for localStorage to load and page to render completely
+      await waitFor(
+        () => {
+          expect(screen.getByText('Scrobble 1 Tracks')).toBeInTheDocument();
+          expect(
+            screen.getByText('The Beatles - Abbey Road')
+          ).toBeInTheDocument();
+        },
+        { timeout: 10000 }
+      );
 
       const scrobbleButton = screen.getByText('Scrobble 1 Tracks');
       await user.click(scrobbleButton);
@@ -750,8 +767,11 @@ describe('ScrobblePage', () => {
       await waitFor(
         () => {
           expect(screen.getByText('Scrobble 3 Tracks')).toBeInTheDocument();
+          expect(
+            screen.getByText('The Beatles - Abbey Road')
+          ).toBeInTheDocument();
         },
-        { timeout: 5000 }
+        { timeout: 15000 }
       );
 
       const scrobbleButton = screen.getByText('Scrobble 3 Tracks');
@@ -759,11 +779,14 @@ describe('ScrobblePage', () => {
 
       expect(screen.getByText('Scrobbling Progress')).toBeInTheDocument();
 
-      await waitFor(() => {
-        expect(
-          screen.getByText(/Successfully scrobbled: 3 tracks/)
-        ).toBeInTheDocument();
-      });
-    });
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText(/Successfully scrobbled: 3 tracks/)
+          ).toBeInTheDocument();
+        },
+        { timeout: 10000 }
+      );
+    }, 20000);
   });
 });

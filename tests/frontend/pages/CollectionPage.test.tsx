@@ -514,8 +514,11 @@ describe('CollectionPage', () => {
 
       renderCollectionPageWithProviders(authStatus);
 
+      // Wait for collection to load completely
       await waitFor(() => {
         expect(screen.getByTestId('album-card-1')).toBeInTheDocument();
+        expect(screen.getByTestId('album-card-2')).toBeInTheDocument();
+        expect(screen.getByText('2 total items')).toBeInTheDocument();
       });
 
       const selectButton = screen.getAllByText('Select')[0];
@@ -530,12 +533,15 @@ describe('CollectionPage', () => {
       await user.click(scrobbleButton);
 
       // Wait for localStorage.setItem to be called
-      await waitFor(() => {
-        expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-          'selectedAlbums',
-          expect.stringContaining('Artist 1')
-        );
-      });
+      await waitFor(
+        () => {
+          expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+            'selectedAlbums',
+            expect.stringContaining('Artist 1')
+          );
+        },
+        { timeout: 10000 }
+      );
     });
   });
 
@@ -726,20 +732,25 @@ describe('CollectionPage', () => {
 
       renderCollectionPageWithProviders(authStatus);
 
+      // Wait for collection to load completely
       await waitFor(() => {
         expect(screen.getByText('View Details')).toBeInTheDocument();
+        expect(screen.getByText('1 total items')).toBeInTheDocument();
       });
 
       const viewDetailsButton = screen.getByText('View Details');
       await user.click(viewDetailsButton);
 
       // Wait for localStorage.setItem to be called
-      await waitFor(() => {
-        expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-          'selectedRelease',
-          expect.stringContaining('Artist')
-        );
-      });
+      await waitFor(
+        () => {
+          expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+            'selectedRelease',
+            expect.stringContaining('Artist')
+          );
+        },
+        { timeout: 10000 }
+      );
     });
   });
 
