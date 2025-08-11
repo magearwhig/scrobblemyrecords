@@ -25,7 +25,9 @@ jest.mock('../../../src/renderer/components/AlbumCard', () => {
         <div>
           {item.release.artist} - {item.release.title}
         </div>
-        <button onClick={onSelect}>{selected ? 'Deselect' : 'Select'}</button>
+        <button onClick={() => onSelect(item.release.id)}>
+          {selected ? 'Deselect' : 'Select'}
+        </button>
         <button onClick={() => onViewDetails(item.release)}>
           View Details
         </button>
@@ -419,6 +421,10 @@ describe('CollectionPage', () => {
     };
 
     beforeEach(async () => {
+      // Clear localStorage mock
+      mockLocalStorage.setItem.mockClear();
+      mockLocalStorage.getItem.mockClear();
+
       const mockCollection = [
         createMockCollectionItem(1, 'Artist 1', 'Album 1'),
         createMockCollectionItem(2, 'Artist 2', 'Album 2'),
@@ -669,6 +675,10 @@ describe('CollectionPage', () => {
     };
 
     beforeEach(async () => {
+      // Clear localStorage mock
+      mockLocalStorage.setItem.mockClear();
+      mockLocalStorage.getItem.mockClear();
+
       const mockCollection = [createMockCollectionItem(1, 'Artist', 'Album')];
 
       mockApi.getEntireCollection.mockResolvedValue({

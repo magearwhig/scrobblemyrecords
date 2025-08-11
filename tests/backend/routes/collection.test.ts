@@ -43,6 +43,7 @@ describe('Collection Routes', () => {
     mockDiscogsService.searchCollectionFromCache = jest.fn();
     mockDiscogsService.getCacheProgress = jest.fn();
     mockDiscogsService.clearCache = jest.fn();
+    mockDiscogsService.getUserCollection = jest.fn();
 
     // Create Express app with mocked services
     app = express();

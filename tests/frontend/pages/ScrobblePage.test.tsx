@@ -188,6 +188,12 @@ describe('ScrobblePage', () => {
       lastfm: { authenticated: true, username: 'lastfm_user' },
     };
 
+    beforeEach(() => {
+      // Clear localStorage mock
+      mockLocalStorage.getItem.mockClear();
+      mockLocalStorage.setItem.mockClear();
+    });
+
     it('shows no albums message when none are selected', () => {
       mockLocalStorage.getItem.mockReturnValue(null);
 
@@ -261,6 +267,10 @@ describe('ScrobblePage', () => {
     };
 
     beforeEach(() => {
+      // Clear localStorage mock
+      mockLocalStorage.getItem.mockClear();
+      mockLocalStorage.setItem.mockClear();
+
       const mockAlbums = [
         createMockCollectionItem(1, 'The Beatles', 'Abbey Road'),
       ];
