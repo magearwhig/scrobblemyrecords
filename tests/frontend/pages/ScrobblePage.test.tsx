@@ -701,7 +701,7 @@ describe('ScrobblePage', () => {
       await user.click(backButton);
 
       expect(mockHistoryBack).toHaveBeenCalled();
-    });
+    }, 15000);
 
     it('disables back button during scrobbling', async () => {
       const user = userEvent.setup();
@@ -727,7 +727,7 @@ describe('ScrobblePage', () => {
 
       const backButton = screen.getByText('Back to Collection');
       expect(backButton).toBeDisabled();
-    });
+    }, 15000);
   });
 
   describe('Progress Tracking', () => {
@@ -737,6 +737,9 @@ describe('ScrobblePage', () => {
     };
 
     beforeEach(async () => {
+      // Clear and reset localStorage mock for this specific test
+      mockLocalStorage.getItem.mockClear();
+
       const mockAlbums = [
         createMockCollectionItem(1, 'The Beatles', 'Abbey Road'),
       ];

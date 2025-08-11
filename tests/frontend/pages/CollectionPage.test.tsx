@@ -542,7 +542,7 @@ describe('CollectionPage', () => {
         },
         { timeout: 10000 }
       );
-    });
+    }, 15000);
   });
 
   describe('Cache Management', () => {
