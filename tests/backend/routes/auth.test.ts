@@ -383,15 +383,26 @@ describe('Auth Routes', () => {
     });
 
     it('should handle missing API key', async () => {
-      const response = await request(app)
-        .get('/api/v1/auth/lastfm/auth-url')
-        .expect(400);
+      // Temporarily clear the environment variable for this test
+      const originalApiKey = process.env.LASTFM_API_KEY;
+      delete process.env.LASTFM_API_KEY;
 
-      expect(response.body).toEqual({
-        success: false,
-        error:
-          'API key is required (either provide one or set LASTFM_API_KEY environment variable)',
-      });
+      try {
+        const response = await request(app)
+          .get('/api/v1/auth/lastfm/auth-url')
+          .expect(400);
+
+        expect(response.body).toEqual({
+          success: false,
+          error:
+            'API key is required (either provide one or set LASTFM_API_KEY environment variable)',
+        });
+      } finally {
+        // Restore the environment variable
+        if (originalApiKey) {
+          process.env.LASTFM_API_KEY = originalApiKey;
+        }
+      }
     });
 
     it('should handle Last.fm service errors', async () => {
