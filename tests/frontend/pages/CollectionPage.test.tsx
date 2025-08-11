@@ -529,10 +529,13 @@ describe('CollectionPage', () => {
       const scrobbleButton = screen.getByText('Scrobble Selected (1)');
       await user.click(scrobbleButton);
 
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        'selectedAlbums',
-        expect.stringContaining('Artist 1')
-      );
+      // Wait for localStorage.setItem to be called
+      await waitFor(() => {
+        expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+          'selectedAlbums',
+          expect.stringContaining('Artist 1')
+        );
+      });
     });
   });
 
@@ -730,10 +733,13 @@ describe('CollectionPage', () => {
       const viewDetailsButton = screen.getByText('View Details');
       await user.click(viewDetailsButton);
 
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        'selectedRelease',
-        expect.stringContaining('Artist')
-      );
+      // Wait for localStorage.setItem to be called
+      await waitFor(() => {
+        expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+          'selectedRelease',
+          expect.stringContaining('Artist')
+        );
+      });
     });
   });
 

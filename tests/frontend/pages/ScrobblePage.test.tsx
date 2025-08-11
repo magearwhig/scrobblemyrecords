@@ -246,8 +246,15 @@ describe('ScrobblePage', () => {
 
       renderScrobblePageWithProviders(authStatus);
 
+      // Wait for localStorage to be read and albums to load
+      await waitFor(
+        () => {
+          expect(screen.getByText('Selected Albums (2)')).toBeInTheDocument();
+        },
+        { timeout: 5000 }
+      );
+
       await waitFor(() => {
-        expect(screen.getByText('Selected Albums (2)')).toBeInTheDocument();
         expect(
           screen.getByText('The Beatles - Abbey Road')
         ).toBeInTheDocument();
@@ -739,9 +746,13 @@ describe('ScrobblePage', () => {
 
       renderScrobblePageWithProviders(authStatus);
 
-      await waitFor(() => {
-        expect(screen.getByText('Scrobble 3 Tracks')).toBeInTheDocument();
-      });
+      // Wait for localStorage to be read and tracks to be prepared
+      await waitFor(
+        () => {
+          expect(screen.getByText('Scrobble 3 Tracks')).toBeInTheDocument();
+        },
+        { timeout: 5000 }
+      );
 
       const scrobbleButton = screen.getByText('Scrobble 3 Tracks');
       await user.click(scrobbleButton);
