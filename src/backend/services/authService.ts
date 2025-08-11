@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import CryptoJS from 'crypto-js';
 
 import { UserSettings } from '../../shared/types';
+import { EncryptionKeyValidator } from '../utils/encryptionValidator';
 import { FileStorage } from '../utils/fileStorage';
 
 export class AuthService {
@@ -11,8 +12,19 @@ export class AuthService {
 
   constructor(fileStorage: FileStorage) {
     this.fileStorage = fileStorage;
-    this.encryptionKey =
-      process.env.ENCRYPTION_KEY || 'default-encryption-key-change-me';
+
+    // Validate encryption key at startup - no fallback defaults allowed
+    const encryptionKey = process.env.ENCRYPTION_KEY;
+
+    if (!encryptionKey) {
+      EncryptionKeyValidator.validateAndThrow('', 'AuthService');
+      throw new Error('ENCRYPTION_KEY environment variable is required'); // This won't be reached but satisfies TypeScript
+    }
+
+    // Validate key strength and security
+    EncryptionKeyValidator.validateAndThrow(encryptionKey, 'AuthService');
+
+    this.encryptionKey = encryptionKey;
   }
 
   private encrypt(text: string): string {

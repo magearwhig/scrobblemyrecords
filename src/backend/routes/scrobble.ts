@@ -4,6 +4,7 @@ import { ScrobbleTrack, ScrobbleSession } from '../../shared/types';
 import { AuthService } from '../services/authService';
 import { LastFmService } from '../services/lastfmService';
 import { FileStorage } from '../utils/fileStorage';
+import { validateSessionId } from '../utils/validation';
 
 // Create router factory function for dependency injection
 export default function createScrobbleRouter(
@@ -122,6 +123,14 @@ export default function createScrobbleRouter(
   router.get('/session/:sessionId', async (req: Request, res: Response) => {
     try {
       const { sessionId } = req.params;
+
+      // Validate sessionId format to prevent path traversal
+      if (!validateSessionId(sessionId)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid session ID format',
+        });
+      }
 
       const session = await fileStorage.readJSON(
         `scrobbles/session-${sessionId}.json`

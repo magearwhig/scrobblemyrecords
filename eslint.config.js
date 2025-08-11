@@ -22,10 +22,10 @@ module.exports = [
       'release/',
     ],
   },
-  
+
   // JavaScript files
   js.configs.recommended,
-  
+
   // TypeScript files
   {
     files: ['**/*.{ts,tsx}'],
@@ -48,13 +48,13 @@ module.exports = [
         fetch: 'readonly',
         URL: 'readonly',
         URLSearchParams: 'readonly',
-        
+
         // Timer functions
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
         setInterval: 'readonly',
         clearInterval: 'readonly',
-        
+
         // Node.js globals
         process: 'readonly',
         Buffer: 'readonly',
@@ -64,7 +64,7 @@ module.exports = [
         module: 'readonly',
         require: 'readonly',
         exports: 'readonly',
-        
+
         // TypeScript globals
         NodeJS: 'readonly',
       },
@@ -81,7 +81,7 @@ module.exports = [
       '@typescript-eslint/no-explicit-any': 'warn',
       'prefer-const': 'error',
       '@typescript-eslint/no-var-requires': 'error',
-      
+
       // Import rules
       'import/order': [
         'error',
@@ -103,7 +103,7 @@ module.exports = [
       ],
       'import/no-unresolved': 'off', // TypeScript handles this
       'import/no-duplicates': 'error',
-      
+
       // General rules
       'no-console': 'warn',
       'no-debugger': 'error',
@@ -114,7 +114,7 @@ module.exports = [
       'prefer-template': 'error',
     },
   },
-  
+
   // React files
   {
     files: ['src/renderer/**/*.{ts,tsx}'],
@@ -137,7 +137,7 @@ module.exports = [
       'no-console': 'warn', // Allow console in frontend for debugging
     },
   },
-  
+
   // Backend files
   {
     files: ['src/backend/**/*.ts', 'src/server.ts'],
@@ -158,7 +158,7 @@ module.exports = [
       'no-console': 'off', // Allow console in backend
     },
   },
-  
+
   // Test files
   {
     files: ['tests/**/*.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
@@ -182,7 +182,7 @@ module.exports = [
       '@typescript-eslint/no-unused-vars': 'off', // Allow unused vars in tests
     },
   },
-  
+
   // Prettier config (must be last)
   prettier,
-]; 
+];

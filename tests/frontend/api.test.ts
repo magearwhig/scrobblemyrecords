@@ -417,4 +417,329 @@ describe('API Service', () => {
       expect(mockDefaults.baseURL).toBe(`${newBaseUrl}/api/v1`);
     });
   });
+
+  describe('Error Handling', () => {
+    it('should handle auth status errors', async () => {
+      const mockGet = jest.fn().mockRejectedValue(new Error('Auth error'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.getAuthStatus()).rejects.toThrow('Auth error');
+      expect(mockGet).toHaveBeenCalledWith('/auth/status');
+    });
+
+    it('should handle save Discogs token errors', async () => {
+      const mockPost = jest
+        .fn()
+        .mockRejectedValue(new Error('Token save failed'));
+      (api as any).api = { post: mockPost };
+
+      await expect(api.saveDiscogsToken('invalid-token')).rejects.toThrow(
+        'Token save failed'
+      );
+    });
+
+    it('should handle Discogs connection test errors', async () => {
+      const mockGet = jest
+        .fn()
+        .mockRejectedValue(new Error('Connection failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.testDiscogsConnection()).rejects.toThrow(
+        'Connection failed'
+      );
+    });
+
+    it('should handle Last.fm auth URL errors', async () => {
+      const mockGet = jest
+        .fn()
+        .mockRejectedValue(new Error('Auth URL fetch failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.getLastfmAuthUrl()).rejects.toThrow(
+        'Auth URL fetch failed'
+      );
+    });
+
+    it('should handle Last.fm callback errors', async () => {
+      const mockPost = jest
+        .fn()
+        .mockRejectedValue(new Error('Callback failed'));
+      (api as any).api = { post: mockPost };
+
+      await expect(api.handleLastfmCallback('invalid-token')).rejects.toThrow(
+        'Callback failed'
+      );
+    });
+
+    it('should handle Last.fm connection test errors', async () => {
+      const mockGet = jest
+        .fn()
+        .mockRejectedValue(new Error('Last.fm connection failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.testLastfmConnection()).rejects.toThrow(
+        'Last.fm connection failed'
+      );
+    });
+
+    it('should handle collection fetch errors', async () => {
+      const mockGet = jest
+        .fn()
+        .mockRejectedValue(new Error('Collection fetch failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.getUserCollection('testuser')).rejects.toThrow(
+        'Collection fetch failed'
+      );
+    });
+
+    it('should handle entire collection fetch errors', async () => {
+      const mockGet = jest
+        .fn()
+        .mockRejectedValue(new Error('Entire collection fetch failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.getEntireCollection('testuser')).rejects.toThrow(
+        'Entire collection fetch failed'
+      );
+    });
+
+    it('should handle collection search errors', async () => {
+      const mockGet = jest.fn().mockRejectedValue(new Error('Search failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.searchCollection('testuser', 'query')).rejects.toThrow(
+        'Search failed'
+      );
+    });
+
+    it('should handle paginated search errors', async () => {
+      const mockGet = jest
+        .fn()
+        .mockRejectedValue(new Error('Paginated search failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(
+        api.searchCollectionPaginated('testuser', 'query')
+      ).rejects.toThrow('Paginated search failed');
+    });
+
+    it('should handle preload errors', async () => {
+      const mockPost = jest.fn().mockRejectedValue(new Error('Preload failed'));
+      (api as any).api = { post: mockPost };
+
+      await expect(api.preloadCollection('testuser')).rejects.toThrow(
+        'Preload failed'
+      );
+    });
+
+    it('should handle release details errors', async () => {
+      const mockGet = jest
+        .fn()
+        .mockRejectedValue(new Error('Release details failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.getReleaseDetails(123)).rejects.toThrow(
+        'Release details failed'
+      );
+    });
+
+    it('should handle cache progress errors', async () => {
+      const mockGet = jest
+        .fn()
+        .mockRejectedValue(new Error('Cache progress failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.getCacheProgress('testuser')).rejects.toThrow(
+        'Cache progress failed'
+      );
+    });
+
+    it('should handle cache clear errors', async () => {
+      const mockDelete = jest
+        .fn()
+        .mockRejectedValue(new Error('Cache clear failed'));
+      (api as any).api = { delete: mockDelete };
+
+      await expect(api.clearCollectionCache()).rejects.toThrow(
+        'Cache clear failed'
+      );
+    });
+
+    it('should handle track scrobble errors', async () => {
+      const mockPost = jest
+        .fn()
+        .mockRejectedValue(new Error('Scrobble failed'));
+      (api as any).api = { post: mockPost };
+
+      const track = { artist: 'Test Artist', track: 'Test Track' };
+      await expect(api.scrobbleTrack(track)).rejects.toThrow('Scrobble failed');
+    });
+
+    it('should handle batch scrobble errors', async () => {
+      const mockPost = jest
+        .fn()
+        .mockRejectedValue(new Error('Batch scrobble failed'));
+      (api as any).api = { post: mockPost };
+
+      const tracks = [{ artist: 'Artist 1', track: 'Track 1' }];
+      await expect(api.scrobbleBatch(tracks)).rejects.toThrow(
+        'Batch scrobble failed'
+      );
+    });
+
+    it('should handle scrobble progress errors', async () => {
+      const mockGet = jest
+        .fn()
+        .mockRejectedValue(new Error('Progress fetch failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.getScrobbleProgress('session-123')).rejects.toThrow(
+        'Progress fetch failed'
+      );
+    });
+
+    it('should handle prepare tracks errors', async () => {
+      const mockPost = jest
+        .fn()
+        .mockRejectedValue(new Error('Prepare tracks failed'));
+      (api as any).api = { post: mockPost };
+
+      const release = {
+        id: 123,
+        title: 'Test Album',
+        artist: 'Test Artist',
+        format: ['Vinyl'],
+        label: ['Test Label'],
+        resource_url: 'https://api.discogs.com/releases/123',
+      };
+      await expect(api.prepareTracksFromRelease(release)).rejects.toThrow(
+        'Prepare tracks failed'
+      );
+    });
+
+    it('should handle scrobble history errors', async () => {
+      const mockGet = jest
+        .fn()
+        .mockRejectedValue(new Error('History fetch failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.getScrobbleHistory()).rejects.toThrow(
+        'History fetch failed'
+      );
+    });
+
+    it('should handle session fetch errors', async () => {
+      const mockGet = jest
+        .fn()
+        .mockRejectedValue(new Error('Session fetch failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.getScrobbleSession('session-123')).rejects.toThrow(
+        'Session fetch failed'
+      );
+    });
+
+    it('should handle check for new items errors', async () => {
+      const mockGet = jest
+        .fn()
+        .mockRejectedValue(new Error('Check new items failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.checkForNewItems('testuser')).rejects.toThrow(
+        'Check new items failed'
+      );
+    });
+
+    it('should handle update cache with new items errors', async () => {
+      const mockPost = jest
+        .fn()
+        .mockRejectedValue(new Error('Update cache failed'));
+      (api as any).api = { post: mockPost };
+
+      await expect(api.updateCacheWithNewItems('testuser')).rejects.toThrow(
+        'Update cache failed'
+      );
+    });
+
+    it('should handle Last.fm session key errors', async () => {
+      const mockGet = jest
+        .fn()
+        .mockRejectedValue(new Error('Session key fetch failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.getLastfmSessionKey()).rejects.toThrow(
+        'Session key fetch failed'
+      );
+    });
+
+    it('should handle Last.fm recent scrobbles errors', async () => {
+      const mockGet = jest
+        .fn()
+        .mockRejectedValue(new Error('Recent scrobbles failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.getLastfmRecentScrobbles()).rejects.toThrow(
+        'Recent scrobbles failed'
+      );
+    });
+
+    it('should handle Last.fm top tracks errors', async () => {
+      const mockGet = jest
+        .fn()
+        .mockRejectedValue(new Error('Top tracks failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.getLastfmTopTracks()).rejects.toThrow(
+        'Top tracks failed'
+      );
+    });
+
+    it('should handle Last.fm top artists errors', async () => {
+      const mockGet = jest
+        .fn()
+        .mockRejectedValue(new Error('Top artists failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.getLastfmTopArtists()).rejects.toThrow(
+        'Top artists failed'
+      );
+    });
+
+    it('should handle clear auth errors', async () => {
+      const mockPost = jest
+        .fn()
+        .mockRejectedValue(new Error('Clear auth failed'));
+      (api as any).api = { post: mockPost };
+
+      await expect(api.clearAuth()).rejects.toThrow('Clear auth failed');
+    });
+
+    it('should handle get Discogs auth URL errors', async () => {
+      const mockGet = jest.fn().mockRejectedValue(new Error('Auth URL failed'));
+      (api as any).api = { get: mockGet };
+
+      await expect(api.getDiscogsAuthUrl()).rejects.toThrow('Auth URL failed');
+    });
+  });
+
+  describe('Singleton Pattern', () => {
+    it('should return the same instance for multiple calls', () => {
+      const instance1 = getApiService();
+      const instance2 = getApiService();
+
+      expect(instance1).toBe(instance2);
+    });
+
+    it('should update base URL on existing instance', () => {
+      const instance1 = getApiService('http://localhost:3001');
+      const mockDefaults = { baseURL: 'http://localhost:3001/api/v1' };
+      (instance1 as any).api = { defaults: mockDefaults };
+
+      const instance2 = getApiService('http://localhost:4000');
+
+      expect(instance1).toBe(instance2);
+      expect(mockDefaults.baseURL).toBe('http://localhost:4000/api/v1');
+    });
+  });
 });

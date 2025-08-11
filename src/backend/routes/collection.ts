@@ -3,6 +3,8 @@ import express, { Request, Response } from 'express';
 import { AuthService } from '../services/authService';
 import { DiscogsService } from '../services/discogsService';
 import { FileStorage } from '../utils/fileStorage';
+import { createLogger } from '../utils/logger';
+import { validateUsername } from '../utils/validation';
 
 // Create router factory function for dependency injection
 export default function createCollectionRouter(
@@ -11,11 +13,21 @@ export default function createCollectionRouter(
   discogsService: DiscogsService
 ) {
   const router = express.Router();
+  const logger = createLogger('CollectionRoutes');
 
   // Get user's collection
   router.get('/:username', async (req: Request, res: Response) => {
     try {
       const { username } = req.params;
+
+      // Validate username to prevent path traversal
+      if (!validateUsername(username)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid username format',
+        });
+      }
+
       const page = parseInt(req.query.page as string) || 1;
       const perPage = parseInt(req.query.per_page as string) || 50;
       const forceReload = req.query.force_reload === 'true';
@@ -40,11 +52,18 @@ export default function createCollectionRouter(
   router.get('/:username/all', async (req: Request, res: Response) => {
     try {
       const { username } = req.params;
+
+      // Validate username to prevent path traversal
+      if (!validateUsername(username)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid username format',
+        });
+      }
+
       const forceReload = req.query.force_reload === 'true';
 
-      console.log(
-        `📦 Loading entire collection for ${username} (forceReload: ${forceReload})`
-      );
+      logger.info(`Loading entire collection for ${username}`, { forceReload });
 
       // Get all cached pages
       const allItems: any[] = [];
@@ -65,18 +84,21 @@ export default function createCollectionRouter(
         const isExpired =
           !cached.timestamp || Date.now() - cached.timestamp >= 86400000;
         if (isExpired && !forceReload) {
-          console.log(
-            `⏰ Cache expired for page ${pageNumber} (age: ${cached.timestamp ? Math.round((Date.now() - cached.timestamp) / 1000 / 60) : 'unknown'} minutes)`
-          );
+          const ageMinutes = cached.timestamp
+            ? Math.round((Date.now() - cached.timestamp) / 1000 / 60)
+            : 'unknown';
+          logger.debug(`Cache expired for page ${pageNumber}`, {
+            age: `${ageMinutes} minutes`,
+          });
           hasExpiredCache = true;
           // If this is the first page and it's expired, trigger automatic refresh
           if (pageNumber === 1) {
-            console.log(
-              `🔄 First page expired, starting background refresh for ${username}`
+            logger.info(
+              `First page expired, starting background refresh for ${username}`
             );
             // Start background preloading without waiting for it
             discogsService.preloadAllCollectionPages(username).catch(error => {
-              console.error('Background refresh failed:', error);
+              logger.error('Background refresh failed', error);
             });
           }
           // Still include expired cache data for now, but mark it as expired
@@ -90,8 +112,12 @@ export default function createCollectionRouter(
         allItems.push(...cached.data);
         pageNumber++;
       }
-      console.log(
-        `📦 Loaded ${allItems.length} items from cache for ${username} (expired: ${hasExpiredCache}, valid: ${hasValidCache})`
+      logger.info(
+        `Loaded ${allItems.length} items from cache for ${username}`,
+        {
+          expired: hasExpiredCache,
+          valid: hasValidCache,
+        }
       );
 
       // If we have no items and expired cache was detected, return appropriate response
@@ -120,7 +146,7 @@ export default function createCollectionRouter(
         timestamp: Date.now(),
       });
     } catch (error) {
-      console.error('Error loading entire collection:', error);
+      logger.error('Error loading entire collection', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -132,6 +158,14 @@ export default function createCollectionRouter(
   router.get('/:username/search', async (req: Request, res: Response) => {
     try {
       const { username } = req.params;
+
+      // Validate username to prevent path traversal
+      if (!validateUsername(username)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid username format',
+        });
+      }
       const { q: query } = req.query;
 
       if (!query) {
@@ -206,9 +240,17 @@ export default function createCollectionRouter(
     try {
       const { username } = req.params;
 
+      // Validate username to prevent path traversal
+      if (!validateUsername(username)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid username format',
+        });
+      }
+
       // Start preloading in background (don't await)
       discogsService.preloadAllCollectionPages(username).catch(error => {
-        console.error('Background preload failed:', error);
+        logger.error('Background preload failed', error);
       });
 
       res.json({

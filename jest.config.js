@@ -28,7 +28,9 @@ module.exports = {
       roots: ['<rootDir>/tests/frontend'],
       testMatch: ['**/frontend/**/*.test.tsx', '**/frontend/**/*.test.ts'],
       transform: {
-        '^.+\\.(ts|tsx)$': 'ts-jest',
+        '^.+\\.(ts|tsx)$': ['ts-jest', {
+          tsconfig: 'tsconfig.test.json'
+        }],
       },
       collectCoverageFrom: [
         'src/renderer/**/*.ts',
