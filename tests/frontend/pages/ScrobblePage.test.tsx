@@ -43,9 +43,12 @@ const mockLocalStorage = {
   setItem: jest.fn(),
   removeItem: jest.fn(),
   clear: jest.fn(),
+  length: 0,
+  key: jest.fn(),
 };
 Object.defineProperty(window, 'localStorage', {
   value: mockLocalStorage,
+  writable: true,
 });
 
 // Mock window.history.back
@@ -124,6 +127,12 @@ describe('ScrobblePage', () => {
     mockApi = createMockApiInstance();
     mockApiService.getApiService.mockReturnValue(mockApi as any);
     jest.clearAllMocks();
+
+    // Re-setup localStorage mock after clearing
+    mockLocalStorage.getItem.mockClear();
+    mockLocalStorage.setItem.mockClear();
+    mockLocalStorage.removeItem.mockClear();
+    mockLocalStorage.clear.mockClear();
   });
 
   describe('Authentication', () => {

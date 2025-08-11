@@ -72,19 +72,37 @@ jest.mock('../../../src/renderer/context/AppContext', () => ({
 }));
 
 // Mock window.location.hash
-delete (window as any).location;
-(window as any).location = {
-  hash: '',
-};
+if (!window.location) {
+  Object.defineProperty(window, 'location', {
+    value: {
+      hash: '',
+      href: 'http://localhost:3000',
+      pathname: '/',
+      search: '',
+    },
+    writable: true,
+  });
+} else {
+  // Update existing location object
+  Object.assign(window.location, {
+    hash: '',
+    href: 'http://localhost:3000',
+    pathname: '/',
+    search: '',
+  });
+}
 
 const mockLocalStorage = {
   getItem: jest.fn(),
   setItem: jest.fn(),
   removeItem: jest.fn(),
   clear: jest.fn(),
+  length: 0,
+  key: jest.fn(),
 };
 Object.defineProperty(window, 'localStorage', {
   value: mockLocalStorage,
+  writable: true,
 });
 
 const createMockAuthContext = (authStatus: AuthStatus) => ({
@@ -146,6 +164,12 @@ describe('CollectionPage', () => {
     mockApi = createMockApiInstance();
     mockApiService.getApiService.mockReturnValue(mockApi as any);
     jest.clearAllMocks();
+
+    // Re-setup localStorage mock after clearing
+    mockLocalStorage.getItem.mockClear();
+    mockLocalStorage.setItem.mockClear();
+    mockLocalStorage.removeItem.mockClear();
+    mockLocalStorage.clear.mockClear();
   });
 
   describe('Authentication', () => {
