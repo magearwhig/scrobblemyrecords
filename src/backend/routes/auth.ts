@@ -1,11 +1,14 @@
 import express, { Request, Response } from 'express';
 
+import { LastFmPeriodType } from '../../shared/types';
 import { AuthService } from '../services/authService';
 import { DiscogsService } from '../services/discogsService';
 import { LastFmService } from '../services/lastfmService';
 import { FileStorage } from '../utils/fileStorage';
+import { createLogger } from '../utils/logger';
 
 const router = express.Router();
+const logger = createLogger('AuthRoutes');
 
 // Initialize services
 const fileStorage = new FileStorage();
@@ -64,31 +67,33 @@ router.get('/discogs/auth-url', async (req: Request, res: Response) => {
 // Discogs OAuth callback
 router.get('/discogs/callback', async (req: Request, res: Response) => {
   try {
-    console.log('Discogs callback received:', req.query);
+    logger.info('Discogs OAuth callback received');
     const { oauth_token, oauth_verifier } = req.query;
 
     if (!oauth_token || !oauth_verifier) {
-      console.log('Missing parameters in callback');
+      logger.warn('Missing OAuth parameters in callback');
       return res.status(400).send(`
         <html><body>
           <h2>Authentication Error</h2>
-          <p>Missing required parameters. Got: ${JSON.stringify(req.query)}</p>
+          <p>Missing required OAuth parameters for authentication.</p>
           <script>window.close();</script>
         </body></html>
       `);
     }
 
-    console.log('Processing callback with:', { oauth_token, oauth_verifier });
+    logger.debug('Processing OAuth callback');
     const result = await discogsService.handleCallback(
       oauth_token as string,
       oauth_verifier as string
     );
-    console.log('Callback result:', result);
+    logger.info('Discogs OAuth callback successful', {
+      username: result.username,
+    });
 
     res.send(`
       <html><body>
         <h2>Discogs Authentication Successful!</h2>
-        <p>Welcome ${result.username}! You can close this window.</p>
+        <p>Authentication completed successfully! You can now close this window.</p>
         <script>
           localStorage.setItem('discogs_auth_success', 'true');
           window.close();
@@ -96,7 +101,7 @@ router.get('/discogs/callback', async (req: Request, res: Response) => {
       </body></html>
     `);
   } catch (error) {
-    console.error('Discogs callback error:', error);
+    logger.error('Discogs OAuth callback error', error);
     res.status(500).send(`
       <html><body>
         <h2>Authentication Error</h2>
@@ -206,13 +211,13 @@ router.get('/lastfm/callback', async (req: Request, res: Response) => {
       return res.status(400).send(`
         <html><body>
           <h2>Last.fm Authentication Error</h2>
-          <p>Missing token parameter. Got: ${JSON.stringify(req.query)}</p>
+          <p>Missing required token parameter for authentication.</p>
           <script>window.close();</script>
         </body></html>
       `);
     }
 
-    console.log('Last.fm callback received token:', token);
+    logger.info('Last.fm OAuth callback received');
     const { sessionKey, username } = await lastfmService.getSession(
       token as string
     );
@@ -228,7 +233,7 @@ router.get('/lastfm/callback', async (req: Request, res: Response) => {
     res.send(`
       <html><body>
         <h2>Last.fm Authentication Successful!</h2>
-        <p>Welcome ${username}! You can close this window.</p>
+        <p>Authentication completed successfully! You can now close this window.</p>
         <script>
           localStorage.setItem('lastfm_auth_success', 'true');
           window.close();
@@ -236,7 +241,7 @@ router.get('/lastfm/callback', async (req: Request, res: Response) => {
       </body></html>
     `);
   } catch (error) {
-    console.error('Last.fm callback error:', error);
+    logger.error('Last.fm OAuth callback error', error);
     res.status(500).send(`
       <html><body>
         <h2>Last.fm Authentication Error</h2>
@@ -284,38 +289,14 @@ router.post('/lastfm/callback', async (req: Request, res: Response) => {
   }
 });
 
-// Test Last.fm session creation (for debugging)
-router.get(
-  '/lastfm/test-session/:token',
-  async (req: Request, res: Response) => {
-    try {
-      const { token } = req.params;
-      console.log('Testing Last.fm session creation with token:', token);
-
-      const { sessionKey, username } = await lastfmService.getSession(token);
-
-      res.json({
-        success: true,
-        data: {
-          sessionKey: sessionKey ? 'present' : 'missing',
-          username,
-        },
-      });
-    } catch (error) {
-      console.error('Last.fm session test error:', error);
-      res.status(500).json({
-        success: false,
-        error:
-          error instanceof Error ? error.message : 'Session creation failed',
-      });
-    }
-  }
-);
-
 // Test Last.fm connection
 router.get('/lastfm/test', async (req: Request, res: Response) => {
   try {
     const result = await lastfmService.testConnection();
+
+    if (!result.success) {
+      throw new Error(result.message);
+    }
 
     res.json({
       success: result.success,
@@ -332,33 +313,9 @@ router.get('/lastfm/test', async (req: Request, res: Response) => {
   }
 });
 
-// Get Last.fm session key (for debugging)
-router.get('/lastfm/session-key', async (req: Request, res: Response) => {
-  try {
-    const credentials = await authService.getLastFmCredentials();
-
-    if (!credentials.sessionKey) {
-      return res.status(400).json({
-        success: false,
-        error: 'No Last.fm session key found. Please authenticate first.',
-      });
-    }
-
-    res.json({
-      success: true,
-      data: {
-        sessionKey: credentials.sessionKey,
-        username: credentials.username,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error:
-        error instanceof Error ? error.message : 'Failed to get session key',
-    });
-  }
-});
+// Session key debug endpoint REMOVED for security
+// This endpoint exposed authentication status and was unnecessary
+// Use /auth/status endpoint instead to check authentication state
 
 // Get Last.fm recent scrobbles
 router.get('/lastfm/recent-scrobbles', async (req: Request, res: Response) => {
@@ -388,7 +345,7 @@ router.get('/lastfm/top-tracks', async (req: Request, res: Response) => {
   try {
     const { period, limit } = req.query;
     const tracks = await lastfmService.getTopTracks(
-      (period as any) || '7day',
+      (period as LastFmPeriodType) || '7day',
       limit ? parseInt(limit as string) : 10
     );
 
@@ -410,7 +367,7 @@ router.get('/lastfm/top-artists', async (req: Request, res: Response) => {
   try {
     const { period, limit } = req.query;
     const artists = await lastfmService.getTopArtists(
-      (period as any) || '7day',
+      (period as LastFmPeriodType) || '7day',
       limit ? parseInt(limit as string) : 10
     );
 

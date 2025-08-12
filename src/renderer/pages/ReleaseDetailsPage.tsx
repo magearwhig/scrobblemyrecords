@@ -749,10 +749,15 @@ const ReleaseDetailsPage: React.FC = () => {
                 style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}
               >
                 <div className='form-group' style={{ margin: 0, flex: 1 }}>
-                  <label className='form-label' style={{ fontSize: '0.9rem' }}>
+                  <label
+                    htmlFor='start-time-input'
+                    className='form-label'
+                    style={{ fontSize: '0.9rem' }}
+                  >
                     Start Time:
                   </label>
                   <input
+                    id='start-time-input'
                     type='datetime-local'
                     className='form-input'
                     value={startTime}

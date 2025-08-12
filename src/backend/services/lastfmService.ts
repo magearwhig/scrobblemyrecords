@@ -4,6 +4,7 @@ import axios, { AxiosInstance } from 'axios';
 
 import { ScrobbleTrack, ScrobbleSession } from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
+import { createLogger } from '../utils/logger';
 
 import { AuthService } from './authService';
 
@@ -12,6 +13,7 @@ export class LastFmService {
   private fileStorage: FileStorage;
   private authService: AuthService;
   private baseUrl = 'https://ws.audioscrobbler.com/2.0/';
+  private logger = createLogger('LastFmService');
 
   constructor(fileStorage: FileStorage, authService: AuthService) {
     this.fileStorage = fileStorage;
@@ -67,9 +69,9 @@ export class LastFmService {
     token: string
   ): Promise<{ sessionKey: string; username: string }> {
     try {
-      console.log('Getting Last.fm session for token:', token);
+      this.logger.info('Getting Last.fm session for token');
       const credentials = await this.authService.getLastFmCredentials();
-      console.log('Last.fm credentials:', {
+      this.logger.debug('Last.fm credentials check', {
         apiKey: credentials.apiKey ? 'present' : 'missing',
       });
 
@@ -78,7 +80,9 @@ export class LastFmService {
       }
 
       const secret = process.env.LASTFM_SECRET || '';
-      console.log('Last.fm secret:', secret ? 'present' : 'missing');
+      this.logger.debug('Last.fm secret check', {
+        secret: secret ? 'present' : 'missing',
+      });
 
       // Parameters for signature generation (exclude format)
       const signatureParams = {
@@ -87,9 +91,8 @@ export class LastFmService {
         token,
       };
 
-      console.log('Last.fm signature params:', signatureParams);
+      // Note: Signature params and API signature contain sensitive data and are not logged
       const apiSig = this.generateApiSig(signatureParams, secret);
-      console.log('Generated API signature:', apiSig);
 
       const response = await this.axios.post('', null, {
         params: {
@@ -99,10 +102,13 @@ export class LastFmService {
         },
       });
 
-      console.log('Last.fm API response:', response.data);
+      this.logger.debug('Last.fm API response received');
 
       if (response.data.error) {
-        console.error('Last.fm API error:', response.data);
+        this.logger.error('Last.fm API error', {
+          error: response.data.error,
+          message: response.data.message,
+        });
         throw new Error(
           `Last.fm API error ${response.data.error}: ${response.data.message || 'Unknown error'}`
         );
@@ -114,12 +120,12 @@ export class LastFmService {
         username: session.name,
       };
     } catch (error: any) {
-      console.error('Error getting Last.fm session:', error);
+      this.logger.error('Error getting Last.fm session', error);
       if (error.response) {
-        console.error('Last.fm API response error:', {
+        this.logger.error('Last.fm API response error', {
           status: error.response.status,
           data: error.response.data,
-          headers: error.response.headers,
+          // Headers omitted as they may contain sensitive data
         });
       }
       throw error;
@@ -133,34 +139,35 @@ export class LastFmService {
     message: string;
   }> {
     try {
-      console.log('Starting scrobble for track:', track);
+      this.logger.info('Starting scrobble for track', {
+        artist: track.artist,
+        track: track.track,
+        album: track.album,
+      });
 
       const credentials = await this.authService.getLastFmCredentials();
       if (!credentials.apiKey || !credentials.sessionKey) {
         throw new Error('Last.fm credentials not configured');
       }
 
-      console.log('Last.fm credentials found:', {
+      this.logger.debug('Last.fm credentials found', {
         apiKey: credentials.apiKey ? 'present' : 'missing',
         sessionKey: credentials.sessionKey ? 'present' : 'missing',
       });
 
       const secret = process.env.LASTFM_SECRET || '';
       if (!secret) {
-        console.error('LASTFM_SECRET environment variable is not set!');
+        this.logger.error('LASTFM_SECRET environment variable is not set');
         throw new Error('Last.fm API secret not configured');
       }
 
       // Use provided timestamp or current time if not provided
       const timestamp = track.timestamp || Math.floor(Date.now() / 1000);
-      console.log(
-        'Using timestamp:',
+      this.logger.debug('Using timestamp for track', {
         timestamp,
-        'for track:',
-        track.artist,
-        '-',
-        track.track
-      );
+        artist: track.artist,
+        track: track.track,
+      });
 
       // Clean and validate track data
       const cleanArtist = track.artist.trim();
@@ -189,11 +196,9 @@ export class LastFmService {
         signatureParams['duration[0]'] = track.duration.toString();
       }
 
-      console.log('Signature parameters:', signatureParams);
-
+      // Note: Signature parameters and API signature contain sensitive data and are not logged
       // Generate signature
       const apiSig = this.generateApiSig(signatureParams, secret);
-      console.log('Generated API signature:', apiSig);
 
       // Add format for the actual request
       const requestParams = {
@@ -202,16 +207,19 @@ export class LastFmService {
         format: 'json',
       };
 
-      console.log('Sending request to Last.fm with params:', requestParams);
+      this.logger.debug('Sending scrobble request to Last.fm');
 
       const response = await this.axios.post('', null, {
         params: requestParams,
       });
 
-      console.log('Last.fm scrobble response:', response.data);
+      this.logger.debug('Last.fm scrobble response received');
 
       if (response.data.error) {
-        console.error('Last.fm scrobble error:', response.data);
+        this.logger.error('Last.fm scrobble error', {
+          error: response.data.error,
+          message: response.data.message,
+        });
         throw new Error(response.data.message || 'Scrobbling failed');
       }
 
@@ -221,9 +229,9 @@ export class LastFmService {
       const ignored = scrobble?.ignored || 0;
 
       if (scrobble) {
-        console.log('Scrobble status:', scrobble);
+        this.logger.debug('Scrobble status', { accepted, ignored });
         if (ignored > 0) {
-          console.warn(
+          this.logger.warn(
             `Scrobble ignored: ${ignored} tracks ignored, ${accepted} accepted`
           );
         }
@@ -234,7 +242,11 @@ export class LastFmService {
           ? `Successfully scrobbled ${cleanArtist} - ${cleanTrack}`
           : `Scrobble ignored: ${cleanArtist} - ${cleanTrack} (may be duplicate or invalid)`;
 
-      console.log('Scrobble result:', { accepted, ignored, message });
+      this.logger.info('Scrobble result', {
+        accepted,
+        ignored,
+        success: accepted > 0,
+      });
 
       return {
         success: accepted > 0,
@@ -243,12 +255,12 @@ export class LastFmService {
         message,
       };
     } catch (error: any) {
-      console.error('Error scrobbling track:', error);
+      this.logger.error('Error scrobbling track', error);
       if (error.response) {
-        console.error('Last.fm API response error:', {
+        this.logger.error('Last.fm API response error', {
           status: error.response.status,
           data: error.response.data,
-          headers: error.response.headers,
+          // Headers omitted as they may contain sensitive data
         });
       }
       throw error;
@@ -388,7 +400,7 @@ export class LastFmService {
 
       return sessions.sort((a, b) => b.timestamp - a.timestamp);
     } catch (error) {
-      console.error('Error getting scrobble history:', error);
+      this.logger.error('Error getting scrobble history', error);
       return [];
     }
   }
@@ -399,7 +411,7 @@ export class LastFmService {
     userInfo?: any;
   }> {
     try {
-      console.log('Testing Last.fm connection...');
+      this.logger.info('Testing Last.fm connection...');
 
       const credentials = await this.authService.getLastFmCredentials();
       if (!credentials.apiKey || !credentials.sessionKey) {
@@ -428,7 +440,7 @@ export class LastFmService {
         userInfo,
       };
     } catch (error: any) {
-      console.error('Last.fm connection test failed:', error);
+      this.logger.error('Last.fm connection test failed', error);
       return {
         success: false,
         message: error.message || 'Failed to connect to Last.fm',
@@ -458,7 +470,7 @@ export class LastFmService {
 
       return response.data.user;
     } catch (error) {
-      console.error('Error getting user info:', error);
+      this.logger.error('Error getting user info', error);
       throw error;
     }
   }
@@ -488,7 +500,7 @@ export class LastFmService {
 
       return response.data.recenttracks.track || [];
     } catch (error) {
-      console.error('Error getting recent scrobbles:', error);
+      this.logger.error('Error getting recent scrobbles', error);
       throw error;
     }
   }
@@ -520,7 +532,7 @@ export class LastFmService {
 
       return response.data.toptracks.track || [];
     } catch (error) {
-      console.error('Error getting top tracks:', error);
+      this.logger.error('Error getting top tracks', error);
       throw error;
     }
   }
@@ -552,7 +564,7 @@ export class LastFmService {
 
       return response.data.topartists.artist || [];
     } catch (error) {
-      console.error('Error getting top artists:', error);
+      this.logger.error('Error getting top artists', error);
       throw error;
     }
   }

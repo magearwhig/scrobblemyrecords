@@ -108,3 +108,27 @@ export interface ScrobbleProgress {
   track?: string;
   status: 'preparing' | 'scrobbling' | 'completed' | 'error';
 }
+
+// Cache and progress tracking interfaces
+export interface CollectionCacheProgress {
+  username: string;
+  totalPages?: number;
+  currentPage?: number;
+  completedPages?: number[];
+  startTime?: number;
+  endTime?: number;
+  status: 'loading' | 'completed' | 'failed';
+  error?: string;
+}
+
+export interface CachedCollectionData {
+  data: CollectionItem[];
+  timestamp: number;
+}
+
+export type LastFmPeriodType =
+  | '7day'
+  | '1month'
+  | '3month'
+  | '6month'
+  | '12month';

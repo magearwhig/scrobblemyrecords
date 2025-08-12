@@ -1,8 +1,11 @@
 import express, { Request, Response } from 'express';
 
+import { CachedCollectionData, CollectionItem } from '../../shared/types';
 import { AuthService } from '../services/authService';
 import { DiscogsService } from '../services/discogsService';
 import { FileStorage } from '../utils/fileStorage';
+import { createLogger } from '../utils/logger';
+import { validateUsername } from '../utils/validation';
 
 // Create router factory function for dependency injection
 export default function createCollectionRouter(
@@ -11,11 +14,30 @@ export default function createCollectionRouter(
   discogsService: DiscogsService
 ) {
   const router = express.Router();
+  const logger = createLogger('CollectionRoutes');
 
-  // Get user's collection
+  // Get user's collection (paginated)
   router.get('/:username', async (req: Request, res: Response) => {
     try {
       const { username } = req.params;
+
+      // Validate username to prevent path traversal
+      if (!validateUsername(username)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid username format',
+        });
+      }
+
+      // Check authentication first
+      const token = await authService.getDiscogsToken();
+      if (!token) {
+        return res.status(500).json({
+          success: false,
+          error: 'No Discogs token available. Please authenticate first.',
+        });
+      }
+
       const page = parseInt(req.query.page as string) || 1;
       const perPage = parseInt(req.query.per_page as string) || 50;
       const forceReload = req.query.force_reload === 'true';
@@ -40,21 +62,29 @@ export default function createCollectionRouter(
   router.get('/:username/all', async (req: Request, res: Response) => {
     try {
       const { username } = req.params;
+
+      // Validate username to prevent path traversal
+      if (!validateUsername(username)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid username format',
+        });
+      }
+
       const forceReload = req.query.force_reload === 'true';
 
-      console.log(
-        `📦 Loading entire collection for ${username} (forceReload: ${forceReload})`
-      );
+      logger.info(`Loading entire collection for ${username}`, { forceReload });
 
       // Get all cached pages
-      const allItems: any[] = [];
+      const allItems: CollectionItem[] = [];
       let pageNumber = 1;
       let hasExpiredCache = false;
       let hasValidCache = false;
 
       while (true) {
         const cacheKey = `collections/${username}-page-${pageNumber}.json`;
-        const cached = await fileStorage.readJSON<any>(cacheKey);
+        const cached =
+          await fileStorage.readJSON<CachedCollectionData>(cacheKey);
 
         if (!cached || !cached.data) {
           // No cache file found
@@ -65,18 +95,21 @@ export default function createCollectionRouter(
         const isExpired =
           !cached.timestamp || Date.now() - cached.timestamp >= 86400000;
         if (isExpired && !forceReload) {
-          console.log(
-            `⏰ Cache expired for page ${pageNumber} (age: ${cached.timestamp ? Math.round((Date.now() - cached.timestamp) / 1000 / 60) : 'unknown'} minutes)`
-          );
+          const ageMinutes = cached.timestamp
+            ? Math.round((Date.now() - cached.timestamp) / 1000 / 60)
+            : 'unknown';
+          logger.debug(`Cache expired for page ${pageNumber}`, {
+            age: `${ageMinutes} minutes`,
+          });
           hasExpiredCache = true;
           // If this is the first page and it's expired, trigger automatic refresh
           if (pageNumber === 1) {
-            console.log(
-              `🔄 First page expired, starting background refresh for ${username}`
+            logger.info(
+              `First page expired, starting background refresh for ${username}`
             );
             // Start background preloading without waiting for it
             discogsService.preloadAllCollectionPages(username).catch(error => {
-              console.error('Background refresh failed:', error);
+              logger.error('Background refresh failed', error);
             });
           }
           // Still include expired cache data for now, but mark it as expired
@@ -90,8 +123,12 @@ export default function createCollectionRouter(
         allItems.push(...cached.data);
         pageNumber++;
       }
-      console.log(
-        `📦 Loaded ${allItems.length} items from cache for ${username} (expired: ${hasExpiredCache}, valid: ${hasValidCache})`
+      logger.info(
+        `Loaded ${allItems.length} items from cache for ${username}`,
+        {
+          expired: hasExpiredCache,
+          valid: hasValidCache,
+        }
       );
 
       // If we have no items and expired cache was detected, return appropriate response
@@ -120,7 +157,7 @@ export default function createCollectionRouter(
         timestamp: Date.now(),
       });
     } catch (error) {
-      console.error('Error loading entire collection:', error);
+      logger.error('Error loading entire collection', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -128,10 +165,28 @@ export default function createCollectionRouter(
     }
   });
 
-  // Search user's collection
+  // Search user's collection (using cache)
   router.get('/:username/search', async (req: Request, res: Response) => {
     try {
       const { username } = req.params;
+
+      // Validate username to prevent path traversal
+      if (!validateUsername(username)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid username format',
+        });
+      }
+
+      // Check authentication first
+      const token = await authService.getDiscogsToken();
+      if (!token) {
+        return res.status(500).json({
+          success: false,
+          error: 'No Discogs token available. Please authenticate first.',
+        });
+      }
+
       const { q: query } = req.query;
 
       if (!query) {
@@ -141,14 +196,14 @@ export default function createCollectionRouter(
         });
       }
 
-      const results = await discogsService.searchCollection(
+      const result = await discogsService.searchCollection(
         username,
         query as string
       );
 
       res.json({
         success: true,
-        data: results,
+        data: result,
       });
     } catch (error) {
       res.status(500).json({
@@ -164,6 +219,24 @@ export default function createCollectionRouter(
     async (req: Request, res: Response) => {
       try {
         const { username } = req.params;
+
+        // Validate username to prevent path traversal
+        if (!validateUsername(username)) {
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid username format',
+          });
+        }
+
+        // Check authentication first
+        const token = await authService.getDiscogsToken();
+        if (!token) {
+          return res.status(500).json({
+            success: false,
+            error: 'No Discogs token available. Please authenticate first.',
+          });
+        }
+
         const { q: query } = req.query;
         const page = parseInt(req.query.page as string) || 1;
         const perPage = parseInt(req.query.per_page as string) || 50;
@@ -175,7 +248,7 @@ export default function createCollectionRouter(
           });
         }
 
-        const results = await discogsService.searchCollectionFromCache(
+        const result = await discogsService.searchCollectionFromCache(
           username,
           query as string,
           page,
@@ -184,12 +257,12 @@ export default function createCollectionRouter(
 
         res.json({
           success: true,
-          data: results.items,
+          data: result.items,
           pagination: {
             page,
             per_page: perPage,
-            total: results.total,
-            pages: results.totalPages,
+            total: result.total,
+            pages: result.totalPages,
           },
         });
       } catch (error) {
@@ -206,9 +279,17 @@ export default function createCollectionRouter(
     try {
       const { username } = req.params;
 
+      // Validate username to prevent path traversal
+      if (!validateUsername(username)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid username format',
+        });
+      }
+
       // Start preloading in background (don't await)
       discogsService.preloadAllCollectionPages(username).catch(error => {
-        console.error('Background preload failed:', error);
+        logger.error('Background preload failed', error);
       });
 
       res.json({
@@ -226,6 +307,15 @@ export default function createCollectionRouter(
   // Get release details
   router.get('/release/:releaseId', async (req: Request, res: Response) => {
     try {
+      // Check authentication first
+      const token = await authService.getDiscogsToken();
+      if (!token) {
+        return res.status(500).json({
+          success: false,
+          error: 'No Discogs token available. Please authenticate first.',
+        });
+      }
+
       const releaseId = parseInt(req.params.releaseId);
 
       if (isNaN(releaseId)) {
@@ -278,6 +368,14 @@ export default function createCollectionRouter(
     try {
       const { username } = req.params;
 
+      // Validate username to prevent path traversal
+      if (!validateUsername(username)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid username format',
+        });
+      }
+
       const progress = await discogsService.getCacheProgress(username);
 
       res.json({
@@ -296,6 +394,23 @@ export default function createCollectionRouter(
   router.get('/:username/check-new', async (req: Request, res: Response) => {
     try {
       const { username } = req.params;
+
+      // Validate username to prevent path traversal
+      if (!validateUsername(username)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid username format',
+        });
+      }
+
+      // Check authentication first
+      const token = await authService.getDiscogsToken();
+      if (!token) {
+        return res.status(500).json({
+          success: false,
+          error: 'No Discogs token available. Please authenticate first.',
+        });
+      }
 
       const result = await discogsService.checkForNewItems(username);
 
@@ -320,6 +435,14 @@ export default function createCollectionRouter(
   router.post('/:username/update-new', async (req: Request, res: Response) => {
     try {
       const { username } = req.params;
+
+      // Validate username to prevent path traversal
+      if (!validateUsername(username)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid username format',
+        });
+      }
 
       const result = await discogsService.updateCacheWithNewItems(username);
 

@@ -39,7 +39,7 @@ A desktop application that allows users to select albums from their Discogs coll
 
 ### Getting Discogs API Access
 1. **Create Discogs Account**: Sign up at discogs.com
-2. **Register Application**: 
+2. **Register Application**:
    - Go to Settings → Developers
    - Click "Create an Application"
    - Fill form with app name, description, and website
@@ -51,7 +51,7 @@ A desktop application that allows users to select albums from their Discogs coll
 
 ### Getting Last.fm API Access
 1. **Create Last.fm Account**: Sign up at last.fm
-2. **Get API Key**: 
+2. **Get API Key**:
    - Visit https://www.last.fm/api/account/create
    - Fill application form with name, description, and website
    - Leave callback URL blank for desktop app

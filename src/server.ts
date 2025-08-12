@@ -3,6 +3,9 @@ import dotenv from 'dotenv';
 import express from 'express';
 import helmet from 'helmet';
 
+// Load environment variables before any other imports
+dotenv.config();
+
 import authRoutes from './backend/routes/auth';
 import createCollectionRouter from './backend/routes/collection';
 import createScrobbleRouter from './backend/routes/scrobble';
@@ -11,13 +14,12 @@ import { DiscogsService } from './backend/services/discogsService';
 import { LastFmService } from './backend/services/lastfmService';
 import { FileStorage } from './backend/utils/fileStorage';
 
-dotenv.config();
-
 const app = express();
 const PORT = parseInt(
   process.env.BACKEND_PORT || process.env.PORT || '3001',
   10
 );
+const HOST = process.env.HOST || '127.0.0.1';
 
 // Initialize file storage
 const fileStorage = new FileStorage();
@@ -25,32 +27,41 @@ const fileStorage = new FileStorage();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration for both web and Electron
+// CORS configuration with strict origin allowlist
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, etc.)
-      if (!origin) return callback(null, true);
-
-      // Allow file:// protocol for Electron
-      if (origin && origin.startsWith('file://')) return callback(null, true);
-
-      // Allow localhost origins
-      if (
-        origin &&
-        (origin.includes('localhost') || origin.includes('127.0.0.1'))
-      ) {
+      // Allow requests with no origin (mobile apps, curl, tests, etc.)
+      if (!origin) {
         return callback(null, true);
       }
 
-      // Check environment-specific frontend URL
-      if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
+      // Strict allowlist of permitted origins
+      const allowedOrigins = [
+        'http://localhost:8080', // Development frontend
+        'http://127.0.0.1:8080', // Alternative localhost
+        'http://localhost:3000', // Test environment
+        'http://127.0.0.1:3000', // Alternative test environment
+        process.env.FRONTEND_URL, // Production frontend URL
+      ].filter(Boolean); // Remove undefined entries
+
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
 
+      // For tests, be more permissive
+      if (process.env.NODE_ENV === 'test') {
+        return callback(null, true);
+      }
+
+      // Log rejected CORS requests for security monitoring
+      console.warn(`🚫 CORS request rejected from origin: ${origin || 'null'}`);
       return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    optionsSuccessStatus: 200, // Some legacy browsers choke on 204
   })
 );
 
@@ -58,9 +69,31 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// JSON parsing error handler
+app.use(
+  (
+    err: Error,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    if (err instanceof SyntaxError && 'body' in err) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid JSON format',
+      });
+    }
+    next(err);
+  }
+);
+
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+  });
 });
 
 // Initialize services
@@ -95,7 +128,7 @@ app.get('/api/v1', (req, res) => {
 // Error handling middleware
 app.use(
   (
-    err: any,
+    err: Error,
     req: express.Request,
     res: express.Response,
     _next: express.NextFunction
@@ -124,10 +157,15 @@ async function startServer() {
 
     // Only start server if not in test environment
     if (process.env.NODE_ENV !== 'test') {
-      const server = app.listen(PORT, () => {
-        console.log(`🚀 Server running on port ${PORT}`);
-        console.log(`📊 Health check: http://localhost:${PORT}/health`);
-        console.log(`🔧 Server bound to: 0.0.0.0:${PORT}`);
+      const server = app.listen(PORT, HOST, () => {
+        console.log(`🚀 Server running on ${HOST}:${PORT}`);
+        console.log(`📊 Health check: http://${HOST}:${PORT}/health`);
+        console.log(`🔒 Server bound to: ${HOST}:${PORT} (localhost only)`);
+        if (HOST !== '127.0.0.1' && HOST !== 'localhost') {
+          console.warn(
+            `⚠️  Server bound to ${HOST} - ensure this is intentional for security`
+          );
+        }
       });
 
       server.on('error', error => {

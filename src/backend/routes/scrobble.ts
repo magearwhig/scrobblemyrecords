@@ -1,9 +1,10 @@
 import express, { Request, Response } from 'express';
 
-import { ScrobbleTrack, ScrobbleSession } from '../../shared/types';
+import { ScrobbleTrack, ScrobbleSession, Track } from '../../shared/types';
 import { AuthService } from '../services/authService';
 import { LastFmService } from '../services/lastfmService';
 import { FileStorage } from '../utils/fileStorage';
+import { validateSessionId } from '../utils/validation';
 
 // Create router factory function for dependency injection
 export default function createScrobbleRouter(
@@ -70,6 +71,15 @@ export default function createScrobbleRouter(
         }
       }
 
+      // Check authentication after validation
+      const testResult = await lastfmService.testConnection();
+      if (!testResult.success) {
+        return res.status(500).json({
+          success: false,
+          error: testResult.message,
+        });
+      }
+
       // Set timestamps for tracks
       const currentTime = baseTimestamp || Math.floor(Date.now() / 1000);
       const tracksWithTimestamps = tracks.map((track, index) => ({
@@ -101,6 +111,15 @@ export default function createScrobbleRouter(
   // Get scrobble history
   router.get('/history', async (req: Request, res: Response) => {
     try {
+      // Check authentication first by testing connection
+      const testResult = await lastfmService.testConnection();
+      if (!testResult.success) {
+        return res.status(500).json({
+          success: false,
+          error: testResult.message,
+        });
+      }
+
       const sessions = await lastfmService.getScrobbleHistory();
 
       res.json({
@@ -122,6 +141,14 @@ export default function createScrobbleRouter(
   router.get('/session/:sessionId', async (req: Request, res: Response) => {
     try {
       const { sessionId } = req.params;
+
+      // Validate sessionId format to prevent path traversal
+      if (!validateSessionId(sessionId)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid session ID format',
+        });
+      }
 
       const session = await fileStorage.readJSON(
         `scrobbles/session-${sessionId}.json`
@@ -161,7 +188,7 @@ export default function createScrobbleRouter(
       // Filter tracks if specific tracks are selected
       const tracksToScrobble =
         selectedTracks && selectedTracks.length > 0
-          ? release.tracklist.filter((track: any, index: number) =>
+          ? release.tracklist.filter((track: Track, index: number) =>
               selectedTracks.includes(index)
             )
           : release.tracklist;
@@ -174,7 +201,7 @@ export default function createScrobbleRouter(
       // Calculate timestamps based on track durations
       let currentTime = startTimestamp;
       const scrobbleTracks: ScrobbleTrack[] = tracksToScrobble.map(
-        (track: any) => {
+        (track: Track) => {
           const trackDuration = track.duration
             ? parseTrackDuration(track.duration)
             : 180; // Default 3 minutes
