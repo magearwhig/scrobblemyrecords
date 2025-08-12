@@ -150,13 +150,13 @@ body {
 .btn {
   background: var(--accent-color);
   color: white;
-  border: none;
+  border: 1px solid var(--accent-color);
   padding: 0.75rem 1.5rem;
   border-radius: 8px;
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
   text-decoration: none;
   display: inline-block;
   text-align: center;
@@ -164,10 +164,12 @@ body {
 
 .btn:hover {
   background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .btn:disabled {
   background: var(--text-muted);
+  border-color: var(--text-muted);
   cursor: not-allowed;
 }
 
@@ -191,6 +193,78 @@ body {
 .btn-small {
   padding: 0.5rem 1rem;
   font-size: 0.8rem;
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-outline:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
+.btn-outline:disabled {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: var(--border-color);
+  cursor: not-allowed;
+}
+
+/* Special styles for filter buttons (side/disc selection) */
+.btn-filter {
+  transition: all 0.2s ease;
+  font-weight: 500;
+  position: relative;
+}
+
+.btn-filter:focus {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.btn-filter.btn-outline:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-filter.btn-primary {
+  box-shadow: 0 2px 4px rgba(29, 185, 84, 0.3);
+}
+
+.btn-filter.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(29, 185, 84, 0.4);
+}
+
+/* Dark mode adjustments for filter buttons */
+.dark-mode .btn-filter.btn-outline:hover {
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
+}
+
+/* High contrast mode support for accessibility */
+@media (prefers-contrast: high) {
+  .btn-filter.btn-outline {
+    border-width: 2px;
+  }
+
+  .btn-filter.btn-primary {
+    border-width: 2px;
+  }
+}
+
+/* Reduced motion support for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .btn-filter {
+    transition: none;
+  }
+
+  .btn-filter:hover {
+    transform: none;
+  }
 }
 
 /* Forms */

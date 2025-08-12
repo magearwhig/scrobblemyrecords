@@ -674,9 +674,11 @@ const ReleaseDetailsPage: React.FC = () => {
                         {Object.entries(discs).map(([discName, discSides]) => (
                           <button
                             key={discName}
-                            className={`btn btn-small ${isDiscSelected(discSides) ? 'btn-primary' : 'btn-outline'}`}
+                            className={`btn btn-small btn-filter ${isDiscSelected(discSides) ? 'btn-primary' : 'btn-outline'}`}
                             onClick={() => handleDiscToggle(discSides)}
                             style={{ fontSize: '0.85rem' }}
+                            aria-pressed={isDiscSelected(discSides)}
+                            aria-label={`${isDiscSelected(discSides) ? 'Deselect' : 'Select'} ${discName} with sides ${discSides.join(' and ')}`}
                           >
                             {discName} ({discSides.join('/')})
                           </button>
@@ -708,9 +710,11 @@ const ReleaseDetailsPage: React.FC = () => {
                         return (
                           <button
                             key={side}
-                            className={`btn btn-small ${isSideSelected(side) ? 'btn-primary' : 'btn-outline'}`}
+                            className={`btn btn-small btn-filter ${isSideSelected(side) ? 'btn-primary' : 'btn-outline'}`}
                             onClick={() => handleSideToggle(side)}
                             style={{ fontSize: '0.85rem' }}
+                            aria-pressed={isSideSelected(side)}
+                            aria-label={`${isSideSelected(side) ? 'Deselect' : 'Select'} side ${side} with ${sideTrackCount} track${sideTrackCount === 1 ? '' : 's'}`}
                           >
                             Side {side} ({sideTrackCount})
                           </button>
