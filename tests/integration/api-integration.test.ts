@@ -1,4 +1,17 @@
+import fs from 'fs/promises';
+
 import request from 'supertest';
+
+// Set environment variables before any imports to prevent initialization errors
+process.env.NODE_ENV = 'test';
+process.env.ENCRYPTION_KEY =
+  'test-encryption-key-for-testing-32-chars-minimum-length-required';
+process.env.DISCOGS_CLIENT_ID = 'test-discogs-client-id';
+process.env.DISCOGS_CLIENT_SECRET = 'test-discogs-client-secret';
+process.env.LASTFM_API_KEY = 'test-lastfm-api-key';
+process.env.LASTFM_SECRET = 'test-lastfm-secret';
+// Use separate test data directory to avoid conflicts with development data
+process.env.DATA_DIR = './test-data-integration';
 
 // Mock external service calls to prevent real HTTP requests during integration tests
 jest.mock('../../src/backend/services/discogsService', () => {
@@ -11,6 +24,41 @@ jest.mock('../../src/backend/services/lastfmService', () => {
 import app from '../../src/server';
 
 describe('API Integration Tests', () => {
+  const testDataDir = './test-data-integration';
+  const originalDataDir = './data';
+  const backupDataDir = './data-backup-integration';
+
+  // Ensure proper test isolation with mock cleanup and data cleanup
+  beforeEach(async () => {
+    jest.clearAllMocks();
+
+    // Backup existing data directory to avoid encryption conflicts
+    try {
+      await fs.access(originalDataDir);
+      await fs.rename(originalDataDir, backupDataDir);
+    } catch (error) {
+      // Original data directory doesn't exist, which is fine
+    }
+  });
+
+  afterEach(async () => {
+    // Clean up test data directory after each test
+    try {
+      await fs.rm(testDataDir, { recursive: true, force: true });
+      await fs.rm(originalDataDir, { recursive: true, force: true });
+    } catch (error) {
+      // Ignore errors if directory doesn't exist
+    }
+
+    // Restore original data directory
+    try {
+      await fs.access(backupDataDir);
+      await fs.rename(backupDataDir, originalDataDir);
+    } catch (error) {
+      // Backup doesn't exist, which is fine
+    }
+  });
+
   describe('API Health and Status', () => {
     it('should return API health status', async () => {
       const response = await request(app).get('/health').expect(200);
