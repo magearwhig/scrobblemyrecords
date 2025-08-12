@@ -136,10 +136,6 @@ dev-debug.log
 *.sw?
 # OS specific
 
-# Task files
-# tasks.json
-# tasks/ 
-
 # AI/Development tool directories
 .claude/
 .cursor/
@@ -155,6 +151,10 @@ potential_tasks.md
 security.md
 dev_plan.md
 dev_prompt.md
+TESTING_GUIDE.md
+TESTING_QUICK_REFERENCE.md
+TEST_STYLE_GUIDE.md
+TESTING_ASSESSMENT.md
 
 # Command history and debug files
 grep
@@ -177,3 +177,7 @@ secrets.json
 analysis-*.md
 research-*.md
 notes-*.txt
+
+# Task files
+# tasks.json
+# tasks/ 

@@ -89,7 +89,7 @@ describe('API Routes', () => {
         .post('/api/v1/auth/discogs/token')
         .send('invalid json')
         .type('application/json')
-        .expect(500); // Express returns 500 for JSON parse errors
+        .expect(400); // Our improved error handling returns 400 for JSON parse errors
     });
   });
 });

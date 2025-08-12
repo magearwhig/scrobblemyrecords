@@ -40,6 +40,15 @@ describe('Scrobble Routes', () => {
 
     // Setup mock methods
     mockLastFmService.getScrobbleHistory = jest.fn();
+    mockLastFmService.scrobbleTrack = jest.fn();
+    mockLastFmService.scrobbleBatch = jest.fn();
+
+    // Setup authentication mocks
+    mockLastFmService.testConnection = jest.fn().mockResolvedValue({
+      success: true,
+      message: 'Connection successful',
+      userInfo: { name: 'testuser' },
+    });
 
     // Create Express app with mocked services
     app = express();
@@ -458,6 +467,152 @@ describe('Scrobble Routes', () => {
 
       expect(response.body.success).toBe(false);
       expect(response.body.error).toContain('Read error');
+    });
+  });
+
+  describe('GET /session/:sessionId', () => {
+    it('should return scrobble session details', async () => {
+      const mockSession = {
+        id: 'test-session-123',
+        status: 'completed',
+        tracks: [
+          {
+            title: 'Test Track 1',
+            artist: 'Test Artist',
+            album: 'Test Album',
+            timestamp: 1640995200,
+          },
+        ],
+        results: {
+          success: 1,
+          failed: 0,
+          ignored: 0,
+          errors: [],
+        },
+        createdAt: '2023-01-01T00:00:00Z',
+        completedAt: '2023-01-01T00:05:00Z',
+      };
+
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(mockSession);
+
+      const response = await request(app)
+        .get('/api/v1/scrobble/session/test-session-123')
+        .expect(200);
+
+      expect(response.body).toEqual({
+        success: true,
+        data: mockSession,
+      });
+      expect(mockFileStorage.readJSON).toHaveBeenCalledWith(
+        'scrobbles/session-test-session-123.json'
+      );
+    });
+
+    it('should handle non-existent session', async () => {
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(null);
+
+      const response = await request(app)
+        .get('/api/v1/scrobble/session/non-existent-session')
+        .expect(404);
+
+      expect(response.body).toEqual({
+        success: false,
+        error: 'Session not found',
+      });
+    });
+
+    it('should handle invalid session ID format', async () => {
+      const response = await request(app)
+        .get('/api/v1/scrobble/session/invalid..session..id')
+        .expect(400);
+
+      expect(response.body).toEqual({
+        success: false,
+        error: 'Invalid session ID format',
+      });
+    });
+
+    it('should handle service errors', async () => {
+      mockFileStorage.readJSON = jest
+        .fn()
+        .mockRejectedValue(new Error('Database error'));
+
+      const response = await request(app)
+        .get('/api/v1/scrobble/session/test-session-123')
+        .expect(500);
+
+      expect(response.body).toEqual({
+        success: false,
+        error: 'Database error',
+      });
+    });
+
+    it('should return session with in-progress status', async () => {
+      const mockSession = {
+        id: 'test-session-123',
+        status: 'in-progress',
+        tracks: [
+          {
+            title: 'Test Track 1',
+            artist: 'Test Artist',
+            album: 'Test Album',
+            timestamp: 1640995200,
+          },
+        ],
+        results: {
+          success: 0,
+          failed: 0,
+          ignored: 0,
+          errors: [],
+        },
+        createdAt: '2023-01-01T00:00:00Z',
+        completedAt: null,
+      };
+
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(mockSession);
+
+      const response = await request(app)
+        .get('/api/v1/scrobble/session/test-session-123')
+        .expect(200);
+
+      expect(response.body).toEqual({
+        success: true,
+        data: mockSession,
+      });
+    });
+
+    it('should return session with failed status', async () => {
+      const mockSession = {
+        id: 'test-session-123',
+        status: 'failed',
+        tracks: [
+          {
+            title: 'Test Track 1',
+            artist: 'Test Artist',
+            album: 'Test Album',
+            timestamp: 1640995200,
+          },
+        ],
+        results: {
+          success: 0,
+          failed: 1,
+          ignored: 0,
+          errors: ['Authentication failed'],
+        },
+        createdAt: '2023-01-01T00:00:00Z',
+        completedAt: '2023-01-01T00:01:00Z',
+      };
+
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(mockSession);
+
+      const response = await request(app)
+        .get('/api/v1/scrobble/session/test-session-123')
+        .expect(200);
+
+      expect(response.body).toEqual({
+        success: true,
+        data: mockSession,
+      });
     });
   });
 });

@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 
+import { LastFmPeriodType } from '../../shared/types';
 import { AuthService } from '../services/authService';
 import { DiscogsService } from '../services/discogsService';
 import { LastFmService } from '../services/lastfmService';
@@ -288,14 +289,14 @@ router.post('/lastfm/callback', async (req: Request, res: Response) => {
   }
 });
 
-// Test Last.fm session creation endpoint REMOVED for security
-// This endpoint was dangerous as it could create sessions from tokens
-// For debugging authentication issues, use the standard /lastfm/test endpoint instead
-
 // Test Last.fm connection
 router.get('/lastfm/test', async (req: Request, res: Response) => {
   try {
     const result = await lastfmService.testConnection();
+
+    if (!result.success) {
+      throw new Error(result.message);
+    }
 
     res.json({
       success: result.success,
@@ -344,7 +345,7 @@ router.get('/lastfm/top-tracks', async (req: Request, res: Response) => {
   try {
     const { period, limit } = req.query;
     const tracks = await lastfmService.getTopTracks(
-      (period as any) || '7day',
+      (period as LastFmPeriodType) || '7day',
       limit ? parseInt(limit as string) : 10
     );
 
@@ -366,7 +367,7 @@ router.get('/lastfm/top-artists', async (req: Request, res: Response) => {
   try {
     const { period, limit } = req.query;
     const artists = await lastfmService.getTopArtists(
-      (period as any) || '7day',
+      (period as LastFmPeriodType) || '7day',
       limit ? parseInt(limit as string) : 10
     );
 

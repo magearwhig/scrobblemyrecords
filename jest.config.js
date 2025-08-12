@@ -5,8 +5,8 @@ module.exports = {
       displayName: 'backend',
       preset: 'ts-jest',
       testEnvironment: 'node',
-      roots: ['<rootDir>/tests/backend'],
-      testMatch: ['**/backend/**/*.test.ts'],
+      roots: ['<rootDir>/tests/backend', '<rootDir>/tests/integration'],
+      testMatch: ['**/backend/**/*.test.ts', '**/integration/**/*.test.ts'],
       transform: {
         '^.+\\.ts$': 'ts-jest',
       },

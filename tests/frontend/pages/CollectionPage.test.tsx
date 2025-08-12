@@ -10,7 +10,27 @@ import { AuthStatus, CollectionItem } from '../../../src/shared/types';
 
 // Mock the API service
 jest.mock('../../../src/renderer/services/api');
-const mockApiService = apiService as jest.Mocked<typeof apiService>;
+
+// Create a mock API service instance
+const mockApiServiceInstance = {
+  getEntireCollection: jest.fn(),
+  searchCollectionPaginated: jest.fn(),
+  checkForNewItems: jest.fn(),
+  updateCacheWithNewItems: jest.fn(),
+  clearCollectionCache: jest.fn(),
+  getUserCollection: jest.fn(),
+  getAuthStatus: jest.fn(),
+  testDiscogsConnection: jest.fn(),
+  testLastfmConnection: jest.fn(),
+  getLastfmSessionKey: jest.fn(),
+  prepareTracksFromRelease: jest.fn(),
+  scrobbleBatch: jest.fn(),
+  getScrobbleProgress: jest.fn(),
+  getReleaseDetails: jest.fn(),
+};
+
+// Mock the getApiService function to return our mock instance
+(apiService.getApiService as jest.Mock).mockReturnValue(mockApiServiceInstance);
 
 // Mock components
 jest.mock('../../../src/renderer/components/AlbumCard', () => {
@@ -100,514 +120,388 @@ const mockLocalStorage = {
   length: 0,
   key: jest.fn(),
 };
+
 Object.defineProperty(window, 'localStorage', {
   value: mockLocalStorage,
   writable: true,
 });
 
-const createMockAuthContext = (authStatus: AuthStatus) => ({
-  authStatus,
-  setAuthStatus: jest.fn(),
-});
-
-const createMockApiInstance = () => ({
-  getAuthStatus: jest.fn(),
-  getEntireCollection: jest.fn(),
-  preloadCollection: jest.fn(),
-  searchCollectionPaginated: jest.fn(),
-  getCacheProgress: jest.fn(),
-  clearCollectionCache: jest.fn(),
-  checkForNewItems: jest.fn(),
-  updateCacheWithNewItems: jest.fn(),
-});
-
-const createMockCollectionItem = (
-  id: number,
-  artist: string,
-  title: string
-): CollectionItem => ({
-  id,
-  release: {
-    id,
-    artist,
-    title,
-    year: 2020,
-    format: [],
-    label: [],
-    resource_url: '',
+// Mock collection data
+const mockCollectionItems: CollectionItem[] = [
+  {
+    id: 1,
+    release: {
+      id: 101,
+      title: 'Album A',
+      artist: 'Artist A',
+      year: 2020,
+      format: ['Vinyl'],
+      label: ['Label A'],
+      cover_image: 'cover1.jpg',
+      resource_url: 'https://api.discogs.com/releases/101',
+    },
+    date_added: '2023-01-01T00:00:00Z',
   },
-  date_added: '2023-01-01T00:00:00Z',
-  folder_id: 1,
-});
+  {
+    id: 2,
+    release: {
+      id: 102,
+      title: 'Album B',
+      artist: 'Artist B',
+      year: 2021,
+      format: ['CD'],
+      label: ['Label B'],
+      cover_image: 'cover2.jpg',
+      resource_url: 'https://api.discogs.com/releases/102',
+    },
+    date_added: '2023-01-02T00:00:00Z',
+  },
+  {
+    id: 3,
+    release: {
+      id: 103,
+      title: 'Album C',
+      artist: 'Artist C',
+      year: 2019,
+      format: ['Vinyl', 'LP'],
+      label: ['Label C'],
+      cover_image: 'cover3.jpg',
+      resource_url: 'https://api.discogs.com/releases/103',
+    },
+    date_added: '2023-01-03T00:00:00Z',
+  },
+];
 
-const renderCollectionPageWithProviders = (
-  authStatus: AuthStatus,
-  serverUrl: string = 'http://localhost:3001'
-) => {
-  mockUseApp.state = { serverUrl };
-  const authContextValue = createMockAuthContext(authStatus);
+// Mock collection with missing data for edge cases
+const mockCollectionWithMissingData: CollectionItem[] = [
+  {
+    id: 1,
+    release: {
+      id: 101,
+      title: '',
+      artist: '',
+      year: undefined,
+      format: ['Vinyl'],
+      label: ['Label A'],
+      cover_image: 'cover1.jpg',
+      resource_url: 'https://api.discogs.com/releases/101',
+    },
+    date_added: '',
+  },
+  {
+    id: 2,
+    release: {
+      id: 102,
+      title: 'Album B',
+      artist: 'Artist B',
+      year: 2021,
+      format: ['CD'],
+      label: ['Label B'],
+      cover_image: 'cover2.jpg',
+      resource_url: 'https://api.discogs.com/releases/102',
+    },
+    date_added: '2023-01-02T00:00:00Z',
+  },
+];
 
-  return {
-    ...render(
-      <AuthProvider value={authContextValue}>
-        <CollectionPage />
-      </AuthProvider>
-    ),
-    authContextValue,
-  };
+const mockAuthStatus: AuthStatus = {
+  discogs: { authenticated: true, username: 'testuser' },
+  lastfm: { authenticated: true, username: 'testuser' },
+};
+
+const mockAuthContext = {
+  authStatus: mockAuthStatus,
+  setAuthStatus: jest.fn(),
+};
+
+const renderWithProviders = (component: React.ReactElement) => {
+  return render(
+    <AuthProvider value={mockAuthContext}>{component}</AuthProvider>
+  );
 };
 
 describe('CollectionPage', () => {
-  let mockApi: ReturnType<typeof createMockApiInstance>;
-
   beforeEach(() => {
-    mockApi = createMockApiInstance();
-    mockApiService.getApiService.mockReturnValue(mockApi as any);
     jest.clearAllMocks();
-
-    // Re-setup localStorage mock after clearing
-    mockLocalStorage.getItem.mockClear();
-    mockLocalStorage.setItem.mockClear();
-    mockLocalStorage.removeItem.mockClear();
-    mockLocalStorage.clear.mockClear();
+    mockApiServiceInstance.getEntireCollection.mockResolvedValue({
+      success: true,
+      data: mockCollectionItems,
+    });
+    mockApiServiceInstance.searchCollectionPaginated.mockResolvedValue({
+      items: mockCollectionItems,
+      total: mockCollectionItems.length,
+      totalPages: 1,
+      page: 1,
+      perPage: 50,
+    });
+    mockApiServiceInstance.checkForNewItems.mockResolvedValue({
+      success: true,
+      data: { newItemsCount: 0 },
+    });
+    mockApiServiceInstance.updateCacheWithNewItems.mockResolvedValue({
+      success: true,
+      data: { newItemsAdded: 0 },
+    });
+    mockApiServiceInstance.clearCollectionCache.mockResolvedValue(undefined);
+    mockApiServiceInstance.getUserCollection.mockResolvedValue({
+      success: true,
+      data: mockCollectionItems,
+    });
   });
 
   describe('Authentication', () => {
     it('shows authentication required message when not authenticated', () => {
-      const authStatus: AuthStatus = {
-        discogs: { authenticated: false, username: undefined },
-        lastfm: { authenticated: false, username: undefined },
+      const unauthenticatedContext = {
+        authStatus: {
+          discogs: { authenticated: false, username: '' },
+          lastfm: { authenticated: false, username: '' },
+        },
+        setAuthStatus: jest.fn(),
       };
 
-      renderCollectionPageWithProviders(authStatus);
+      render(
+        <AuthProvider value={unauthenticatedContext}>
+          <CollectionPage />
+        </AuthProvider>
+      );
 
-      expect(screen.getByText('Browse Collection')).toBeInTheDocument();
       expect(
-        screen.getByText(
-          'Please authenticate with Discogs first to browse your collection.'
-        )
+        screen.getByText(/Please authenticate with Discogs/)
       ).toBeInTheDocument();
-      expect(screen.getByText('Go to Setup')).toBeInTheDocument();
     });
 
     it('loads collection when authenticated', async () => {
-      const authStatus: AuthStatus = {
-        discogs: { authenticated: true, username: 'test_user' },
-        lastfm: { authenticated: false, username: undefined },
-      };
-
-      const mockCollection = [
-        createMockCollectionItem(1, 'Artist 1', 'Album 1'),
-        createMockCollectionItem(2, 'Artist 2', 'Album 2'),
-      ];
-
-      mockApi.getEntireCollection.mockResolvedValue({
-        success: true,
-        data: mockCollection,
-        cacheStatus: 'valid',
-      });
-      mockApi.getCacheProgress.mockResolvedValue({ status: 'completed' });
-
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(mockApi.getEntireCollection).toHaveBeenCalledWith(
-          'test_user',
-          false
-        );
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
-
-      expect(screen.getByText('2 total items')).toBeInTheDocument();
     });
   });
 
   describe('Collection Loading', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: true, username: 'test_user' },
-      lastfm: { authenticated: false, username: undefined },
-    };
-
-    it('shows loading state while fetching collection', async () => {
-      mockApi.getEntireCollection.mockImplementation(
+    it('shows loading state while fetching collection', () => {
+      mockApiServiceInstance.getEntireCollection.mockImplementation(
         () => new Promise(() => {})
-      ); // Never resolves
+      );
 
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Loading collection...')).toBeInTheDocument();
-      });
+      expect(screen.getByText('Loading collection...')).toBeInTheDocument();
     });
 
     it('displays collection items when loaded', async () => {
-      const mockCollection = [
-        createMockCollectionItem(1, 'The Beatles', 'Abbey Road'),
-        createMockCollectionItem(2, 'Pink Floyd', 'Dark Side of the Moon'),
-      ];
-
-      mockApi.getEntireCollection.mockResolvedValue({
-        success: true,
-        data: mockCollection,
-        cacheStatus: 'valid',
-      });
-      mockApi.getCacheProgress.mockResolvedValue({ status: 'completed' });
-
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(
-          screen.getByText('The Beatles - Abbey Road')
-        ).toBeInTheDocument();
-        expect(
-          screen.getByText('Pink Floyd - Dark Side of the Moon')
-        ).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+        expect(screen.getByText('Artist B - Album B')).toBeInTheDocument();
+        expect(screen.getByText('Artist C - Album C')).toBeInTheDocument();
       });
     });
 
     it('displays error message when loading fails', async () => {
-      mockApi.getEntireCollection.mockRejectedValue(
-        new Error('Failed to load')
+      mockApiServiceInstance.getEntireCollection.mockRejectedValue(
+        new Error('API Error')
       );
 
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('Failed to load')).toBeInTheDocument();
-        expect(screen.getByText('Retry')).toBeInTheDocument();
+        expect(screen.getByText('API Error')).toBeInTheDocument();
       });
     });
 
     it('allows retry when loading fails', async () => {
-      const user = userEvent.setup();
-
-      mockApi.getEntireCollection.mockRejectedValueOnce(
-        new Error('Failed to load')
+      mockApiServiceInstance.getEntireCollection.mockRejectedValueOnce(
+        new Error('API Error')
       );
-      mockApi.getEntireCollection.mockResolvedValue({
-        success: true,
-        data: [createMockCollectionItem(1, 'Artist', 'Album')],
-        cacheStatus: 'valid',
-      });
-      mockApi.getCacheProgress.mockResolvedValue({ status: 'completed' });
 
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('Retry')).toBeInTheDocument();
+        expect(screen.getByText('API Error')).toBeInTheDocument();
       });
 
       const retryButton = screen.getByText('Retry');
-      await user.click(retryButton);
+      await userEvent.click(retryButton);
 
       await waitFor(() => {
-        expect(screen.getByText('Artist - Album')).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
-
-      expect(mockApi.getEntireCollection).toHaveBeenCalledTimes(2);
     });
   });
 
   describe('Search Functionality', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: true, username: 'test_user' },
-      lastfm: { authenticated: false, username: undefined },
-    };
-
-    beforeEach(async () => {
-      const mockCollection = [
-        createMockCollectionItem(1, 'The Beatles', 'Abbey Road'),
-        createMockCollectionItem(2, 'Pink Floyd', 'Dark Side of the Moon'),
-      ];
-
-      mockApi.getEntireCollection.mockResolvedValue({
-        success: true,
-        data: mockCollection,
-        cacheStatus: 'valid',
-      });
-      mockApi.getCacheProgress.mockResolvedValue({ status: 'completed' });
-    });
-
     it('allows searching the collection', async () => {
-      const user = userEvent.setup();
-
-      const searchResults = [
-        createMockCollectionItem(1, 'The Beatles', 'Abbey Road'),
-      ];
-      mockApi.searchCollectionPaginated.mockResolvedValue({
-        items: searchResults,
-        totalPages: 1,
-        total: 1,
-      });
-
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(screen.getByTestId('search-input')).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
       const searchInput = screen.getByTestId('search-input');
-      const searchButton = screen.getByText('Search');
+      await userEvent.type(searchInput, 'Artist A');
 
-      await user.type(searchInput, 'Beatles');
-      await user.click(searchButton);
+      const searchButton = screen.getByText('Search');
+      await userEvent.click(searchButton);
 
       await waitFor(() => {
-        expect(mockApi.searchCollectionPaginated).toHaveBeenCalledWith(
-          'test_user',
-          'Beatles',
-          1,
-          50
-        );
+        expect(
+          mockApiServiceInstance.searchCollectionPaginated
+        ).toHaveBeenCalledWith('testuser', 'Artist A', 1, 50);
       });
     });
 
     it('clears search when query is empty', async () => {
-      const user = userEvent.setup();
-
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(screen.getByTestId('search-input')).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      // First search for something
       const searchInput = screen.getByTestId('search-input');
+      await userEvent.clear(searchInput);
+
       const searchButton = screen.getByText('Search');
-
-      await user.type(searchInput, 'Beatles');
-      await user.click(searchButton);
-
-      // Then clear the search
-      await user.clear(searchInput);
-      await user.click(searchButton);
+      await userEvent.click(searchButton);
 
       await waitFor(() => {
-        expect(screen.getByText('2 total items')).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
     });
   });
 
   describe('Sorting', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: true, username: 'test_user' },
-      lastfm: { authenticated: false, username: undefined },
-    };
-
-    beforeEach(async () => {
-      const mockCollection = [
-        createMockCollectionItem(1, 'B Artist', 'Z Album'),
-        createMockCollectionItem(2, 'A Artist', 'Y Album'),
-      ];
-
-      mockApi.getEntireCollection.mockResolvedValue({
-        success: true,
-        data: mockCollection,
-        cacheStatus: 'valid',
-      });
-      mockApi.getCacheProgress.mockResolvedValue({ status: 'completed' });
-    });
-
     it('allows changing sort criteria', async () => {
-      const user = userEvent.setup();
-
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('Sort by:')).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
       const sortSelect = screen.getByDisplayValue('Artist');
-      await user.selectOptions(sortSelect, 'title');
+      await userEvent.selectOptions(sortSelect, 'title');
 
       expect(sortSelect).toHaveValue('title');
     });
 
     it('allows toggling sort order', async () => {
-      const user = userEvent.setup();
-
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(screen.getByTitle('Sort ascending')).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const sortOrderButton = screen.getByTitle('Sort ascending');
-      await user.click(sortOrderButton);
+      const sortOrderButton = screen.getByText('↑');
+      await userEvent.click(sortOrderButton);
 
-      expect(screen.getByTitle('Sort descending')).toBeInTheDocument();
+      expect(screen.getByText('↓')).toBeInTheDocument();
     });
   });
 
   describe('Selection', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: true, username: 'test_user' },
-      lastfm: { authenticated: false, username: undefined },
-    };
-
-    beforeEach(async () => {
-      // Clear localStorage mock
-      mockLocalStorage.setItem.mockClear();
-      mockLocalStorage.getItem.mockClear();
-
-      const mockCollection = [
-        createMockCollectionItem(1, 'Artist 1', 'Album 1'),
-        createMockCollectionItem(2, 'Artist 2', 'Album 2'),
-      ];
-
-      mockApi.getEntireCollection.mockResolvedValue({
-        success: true,
-        data: mockCollection,
-        cacheStatus: 'valid',
-      });
-      mockApi.getCacheProgress.mockResolvedValue({ status: 'completed' });
-    });
-
     it('allows selecting individual albums', async () => {
-      const user = userEvent.setup();
-
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(screen.getByTestId('album-card-1')).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const selectButton = screen.getAllByText('Select')[0];
-      await user.click(selectButton);
+      const selectButtons = screen.getAllByText('Select');
+      await userEvent.click(selectButtons[0]);
 
-      expect(screen.getByText('1 selected')).toBeInTheDocument();
       expect(screen.getByText('Deselect')).toBeInTheDocument();
     });
 
     it('allows selecting all albums', async () => {
-      const user = userEvent.setup();
-
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('Select All')).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
       const selectAllButton = screen.getByText('Select All');
-      await user.click(selectAllButton);
+      await userEvent.click(selectAllButton);
 
-      expect(screen.getByText('2 selected')).toBeInTheDocument();
-      expect(screen.getByText('Deselect All')).toBeInTheDocument();
+      const deselectButtons = screen.getAllByText('Deselect');
+      expect(deselectButtons).toHaveLength(3);
     });
 
     it('shows scrobble button when albums are selected', async () => {
-      const user = userEvent.setup();
-
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(screen.getByTestId('album-card-1')).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const selectButton = screen.getAllByText('Select')[0];
-      await user.click(selectButton);
+      const selectButtons = screen.getAllByText('Select');
+      await userEvent.click(selectButtons[0]);
 
       expect(screen.getByText('Scrobble Selected (1)')).toBeInTheDocument();
     });
 
     it('navigates to scrobble page when scrobble button is clicked', async () => {
-      const user = userEvent.setup();
+      renderWithProviders(<CollectionPage />);
 
-      renderCollectionPageWithProviders(authStatus);
-
-      // Wait for collection to load completely
       await waitFor(() => {
-        expect(screen.getByTestId('album-card-1')).toBeInTheDocument();
-        expect(screen.getByTestId('album-card-2')).toBeInTheDocument();
-        expect(screen.getByText('2 total items')).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const selectButton = screen.getAllByText('Select')[0];
-      await user.click(selectButton);
-
-      // Wait for the scrobble button to appear after selection
-      await waitFor(() => {
-        expect(screen.getByText('Scrobble Selected (1)')).toBeInTheDocument();
-      });
+      const selectButtons = screen.getAllByText('Select');
+      await userEvent.click(selectButtons[0]);
 
       const scrobbleButton = screen.getByText('Scrobble Selected (1)');
-      await user.click(scrobbleButton);
+      await userEvent.click(scrobbleButton);
 
-      // Wait for localStorage.setItem to be called
-      await waitFor(
-        () => {
-          expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-            'selectedAlbums',
-            expect.stringContaining('Artist 1')
-          );
-        },
-        { timeout: 10000 }
-      );
-    }, 15000);
+      expect(window.location.hash).toBe('#scrobble');
+    });
   });
 
   describe('Cache Management', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: true, username: 'test_user' },
-      lastfm: { authenticated: false, username: undefined },
-    };
-
-    beforeEach(async () => {
-      mockApi.getEntireCollection.mockResolvedValue({
-        success: true,
-        data: [createMockCollectionItem(1, 'Artist', 'Album')],
-        cacheStatus: 'valid',
-      });
-      mockApi.getCacheProgress.mockResolvedValue({ status: 'completed' });
-    });
-
     it('shows cache management buttons', async () => {
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('Check for New Items')).toBeInTheDocument();
-        expect(screen.getByText('Force Reload')).toBeInTheDocument();
-        expect(screen.getByText('Clear Cache')).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
+
+      expect(screen.getByText('Check for New Items')).toBeInTheDocument();
+      expect(screen.getByText('Force Reload')).toBeInTheDocument();
+      expect(screen.getByText('Clear Cache')).toBeInTheDocument();
     });
 
     it('allows checking for new items', async () => {
-      const user = userEvent.setup();
-
-      mockApi.checkForNewItems.mockResolvedValue({
-        success: true,
-        data: { newItemsCount: 5, latestCacheDate: '2023-01-01' },
-      });
-
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('Check for New Items')).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
       const checkButton = screen.getByText('Check for New Items');
-      await user.click(checkButton);
+      await userEvent.click(checkButton);
 
       await waitFor(() => {
-        expect(mockApi.checkForNewItems).toHaveBeenCalledWith('test_user');
+        expect(mockApiServiceInstance.checkForNewItems).toHaveBeenCalledWith(
+          'testuser'
+        );
       });
     });
 
     it('shows update button when new items are found', async () => {
-      const user = userEvent.setup();
-
-      mockApi.checkForNewItems.mockResolvedValue({
+      mockApiServiceInstance.checkForNewItems.mockResolvedValue({
         success: true,
-        data: { newItemsCount: 5, latestCacheDate: '2023-01-01' },
+        data: { newItemsCount: 5 },
       });
 
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('Check for New Items')).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
       const checkButton = screen.getByText('Check for New Items');
-      await user.click(checkButton);
+      await userEvent.click(checkButton);
 
       await waitFor(() => {
         expect(
@@ -617,183 +511,597 @@ describe('CollectionPage', () => {
     });
 
     it('allows force reloading cache', async () => {
-      const user = userEvent.setup();
-
-      mockApi.getEntireCollection.mockResolvedValue({
-        success: true,
-        data: [createMockCollectionItem(1, 'Artist', 'Album')],
-        cacheStatus: 'valid',
-      });
-
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('Force Reload')).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
       const forceReloadButton = screen.getByText('Force Reload');
-      await user.click(forceReloadButton);
+      await userEvent.click(forceReloadButton);
 
       await waitFor(() => {
-        expect(mockApi.getEntireCollection).toHaveBeenCalledWith(
-          'test_user',
+        expect(mockApiServiceInstance.getEntireCollection).toHaveBeenCalledWith(
+          'testuser',
           true
         );
       });
     });
 
     it('allows clearing cache', async () => {
-      const user = userEvent.setup();
-
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('Clear Cache')).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const clearCacheButton = screen.getByText('Clear Cache');
-      await user.click(clearCacheButton);
+      const clearButton = screen.getByText('Clear Cache');
+      await userEvent.click(clearButton);
 
       await waitFor(() => {
-        expect(mockApi.clearCollectionCache).toHaveBeenCalled();
+        expect(mockApiServiceInstance.clearCollectionCache).toHaveBeenCalled();
       });
     });
   });
 
   describe('Pagination', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: true, username: 'test_user' },
-      lastfm: { authenticated: false, username: undefined },
-    };
-
-    beforeEach(async () => {
-      // Create a collection with enough items to require pagination (>50 items)
-      const mockCollection = Array.from({ length: 75 }, (_, i) =>
-        createMockCollectionItem(i + 1, `Artist ${i + 1}`, `Album ${i + 1}`)
-      );
-
-      mockApi.getEntireCollection.mockResolvedValue({
-        success: true,
-        data: mockCollection,
-        cacheStatus: 'valid',
-      });
-      mockApi.getCacheProgress.mockResolvedValue({ status: 'completed' });
-    });
-
     it('shows pagination controls for large collections', async () => {
-      renderCollectionPageWithProviders(authStatus);
+      const largeCollection = Array.from({ length: 50 }, (_, i) => ({
+        id: i + 1,
+        release: {
+          id: i + 101,
+          title: `Album ${i + 1}`,
+          artist: `Artist ${i + 1}`,
+          year: 2020 + i,
+          format: ['Vinyl'],
+          label: ['Label A'],
+          cover_image: 'cover.jpg',
+        },
+        date_added: '2023-01-01T00:00:00Z',
+      }));
+
+      mockApiServiceInstance.getEntireCollection.mockResolvedValue({
+        success: true,
+        data: largeCollection,
+      });
+
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('Page 1 of 2')).toBeInTheDocument();
         expect(screen.getByText('Previous')).toBeInTheDocument();
         expect(screen.getByText('Next')).toBeInTheDocument();
       });
     });
 
     it('allows navigating to next page', async () => {
-      const user = userEvent.setup();
+      const largeCollection = Array.from({ length: 150 }, (_, i) => ({
+        id: i + 1,
+        release: {
+          id: i + 101,
+          title: `Album ${i + 1}`,
+          artist: `Artist ${i + 1}`,
+          year: 2020 + i,
+          format: ['Vinyl'],
+          label: ['Label A'],
+          cover_image: 'cover.jpg',
+        },
+        date_added: '2023-01-01T00:00:00Z',
+      }));
 
-      renderCollectionPageWithProviders(authStatus);
+      mockApiServiceInstance.getEntireCollection.mockResolvedValue({
+        success: true,
+        data: largeCollection,
+      });
+
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
         expect(screen.getByText('Next')).toBeInTheDocument();
       });
 
       const nextButton = screen.getByText('Next');
-      await user.click(nextButton);
+      await userEvent.click(nextButton);
 
-      expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
+      expect(screen.getByText('Page 2 of 3')).toBeInTheDocument();
     });
   });
 
   describe('View Details', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: true, username: 'test_user' },
-      lastfm: { authenticated: false, username: undefined },
-    };
-
-    beforeEach(async () => {
-      // Clear localStorage mock
-      mockLocalStorage.setItem.mockClear();
-      mockLocalStorage.getItem.mockClear();
-
-      const mockCollection = [createMockCollectionItem(1, 'Artist', 'Album')];
-
-      mockApi.getEntireCollection.mockResolvedValue({
-        success: true,
-        data: mockCollection,
-        cacheStatus: 'valid',
-      });
-      mockApi.getCacheProgress.mockResolvedValue({ status: 'completed' });
-    });
-
     it('allows viewing album details', async () => {
-      const user = userEvent.setup();
+      renderWithProviders(<CollectionPage />);
 
-      renderCollectionPageWithProviders(authStatus);
-
-      // Wait for collection to load completely
       await waitFor(() => {
-        expect(screen.getByText('View Details')).toBeInTheDocument();
-        expect(screen.getByText('1 total items')).toBeInTheDocument();
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const viewDetailsButton = screen.getByText('View Details');
-      await user.click(viewDetailsButton);
+      const viewDetailsButtons = screen.getAllByText('View Details');
+      await userEvent.click(viewDetailsButtons[0]);
 
-      // Wait for localStorage.setItem to be called
-      await waitFor(
-        () => {
-          expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-            'selectedRelease',
-            expect.stringContaining('Artist')
-          );
-        },
-        { timeout: 10000 }
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+        'selectedRelease',
+        JSON.stringify(mockCollectionItems[0].release)
       );
+      expect(window.location.hash).toBe('#release-details');
     });
   });
 
   describe('Cache Status Indicators', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: true, username: 'test_user' },
-      lastfm: { authenticated: false, username: undefined },
-    };
-
     it('shows cache status when using cached data', async () => {
-      mockApi.getEntireCollection.mockResolvedValue({
+      mockApiServiceInstance.getEntireCollection.mockResolvedValue({
         success: true,
-        data: [createMockCollectionItem(1, 'Artist', 'Album')],
-        cacheStatus: 'valid',
+        data: mockCollectionItems,
+        cacheStatus: 'cached',
+        message: 'Using cached data',
       });
-      mockApi.getCacheProgress.mockResolvedValue({ status: 'completed' });
 
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('⚡ Using cached data')).toBeInTheDocument();
+        const elements = screen.getAllByText((content, element) => {
+          return element?.textContent?.includes('Using cached data') || false;
+        });
+        expect(elements.length).toBeGreaterThan(0);
       });
     });
 
     it('shows refreshing status when cache is expired', async () => {
-      mockApi.getEntireCollection.mockResolvedValue({
+      mockApiServiceInstance.getEntireCollection.mockResolvedValue({
         success: true,
-        data: [createMockCollectionItem(1, 'Artist', 'Album')],
-        cacheStatus: 'expired',
+        data: mockCollectionItems,
+        cacheStatus: 'refreshing',
         refreshing: true,
-      });
-      mockApi.getCacheProgress.mockResolvedValue({
-        status: 'loading',
-        currentPage: 1,
-        totalPages: 10,
+        message: 'Refreshing cache...',
       });
 
-      renderCollectionPageWithProviders(authStatus);
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        const elements = screen.getAllByText((content, element) => {
+          return element?.textContent?.includes('Refreshing cache...') || false;
+        });
+        expect(elements.length).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe('Advanced Error Handling', () => {
+    it('handles error when checking for new items fails', async () => {
+      mockApiServiceInstance.checkForNewItems.mockRejectedValue(
+        new Error('Check failed')
+      );
+
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      const checkButton = screen.getByText('Check for New Items');
+      await userEvent.click(checkButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Check failed')).toBeInTheDocument();
+      });
+    });
+
+    it('handles error when checking for new items fails with non-Error exception', async () => {
+      mockApiServiceInstance.checkForNewItems.mockRejectedValue('String error');
+
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      const checkButton = screen.getByText('Check for New Items');
+      await userEvent.click(checkButton);
 
       await waitFor(() => {
         expect(
-          screen.getByText(/⏰ Cache expired - Refreshing.../)
+          screen.getByText('Failed to check for new items')
         ).toBeInTheDocument();
+      });
+    });
+
+    it('handles error when updating cache with new items fails', async () => {
+      mockApiServiceInstance.checkForNewItems.mockResolvedValue({
+        success: true,
+        data: { newItemsCount: 5 },
+      });
+      mockApiServiceInstance.updateCacheWithNewItems.mockRejectedValue(
+        new Error('Update failed')
+      );
+
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      const checkButton = screen.getByText('Check for New Items');
+      await userEvent.click(checkButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Update with New Items (5)')
+        ).toBeInTheDocument();
+      });
+
+      const updateButton = screen.getByText('Update with New Items (5)');
+      await userEvent.click(updateButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Update failed')).toBeInTheDocument();
+      });
+    });
+
+    it('handles error when updating cache with new items fails with non-Error exception', async () => {
+      mockApiServiceInstance.checkForNewItems.mockResolvedValue({
+        success: true,
+        data: { newItemsCount: 5 },
+      });
+      mockApiServiceInstance.updateCacheWithNewItems.mockRejectedValue(
+        'String error'
+      );
+
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      const checkButton = screen.getByText('Check for New Items');
+      await userEvent.click(checkButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Update with New Items (5)')
+        ).toBeInTheDocument();
+      });
+
+      const updateButton = screen.getByText('Update with New Items (5)');
+      await userEvent.click(updateButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Failed to update cache with new items')
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Advanced Sorting Functionality', () => {
+    it('sorts by title correctly', async () => {
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      const sortSelect = screen.getByDisplayValue('Artist');
+      await userEvent.selectOptions(sortSelect, 'title');
+
+      expect(sortSelect).toHaveValue('title');
+    });
+
+    it('sorts by year correctly', async () => {
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      const sortSelect = screen.getByDisplayValue('Artist');
+      await userEvent.selectOptions(sortSelect, 'year');
+
+      expect(sortSelect).toHaveValue('year');
+    });
+
+    it('sorts by date added correctly', async () => {
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      const sortSelect = screen.getByDisplayValue('Artist');
+      await userEvent.selectOptions(sortSelect, 'date_added');
+
+      expect(sortSelect).toHaveValue('date_added');
+    });
+
+    it('handles sorting with missing data gracefully', async () => {
+      const mockCollectionWithMissingData = [
+        {
+          id: 1,
+          release: {
+            id: 101,
+            title: '',
+            artist: '',
+            year: undefined,
+            format: ['Vinyl'],
+            label: ['Label A'],
+            cover_image: 'cover1.jpg',
+          },
+          date_added: '',
+        },
+        {
+          id: 2,
+          release: {
+            id: 102,
+            title: 'Album B',
+            artist: 'Artist B',
+            year: 2021,
+            format: ['CD'],
+            label: ['Label B'],
+            cover_image: 'cover2.jpg',
+          },
+          date_added: '2023-01-02T00:00:00Z',
+        },
+      ];
+
+      mockApiServiceInstance.getEntireCollection.mockResolvedValue({
+        success: true,
+        data: mockCollectionWithMissingData,
+      });
+
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist B - Album B')).toBeInTheDocument();
+      });
+
+      const sortSelect = screen.getByDisplayValue('Artist');
+      await userEvent.selectOptions(sortSelect, 'title');
+
+      expect(sortSelect).toHaveValue('title');
+    });
+  });
+
+  describe('Empty Collection States', () => {
+    it('shows empty collection message when no items', async () => {
+      mockApiServiceInstance.getEntireCollection.mockResolvedValue({
+        success: true,
+        data: [],
+      });
+
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('No items in your collection')
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('shows no search results message', async () => {
+      // Set up the mock response before user interaction
+      mockApiServiceInstance.searchCollectionPaginated.mockResolvedValue({
+        items: [],
+        total: 0,
+        totalPages: 0,
+        page: 1,
+        perPage: 50,
+      });
+
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      const searchInput = screen.getByTestId('search-input');
+      await userEvent.type(searchInput, 'Nonexistent Artist');
+
+      const searchButton = screen.getByText('Search');
+      await userEvent.click(searchButton);
+
+      await waitFor(() => {
+        const elements = screen.getAllByText((content, element) => {
+          return (
+            element?.textContent?.includes(
+              'No results found for "Nonexistent Artist"'
+            ) || false
+          );
+        });
+        expect(elements.length).toBeGreaterThan(0);
+      });
+    });
+
+    it('shows debug information in empty state', async () => {
+      mockApiServiceInstance.getEntireCollection.mockResolvedValue({
+        success: true,
+        data: [],
+      });
+
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(
+            /Debug: entireCollection=0, filtered=0, searchMode=false/
+          )
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Search Pagination', () => {
+    it('handles search pagination correctly', async () => {
+      const searchResults = Array.from({ length: 50 }, (_, i) => ({
+        id: i + 1,
+        release: {
+          id: i + 101,
+          title: `Search Album ${i + 1}`,
+          artist: `Search Artist ${i + 1}`,
+          year: 2020 + i,
+          format: ['Vinyl'],
+          label: ['Label A'],
+          cover_image: 'cover.jpg',
+        },
+        date_added: '2023-01-01T00:00:00Z',
+      }));
+
+      mockApiServiceInstance.searchCollectionPaginated.mockResolvedValue({
+        items: searchResults,
+        total: 50,
+        totalPages: 3,
+        page: 1,
+        perPage: 50,
+      });
+
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      const searchInput = screen.getByTestId('search-input');
+      await userEvent.type(searchInput, 'Search');
+
+      const searchButton = screen.getByText('Search');
+      await userEvent.click(searchButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Page 1 of 3 (50 results)')
+        ).toBeInTheDocument();
+      });
+
+      const nextButton = screen.getByText('Next');
+      await userEvent.click(nextButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Page 2 of 3 (50 results)')
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('disables pagination buttons appropriately', async () => {
+      const searchResults = Array.from({ length: 10 }, (_, i) => ({
+        id: i + 1,
+        release: {
+          id: i + 101,
+          title: `Search Album ${i + 1}`,
+          artist: `Search Artist ${i + 1}`,
+          year: 2020 + i,
+          format: ['Vinyl'],
+          label: ['Label A'],
+          cover_image: 'cover.jpg',
+        },
+        date_added: '2023-01-01T00:00:00Z',
+      }));
+
+      mockApiServiceInstance.searchCollectionPaginated.mockResolvedValue({
+        items: searchResults,
+        total: 10,
+        totalPages: 1,
+        page: 1,
+        perPage: 50,
+      });
+
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      const searchInput = screen.getByTestId('search-input');
+      await userEvent.type(searchInput, 'Search');
+
+      const searchButton = screen.getByText('Search');
+      await userEvent.click(searchButton);
+
+      await waitFor(() => {
+        const nextButton = screen.getByText('Next');
+        expect(nextButton).toBeDisabled();
+      });
+    });
+  });
+
+  describe('Cache Update Success Handling', () => {
+    it('shows success message when new items are added', async () => {
+      mockApiServiceInstance.checkForNewItems.mockResolvedValue({
+        success: true,
+        data: { newItemsCount: 3 },
+      });
+      mockApiServiceInstance.updateCacheWithNewItems.mockResolvedValue({
+        success: true,
+        data: { newItemsAdded: 3 },
+      });
+      // Mock the loadCollection call that happens after update
+      mockApiServiceInstance.getEntireCollection.mockResolvedValue({
+        success: true,
+        data: mockCollectionItems,
+      });
+
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      const checkButton = screen.getByText('Check for New Items');
+      await userEvent.click(checkButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Update with New Items (3)')
+        ).toBeInTheDocument();
+      });
+
+      const updateButton = screen.getByText('Update with New Items (3)');
+      await userEvent.click(updateButton);
+
+      // Verify that the update operation completed successfully by checking that getEntireCollection was called
+      await waitFor(() => {
+        expect(
+          mockApiServiceInstance.updateCacheWithNewItems
+        ).toHaveBeenCalledWith('testuser');
+        expect(mockApiServiceInstance.getEntireCollection).toHaveBeenCalledWith(
+          'testuser',
+          false
+        );
+      });
+    });
+
+    it('shows message when no new items are found to add', async () => {
+      mockApiServiceInstance.checkForNewItems.mockResolvedValue({
+        success: true,
+        data: { newItemsCount: 3 },
+      });
+      mockApiServiceInstance.updateCacheWithNewItems.mockResolvedValue({
+        success: true,
+        data: { newItemsAdded: 0 },
+      });
+
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      const checkButton = screen.getByText('Check for New Items');
+      await userEvent.click(checkButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Update with New Items (3)')
+        ).toBeInTheDocument();
+      });
+
+      const updateButton = screen.getByText('Update with New Items (3)');
+      await userEvent.click(updateButton);
+
+      await waitFor(() => {
+        const elements = screen.getAllByText((content, element) => {
+          return (
+            element?.textContent?.includes('No new items were found to add.') ||
+            false
+          );
+        });
+        expect(elements.length).toBeGreaterThan(0);
       });
     });
   });

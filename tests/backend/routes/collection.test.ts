@@ -44,6 +44,12 @@ describe('Collection Routes', () => {
     mockDiscogsService.getCacheProgress = jest.fn();
     mockDiscogsService.clearCache = jest.fn();
     mockDiscogsService.getUserCollection = jest.fn();
+    mockDiscogsService.checkForNewItems = jest.fn();
+    mockDiscogsService.updateCacheWithNewItems = jest.fn();
+    mockDiscogsService.getReleaseDetails = jest.fn();
+
+    // Setup authentication mocks
+    mockAuthService.getDiscogsToken = jest.fn().mockResolvedValue('mock-token');
 
     // Create Express app with mocked services
     app = express();
@@ -489,6 +495,237 @@ describe('Collection Routes', () => {
 
       expect(response.body.success).toBe(false);
       expect(response.body.error).toContain('Clear error');
+    });
+  });
+
+  describe('GET /:username/check-new', () => {
+    it('should check for new items in collection', async () => {
+      const mockCheckResult = {
+        success: true,
+        newItemsCount: 5,
+        latestCacheDate: '2023-01-01T00:00:00Z',
+        latestDiscogsDate: '2023-01-02T00:00:00Z',
+      };
+
+      mockDiscogsService.checkForNewItems = jest
+        .fn()
+        .mockResolvedValue(mockCheckResult);
+
+      const response = await request(app)
+        .get('/api/v1/collection/testuser/check-new')
+        .expect(200);
+
+      expect(response.body).toEqual({
+        success: true,
+        data: {
+          newItemsCount: 5,
+          latestCacheDate: '2023-01-01T00:00:00Z',
+          latestDiscogsDate: '2023-01-02T00:00:00Z',
+        },
+      });
+      expect(mockDiscogsService.checkForNewItems).toHaveBeenCalledWith(
+        'testuser'
+      );
+    });
+
+    it('should handle when no new items are found', async () => {
+      const mockCheckResult = {
+        success: true,
+        newItemsCount: 0,
+        latestCacheDate: '2023-01-01T00:00:00Z',
+        latestDiscogsDate: '2023-01-01T00:00:00Z',
+      };
+
+      mockDiscogsService.checkForNewItems = jest
+        .fn()
+        .mockResolvedValue(mockCheckResult);
+
+      const response = await request(app)
+        .get('/api/v1/collection/testuser/check-new')
+        .expect(200);
+
+      expect(response.body).toEqual({
+        success: true,
+        data: {
+          newItemsCount: 0,
+          latestCacheDate: '2023-01-01T00:00:00Z',
+          latestDiscogsDate: '2023-01-01T00:00:00Z',
+        },
+      });
+    });
+
+    it('should handle service errors', async () => {
+      mockDiscogsService.checkForNewItems = jest
+        .fn()
+        .mockRejectedValue(new Error('API error'));
+
+      const response = await request(app)
+        .get('/api/v1/collection/testuser/check-new')
+        .expect(500);
+
+      expect(response.body).toEqual({
+        success: false,
+        error: 'API error',
+      });
+    });
+
+    it('should validate username format', async () => {
+      const response = await request(app)
+        .get('/api/v1/collection/invalid..username/check-new')
+        .expect(400);
+
+      expect(response.body).toEqual({
+        success: false,
+        error: 'Invalid username format',
+      });
+    });
+  });
+
+  describe('POST /:username/update-new', () => {
+    it('should update cache with new items', async () => {
+      const mockUpdateResult = {
+        success: true,
+        newItemsAdded: 3,
+      };
+
+      mockDiscogsService.updateCacheWithNewItems = jest
+        .fn()
+        .mockResolvedValue(mockUpdateResult);
+
+      const response = await request(app)
+        .post('/api/v1/collection/testuser/update-new')
+        .expect(200);
+
+      expect(response.body).toEqual({
+        success: true,
+        data: {
+          newItemsAdded: 3,
+        },
+      });
+      expect(mockDiscogsService.updateCacheWithNewItems).toHaveBeenCalledWith(
+        'testuser'
+      );
+    });
+
+    it('should handle when no new items are added', async () => {
+      const mockUpdateResult = {
+        success: true,
+        newItemsAdded: 0,
+      };
+
+      mockDiscogsService.updateCacheWithNewItems = jest
+        .fn()
+        .mockResolvedValue(mockUpdateResult);
+
+      const response = await request(app)
+        .post('/api/v1/collection/testuser/update-new')
+        .expect(200);
+
+      expect(response.body).toEqual({
+        success: true,
+        data: {
+          newItemsAdded: 0,
+        },
+      });
+    });
+
+    it('should handle service errors', async () => {
+      mockDiscogsService.updateCacheWithNewItems = jest
+        .fn()
+        .mockRejectedValue(new Error('Update failed'));
+
+      const response = await request(app)
+        .post('/api/v1/collection/testuser/update-new')
+        .expect(500);
+
+      expect(response.body).toEqual({
+        success: false,
+        error: 'Update failed',
+      });
+    });
+
+    it('should validate username format', async () => {
+      const response = await request(app)
+        .post('/api/v1/collection/invalid..username/update-new')
+        .expect(400);
+
+      expect(response.body).toEqual({
+        success: false,
+        error: 'Invalid username format',
+      });
+    });
+  });
+
+  describe('GET /:username/progress', () => {
+    it('should return cache progress information', async () => {
+      const mockProgress = {
+        cachedPages: 5,
+        totalPages: 10,
+        progress: 50,
+        isComplete: false,
+        lastUpdated: '2023-01-01T00:00:00Z',
+      };
+
+      mockDiscogsService.getCacheProgress.mockResolvedValue(mockProgress);
+
+      const response = await request(app)
+        .get('/api/v1/collection/testuser/progress')
+        .expect(200);
+
+      expect(response.body).toEqual({
+        success: true,
+        data: mockProgress,
+      });
+      expect(mockDiscogsService.getCacheProgress).toHaveBeenCalledWith(
+        'testuser'
+      );
+    });
+
+    it('should handle completed cache progress', async () => {
+      const mockProgress = {
+        cachedPages: 10,
+        totalPages: 10,
+        progress: 100,
+        isComplete: true,
+        lastUpdated: '2023-01-01T00:00:00Z',
+      };
+
+      mockDiscogsService.getCacheProgress.mockResolvedValue(mockProgress);
+
+      const response = await request(app)
+        .get('/api/v1/collection/testuser/progress')
+        .expect(200);
+
+      expect(response.body).toEqual({
+        success: true,
+        data: mockProgress,
+      });
+    });
+
+    it('should handle service errors', async () => {
+      mockDiscogsService.getCacheProgress = jest
+        .fn()
+        .mockRejectedValue(new Error('Progress check failed'));
+
+      const response = await request(app)
+        .get('/api/v1/collection/testuser/progress')
+        .expect(500);
+
+      expect(response.body).toEqual({
+        success: false,
+        error: 'Progress check failed',
+      });
+    });
+
+    it('should validate username format', async () => {
+      const response = await request(app)
+        .get('/api/v1/collection/invalid..username/progress')
+        .expect(400);
+
+      expect(response.body).toEqual({
+        success: false,
+        error: 'Invalid username format',
+      });
     });
   });
 });

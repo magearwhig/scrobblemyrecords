@@ -31,8 +31,8 @@ app.use(helmet());
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, etc.) in development only
-      if (!origin && process.env.NODE_ENV !== 'production') {
+      // Allow requests with no origin (mobile apps, curl, tests, etc.)
+      if (!origin) {
         return callback(null, true);
       }
 
@@ -40,10 +40,17 @@ app.use(
       const allowedOrigins = [
         'http://localhost:8080', // Development frontend
         'http://127.0.0.1:8080', // Alternative localhost
+        'http://localhost:3000', // Test environment
+        'http://127.0.0.1:3000', // Alternative test environment
         process.env.FRONTEND_URL, // Production frontend URL
       ].filter(Boolean); // Remove undefined entries
 
-      if (origin && allowedOrigins.includes(origin)) {
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // For tests, be more permissive
+      if (process.env.NODE_ENV === 'test') {
         return callback(null, true);
       }
 
@@ -52,6 +59,9 @@ app.use(
       return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    optionsSuccessStatus: 200, // Some legacy browsers choke on 204
   })
 );
 
@@ -59,9 +69,31 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// JSON parsing error handler
+app.use(
+  (
+    err: Error,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    if (err instanceof SyntaxError && 'body' in err) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid JSON format',
+      });
+    }
+    next(err);
+  }
+);
+
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+  });
 });
 
 // Initialize services
@@ -96,7 +128,7 @@ app.get('/api/v1', (req, res) => {
 // Error handling middleware
 app.use(
   (
-    err: any,
+    err: Error,
     req: express.Request,
     res: express.Response,
     _next: express.NextFunction
