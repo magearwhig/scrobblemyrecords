@@ -228,7 +228,13 @@ describe('ScrobblePage', () => {
         createMockCollectionItem(2, 'Pink Floyd', 'Dark Side of the Moon'),
       ];
 
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockAlbums));
+      // Mock localStorage.getItem to return albums data for 'selectedAlbums' key
+      mockLocalStorage.getItem.mockImplementation((key: string) => {
+        if (key === 'selectedAlbums') {
+          return JSON.stringify(mockAlbums);
+        }
+        return null;
+      });
 
       const releaseDetails1 = createMockReleaseDetails(
         'The Beatles',
@@ -268,7 +274,12 @@ describe('ScrobblePage', () => {
     });
 
     it('handles localStorage parsing errors', () => {
-      mockLocalStorage.getItem.mockReturnValue('invalid json');
+      mockLocalStorage.getItem.mockImplementation((key: string) => {
+        if (key === 'selectedAlbums') {
+          return 'invalid json';
+        }
+        return null;
+      });
 
       renderScrobblePageWithProviders(authStatus);
 
@@ -296,7 +307,12 @@ describe('ScrobblePage', () => {
       const mockAlbums = [
         createMockCollectionItem(1, 'The Beatles', 'Abbey Road'),
       ];
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockAlbums));
+      mockLocalStorage.getItem.mockImplementation((key: string) => {
+        if (key === 'selectedAlbums') {
+          return JSON.stringify(mockAlbums);
+        }
+        return null;
+      });
     });
 
     it('prepares tracks from selected albums', async () => {
@@ -357,7 +373,12 @@ describe('ScrobblePage', () => {
       const mockAlbums = [
         createMockCollectionItem(1, 'The Beatles', 'Abbey Road'),
       ];
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockAlbums));
+      mockLocalStorage.getItem.mockImplementation((key: string) => {
+        if (key === 'selectedAlbums') {
+          return JSON.stringify(mockAlbums);
+        }
+        return null;
+      });
 
       const releaseDetails = createMockReleaseDetails(
         'The Beatles',
@@ -422,7 +443,12 @@ describe('ScrobblePage', () => {
       const mockAlbums = [
         createMockCollectionItem(1, 'The Beatles', 'Abbey Road'),
       ];
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockAlbums));
+      mockLocalStorage.getItem.mockImplementation((key: string) => {
+        if (key === 'selectedAlbums') {
+          return JSON.stringify(mockAlbums);
+        }
+        return null;
+      });
 
       const releaseDetails = createMockReleaseDetails(
         'The Beatles',
@@ -501,7 +527,12 @@ describe('ScrobblePage', () => {
       const mockAlbums = [
         createMockCollectionItem(1, 'The Beatles', 'Abbey Road'),
       ];
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockAlbums));
+      mockLocalStorage.getItem.mockImplementation((key: string) => {
+        if (key === 'selectedAlbums') {
+          return JSON.stringify(mockAlbums);
+        }
+        return null;
+      });
 
       const releaseDetails = createMockReleaseDetails(
         'The Beatles',
@@ -671,7 +702,12 @@ describe('ScrobblePage', () => {
       const mockAlbums = [
         createMockCollectionItem(1, 'The Beatles', 'Abbey Road'),
       ];
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockAlbums));
+      mockLocalStorage.getItem.mockImplementation((key: string) => {
+        if (key === 'selectedAlbums') {
+          return JSON.stringify(mockAlbums);
+        }
+        return null;
+      });
 
       const releaseDetails = createMockReleaseDetails(
         'The Beatles',
@@ -743,7 +779,12 @@ describe('ScrobblePage', () => {
       const mockAlbums = [
         createMockCollectionItem(1, 'The Beatles', 'Abbey Road'),
       ];
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockAlbums));
+      mockLocalStorage.getItem.mockImplementation((key: string) => {
+        if (key === 'selectedAlbums') {
+          return JSON.stringify(mockAlbums);
+        }
+        return null;
+      });
 
       const releaseDetails = createMockReleaseDetails(
         'The Beatles',

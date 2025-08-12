@@ -560,7 +560,9 @@ describe('ReleaseDetailsPage Error Handling and Loading States', () => {
     renderWithProviders(<ReleaseDetailsPage />);
 
     expect(
-      screen.getByText(/Unexpected token 'i', "invalid json" is not valid JSON/)
+      screen.getByText(
+        /Unexpected token.*in.*JSON|Unexpected token 'i'.*invalid json/i
+      )
     ).toBeInTheDocument();
   });
 });

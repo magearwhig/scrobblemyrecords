@@ -223,6 +223,13 @@ const renderWithProviders = (component: React.ReactElement) => {
 describe('CollectionPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Clear localStorage mock calls
+    mockLocalStorage.getItem.mockClear();
+    mockLocalStorage.setItem.mockClear();
+    mockLocalStorage.removeItem.mockClear();
+    mockLocalStorage.clear.mockClear();
+
     mockApiServiceInstance.getEntireCollection.mockResolvedValue({
       success: true,
       data: mockCollectionItems,
