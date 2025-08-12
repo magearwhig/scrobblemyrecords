@@ -131,5 +131,4 @@ export type LastFmPeriodType =
   | '1month'
   | '3month'
   | '6month'
-  | '12month'
-  | 'overall';
+  | '12month';
