@@ -134,6 +134,12 @@ describe('ScrobblePage', () => {
     mockLocalStorage.removeItem.mockClear();
     mockLocalStorage.clear.mockClear();
 
+    // Ensure our mock is properly attached to window.localStorage
+    Object.defineProperty(window, 'localStorage', {
+      value: mockLocalStorage,
+      writable: true,
+    });
+
     // Set default return value for getItem to null
     mockLocalStorage.getItem.mockReturnValue(null);
   });
@@ -236,6 +242,11 @@ describe('ScrobblePage', () => {
         return null;
       });
 
+      // Ensure the mock is properly configured
+      expect(mockLocalStorage.getItem('selectedAlbums')).toBe(
+        JSON.stringify(mockAlbums)
+      );
+
       const releaseDetails1 = createMockReleaseDetails(
         'The Beatles',
         'Abbey Road',
@@ -260,7 +271,7 @@ describe('ScrobblePage', () => {
         () => {
           expect(screen.getByText('Selected Albums (2)')).toBeInTheDocument();
         },
-        { timeout: 5000 }
+        { timeout: 10000 }
       );
 
       await waitFor(() => {

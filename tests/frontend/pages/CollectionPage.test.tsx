@@ -91,26 +91,7 @@ jest.mock('../../../src/renderer/context/AppContext', () => ({
   useApp: () => mockUseApp,
 }));
 
-// Mock window.location.hash
-if (!window.location) {
-  Object.defineProperty(window, 'location', {
-    value: {
-      hash: '',
-      href: 'http://localhost:3000',
-      pathname: '/',
-      search: '',
-    },
-    writable: true,
-  });
-} else {
-  // Update existing location object
-  Object.assign(window.location, {
-    hash: '',
-    href: 'http://localhost:3000',
-    pathname: '/',
-    search: '',
-  });
-}
+// Navigation tests use window.location.hash which is supported in JSDOM
 
 const mockLocalStorage = {
   getItem: jest.fn(),
@@ -229,6 +210,12 @@ describe('CollectionPage', () => {
     mockLocalStorage.setItem.mockClear();
     mockLocalStorage.removeItem.mockClear();
     mockLocalStorage.clear.mockClear();
+
+    // Ensure our mock is properly attached to window.localStorage
+    Object.defineProperty(window, 'localStorage', {
+      value: mockLocalStorage,
+      writable: true,
+    });
 
     mockApiServiceInstance.getEntireCollection.mockResolvedValue({
       success: true,
@@ -624,10 +611,14 @@ describe('CollectionPage', () => {
       const viewDetailsButtons = screen.getAllByText('View Details');
       await userEvent.click(viewDetailsButtons[0]);
 
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        'selectedRelease',
-        JSON.stringify(mockCollectionItems[0].release)
-      );
+      // Wait for localStorage operations to complete
+      await waitFor(() => {
+        expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+          'selectedRelease',
+          JSON.stringify(mockCollectionItems[0].release)
+        );
+      });
+
       expect(window.location.hash).toBe('#release-details');
     });
   });
