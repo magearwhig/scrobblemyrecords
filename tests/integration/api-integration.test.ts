@@ -1,5 +1,13 @@
 import request from 'supertest';
 
+// Mock external service calls to prevent real HTTP requests during integration tests
+jest.mock('../../src/backend/services/discogsService', () => {
+  return require('./__mocks__/discogsService');
+});
+jest.mock('../../src/backend/services/lastfmService', () => {
+  return require('./__mocks__/lastfmService');
+});
+
 import app from '../../src/server';
 
 describe('API Integration Tests', () => {
