@@ -14,6 +14,7 @@ const HistoryPage: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [selectedSession, setSelectedSession] =
     useState<ScrobbleSession | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const api = getApiService(state.serverUrl);
 
@@ -57,6 +58,44 @@ const HistoryPage: React.FC = () => {
 
   const formatDate = (timestamp: number) => {
     return formatLocalTimeClean(timestamp);
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (
+      !window.confirm(
+        'Are you sure you want to delete this session? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    setActionLoading(`delete-${sessionId}`);
+    try {
+      await api.deleteScrobbleSession(sessionId);
+      // Reload history to reflect the change
+      await loadHistory();
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : 'Failed to delete session'
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleResubmitSession = async (sessionId: string) => {
+    setActionLoading(`resubmit-${sessionId}`);
+    try {
+      await api.resubmitScrobbleSession(sessionId);
+      // Reload history to reflect the change
+      await loadHistory();
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : 'Failed to resubmit session'
+      );
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -224,18 +263,51 @@ const HistoryPage: React.FC = () => {
                   </div>
                 </div>
 
-                <button
-                  className='btn btn-small btn-secondary'
-                  onClick={() =>
-                    setSelectedSession(
-                      selectedSession?.id === session.id ? null : session
-                    )
-                  }
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '0.5rem',
+                    alignItems: 'center',
+                  }}
                 >
-                  {selectedSession?.id === session.id
-                    ? 'Hide Details'
-                    : 'View Details'}
-                </button>
+                  <button
+                    className='btn btn-small btn-secondary'
+                    onClick={() =>
+                      setSelectedSession(
+                        selectedSession?.id === session.id ? null : session
+                      )
+                    }
+                  >
+                    {selectedSession?.id === session.id
+                      ? 'Hide Details'
+                      : 'View Details'}
+                  </button>
+
+                  {/* Action buttons for pending and failed sessions */}
+                  {(session.status === 'pending' ||
+                    session.status === 'failed') && (
+                    <>
+                      <button
+                        className='btn btn-small btn-danger'
+                        onClick={() => handleDeleteSession(session.id)}
+                        disabled={actionLoading === `delete-${session.id}`}
+                      >
+                        {actionLoading === `delete-${session.id}`
+                          ? 'Deleting...'
+                          : 'Delete'}
+                      </button>
+                      <button
+                        className='btn btn-small'
+                        onClick={() => handleResubmitSession(session.id)}
+                        disabled={actionLoading === `resubmit-${session.id}`}
+                      >
+                        {actionLoading === `resubmit-${session.id}`
+                          ? 'Resubmitting...'
+                          : 'Resubmit'}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               {selectedSession?.id === session.id && (
@@ -246,17 +318,24 @@ const HistoryPage: React.FC = () => {
                     backgroundColor: '#f8f9fa',
                     borderRadius: '8px',
                     border: '1px solid #e9ecef',
+                    color: '#333',
                   }}
                 >
-                  <h4 style={{ marginTop: 0, marginBottom: '1rem' }}>
+                  <h4
+                    style={{
+                      marginTop: 0,
+                      marginBottom: '1rem',
+                      color: '#333',
+                    }}
+                  >
                     Session Details
                   </h4>
 
-                  <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ marginBottom: '1rem', color: '#333' }}>
                     <strong>Session ID:</strong> {session.id}
                   </div>
 
-                  <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ marginBottom: '1rem', color: '#333' }}>
                     <strong>Tracks ({session.tracks.length}):</strong>
                   </div>
 
@@ -280,7 +359,13 @@ const HistoryPage: React.FC = () => {
                               : 'none',
                         }}
                       >
-                        <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>
+                        <div
+                          style={{
+                            fontWeight: 500,
+                            fontSize: '0.9rem',
+                            color: '#333',
+                          }}
+                        >
                           {track.track}
                         </div>
                         <div style={{ fontSize: '0.8rem', color: '#666' }}>

@@ -55,10 +55,13 @@ const ReleaseDetailsPage: React.FC = () => {
       const fullRelease = await api.getReleaseDetails(releaseInfo.id);
       setRelease(fullRelease);
 
-      // Select all tracks by default
-      const allTrackIndices =
-        fullRelease.tracklist?.map((_, index) => index) || [];
-      setSelectedTracks(new Set(allTrackIndices));
+      // Select all actual tracks by default (filter out section headers)
+      const actualTrackIndices =
+        fullRelease.tracklist
+          ?.map((track, index) => ({ track, index }))
+          .filter(({ track }) => track.position && track.position.trim() !== '')
+          .map(({ index }) => index) || [];
+      setSelectedTracks(new Set(actualTrackIndices));
     } catch (error) {
       setError(
         error instanceof Error
@@ -81,12 +84,16 @@ const ReleaseDetailsPage: React.FC = () => {
   };
 
   const handleSelectAllTracks = () => {
-    if (selectedTracks.size === (release?.tracklist?.length || 0)) {
+    const actualTrackIndices =
+      release?.tracklist
+        ?.map((track, index) => ({ track, index }))
+        .filter(({ track }) => track.position && track.position.trim() !== '')
+        .map(({ index }) => index) || [];
+
+    if (selectedTracks.size === actualTrackIndices.length) {
       setSelectedTracks(new Set());
     } else {
-      const allTrackIndices =
-        release?.tracklist?.map((_, index) => index) || [];
-      setSelectedTracks(new Set(allTrackIndices));
+      setSelectedTracks(new Set(actualTrackIndices));
     }
   };
 
@@ -896,55 +903,88 @@ const ReleaseDetailsPage: React.FC = () => {
             borderRadius: '4px',
           }}
         >
-          {release.tracklist?.map((track, index) => (
-            <div
-              key={index}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '0.75rem',
-                borderBottom:
-                  index < (release.tracklist?.length || 0) - 1
-                    ? '1px solid var(--border-color)'
-                    : 'none',
-                backgroundColor: selectedTracks.has(index)
-                  ? 'var(--bg-tertiary)'
-                  : 'var(--bg-secondary)',
-                cursor: 'pointer',
-              }}
-              onClick={() => handleTrackToggle(index)}
-            >
-              <input
-                type='checkbox'
-                checked={selectedTracks.has(index)}
-                onChange={() => handleTrackToggle(index)}
-                style={{ marginRight: '1rem' }}
-              />
+          {release.tracklist?.map((track, index) => {
+            const isSectionHeader =
+              !track.position || track.position.trim() === '';
 
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: '500' }}>
-                  {track.position} {track.title}
-                </div>
-                {track.artist && track.artist !== release.artist && (
+            if (isSectionHeader) {
+              // Render section header as non-selectable informational item
+              return (
+                <div
+                  key={index}
+                  style={{
+                    padding: '0.75rem',
+                    borderBottom: '1px solid var(--border-color)',
+                    backgroundColor: 'var(--bg-primary)',
+                    borderLeft: '4px solid var(--accent-color)',
+                  }}
+                >
                   <div
                     style={{
+                      fontWeight: '600',
+                      color: 'var(--accent-color)',
                       fontSize: '0.9rem',
-                      color: 'var(--text-secondary)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
                     }}
                   >
-                    {track.artist}
+                    {track.title}
                   </div>
-                )}
-                {track.duration && (
-                  <div
-                    style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}
-                  >
-                    {track.duration}
+                </div>
+              );
+            }
+
+            // Render actual track as selectable item
+            return (
+              <div
+                key={index}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0.75rem',
+                  borderBottom:
+                    index < (release.tracklist?.length || 0) - 1
+                      ? '1px solid var(--border-color)'
+                      : 'none',
+                  backgroundColor: selectedTracks.has(index)
+                    ? 'var(--bg-tertiary)'
+                    : 'var(--bg-secondary)',
+                  cursor: 'pointer',
+                }}
+                onClick={() => handleTrackToggle(index)}
+              >
+                <input
+                  type='checkbox'
+                  checked={selectedTracks.has(index)}
+                  onChange={() => handleTrackToggle(index)}
+                  style={{ marginRight: '1rem' }}
+                />
+
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: '500' }}>
+                    {track.position} {track.title}
                   </div>
-                )}
+                  {track.artist && track.artist !== release.artist && (
+                    <div
+                      style={{
+                        fontSize: '0.9rem',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      {track.artist}
+                    </div>
+                  )}
+                  {track.duration && (
+                    <div
+                      style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}
+                    >
+                      {track.duration}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

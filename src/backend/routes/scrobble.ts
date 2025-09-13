@@ -304,5 +304,144 @@ export default function createScrobbleRouter(
     }
   });
 
+  // Delete a scrobble session
+  router.delete('/session/:sessionId', async (req: Request, res: Response) => {
+    try {
+      const { sessionId } = req.params;
+
+      // Validate sessionId format to prevent path traversal
+      if (!validateSessionId(sessionId)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid session ID format',
+        });
+      }
+
+      const sessionPath = `scrobbles/session-${sessionId}.json`;
+      const session = await fileStorage.readJSON<ScrobbleSession>(sessionPath);
+
+      if (!session) {
+        return res.status(404).json({
+          success: false,
+          error: 'Session not found',
+        });
+      }
+
+      // Only allow deletion of pending or failed sessions
+      if (session.status === 'completed') {
+        return res.status(400).json({
+          success: false,
+          error: 'Cannot delete completed sessions',
+        });
+      }
+
+      await fileStorage.delete(sessionPath);
+
+      res.json({
+        success: true,
+        data: {
+          message: 'Session deleted successfully',
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error:
+          error instanceof Error ? error.message : 'Failed to delete session',
+      });
+    }
+  });
+
+  // Resubmit a failed or pending scrobble session
+  router.post(
+    '/session/:sessionId/resubmit',
+    async (req: Request, res: Response) => {
+      try {
+        const { sessionId } = req.params;
+
+        // Validate sessionId format to prevent path traversal
+        if (!validateSessionId(sessionId)) {
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid session ID format',
+          });
+        }
+
+        const sessionPath = `scrobbles/session-${sessionId}.json`;
+        const session =
+          await fileStorage.readJSON<ScrobbleSession>(sessionPath);
+
+        if (!session) {
+          return res.status(404).json({
+            success: false,
+            error: 'Session not found',
+          });
+        }
+
+        // Only allow resubmission of pending or failed sessions
+        if (session.status === 'completed') {
+          return res.status(400).json({
+            success: false,
+            error: 'Cannot resubmit completed sessions',
+          });
+        }
+
+        // Check authentication
+        const testResult = await lastfmService.testConnection();
+        if (!testResult.success) {
+          return res.status(500).json({
+            success: false,
+            error: testResult.message,
+          });
+        }
+
+        // Update session status to in-progress
+        session.status = 'in-progress';
+        session.progress = {
+          current: 0,
+          total: session.tracks.length,
+          success: 0,
+          failed: 0,
+          ignored: 0,
+        };
+        session.error = undefined;
+
+        await fileStorage.writeJSON(sessionPath, session);
+
+        // Start resubmitting tracks (without creating a new session)
+        const results = await lastfmService.resubmitTracks(session.tracks);
+
+        // Update session with results
+        session.status = results.success > 0 ? 'completed' : 'failed';
+        session.progress = {
+          current: session.tracks.length,
+          total: session.tracks.length,
+          success: results.success,
+          failed: results.failed,
+          ignored: results.ignored,
+        };
+        session.error = results.errors?.join('; ') || undefined;
+
+        await fileStorage.writeJSON(sessionPath, session);
+
+        res.json({
+          success: true,
+          data: {
+            message: 'Session resubmitted successfully',
+            results,
+          },
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Failed to resubmit session',
+        });
+      }
+    }
+  );
+
   return router;
 }

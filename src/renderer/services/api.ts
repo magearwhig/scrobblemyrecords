@@ -311,6 +311,26 @@ class ApiService {
     return response.data.data;
   }
 
+  async deleteScrobbleSession(sessionId: string): Promise<{ message: string }> {
+    const response = await this.api.delete(`/scrobble/session/${sessionId}`);
+    return response.data.data;
+  }
+
+  async resubmitScrobbleSession(sessionId: string): Promise<{
+    message: string;
+    results: {
+      success: number;
+      failed: number;
+      ignored: number;
+      errors: string[];
+    };
+  }> {
+    const response = await this.api.post(
+      `/scrobble/session/${sessionId}/resubmit`
+    );
+    return response.data.data;
+  }
+
   // Update base URL (for when server URL changes)
   updateBaseUrl(baseUrl: string): void {
     this.baseUrl = baseUrl;

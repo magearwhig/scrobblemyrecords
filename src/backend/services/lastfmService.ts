@@ -382,6 +382,52 @@ export class LastFmService {
     }
   }
 
+  async resubmitTracks(tracks: ScrobbleTrack[]): Promise<{
+    success: number;
+    failed: number;
+    ignored: number;
+    errors: string[];
+  }> {
+    const results = {
+      success: 0,
+      failed: 0,
+      ignored: 0,
+      errors: [] as string[],
+    };
+
+    for (let i = 0; i < tracks.length; i++) {
+      const track = tracks[i];
+      try {
+        const scrobbleResult = await this.scrobbleTrack(track);
+        if (scrobbleResult.success) {
+          results.success++;
+        } else if (scrobbleResult.ignored > 0) {
+          results.ignored++;
+          results.errors.push(
+            `${track.artist} - ${track.track}: ${scrobbleResult.message}`
+          );
+        } else {
+          results.failed++;
+          results.errors.push(
+            `${track.artist} - ${track.track}: ${scrobbleResult.message}`
+          );
+        }
+      } catch (error) {
+        results.failed++;
+        results.errors.push(
+          `${track.artist} - ${track.track}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      }
+    }
+
+    return {
+      success: results.success,
+      failed: results.failed,
+      ignored: results.ignored,
+      errors: results.errors,
+    };
+  }
+
   async getScrobbleHistory(): Promise<ScrobbleSession[]> {
     try {
       const files = await this.fileStorage.listFiles('scrobbles');
