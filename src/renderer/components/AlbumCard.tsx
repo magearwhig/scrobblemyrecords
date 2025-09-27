@@ -38,6 +38,7 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
     >
       <div
         className='album-cover'
+        onClick={() => onViewDetails(release)}
         style={{
           backgroundImage: getImageUrl(release.cover_image)
             ? `url(${getImageUrl(release.cover_image)})`
@@ -50,7 +51,9 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
           justifyContent: 'center',
           color: '#999',
           fontSize: '0.8rem',
+          cursor: 'pointer',
         }}
+        title='Click to view details'
       >
         {!getImageUrl(release.cover_image) && '🎵'}
       </div>

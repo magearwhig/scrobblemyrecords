@@ -465,6 +465,15 @@ body {
   justify-content: center;
   color: var(--text-muted);
   font-size: 0.8rem;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.album-cover:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
 }
 
 .album-title {
