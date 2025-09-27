@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+/* global HTMLInputElement */
+import React, { useState, useEffect, useRef } from 'react';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
@@ -17,6 +18,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(
     null
   );
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const shouldMaintainFocus = useRef(false);
 
   useEffect(() => {
     // Debounce search to avoid too many API calls
@@ -25,6 +28,10 @@ const SearchBar: React.FC<SearchBarProps> = ({
     }
 
     const timer = setTimeout(() => {
+      // Set flag to maintain focus before triggering search
+      if (inputRef.current && document.activeElement === inputRef.current) {
+        shouldMaintainFocus.current = true;
+      }
       onSearch(query);
     }, 500); // 500ms delay
 
@@ -35,7 +42,19 @@ const SearchBar: React.FC<SearchBarProps> = ({
         clearTimeout(timer);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
+
+  // Restore focus after search updates
+  useEffect(() => {
+    if (shouldMaintainFocus.current && inputRef.current) {
+      inputRef.current.focus();
+      // Restore cursor position to end of text
+      const length = inputRef.current.value.length;
+      inputRef.current.setSelectionRange(length, length);
+      shouldMaintainFocus.current = false;
+    }
+  });
 
   const handleClear = () => {
     setQuery('');
@@ -46,6 +65,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
     <div style={{ position: 'relative', marginBottom: '1rem' }}>
       <div style={{ position: 'relative' }}>
         <input
+          ref={inputRef}
           type='text'
           className='form-input'
           value={query}
