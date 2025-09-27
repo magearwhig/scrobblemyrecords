@@ -1,4 +1,4 @@
-/* global HTMLInputElement */
+/* global HTMLInputElement, HTMLElement, requestAnimationFrame */
 import React, { useState, useEffect, useRef } from 'react';
 
 interface SearchBarProps {
@@ -19,7 +19,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
     null
   );
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const shouldMaintainFocus = useRef(false);
+  const isTypingRef = useRef(false);
+  const cursorPositionRef = useRef(0);
 
   useEffect(() => {
     // Debounce search to avoid too many API calls
@@ -28,11 +29,22 @@ const SearchBar: React.FC<SearchBarProps> = ({
     }
 
     const timer = setTimeout(() => {
-      // Set flag to maintain focus before triggering search
+      // Save cursor position before search
       if (inputRef.current && document.activeElement === inputRef.current) {
-        shouldMaintainFocus.current = true;
+        cursorPositionRef.current = inputRef.current.selectionStart || 0;
       }
       onSearch(query);
+      // Ensure focus is maintained after search
+      setTimeout(() => {
+        if (isTypingRef.current && inputRef.current) {
+          inputRef.current.focus();
+          // Restore cursor position
+          inputRef.current.setSelectionRange(
+            cursorPositionRef.current,
+            cursorPositionRef.current
+          );
+        }
+      }, 0);
     }, 500); // 500ms delay
 
     setDebounceTimer(timer);
@@ -45,20 +57,102 @@ const SearchBar: React.FC<SearchBarProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
-  // Restore focus after search updates
+  // Force focus to be maintained during typing
   useEffect(() => {
-    if (shouldMaintainFocus.current && inputRef.current) {
-      inputRef.current.focus();
-      // Restore cursor position to end of text
-      const length = inputRef.current.value.length;
-      inputRef.current.setSelectionRange(length, length);
-      shouldMaintainFocus.current = false;
+    const interval = setInterval(() => {
+      if (
+        isTypingRef.current &&
+        inputRef.current &&
+        document.activeElement !== inputRef.current
+      ) {
+        const selectionStart = cursorPositionRef.current;
+        inputRef.current.focus();
+        // Use requestAnimationFrame to ensure the focus and selection happen after render
+        requestAnimationFrame(() => {
+          if (inputRef.current) {
+            inputRef.current.setSelectionRange(selectionStart, selectionStart);
+          }
+        });
+      }
+    }, 50); // Check more frequently
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Track when user is actively typing
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    isTypingRef.current = true;
+    cursorPositionRef.current = e.target.selectionStart || 0;
+    setQuery(e.target.value);
+    // Keep typing flag active for much longer (5 seconds)
+    // This ensures focus is maintained even when no results are found
+    const typingTimeoutKey = 'typingTimeout' as const;
+    if (inputRef.current && typingTimeoutKey in inputRef.current) {
+      clearTimeout(
+        (inputRef.current as unknown as { typingTimeout: NodeJS.Timeout })
+          .typingTimeout
+      );
     }
-  });
+    const timeout = setTimeout(() => {
+      isTypingRef.current = false;
+    }, 5000);
+    if (inputRef.current) {
+      (
+        inputRef.current as unknown as { typingTimeout: NodeJS.Timeout }
+      ).typingTimeout = timeout;
+    }
+  };
+
+  // Track focus state
+  const handleFocus = () => {
+    isTypingRef.current = true;
+    // Save cursor position when focusing
+    if (inputRef.current) {
+      cursorPositionRef.current =
+        inputRef.current.selectionStart || query.length;
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Check if we're blurring to something within the search component
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    if (relatedTarget?.closest('.form-input')) {
+      return; // Don't lose typing state if clicking within search
+    }
+    // Don't immediately set to false, wait a bit
+    setTimeout(() => {
+      isTypingRef.current = false;
+    }, 200);
+  };
+
+  // Handle keyboard events to maintain typing state
+  const handleKeyDown = () => {
+    isTypingRef.current = true;
+    // Reset the timeout on any keyboard activity
+    const typingTimeoutKey = 'typingTimeout' as const;
+    if (inputRef.current && typingTimeoutKey in inputRef.current) {
+      clearTimeout(
+        (inputRef.current as unknown as { typingTimeout: NodeJS.Timeout })
+          .typingTimeout
+      );
+    }
+    const timeout = setTimeout(() => {
+      isTypingRef.current = false;
+    }, 5000);
+    if (inputRef.current) {
+      (
+        inputRef.current as unknown as { typingTimeout: NodeJS.Timeout }
+      ).typingTimeout = timeout;
+    }
+  };
 
   const handleClear = () => {
     setQuery('');
     onSearch('');
+    // Keep focus on the input after clearing
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
   };
 
   return (
@@ -69,9 +163,13 @@ const SearchBar: React.FC<SearchBarProps> = ({
           type='text'
           className='form-input'
           value={query}
-          onChange={e => setQuery(e.target.value)}
+          onChange={handleInputChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
+          autoFocus
           style={{
             paddingLeft: '2.5rem',
             paddingRight: query ? '2.5rem' : '1rem',
