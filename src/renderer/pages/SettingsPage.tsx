@@ -25,6 +25,8 @@ const SettingsPage: React.FC = () => {
   const [artists, setArtists] = useState<string[]>([]);
   const [filteredArtists, setFilteredArtists] = useState<string[]>([]);
   const [showArtistSuggestions, setShowArtistSuggestions] = useState(false);
+  const [artistsLoading, setArtistsLoading] = useState(false);
+  const [artistsLoadError, setArtistsLoadError] = useState<string>('');
 
   const api = getApiService(state.serverUrl);
 
@@ -56,13 +58,21 @@ const SettingsPage: React.FC = () => {
     try {
       if (!authStatus.discogs.username) return;
 
+      setArtistsLoading(true);
+      setArtistsLoadError('');
+
       const result = await api.getEntireCollection(authStatus.discogs.username);
       const uniqueArtists = Array.from(
         new Set(result.data.map(item => item.release.artist).filter(Boolean))
       ).sort();
       setArtists(uniqueArtists);
-    } catch {
-      // Silently fail for artist loading - not critical functionality
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to load collection';
+      setArtistsLoadError(errorMessage);
+      console.warn('Failed to load artists for typeahead:', error);
+    } finally {
+      setArtistsLoading(false);
     }
   };
 
@@ -255,18 +265,32 @@ const SettingsPage: React.FC = () => {
           <div
             style={{
               padding: '0.75rem',
-              backgroundColor: '#fff3cd',
-              color: '#856404',
-              border: '1px solid #ffeaa7',
+              backgroundColor: artistsLoadError ? '#f8d7da' : '#fff3cd',
+              color: artistsLoadError ? '#721c24' : '#856404',
+              border: `1px solid ${artistsLoadError ? '#f5c6cb' : '#ffeaa7'}`,
               borderRadius: '6px',
               marginBottom: '1rem',
               fontSize: '0.9rem',
             }}
           >
-            💡{' '}
-            {artists.length > 0
-              ? `Artist suggestions available from your collection (${artists.length} artists loaded).`
-              : 'Loading artist suggestions from your collection...'}
+            {artistsLoadError ? (
+              <>
+                ⚠️ Failed to load artist suggestions: {artistsLoadError}. You
+                can still manually type artist names.
+              </>
+            ) : artistsLoading ? (
+              <>⏳ Loading artist suggestions from your collection...</>
+            ) : artists.length > 0 ? (
+              <>
+                💡 Artist suggestions available from your collection (
+                {artists.length} artists loaded).
+              </>
+            ) : (
+              <>
+                💡 Artist suggestions will appear once your collection is
+                loaded.
+              </>
+            )}
           </div>
         )}
 
