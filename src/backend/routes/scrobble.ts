@@ -210,6 +210,7 @@ export default function createScrobbleRouter(
             artist: track.artist || release.artist,
             track: track.title,
             album: release.title,
+            albumCover: release.cover_image,
             timestamp: currentTime,
             duration: trackDuration,
           };

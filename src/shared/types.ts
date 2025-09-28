@@ -35,6 +35,7 @@ export interface ScrobbleTrack {
   album?: string;
   timestamp?: number;
   duration?: number;
+  albumCover?: string;
 }
 
 export interface ScrobbleSession {

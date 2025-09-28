@@ -75,6 +75,7 @@ const ScrobblePage: React.FC = () => {
             artist: track.artist || releaseDetails.artist,
             track: track.title,
             album: releaseDetails.title,
+            albumCover: album.release.cover_image || releaseDetails.cover_image,
             timestamp: trackTimestamp,
             duration: track.duration
               ? parseInt(track.duration.replace(':', ''))

@@ -124,6 +124,20 @@ const HistoryPage: React.FC = () => {
     }
   };
 
+  const getUniqueAlbumCovers = (tracks: any[]) => {
+    const uniqueAlbums = new Map();
+    tracks.forEach(track => {
+      if (track.album && track.albumCover && !uniqueAlbums.has(track.album)) {
+        uniqueAlbums.set(track.album, {
+          album: track.album,
+          artist: track.artist,
+          cover: track.albumCover,
+        });
+      }
+    });
+    return Array.from(uniqueAlbums.values());
+  };
+
   if (!authStatus.lastfm.authenticated) {
     return (
       <div className='card'>
@@ -261,6 +275,54 @@ const HistoryPage: React.FC = () => {
                       </span>
                     )}
                   </div>
+
+                  {/* Album cover thumbnails */}
+                  {(() => {
+                    const uniqueAlbums = getUniqueAlbumCovers(session.tracks);
+                    if (uniqueAlbums.length > 0) {
+                      return (
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '0.5rem',
+                            marginTop: '0.75rem',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          {uniqueAlbums.slice(0, 5).map((album, idx) => (
+                            <div
+                              key={idx}
+                              title={`${album.album} by ${album.artist}`}
+                              style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '4px',
+                                backgroundImage: `url(${album.cover})`,
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center',
+                                backgroundColor: '#f0f0f0',
+                                border: '1px solid #e0e0e0',
+                                cursor: 'pointer',
+                              }}
+                            />
+                          ))}
+                          {uniqueAlbums.length > 5 && (
+                            <div
+                              style={{
+                                fontSize: '0.8rem',
+                                color: '#666',
+                                marginLeft: '0.5rem',
+                              }}
+                            >
+                              +{uniqueAlbums.length - 5} more
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 <div
