@@ -423,6 +423,18 @@ class ApiService {
     return response.data.data;
   }
 
+  async backfillAlbumCovers(username: string): Promise<{
+    message: string;
+    updatedSessions: number;
+    updatedTracks: number;
+    totalSessions: number;
+  }> {
+    const response = await this.api.post('/scrobble/backfill-covers', {
+      username,
+    });
+    return response.data.data;
+  }
+
   // Update base URL (for when server URL changes)
   updateBaseUrl(baseUrl: string): void {
     this.baseUrl = baseUrl;

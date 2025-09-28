@@ -30,12 +30,23 @@ const ReleaseDetailsPage: React.FC = () => {
     failed: number;
     ignored: number;
   } | null>(null);
+  const [artistMapping, setArtistMapping] = useState<{
+    lastfmName: string;
+    hasMapping: boolean;
+    isOriginal: boolean;
+  } | null>(null);
 
   const api = getApiService(state.serverUrl);
 
   useEffect(() => {
     loadReleaseDetails();
   }, []);
+
+  useEffect(() => {
+    if (release?.artist) {
+      loadArtistMapping(release.artist);
+    }
+  }, [release?.artist]);
 
   const loadReleaseDetails = async () => {
     try {
@@ -70,6 +81,17 @@ const ReleaseDetailsPage: React.FC = () => {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadArtistMapping = async (artistName: string) => {
+    try {
+      const mapping = await api.lookupArtistMapping(artistName);
+      setArtistMapping(mapping);
+    } catch (error) {
+      // Silently fail for artist mapping lookup
+      console.warn('Failed to load artist mapping:', error);
+      setArtistMapping(null);
     }
   };
 
@@ -471,6 +493,22 @@ const ReleaseDetailsPage: React.FC = () => {
               }}
             >
               {release.artist}
+              {artistMapping && artistMapping.hasMapping && (
+                <span
+                  style={{
+                    marginLeft: '0.75rem',
+                    fontSize: '0.9rem',
+                    padding: '0.2rem 0.5rem',
+                    backgroundColor: 'var(--accent-color)',
+                    color: 'white',
+                    borderRadius: '12px',
+                    fontWeight: '500',
+                  }}
+                  title={`This artist will be scrobbled as "${artistMapping.lastfmName}" on Last.fm`}
+                >
+                  → {artistMapping.lastfmName}
+                </span>
+              )}
             </p>
             <p style={{ margin: '0 0 0.5rem 0', color: 'var(--text-muted)' }}>
               {release.year} • {release.format.join(', ')}

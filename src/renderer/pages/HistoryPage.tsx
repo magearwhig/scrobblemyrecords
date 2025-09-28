@@ -15,6 +15,7 @@ const HistoryPage: React.FC = () => {
   const [selectedSession, setSelectedSession] =
     useState<ScrobbleSession | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [backfillLoading, setBackfillLoading] = useState(false);
 
   const api = getApiService(state.serverUrl);
 
@@ -98,6 +99,48 @@ const HistoryPage: React.FC = () => {
     }
   };
 
+  const handleBackfillCovers = async () => {
+    if (!authStatus.discogs.authenticated || !authStatus.discogs.username) {
+      setError('Discogs authentication required to backfill album covers');
+      return;
+    }
+
+    if (
+      !window.confirm(
+        'This will search your Discogs collection to add album covers to existing scrobble sessions. This may take a while for large collections. Continue?'
+      )
+    ) {
+      return;
+    }
+
+    setBackfillLoading(true);
+    setError('');
+
+    try {
+      const result = await api.backfillAlbumCovers(authStatus.discogs.username);
+
+      // Show success message
+      // eslint-disable-next-line no-undef
+      alert(
+        `Backfill completed!\n\n` +
+          `• Updated ${result.updatedSessions} sessions\n` +
+          `• Added covers to ${result.updatedTracks} tracks\n` +
+          `• Processed ${result.totalSessions} total sessions`
+      );
+
+      // Reload history to show the new covers
+      await loadHistory();
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to backfill album covers'
+      );
+    } finally {
+      setBackfillLoading(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
@@ -172,13 +215,25 @@ const HistoryPage: React.FC = () => {
               Times shown in {getTimezoneOffset()}
             </span>
           </div>
-          <button
-            className='btn btn-small btn-secondary'
-            onClick={loadHistory}
-            disabled={loading}
-          >
-            {loading ? 'Refreshing...' : 'Refresh'}
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {authStatus.discogs.authenticated && (
+              <button
+                className='btn btn-small btn-secondary'
+                onClick={handleBackfillCovers}
+                disabled={backfillLoading || loading}
+                title='Add album covers to existing scrobble sessions using your Discogs collection'
+              >
+                {backfillLoading ? 'Backfilling...' : 'Backfill Covers'}
+              </button>
+            )}
+            <button
+              className='btn btn-small btn-secondary'
+              onClick={loadHistory}
+              disabled={loading}
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
         </div>
 
         {error && (

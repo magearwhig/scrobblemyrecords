@@ -11,7 +11,10 @@ import { validateSessionId } from '../utils/validation';
 export default function createScrobbleRouter(
   fileStorage: FileStorage,
   authService: AuthService,
-  lastfmService: LastFmService
+  lastfmService: LastFmService,
+  discogsService?: {
+    searchCollection: (username: string, album: string) => Promise<any>;
+  }
 ) {
   const router = express.Router();
 
@@ -449,6 +452,90 @@ export default function createScrobbleRouter(
       }
     }
   );
+
+  // Backfill existing scrobble sessions with album covers
+  router.post('/backfill-covers', async (req: Request, res: Response) => {
+    try {
+      const { username } = req.body;
+
+      if (!username || !discogsService) {
+        return res.status(400).json({
+          success: false,
+          error: 'Username is required and Discogs service must be available',
+        });
+      }
+
+      // Get all scrobble sessions
+      const sessions = await lastfmService.getScrobbleHistory();
+      let updatedSessions = 0;
+      let updatedTracks = 0;
+
+      for (const session of sessions) {
+        let sessionUpdated = false;
+
+        for (const track of session.tracks) {
+          if (!track.albumCover && track.album) {
+            try {
+              // Try to find matching album in user's collection
+              const searchResults = await discogsService.searchCollection(
+                username,
+                track.album
+              );
+
+              if (searchResults?.items && searchResults.items.length > 0) {
+                // Find the best match (exact album title match preferred)
+                const exactMatch = searchResults.items.find(
+                  (item: { release: { title: string } }) =>
+                    item.release.title.toLowerCase() ===
+                    track.album?.toLowerCase()
+                );
+                const matchedItem = exactMatch || searchResults.items[0];
+
+                if (matchedItem?.release?.cover_image) {
+                  track.albumCover = matchedItem.release.cover_image;
+                  updatedTracks++;
+                  sessionUpdated = true;
+                }
+              }
+            } catch (error) {
+              // Continue with other tracks if one fails
+              console.warn(
+                `Failed to find cover for album: ${track.album}`,
+                error
+              );
+            }
+          }
+        }
+
+        if (sessionUpdated) {
+          // Save the updated session directly to file
+          await fileStorage.writeJSON(
+            `scrobbles/session-${session.id}.json`,
+            session
+          );
+          updatedSessions++;
+        }
+      }
+
+      res.json({
+        success: true,
+        data: {
+          message: 'Backfill completed',
+          updatedSessions,
+          updatedTracks,
+          totalSessions: sessions.length,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to backfill album covers',
+      });
+    }
+  });
 
   return router;
 }

@@ -110,7 +110,7 @@ app.use(
 );
 app.use(
   '/api/v1/scrobble',
-  createScrobbleRouter(fileStorage, authService, lastfmService)
+  createScrobbleRouter(fileStorage, authService, lastfmService, discogsService)
 );
 app.use('/api/v1/artist-mappings', artistMappingRoutes);
 
