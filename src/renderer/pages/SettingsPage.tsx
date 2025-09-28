@@ -58,15 +58,11 @@ const SettingsPage: React.FC = () => {
 
       const result = await api.getEntireCollection(authStatus.discogs.username);
       const uniqueArtists = Array.from(
-        new Set(
-          result.data
-            .map(item => item.basic_information.artists[0]?.name)
-            .filter(Boolean)
-        )
+        new Set(result.data.map(item => item.release.artist).filter(Boolean))
       ).sort();
       setArtists(uniqueArtists);
-    } catch (error) {
-      console.warn('Failed to load artists for typeahead:', error);
+    } catch {
+      // Silently fail for artist loading - not critical functionality
     }
   };
 
@@ -172,11 +168,9 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  // eslint-disable-next-line no-undef
-  const handleImportMappings = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
+  const handleImportMappings = async (event: any) => {
+    const files = (event.target as any).files;
+    const file = files?.[0];
     if (!file) return;
 
     try {
@@ -203,7 +197,7 @@ const SettingsPage: React.FC = () => {
     }
 
     // Reset the input
-    event.target.value = '';
+    (event.target as any).value = '';
   };
 
   const handleClearMappings = async () => {
