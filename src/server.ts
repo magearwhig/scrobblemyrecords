@@ -6,6 +6,7 @@ import helmet from 'helmet';
 // Load environment variables before any other imports
 dotenv.config();
 
+import artistMappingRoutes from './backend/routes/artistMapping';
 import authRoutes from './backend/routes/auth';
 import createCollectionRouter from './backend/routes/collection';
 import createScrobbleRouter from './backend/routes/scrobble';
@@ -111,6 +112,7 @@ app.use(
   '/api/v1/scrobble',
   createScrobbleRouter(fileStorage, authService, lastfmService)
 );
+app.use('/api/v1/artist-mappings', artistMappingRoutes);
 
 // API info endpoint
 app.get('/api/v1', (req, res) => {

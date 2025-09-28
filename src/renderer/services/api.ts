@@ -331,6 +331,98 @@ class ApiService {
     return response.data.data;
   }
 
+  // Artist mapping methods
+  async getArtistMappings(): Promise<{
+    mappings: any[];
+    stats: any;
+  }> {
+    const response = await this.api.get('/artist-mappings');
+    return response.data.data;
+  }
+
+  async addArtistMapping(
+    discogsName: string,
+    lastfmName: string
+  ): Promise<{
+    message: string;
+    discogsName: string;
+    lastfmName: string;
+  }> {
+    const response = await this.api.post('/artist-mappings', {
+      discogsName,
+      lastfmName,
+    });
+    return response.data.data;
+  }
+
+  async updateArtistMapping(
+    discogsName: string,
+    lastfmName: string
+  ): Promise<{
+    message: string;
+    discogsName: string;
+    lastfmName: string;
+  }> {
+    const response = await this.api.put(
+      `/artist-mappings/${encodeURIComponent(discogsName)}`,
+      {
+        lastfmName,
+      }
+    );
+    return response.data.data;
+  }
+
+  async removeArtistMapping(discogsName: string): Promise<{
+    message: string;
+    discogsName: string;
+  }> {
+    const response = await this.api.delete(
+      `/artist-mappings/${encodeURIComponent(discogsName)}`
+    );
+    return response.data.data;
+  }
+
+  async lookupArtistMapping(discogsName: string): Promise<{
+    discogsName: string;
+    lastfmName: string;
+    hasMapping: boolean;
+    isOriginal: boolean;
+  }> {
+    const response = await this.api.get(
+      `/artist-mappings/lookup/${encodeURIComponent(discogsName)}`
+    );
+    return response.data.data;
+  }
+
+  async importArtistMappings(mappings: any[]): Promise<{
+    message: string;
+    imported: number;
+    skipped: number;
+    errors: string[];
+  }> {
+    const response = await this.api.post('/artist-mappings/import', {
+      mappings,
+    });
+    return response.data.data;
+  }
+
+  async exportArtistMappings(): Promise<any> {
+    const response = await this.api.get('/artist-mappings/export');
+    return response.data;
+  }
+
+  async clearArtistMappings(): Promise<{
+    message: string;
+  }> {
+    const response = await this.api.delete('/artist-mappings');
+    return response.data.data;
+  }
+
+  async getArtistMappingStats(): Promise<any> {
+    const response = await this.api.get('/artist-mappings/stats');
+    return response.data.data;
+  }
+
   // Update base URL (for when server URL changes)
   updateBaseUrl(baseUrl: string): void {
     this.baseUrl = baseUrl;

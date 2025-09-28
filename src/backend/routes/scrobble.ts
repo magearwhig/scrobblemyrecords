@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 
 import { ScrobbleTrack, ScrobbleSession, Track } from '../../shared/types';
+import { artistMappingService } from '../services/artistMappingService';
 import { AuthService } from '../services/authService';
 import { LastFmService } from '../services/lastfmService';
 import { FileStorage } from '../utils/fileStorage';
@@ -80,10 +81,11 @@ export default function createScrobbleRouter(
         });
       }
 
-      // Set timestamps for tracks
+      // Set timestamps for tracks and apply artist mappings
       const currentTime = baseTimestamp || Math.floor(Date.now() / 1000);
       const tracksWithTimestamps = tracks.map((track, index) => ({
         ...track,
+        artist: artistMappingService.getLastfmName(track.artist),
         timestamp:
           track.timestamp || currentTime - (tracks.length - index - 1) * 180, // 3 minutes apart
       }));
@@ -206,8 +208,12 @@ export default function createScrobbleRouter(
             ? parseTrackDuration(track.duration)
             : 180; // Default 3 minutes
 
+          const originalArtist = track.artist || release.artist;
+          const mappedArtist =
+            artistMappingService.getLastfmName(originalArtist);
+
           const scrobbleTrack: ScrobbleTrack = {
-            artist: track.artist || release.artist,
+            artist: mappedArtist,
             track: track.title,
             album: release.title,
             albumCover: release.cover_image,
