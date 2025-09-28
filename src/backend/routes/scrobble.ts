@@ -482,14 +482,14 @@ export default function createScrobbleRouter(
                 track.album
               );
 
-              if (searchResults?.items && searchResults.items.length > 0) {
+              if (searchResults && searchResults.length > 0) {
                 // Find the best match (exact album title match preferred)
-                const exactMatch = searchResults.items.find(
+                const exactMatch = searchResults.find(
                   (item: { release: { title: string } }) =>
                     item.release.title.toLowerCase() ===
                     track.album?.toLowerCase()
                 );
-                const matchedItem = exactMatch || searchResults.items[0];
+                const matchedItem = exactMatch || searchResults[0];
 
                 if (matchedItem?.release?.cover_image) {
                   track.albumCover = matchedItem.release.cover_image;
