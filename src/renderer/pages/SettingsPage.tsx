@@ -254,8 +254,8 @@ const SettingsPage: React.FC = () => {
 
       {/* Artist Mappings Section */}
       <div className='card'>
-        <h3>Artist Name Mappings</h3>
-        <p>
+        <h3 style={{ color: '#333' }}>Artist Name Mappings</h3>
+        <p style={{ color: '#333' }}>
           Manage mappings between Discogs and Last.fm artist names. When
           scrobbling, Discogs artist names will be automatically converted to
           their mapped Last.fm names.
@@ -340,7 +340,8 @@ const SettingsPage: React.FC = () => {
               border: '1px solid #e9ecef',
             }}
           >
-            <strong>Current Mappings:</strong> {stats.totalMappings}
+            <strong style={{ color: '#333' }}>Current Mappings:</strong>{' '}
+            <span style={{ color: '#333' }}>{stats.totalMappings}</span>
             {stats.lastUpdated && (
               <span style={{ marginLeft: '1rem', color: '#666' }}>
                 Last updated: {new Date(stats.lastUpdated).toLocaleDateString()}
@@ -396,7 +397,7 @@ const SettingsPage: React.FC = () => {
             border: '1px solid #e9ecef',
           }}
         >
-          <h4 style={{ marginTop: 0, marginBottom: '1rem' }}>
+          <h4 style={{ marginTop: 0, marginBottom: '1rem', color: '#333' }}>
             Add New Mapping
           </h4>
           <div
