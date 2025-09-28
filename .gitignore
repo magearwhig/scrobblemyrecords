@@ -17,10 +17,7 @@ build/
 *.tsbuildinfo
 
 # Cache and data files
-data/collections/
-data/settings/
-data/scrobbles/
-data/cache/
+data/
 *.cache
 
 # Logs
