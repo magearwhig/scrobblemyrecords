@@ -61,9 +61,36 @@ class ArtistMappingService {
 
   private saveMappings(): void {
     try {
-      const currentData = this.getAllMappings();
+      // Build mappings from cache, preserving existing metadata from file
+      const mappings: ArtistMapping[] = [];
+      const existingMappings = new Map<string, ArtistMapping>();
+
+      // Read existing mappings to preserve metadata
+      if (fs.existsSync(this.mappingsFilePath)) {
+        try {
+          const data = fs.readFileSync(this.mappingsFilePath, 'utf8');
+          const mappingData: ArtistMappingData = JSON.parse(data);
+          mappingData.mappings.forEach(m => {
+            existingMappings.set(m.discogsName.toLowerCase(), m);
+          });
+        } catch (error) {
+          logger.warn('Could not read existing mappings file:', error);
+        }
+      }
+
+      // Build new mappings array from cache
+      this.mappingsCache.forEach((lastfmName, discogsNameLower) => {
+        const existing = existingMappings.get(discogsNameLower);
+        mappings.push({
+          discogsName: existing?.discogsName || discogsNameLower,
+          lastfmName,
+          dateAdded: existing?.dateAdded || Date.now(),
+          lastUsed: existing?.lastUsed,
+        });
+      });
+
       const mappingData: ArtistMappingData = {
-        mappings: currentData,
+        mappings,
         version: '1.0',
         lastUpdated: Date.now(),
       };
@@ -72,7 +99,7 @@ class ArtistMappingService {
         this.mappingsFilePath,
         JSON.stringify(mappingData, null, 2)
       );
-      logger.info(`Saved ${currentData.length} artist mappings`);
+      logger.info(`Saved ${mappings.length} artist mappings`);
     } catch (error) {
       logger.error('Error saving artist mappings:', error);
       throw new Error('Failed to save artist mappings');
