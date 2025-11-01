@@ -554,9 +554,10 @@ export class DiscogsService {
         `Searching cached collection for: ${query} (page ${page})`
       );
 
-      // Get all cached pages
+      // Get all cached pages (including expired ones)
       const allItems: CollectionItem[] = [];
       let pageNumber = 1;
+      let hasExpiredCache = false;
 
       while (true) {
         const cacheKey = `collections/${username}-page-${pageNumber}.json`;
@@ -565,15 +566,41 @@ export class DiscogsService {
             cacheKey
           );
 
-        if (!cached || !this.isCacheValid(cached) || !cached.data) {
+        if (!cached || !cached.data) {
+          // No cache file found, stop reading
           break;
         }
 
+        // Check if cache is expired but still use the data
+        const isExpired = !this.isCacheValid(cached);
+        if (isExpired) {
+          const ageMinutes = cached.timestamp
+            ? Math.round((Date.now() - cached.timestamp) / 1000 / 60)
+            : 'unknown';
+          this.logger.debug(`Cache expired for page ${pageNumber}`, {
+            age: `${ageMinutes} minutes`,
+          });
+          hasExpiredCache = true;
+          // Trigger background refresh on first expired page
+          if (pageNumber === 1) {
+            this.logger.info(
+              `Search found expired cache, starting background refresh for ${username}`
+            );
+            // Start background preloading without waiting for it
+            this.preloadAllCollectionPages(username).catch(error => {
+              this.logger.error('Background refresh failed', error);
+            });
+          }
+        }
+
+        // Still include the data even if expired
         allItems.push(...cached.data);
         pageNumber++;
       }
 
-      this.logger.debug(`Loaded ${allItems.length} items from cache`);
+      this.logger.debug(
+        `Loaded ${allItems.length} items from cache${hasExpiredCache ? ' (some expired, refresh triggered)' : ''}`
+      );
 
       // Filter results
       const lowerQuery = query.toLowerCase();
@@ -660,11 +687,6 @@ export class DiscogsService {
       valid: isValid,
     });
     return isValid;
-  }
-
-  private isCacheOlderThan24Hours(cached: any): boolean {
-    const cacheAge = Date.now() - (cached.timestamp || 0);
-    return cacheAge >= 86400000; // 24 hours in milliseconds
   }
 
   async getCacheProgress(username: string): Promise<any> {

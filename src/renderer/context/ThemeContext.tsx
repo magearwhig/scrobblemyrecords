@@ -29,11 +29,25 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Check localStorage for saved preference
     const saved = localStorage.getItem('darkMode');
+    let initialDarkMode: boolean;
+
     if (saved !== null) {
-      return JSON.parse(saved);
+      initialDarkMode = JSON.parse(saved);
+    } else {
+      // Default to system preference
+      initialDarkMode = window.matchMedia(
+        '(prefers-color-scheme: dark)'
+      ).matches;
     }
-    // Default to system preference
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    // Apply the theme class immediately during initialization to prevent flash
+    if (initialDarkMode) {
+      document.documentElement.classList.add('dark-mode');
+    } else {
+      document.documentElement.classList.remove('dark-mode');
+    }
+
+    return initialDarkMode;
   });
 
   useEffect(() => {
