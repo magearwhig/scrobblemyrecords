@@ -502,6 +502,10 @@ body {
   color: var(--text-muted);
 }
 
+.album-metadata {
+  color: var(--text-muted);
+}
+
 /* Search bar enhancements */
 .search-container {
   position: relative;

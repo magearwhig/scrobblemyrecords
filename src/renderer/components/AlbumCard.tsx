@@ -29,13 +29,7 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
   };
 
   return (
-    <div
-      className={`album-card ${selected ? 'selected' : ''}`}
-      style={{
-        border: selected ? '2px solid #1db954' : '1px solid #e0e0e0',
-        backgroundColor: selected ? '#f0fff4' : 'white',
-      }}
-    >
+    <div className={`album-card ${selected ? 'selected' : ''}`}>
       <div
         className='album-cover'
         onClick={() => onViewDetails(release)}
@@ -43,15 +37,6 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
           backgroundImage: getImageUrl(release.cover_image)
             ? `url(${getImageUrl(release.cover_image)})`
             : 'none',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundColor: '#f0f0f0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#999',
-          fontSize: '0.8rem',
-          cursor: 'pointer',
         }}
         title='Click to view details'
       >
@@ -70,14 +55,16 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
         <div className='album-year'>{release.year || 'Unknown Year'}</div>
 
         <div
-          style={{ fontSize: '0.7rem', color: '#999', marginTop: '0.25rem' }}
+          className='album-metadata'
+          style={{ fontSize: '0.7rem', marginTop: '0.25rem' }}
         >
           {formatArray(release.format)}
         </div>
 
         {release.label && release.label.length > 0 && (
           <div
-            style={{ fontSize: '0.7rem', color: '#999', marginTop: '0.25rem' }}
+            className='album-metadata'
+            style={{ fontSize: '0.7rem', marginTop: '0.25rem' }}
           >
             {formatArray(release.label)}
           </div>
