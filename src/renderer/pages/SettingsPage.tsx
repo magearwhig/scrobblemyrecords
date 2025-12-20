@@ -254,8 +254,8 @@ const SettingsPage: React.FC = () => {
 
       {/* Artist Mappings Section */}
       <div className='card'>
-        <h3 style={{ color: '#333' }}>Artist Name Mappings</h3>
-        <p style={{ color: '#333' }}>
+        <h3>Artist Name Mappings</h3>
+        <p>
           Manage mappings between Discogs and Last.fm artist names. When
           scrobbling, Discogs artist names will be automatically converted to
           their mapped Last.fm names.
@@ -333,17 +333,19 @@ const SettingsPage: React.FC = () => {
         {stats && (
           <div
             style={{
-              backgroundColor: '#f8f9fa',
+              backgroundColor: 'var(--bg-tertiary)',
               padding: '1rem',
               borderRadius: '6px',
               marginBottom: '1rem',
-              border: '1px solid #e9ecef',
+              border: '1px solid var(--border-color)',
             }}
           >
-            <strong style={{ color: '#333' }}>Current Mappings:</strong>{' '}
-            <span style={{ color: '#333' }}>{stats.totalMappings}</span>
+            <strong>Current Mappings:</strong>{' '}
+            <span>{stats.totalMappings}</span>
             {stats.lastUpdated && (
-              <span style={{ marginLeft: '1rem', color: '#666' }}>
+              <span
+                style={{ marginLeft: '1rem', color: 'var(--text-secondary)' }}
+              >
                 Last updated: {new Date(stats.lastUpdated).toLocaleDateString()}
               </span>
             )}
@@ -390,14 +392,14 @@ const SettingsPage: React.FC = () => {
         {/* Add New Mapping */}
         <div
           style={{
-            backgroundColor: '#f8f9fa',
+            backgroundColor: 'var(--bg-tertiary)',
             padding: '1rem',
             borderRadius: '6px',
             marginBottom: '1.5rem',
-            border: '1px solid #e9ecef',
+            border: '1px solid var(--border-color)',
           }}
         >
-          <h4 style={{ marginTop: 0, marginBottom: '1rem', color: '#333' }}>
+          <h4 style={{ marginTop: 0, marginBottom: '1rem' }}>
             Add New Mapping
           </h4>
           <div
@@ -414,13 +416,13 @@ const SettingsPage: React.FC = () => {
                   display: 'block',
                   marginBottom: '0.25rem',
                   fontSize: '0.9rem',
-                  color: '#333',
                 }}
               >
                 Discogs Artist Name
               </label>
               <input
                 type='text'
+                className='form-input'
                 value={newMapping.discogsName}
                 onChange={e => handleArtistInputChange(e.target.value)}
                 onFocus={() => {
@@ -433,7 +435,7 @@ const SettingsPage: React.FC = () => {
                   setTimeout(() => setShowArtistSuggestions(false), 200);
                 }}
                 placeholder='Start typing artist name...'
-                style={{ width: '100%', color: '#333' }}
+                style={{ width: '100%' }}
               />
               {showArtistSuggestions && (
                 <div
@@ -442,13 +444,13 @@ const SettingsPage: React.FC = () => {
                     top: '100%',
                     left: 0,
                     right: 0,
-                    backgroundColor: 'white',
-                    border: '1px solid #e0e0e0',
+                    backgroundColor: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '4px',
                     maxHeight: '200px',
                     overflowY: 'auto',
                     zIndex: 1000,
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    boxShadow: 'var(--card-shadow)',
                   }}
                 >
                   {filteredArtists.map((artist, index) => (
@@ -460,16 +462,18 @@ const SettingsPage: React.FC = () => {
                         cursor: 'pointer',
                         borderBottom:
                           index < filteredArtists.length - 1
-                            ? '1px solid #f0f0f0'
+                            ? '1px solid var(--border-color)'
                             : 'none',
-                        color: '#333',
+                        color: 'var(--text-primary)',
                         fontSize: '0.9rem',
                       }}
                       onMouseEnter={e => {
-                        e.currentTarget.style.backgroundColor = '#f8f9fa';
+                        e.currentTarget.style.backgroundColor =
+                          'var(--bg-tertiary)';
                       }}
                       onMouseLeave={e => {
-                        e.currentTarget.style.backgroundColor = 'white';
+                        e.currentTarget.style.backgroundColor =
+                          'var(--bg-secondary)';
                       }}
                     >
                       {artist}
@@ -484,19 +488,19 @@ const SettingsPage: React.FC = () => {
                   display: 'block',
                   marginBottom: '0.25rem',
                   fontSize: '0.9rem',
-                  color: '#333',
                 }}
               >
                 Last.fm Artist Name
               </label>
               <input
                 type='text'
+                className='form-input'
                 value={newMapping.lastfmName}
                 onChange={e =>
                   setNewMapping({ ...newMapping, lastfmName: e.target.value })
                 }
                 placeholder='e.g., Turnstile'
-                style={{ width: '100%', color: '#333' }}
+                style={{ width: '100%' }}
                 onKeyPress={e => e.key === 'Enter' && handleAddMapping()}
               />
             </div>
@@ -517,21 +521,25 @@ const SettingsPage: React.FC = () => {
             Loading artist mappings...
           </div>
         ) : mappings.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '2rem',
+              color: 'var(--text-secondary)',
+            }}
+          >
             No artist mappings configured yet. Add your first mapping above!
           </div>
         ) : (
           <div>
-            <h4 style={{ color: '#333' }}>
-              Current Mappings ({mappings.length})
-            </h4>
+            <h4>Current Mappings ({mappings.length})</h4>
             <div
               style={{
                 maxHeight: '400px',
                 overflowY: 'auto',
-                border: '1px solid #e0e0e0',
+                border: '1px solid var(--border-color)',
                 borderRadius: '6px',
-                backgroundColor: 'white',
+                backgroundColor: 'var(--bg-secondary)',
               }}
             >
               {mappings.map((mapping, index) => (
@@ -541,7 +549,7 @@ const SettingsPage: React.FC = () => {
                     padding: '0.75rem',
                     borderBottom:
                       index < mappings.length - 1
-                        ? '1px solid #f0f0f0'
+                        ? '1px solid var(--border-color)'
                         : 'none',
                     display: 'flex',
                     alignItems: 'center',
@@ -553,16 +561,22 @@ const SettingsPage: React.FC = () => {
                       style={{
                         fontWeight: 500,
                         fontSize: '0.9rem',
-                        color: '#333',
+                        color: 'var(--text-primary)',
                       }}
                     >
                       {mapping.discogsName}
                     </div>
-                    <div style={{ fontSize: '0.8rem', color: '#666' }}>
+                    <div
+                      style={{
+                        fontSize: '0.8rem',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
                       maps to:{' '}
                       {editingMapping === mapping.discogsName ? (
                         <input
                           type='text'
+                          className='form-input'
                           value={editValue}
                           onChange={e => setEditValue(e.target.value)}
                           onKeyPress={e => {
@@ -570,17 +584,22 @@ const SettingsPage: React.FC = () => {
                               handleUpdateMapping(mapping.discogsName);
                             if (e.key === 'Escape') cancelEditing();
                           }}
-                          style={{ minWidth: '150px', color: '#333' }}
+                          style={{ minWidth: '150px' }}
                           autoFocus
                         />
                       ) : (
-                        <strong style={{ color: '#333' }}>
+                        <strong style={{ color: 'var(--text-primary)' }}>
                           {mapping.lastfmName}
                         </strong>
                       )}
                     </div>
                     {mapping.lastUsed && (
-                      <div style={{ fontSize: '0.75rem', color: '#999' }}>
+                      <div
+                        style={{
+                          fontSize: '0.75rem',
+                          color: 'var(--text-muted)',
+                        }}
+                      >
                         Last used:{' '}
                         {new Date(mapping.lastUsed).toLocaleDateString()}
                       </div>

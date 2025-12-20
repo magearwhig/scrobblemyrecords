@@ -482,7 +482,13 @@ const ReleaseDetailsPage: React.FC = () => {
           </div>
 
           <div style={{ flex: 1 }}>
-            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.5rem' }}>
+            <h3
+              style={{
+                margin: '0 0 0.5rem 0',
+                fontSize: '1.5rem',
+                color: 'var(--text-primary)',
+              }}
+            >
               {release.title}
             </h3>
             <p
@@ -641,7 +647,7 @@ const ReleaseDetailsPage: React.FC = () => {
               marginBottom: '0.5rem',
             }}
           >
-            <h4 style={{ margin: 0 }}>
+            <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>
               Tracks ({selectedTracks.size} selected)
             </h4>
             <div
@@ -692,6 +698,7 @@ const ReleaseDetailsPage: React.FC = () => {
                       margin: '0 0 0.75rem 0',
                       fontSize: '0.95rem',
                       fontWeight: '600',
+                      color: 'var(--text-primary)',
                     }}
                   >
                     Select by Side
@@ -783,7 +790,11 @@ const ReleaseDetailsPage: React.FC = () => {
                 border: '1px solid var(--border-color)',
               }}
             >
-              <h5 style={{ margin: '0 0 0.5rem 0' }}>Scrobble Timing</h5>
+              <h5
+                style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}
+              >
+                Scrobble Timing
+              </h5>
               <p
                 style={{
                   margin: '0 0 0.5rem 0',
@@ -999,7 +1010,9 @@ const ReleaseDetailsPage: React.FC = () => {
                 />
 
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: '500' }}>
+                  <div
+                    style={{ fontWeight: '500', color: 'var(--text-primary)' }}
+                  >
                     {track.position} {track.title}
                   </div>
                   {track.artist && track.artist !== release.artist && (
