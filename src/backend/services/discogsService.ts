@@ -333,6 +333,10 @@ export class DiscogsService {
         `Fetching collection page ${page} for ${username} from API`
       );
 
+      // Capture timestamp BEFORE making API call
+      // This ensures items added during/after the fetch are still detected as new
+      const fetchStartTime = Date.now();
+
       const headers = await this.getAuthHeaders();
       const response = await this.axios.get(
         `/users/${username}/collection/folders/0/releases`,
@@ -375,7 +379,7 @@ export class DiscogsService {
         success: true,
         data: transformedReleases,
         pagination: response.data.pagination,
-        timestamp: Date.now(),
+        timestamp: fetchStartTime,
       };
 
       // Cache the result
@@ -956,6 +960,10 @@ export class DiscogsService {
         `Cache was last updated: ${cacheTimestamp.toISOString()}`
       );
 
+      // Capture timestamp BEFORE fetching new items
+      // This ensures items added during the update are still detected as new next time
+      const updateStartTime = Date.now();
+
       // Fetch new items from Discogs (sorted by date_added descending)
       this.logger.info('Fetching new items from Discogs API');
       let headers;
@@ -1077,6 +1085,8 @@ export class DiscogsService {
       this.logger.debug(`Merged to ${mergedItems.length} total items`);
 
       // Re-paginate and save updated cache
+      // Use the update start time (when we started fetching new items) not current time
+      // This ensures items added during the update are still detected as new next time
       const itemsPerPage = 50;
       const totalPages = Math.ceil(mergedItems.length / itemsPerPage);
 
@@ -1094,7 +1104,7 @@ export class DiscogsService {
             per_page: itemsPerPage,
             items: mergedItems.length,
           },
-          timestamp: Date.now(),
+          timestamp: updateStartTime,
         };
 
         const pageKey = `collections/${username}-page-${page}.json`;
