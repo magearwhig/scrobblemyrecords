@@ -192,13 +192,13 @@ describe('AlbumCard', () => {
     );
 
     let card = screen.getByText('Test Album').closest('.album-card');
-    expect(card).toHaveStyle('border: 1px solid rgb(224, 224, 224)');
-    expect(card).toHaveStyle('background-color: rgb(255, 255, 255)');
+    expect(card).toHaveClass('album-card');
+    expect(card).not.toHaveClass('selected');
 
     rerender(<AlbumCard {...defaultProps} selected={true} />);
 
     card = screen.getByText('Test Album').closest('.album-card');
-    expect(card).toHaveStyle('border: 2px solid rgb(29, 185, 84)');
-    expect(card).toHaveStyle('background-color: rgb(240, 255, 244)');
+    expect(card).toHaveClass('album-card');
+    expect(card).toHaveClass('selected');
   });
 });

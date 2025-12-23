@@ -838,25 +838,25 @@ describe('DiscogsService', () => {
     });
   });
 
-  describe('isCacheOlderThan24Hours', () => {
-    it('should return true for cache older than 24 hours', () => {
+  describe('isCacheValid', () => {
+    it('should return false for cache older than 24 hours', () => {
       const oldCache = {
         timestamp: Date.now() - 1000 * 60 * 60 * 25, // 25 hours ago
       };
 
-      const result = (discogsService as any).isCacheOlderThan24Hours(oldCache);
+      const result = (discogsService as any).isCacheValid(oldCache);
 
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
 
-    it('should return false for cache newer than 24 hours', () => {
+    it('should return true for cache newer than 24 hours', () => {
       const newCache = {
         timestamp: Date.now() - 1000 * 60 * 60 * 23, // 23 hours ago
       };
 
-      const result = (discogsService as any).isCacheOlderThan24Hours(newCache);
+      const result = (discogsService as any).isCacheValid(newCache);
 
-      expect(result).toBe(false);
+      expect(result).toBe(true);
     });
   });
 });

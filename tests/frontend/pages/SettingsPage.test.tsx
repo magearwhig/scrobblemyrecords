@@ -2,11 +2,29 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import React from 'react';
 
+import { AppProvider } from '../../../src/renderer/context/AppContext';
+import { AuthProvider } from '../../../src/renderer/context/AuthContext';
 import SettingsPage from '../../../src/renderer/pages/SettingsPage';
+
+const mockAuthValue = {
+  authStatus: {
+    discogs: { authenticated: false },
+    lastfm: { authenticated: false },
+  },
+  setAuthStatus: jest.fn(),
+};
+
+const renderWithProviders = (ui: React.ReactElement) => {
+  return render(
+    <AppProvider>
+      <AuthProvider value={mockAuthValue}>{ui}</AuthProvider>
+    </AppProvider>
+  );
+};
 
 describe('SettingsPage', () => {
   it('renders the settings page title', () => {
-    render(<SettingsPage />);
+    renderWithProviders(<SettingsPage />);
 
     expect(screen.getByText('Settings')).toBeInTheDocument();
     expect(
@@ -15,42 +33,34 @@ describe('SettingsPage', () => {
   });
 
   it('renders the description text', () => {
-    render(<SettingsPage />);
+    renderWithProviders(<SettingsPage />);
 
     expect(
       screen.getByText('Application preferences and configuration options.')
     ).toBeInTheDocument();
   });
 
-  it('shows coming soon message', () => {
-    render(<SettingsPage />);
+  it('renders artist mappings section', () => {
+    renderWithProviders(<SettingsPage />);
 
-    expect(
-      screen.getByText('Settings panel coming soon...')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Artist Name Mappings')).toBeInTheDocument();
   });
 
-  it('displays loading spinner', () => {
-    render(<SettingsPage />);
+  it('renders add new mapping section', () => {
+    renderWithProviders(<SettingsPage />);
 
-    const loadingDiv = screen
-      .getByText('Settings panel coming soon...')
-      .closest('.loading');
-    expect(loadingDiv).toBeInTheDocument();
-
-    const spinner = loadingDiv?.querySelector('.spinner');
-    expect(spinner).toBeInTheDocument();
+    expect(screen.getByText('Add New Mapping')).toBeInTheDocument();
   });
 
   it('renders within a card container', () => {
-    render(<SettingsPage />);
+    renderWithProviders(<SettingsPage />);
 
     const cardElement = screen.getByText('Settings').closest('.card');
     expect(cardElement).toBeInTheDocument();
   });
 
   it('has proper structure with main container', () => {
-    const { container } = render(<SettingsPage />);
+    const { container } = renderWithProviders(<SettingsPage />);
 
     const mainDiv = container.firstChild;
     expect(mainDiv?.nodeName).toBe('DIV');

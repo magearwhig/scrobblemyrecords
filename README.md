@@ -1,5 +1,7 @@
 # Discogs to Last.fm Scrobbler
 
+[![CI](https://github.com/mwood77/recordscrobbles/actions/workflows/ci.yml/badge.svg)](https://github.com/mwood77/recordscrobbles/actions/workflows/ci.yml)
+
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
 A modern web application that bridges your Discogs collection with Last.fm scrobbling. Browse your vinyl collection, select albums or tracks, and automatically scrobble them to your Last.fm profile with customizable timestamps.
