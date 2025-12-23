@@ -1,6 +1,6 @@
 # Discogs to Last.fm Scrobbler
 
-[![CI](https://github.com/mwood77/recordscrobbles/actions/workflows/ci.yml/badge.svg)](https://github.com/mwood77/recordscrobbles/actions/workflows/ci.yml)
+[![CI](https://github.com/magearwhig/scrobblemyrecords/actions/workflows/ci.yml/badge.svg)](https://github.com/magearwhig/scrobblemyrecords/actions/workflows/ci.yml)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
