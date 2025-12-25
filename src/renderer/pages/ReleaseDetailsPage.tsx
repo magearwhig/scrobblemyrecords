@@ -830,9 +830,26 @@ const ReleaseDetailsPage: React.FC = () => {
                         <button
                           className='btn btn-small btn-outline'
                           onClick={() => {
-                            const date = new Date(startTime);
+                            // Parse the datetime-local value and adjust in local time
+                            const [datePart, timePart] = startTime.split('T');
+                            const [year, month, day] = datePart
+                              .split('-')
+                              .map(Number);
+                            const [hours, minutes] = timePart
+                              .split(':')
+                              .map(Number);
+
+                            const date = new Date(
+                              year,
+                              month - 1,
+                              day,
+                              hours,
+                              minutes
+                            );
                             date.setMinutes(date.getMinutes() - 5);
-                            setStartTime(date.toISOString().slice(0, 16));
+
+                            const newValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                            setStartTime(newValue);
                           }}
                           title='Move back 5 minutes'
                           style={{ padding: '0.5rem 0.75rem' }}
@@ -842,9 +859,26 @@ const ReleaseDetailsPage: React.FC = () => {
                         <button
                           className='btn btn-small btn-outline'
                           onClick={() => {
-                            const date = new Date(startTime);
+                            // Parse the datetime-local value and adjust in local time
+                            const [datePart, timePart] = startTime.split('T');
+                            const [year, month, day] = datePart
+                              .split('-')
+                              .map(Number);
+                            const [hours, minutes] = timePart
+                              .split(':')
+                              .map(Number);
+
+                            const date = new Date(
+                              year,
+                              month - 1,
+                              day,
+                              hours,
+                              minutes
+                            );
                             date.setMinutes(date.getMinutes() + 5);
-                            setStartTime(date.toISOString().slice(0, 16));
+
+                            const newValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                            setStartTime(newValue);
                           }}
                           title='Move forward 5 minutes'
                           style={{ padding: '0.5rem 0.75rem' }}
