@@ -816,14 +816,44 @@ const ReleaseDetailsPage: React.FC = () => {
                   >
                     Start Time:
                   </label>
-                  <input
-                    id='start-time-input'
-                    type='datetime-local'
-                    className='form-input'
-                    value={startTime}
-                    onChange={e => setStartTime(e.target.value)}
-                    style={{ fontSize: '0.9rem' }}
-                  />
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                      id='start-time-input'
+                      type='datetime-local'
+                      className='form-input'
+                      value={startTime}
+                      onChange={e => setStartTime(e.target.value)}
+                      style={{ fontSize: '0.9rem', flex: 1 }}
+                    />
+                    {startTime && (
+                      <>
+                        <button
+                          className='btn btn-small btn-outline'
+                          onClick={() => {
+                            const date = new Date(startTime);
+                            date.setMinutes(date.getMinutes() - 5);
+                            setStartTime(date.toISOString().slice(0, 16));
+                          }}
+                          title='Move back 5 minutes'
+                          style={{ padding: '0.5rem 0.75rem' }}
+                        >
+                          ← 5m
+                        </button>
+                        <button
+                          className='btn btn-small btn-outline'
+                          onClick={() => {
+                            const date = new Date(startTime);
+                            date.setMinutes(date.getMinutes() + 5);
+                            setStartTime(date.toISOString().slice(0, 16));
+                          }}
+                          title='Move forward 5 minutes'
+                          style={{ padding: '0.5rem 0.75rem' }}
+                        >
+                          5m →
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div
                   style={{
