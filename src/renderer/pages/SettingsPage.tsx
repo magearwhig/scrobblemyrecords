@@ -27,6 +27,14 @@ const SettingsPage: React.FC = () => {
   const [showArtistSuggestions, setShowArtistSuggestions] = useState(false);
   const [artistsLoading, setArtistsLoading] = useState(false);
   const [artistsLoadError, setArtistsLoadError] = useState<string>('');
+  const [suggestions, setSuggestions] = useState<
+    Array<{
+      artist: string;
+      localScrobbles: number;
+      suggestedMapping: string;
+    }>
+  >([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 
   const api = getApiService(state.serverUrl);
 
@@ -34,8 +42,28 @@ const SettingsPage: React.FC = () => {
     loadMappings();
     if (authStatus.discogs.authenticated && authStatus.discogs.username) {
       loadArtists();
+      loadSuggestions();
     }
   }, [authStatus.discogs.authenticated, authStatus.discogs.username]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle query param for pre-filling artist name (e.g., from disambiguation warning)
+  useEffect(() => {
+    const hash = window.location.hash;
+    const queryStart = hash.indexOf('?');
+    if (queryStart !== -1) {
+      const params = new URLSearchParams(hash.substring(queryStart));
+      const prefillArtist = params.get('prefillArtist');
+      if (prefillArtist) {
+        setNewMapping(prev => ({ ...prev, discogsName: prefillArtist }));
+        // Clear the query param from URL without triggering navigation
+        window.history.replaceState(
+          null,
+          '',
+          `${window.location.pathname}#settings`
+        );
+      }
+    }
+  }, []);
 
   const loadMappings = async () => {
     setLoading(true);
@@ -73,6 +101,38 @@ const SettingsPage: React.FC = () => {
       console.warn('Failed to load artists for typeahead:', error);
     } finally {
       setArtistsLoading(false);
+    }
+  };
+
+  const loadSuggestions = async () => {
+    try {
+      if (!authStatus.discogs.username) return;
+
+      setSuggestionsLoading(true);
+      const result = await api.getArtistMappingSuggestions(
+        authStatus.discogs.username
+      );
+      setSuggestions(result.suggestions);
+    } catch (error) {
+      console.warn('Failed to load mapping suggestions:', error);
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  };
+
+  const handleQuickAddMapping = async (
+    discogsName: string,
+    lastfmName: string
+  ) => {
+    try {
+      await api.addArtistMapping(discogsName, lastfmName);
+      setSuccess(`Mapping added: ${discogsName} → ${lastfmName}`);
+      await loadMappings();
+      await loadSuggestions(); // Refresh suggestions
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : 'Failed to add mapping'
+      );
     }
   };
 
@@ -420,23 +480,42 @@ const SettingsPage: React.FC = () => {
               >
                 Discogs Artist Name
               </label>
-              <input
-                type='text'
-                className='form-input'
-                value={newMapping.discogsName}
-                onChange={e => handleArtistInputChange(e.target.value)}
-                onFocus={() => {
-                  if (newMapping.discogsName && filteredArtists.length > 0) {
-                    setShowArtistSuggestions(true);
-                  }
-                }}
-                onBlur={() => {
-                  // Delay hiding suggestions to allow clicks
-                  setTimeout(() => setShowArtistSuggestions(false), 200);
-                }}
-                placeholder='Start typing artist name...'
-                style={{ width: '100%' }}
-              />
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <input
+                  type='text'
+                  className='form-input'
+                  value={newMapping.discogsName}
+                  onChange={e => handleArtistInputChange(e.target.value)}
+                  onFocus={() => {
+                    if (newMapping.discogsName && filteredArtists.length > 0) {
+                      setShowArtistSuggestions(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    // Delay hiding suggestions to allow clicks
+                    setTimeout(() => setShowArtistSuggestions(false), 200);
+                  }}
+                  placeholder='Start typing artist name...'
+                  style={{ flex: 1 }}
+                />
+                {newMapping.discogsName.trim() && (
+                  <a
+                    href={`https://www.discogs.com/search/?q=${encodeURIComponent(newMapping.discogsName.trim())}&type=artist`}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    title='Search for this artist on Discogs'
+                    style={{
+                      fontSize: '0.85rem',
+                      whiteSpace: 'nowrap',
+                      color: 'var(--link-color)',
+                    }}
+                  >
+                    View on Discogs
+                  </a>
+                )}
+              </div>
               {showArtistSuggestions && (
                 <div
                   style={{
@@ -513,6 +592,171 @@ const SettingsPage: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Possible Mappings Section */}
+        {authStatus.discogs.authenticated && (
+          <div
+            style={{
+              backgroundColor: 'var(--bg-tertiary)',
+              padding: '1rem',
+              borderRadius: '6px',
+              marginBottom: '1.5rem',
+              border: '1px solid var(--border-color)',
+            }}
+          >
+            <h4 style={{ marginTop: 0, marginBottom: '0.5rem' }}>
+              Possible Mappings
+            </h4>
+            <p
+              style={{
+                fontSize: '0.85rem',
+                color: 'var(--text-secondary)',
+                marginBottom: '1rem',
+              }}
+            >
+              Artists in your collection with Discogs disambiguation suffixes
+              (e.g., &quot;Artist (2)&quot;) that may need mappings for correct
+              Last.fm scrobbling.
+            </p>
+
+            {suggestionsLoading ? (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '1rem',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                Loading suggestions...
+              </div>
+            ) : suggestions.length === 0 ? (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '1rem',
+                  color: 'var(--text-muted)',
+                  fontSize: '0.9rem',
+                }}
+              >
+                No disambiguation artists found that need mappings.
+              </div>
+            ) : (
+              <div
+                style={{
+                  maxHeight: '300px',
+                  overflowY: 'auto',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--bg-secondary)',
+                }}
+              >
+                {suggestions.map((suggestion, index) => (
+                  <div
+                    key={suggestion.artist}
+                    style={{
+                      padding: '0.75rem',
+                      borderBottom:
+                        index < suggestions.length - 1
+                          ? '1px solid var(--border-color)'
+                          : 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '0.5rem',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: '200px' }}>
+                      <div
+                        style={{
+                          fontWeight: 500,
+                          fontSize: '0.9rem',
+                          color: 'var(--text-primary)',
+                        }}
+                      >
+                        {suggestion.artist}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '0.8rem',
+                          color: 'var(--text-secondary)',
+                          display: 'flex',
+                          gap: '1rem',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <span>
+                          Local scrobbles:{' '}
+                          <strong>{suggestion.localScrobbles}</strong>
+                        </span>
+                        <a
+                          href={`https://www.discogs.com/search/?q=${encodeURIComponent(suggestion.artist)}&type=artist`}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          style={{
+                            fontSize: '0.8rem',
+                            color: 'var(--link-color)',
+                          }}
+                        >
+                          View on Discogs
+                        </a>
+                        {authStatus.lastfm.username && (
+                          <a
+                            href={`https://www.last.fm/user/${authStatus.lastfm.username}/library/music/${encodeURIComponent(suggestion.artist)}`}
+                            target='_blank'
+                            rel='noopener noreferrer'
+                            style={{
+                              fontSize: '0.8rem',
+                              color: 'var(--link-color)',
+                            }}
+                          >
+                            View on Last.fm
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '0.5rem',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <button
+                        className='btn btn-small'
+                        onClick={() =>
+                          handleQuickAddMapping(
+                            suggestion.artist,
+                            suggestion.suggestedMapping
+                          )
+                        }
+                        title={`Map to "${suggestion.suggestedMapping}"`}
+                      >
+                        Map to &quot;{suggestion.suggestedMapping}&quot;
+                      </button>
+                      <button
+                        className='btn btn-small btn-secondary'
+                        onClick={() => {
+                          setNewMapping({
+                            discogsName: suggestion.artist,
+                            lastfmName: '',
+                          });
+                          // Scroll to add mapping form
+                          document
+                            .querySelector('h4')
+                            ?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        title='Customize mapping'
+                      >
+                        Custom
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Mappings List */}
         {loading && mappings.length === 0 ? (

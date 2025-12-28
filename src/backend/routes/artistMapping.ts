@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 
 import { artistMappingService } from '../services/artistMappingService';
+import { FileStorage } from '../utils/fileStorage';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -284,6 +285,107 @@ router.get('/stats', async (req: Request, res: Response) => {
         error instanceof Error
           ? error.message
           : 'Failed to get artist mapping stats',
+    });
+  }
+});
+
+// Get artists with disambiguation suffix that need mappings
+router.get('/suggestions', async (req: Request, res: Response) => {
+  try {
+    const { username } = req.query;
+
+    if (!username || typeof username !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Username is required',
+      });
+    }
+
+    const fileStorage = new FileStorage();
+    const DISAMBIGUATION_PATTERN = /\s*\(\d+\)\s*$/;
+
+    // Get collection artists
+    const collectionPath = `collections/${username}.json`;
+    let collectionArtists: string[] = [];
+
+    try {
+      const collection = await fileStorage.readJSON<{
+        items: Array<{ release: { artist: string } }>;
+      }>(collectionPath);
+      if (collection?.items) {
+        const artistSet = new Set<string>();
+        collection.items.forEach(item => {
+          if (item.release?.artist) {
+            artistSet.add(item.release.artist);
+          }
+        });
+        collectionArtists = Array.from(artistSet);
+      }
+    } catch {
+      // Collection not cached yet
+      collectionArtists = [];
+    }
+
+    // Filter to only disambiguation artists without mappings
+    const disambiguationArtists = collectionArtists
+      .filter(artist => DISAMBIGUATION_PATTERN.test(artist))
+      .filter(artist => !artistMappingService.hasMapping(artist));
+
+    // Get local scrobble counts
+    const scrobbleCounts: Record<string, number> = {};
+    try {
+      const scrobbleFiles = await fileStorage.listFiles('scrobbles');
+      for (const file of scrobbleFiles) {
+        if (file.startsWith('session-')) {
+          try {
+            const session = await fileStorage.readJSON<{
+              tracks: Array<{ artist: string; status?: string }>;
+            }>(`scrobbles/${file}`);
+            if (session?.tracks) {
+              session.tracks.forEach(track => {
+                if (
+                  track.artist &&
+                  disambiguationArtists.includes(track.artist)
+                ) {
+                  scrobbleCounts[track.artist] =
+                    (scrobbleCounts[track.artist] || 0) + 1;
+                }
+              });
+            }
+          } catch {
+            // Skip invalid files
+          }
+        }
+      }
+    } catch {
+      // Scrobbles directory may not exist
+    }
+
+    // Build response with artist details
+    const suggestions = disambiguationArtists.map(artist => ({
+      artist,
+      localScrobbles: scrobbleCounts[artist] || 0,
+      suggestedMapping: artist.replace(DISAMBIGUATION_PATTERN, '').trim(),
+    }));
+
+    // Sort by local scrobbles (most scrobbled first)
+    suggestions.sort((a, b) => b.localScrobbles - a.localScrobbles);
+
+    res.json({
+      success: true,
+      data: {
+        suggestions,
+        total: suggestions.length,
+      },
+    });
+  } catch (error) {
+    logger.error('Error getting artist mapping suggestions:', error);
+    res.status(500).json({
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to get artist mapping suggestions',
     });
   }
 });

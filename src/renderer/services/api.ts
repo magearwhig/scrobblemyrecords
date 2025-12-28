@@ -423,6 +423,20 @@ class ApiService {
     return response.data.data;
   }
 
+  async getArtistMappingSuggestions(username: string): Promise<{
+    suggestions: Array<{
+      artist: string;
+      localScrobbles: number;
+      suggestedMapping: string;
+    }>;
+    total: number;
+  }> {
+    const response = await this.api.get('/artist-mappings/suggestions', {
+      params: { username },
+    });
+    return response.data.data;
+  }
+
   async backfillAlbumCovers(username: string): Promise<{
     message: string;
     updatedSessions: number;

@@ -614,4 +614,87 @@ export class LastFmService {
       throw error;
     }
   }
+
+  async getLibraryArtists(
+    limit: number = 50,
+    page: number = 1
+  ): Promise<{
+    artists: Array<{ name: string; playcount: string; url: string }>;
+    total: number;
+    page: number;
+    perPage: number;
+    totalPages: number;
+  }> {
+    try {
+      const credentials = await this.authService.getLastFmCredentials();
+      if (!credentials.apiKey || !credentials.username) {
+        throw new Error('Last.fm credentials not configured');
+      }
+
+      const response = await this.axios.get('', {
+        params: {
+          method: 'library.getArtists',
+          api_key: credentials.apiKey,
+          user: credentials.username,
+          limit: limit.toString(),
+          page: page.toString(),
+          format: 'json',
+        },
+      });
+
+      if (response.data.error) {
+        throw new Error(
+          response.data.message || 'Failed to get library artists'
+        );
+      }
+
+      const attr = response.data.artists?.['@attr'] || {};
+      return {
+        artists: response.data.artists?.artist || [],
+        total: parseInt(attr.total || '0', 10),
+        page: parseInt(attr.page || '1', 10),
+        perPage: parseInt(attr.perPage || '50', 10),
+        totalPages: parseInt(attr.totalPages || '1', 10),
+      };
+    } catch (error) {
+      this.logger.error('Error getting library artists', error);
+      throw error;
+    }
+  }
+
+  async getArtistPlaycount(artistName: string): Promise<number | null> {
+    try {
+      const credentials = await this.authService.getLastFmCredentials();
+      if (!credentials.apiKey || !credentials.username) {
+        return null;
+      }
+
+      // Search through library artists to find the specific one
+      // This is a workaround since there's no direct "get playcount for artist X" API
+      let page = 1;
+      const limit = 100;
+      const searchName = artistName.toLowerCase();
+
+      while (page <= 10) {
+        // Limit search to first 1000 artists
+        const result = await this.getLibraryArtists(limit, page);
+
+        for (const artist of result.artists) {
+          if (artist.name.toLowerCase() === searchName) {
+            return parseInt(artist.playcount, 10);
+          }
+        }
+
+        if (page >= result.totalPages) {
+          break;
+        }
+        page++;
+      }
+
+      return null; // Artist not found in library
+    } catch (error) {
+      this.logger.error('Error getting artist playcount', error);
+      return null;
+    }
+  }
 }
