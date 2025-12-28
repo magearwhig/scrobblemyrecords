@@ -67,6 +67,18 @@ export class AuthService {
     );
   }
 
+  /**
+   * Checks if settings contain authentication tokens (not just usernames).
+   * Used to detect decryption failures where tokens become empty but usernames remain.
+   */
+  private hasAuthTokens(settings: UserSettings): boolean {
+    return !!(
+      settings.discogs.token ||
+      settings.lastfm.apiKey ||
+      settings.lastfm.sessionKey
+    );
+  }
+
   async getUserSettings(): Promise<UserSettings> {
     const fileStats = await this.fileStorage.getStats(SETTINGS_PATH);
 
@@ -129,20 +141,27 @@ export class AuthService {
     const decryptedSettings = this.decryptSettings(settings);
 
     // Check if decryption may have failed (had tokens but now empty)
+    // Use hasAuthTokens to check specifically for tokens, not usernames
+    // This catches the case where tokens fail to decrypt but usernames survive
     if (
-      this.hasCredentials(settings) &&
-      !this.hasCredentials(decryptedSettings)
+      this.hasAuthTokens(settings) &&
+      !this.hasAuthTokens(decryptedSettings)
     ) {
-      logger.warn(
-        'Settings had credentials but decryption returned empty values - ' +
-          'encryption key may have changed. Credentials NOT cleared.',
+      logger.error(
+        'DECRYPTION FAILURE DETECTED: Settings had auth tokens but decryption returned empty values. ' +
+          'This usually means the encryption key has changed.',
         {
           hadDiscogsToken: !!settings.discogs.token,
           hadLastfmApiKey: !!settings.lastfm.apiKey,
           hadLastfmSessionKey: !!settings.lastfm.sessionKey,
+          // Don't log actual values, just presence
         }
       );
-      // Return decrypted (empty) values but don't save - preserve original encrypted data
+      // CRITICAL: Throw error to prevent any code path from accidentally saving empty tokens
+      throw new Error(
+        'Decryption failed: encryption key may have changed. ' +
+          'Restore ENCRYPTION_KEY from backup or re-authenticate all services.'
+      );
     }
 
     return decryptedSettings;
@@ -202,22 +221,23 @@ export class AuthService {
       );
     }
 
-    // SAFETY: Block saving empty credentials if existing file has them
+    // SAFETY: Block saving empty tokens if existing file has them
     // This prevents accidental credential loss due to decryption failures
+    // Uses hasAuthTokens to check specifically for tokens, not usernames
     // Can be bypassed with allowCredentialClear for intentional clears
     if (!options?.allowCredentialClear) {
       const fileStats = await this.fileStorage.getStats(SETTINGS_PATH);
       if (fileStats.exists && fileStats.size && fileStats.size > 200) {
         // File has substantial content
-        const hasNewCredentials = this.hasCredentials(encryptedSettings);
-        if (!hasNewCredentials) {
-          // Read existing to check if it has credentials
+        const hasNewTokens = this.hasAuthTokens(encryptedSettings);
+        if (!hasNewTokens) {
+          // Read existing to check if it has tokens
           try {
             const existing =
               await this.fileStorage.readJSON<UserSettings>(SETTINGS_PATH);
-            if (existing && this.hasCredentials(existing)) {
+            if (existing && this.hasAuthTokens(existing)) {
               logger.error(
-                'BLOCKED: Refusing to overwrite credentials with empty values',
+                'BLOCKED: Refusing to overwrite auth tokens with empty values',
                 {
                   existingSize: fileStats.size,
                   hasDiscogsToken: !!existing.discogs.token,
@@ -227,7 +247,7 @@ export class AuthService {
               );
               // Don't save - this would destroy user credentials
               throw new Error(
-                'Cannot save settings: would overwrite existing credentials with empty values. ' +
+                'Cannot save settings: would overwrite existing auth tokens with empty values. ' +
                   'This usually means the encryption key has changed. Restore from backup or re-authenticate.'
               );
             }
