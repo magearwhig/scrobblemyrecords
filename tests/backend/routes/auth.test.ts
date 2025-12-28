@@ -47,8 +47,12 @@ jest.mock('../../../src/backend/utils/fileStorage', () => ({
   FileStorage: jest.fn(() => mockFileStorage),
 }));
 
-// Import the router after mocking
-import authRouter from '../../../src/backend/routes/auth';
+// Import the router factory after mocking
+import { createAuthRouter } from '../../../src/backend/routes/auth';
+import { AuthService } from '../../../src/backend/services/authService';
+import { DiscogsService } from '../../../src/backend/services/discogsService';
+import { LastFmService } from '../../../src/backend/services/lastfmService';
+import { FileStorage } from '../../../src/backend/utils/fileStorage';
 
 describe('Auth Routes', () => {
   let app: express.Application;
@@ -62,6 +66,18 @@ describe('Auth Routes', () => {
     app.use(cors());
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
+
+    // Create router with mocked services
+    const fileStorage = new FileStorage();
+    const authService = new AuthService(fileStorage);
+    const discogsService = new DiscogsService(fileStorage, authService);
+    const lastfmService = new LastFmService(fileStorage, authService);
+    const authRouter = createAuthRouter(
+      fileStorage,
+      authService,
+      discogsService,
+      lastfmService
+    );
     app.use('/api/v1/auth', authRouter);
 
     // Error handling middleware

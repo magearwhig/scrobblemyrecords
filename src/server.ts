@@ -7,7 +7,7 @@ import helmet from 'helmet';
 dotenv.config();
 
 import artistMappingRoutes from './backend/routes/artistMapping';
-import authRoutes from './backend/routes/auth';
+import { createAuthRouter } from './backend/routes/auth';
 import createCollectionRouter from './backend/routes/collection';
 import createScrobbleRouter from './backend/routes/scrobble';
 import { AuthService } from './backend/services/authService';
@@ -103,7 +103,10 @@ const lastfmService = new LastFmService(fileStorage, authService);
 const discogsService = new DiscogsService(fileStorage, authService);
 
 // API routes
-app.use('/api/v1/auth', authRoutes);
+app.use(
+  '/api/v1/auth',
+  createAuthRouter(fileStorage, authService, discogsService, lastfmService)
+);
 app.use(
   '/api/v1/collection',
   createCollectionRouter(fileStorage, authService, discogsService)

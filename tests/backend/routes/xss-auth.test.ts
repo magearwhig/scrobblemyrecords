@@ -1,13 +1,86 @@
 import express from 'express';
 import request from 'supertest';
 
-import authRoutes from '../../../src/backend/routes/auth';
+// Mock services before importing the router
+const mockAuthService = {
+  getUserSettings: jest.fn(),
+  setDiscogsToken: jest.fn(),
+  setLastFmCredentials: jest.fn(),
+  clearTokens: jest.fn(),
+  saveUserSettings: jest.fn(),
+  storeOAuthTokenSecret: jest.fn(),
+  getOAuthTokenSecret: jest.fn(),
+  clearOAuthTokenSecret: jest.fn(),
+};
+
+const mockDiscogsService = {
+  getAuthUrl: jest.fn(),
+  handleCallback: jest.fn(),
+  getUserProfile: jest.fn(),
+};
+
+const mockLastFmService = {
+  getAuthUrl: jest.fn(),
+  getSession: jest.fn(),
+  testConnection: jest.fn(),
+  getRecentScrobbles: jest.fn(),
+  getTopTracks: jest.fn(),
+  getTopArtists: jest.fn(),
+};
+
+const mockFileStorage = {};
+
+// Mock the modules
+jest.mock('../../../src/backend/services/authService', () => ({
+  AuthService: jest.fn(() => mockAuthService),
+}));
+
+jest.mock('../../../src/backend/services/discogsService', () => ({
+  DiscogsService: jest.fn(() => mockDiscogsService),
+}));
+
+jest.mock('../../../src/backend/services/lastfmService', () => ({
+  LastFmService: jest.fn(() => mockLastFmService),
+}));
+
+jest.mock('../../../src/backend/utils/fileStorage', () => ({
+  FileStorage: jest.fn(() => mockFileStorage),
+}));
+
+import { createAuthRouter } from '../../../src/backend/routes/auth';
+import { AuthService } from '../../../src/backend/services/authService';
+import { DiscogsService } from '../../../src/backend/services/discogsService';
+import { LastFmService } from '../../../src/backend/services/lastfmService';
+import { FileStorage } from '../../../src/backend/utils/fileStorage';
+
+// Create app with mocked router
+const fileStorage = new FileStorage();
+const authService = new AuthService(fileStorage);
+const discogsService = new DiscogsService(fileStorage, authService);
+const lastfmService = new LastFmService(fileStorage, authService);
+const authRoutes = createAuthRouter(
+  fileStorage,
+  authService,
+  discogsService,
+  lastfmService
+);
 
 const app = express();
 app.use(express.json());
 app.use('/auth', authRoutes);
 
 describe('XSS Vulnerability Prevention', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Default mock implementations
+    mockDiscogsService.handleCallback.mockRejectedValue(
+      new Error('OAuth verification failed')
+    );
+    mockLastFmService.getSession.mockRejectedValue(
+      new Error('Session retrieval failed')
+    );
+  });
+
   describe('Discogs OAuth callback', () => {
     it('should not include user input in HTML response - missing parameters', async () => {
       const maliciousPayload = '<script>alert("XSS")</script>';
