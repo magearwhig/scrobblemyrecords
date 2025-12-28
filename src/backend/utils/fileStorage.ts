@@ -5,7 +5,10 @@ export class FileStorage {
   private dataDir: string;
   // Strict allowlist pattern for file/directory names
   private readonly SAFE_PATH_PATTERN = /^[a-zA-Z0-9_-]+$/;
-  private readonly SAFE_FILENAME_PATTERN = /^[a-zA-Z0-9_-]+\.(json|txt|md)$/;
+  private readonly SAFE_FILENAME_PATTERN =
+    /^[a-zA-Z0-9_-]+\.(json|txt|md|bak)$/;
+  // Maximum number of backup files to keep per original file
+  private readonly MAX_BACKUPS = 3;
 
   constructor(dataDir: string = './data') {
     this.dataDir = path.resolve(dataDir);
@@ -136,6 +139,124 @@ export class FileStorage {
         return [];
       }
       throw error;
+    }
+  }
+
+  /**
+   * Creates a backup of a file before modification.
+   * Keeps up to MAX_BACKUPS rotated backups with timestamps.
+   */
+  async createBackup(filePath: string): Promise<string | null> {
+    try {
+      const fullPath = this.validateAndResolvePath(filePath);
+
+      // Check if original file exists
+      try {
+        await fs.access(fullPath);
+      } catch {
+        // No file to backup
+        return null;
+      }
+
+      const dir = path.dirname(fullPath);
+      const ext = path.extname(fullPath);
+      const baseName = path.basename(fullPath, ext);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const backupName = `${baseName}-backup-${timestamp}${ext}.bak`;
+      const backupPath = path.join(dir, backupName);
+
+      // Copy the file to backup
+      await fs.copyFile(fullPath, backupPath);
+
+      // Clean up old backups (keep only MAX_BACKUPS most recent)
+      await this.cleanupOldBackups(dir, baseName, ext);
+
+      return backupPath;
+    } catch (error) {
+      console.error('Error creating backup:', error);
+      // Don't throw - backup failure shouldn't prevent the operation
+      return null;
+    }
+  }
+
+  /**
+   * Removes old backup files, keeping only the most recent ones.
+   */
+  private async cleanupOldBackups(
+    dir: string,
+    baseName: string,
+    ext: string
+  ): Promise<void> {
+    try {
+      const files = await fs.readdir(dir);
+      const backupPattern = new RegExp(
+        `^${baseName}-backup-.*${ext.replace('.', '\\.')}\\.bak$`
+      );
+
+      const backups = files
+        .filter(f => backupPattern.test(f))
+        .map(f => ({
+          name: f,
+          path: path.join(dir, f),
+        }))
+        .sort((a, b) => b.name.localeCompare(a.name)); // Newest first (timestamp in name)
+
+      // Remove backups beyond MAX_BACKUPS
+      for (let i = this.MAX_BACKUPS; i < backups.length; i++) {
+        try {
+          await fs.unlink(backups[i].path);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
+
+  /**
+   * Writes JSON with automatic backup of existing file.
+   * Use this for critical files like settings.
+   */
+  async writeJSONWithBackup<T>(filePath: string, data: T): Promise<void> {
+    // Create backup before writing
+    await this.createBackup(filePath);
+
+    // Then write normally
+    await this.writeJSON(filePath, data);
+  }
+
+  /**
+   * Reads raw file content as string.
+   */
+  async readRaw(filePath: string): Promise<string | null> {
+    try {
+      const fullPath = this.validateAndResolvePath(filePath);
+      return await fs.readFile(fullPath, 'utf-8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Gets file stats (for checking if file exists and its modification time).
+   */
+  async getStats(
+    filePath: string
+  ): Promise<{ exists: boolean; mtime?: Date; size?: number }> {
+    try {
+      const fullPath = this.validateAndResolvePath(filePath);
+      const stats = await fs.stat(fullPath);
+      return {
+        exists: true,
+        mtime: stats.mtime,
+        size: stats.size,
+      };
+    } catch {
+      return { exists: false };
     }
   }
 }

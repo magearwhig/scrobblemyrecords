@@ -5,6 +5,10 @@ import CryptoJS from 'crypto-js';
 import { UserSettings } from '../../shared/types';
 import { EncryptionKeyValidator } from '../utils/encryptionValidator';
 import { FileStorage } from '../utils/fileStorage';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('AuthService');
+const SETTINGS_PATH = 'settings/user-settings.json';
 
 export class AuthService {
   private fileStorage: FileStorage;
@@ -32,16 +36,82 @@ export class AuthService {
   }
 
   private decrypt(encryptedText: string): string {
-    const bytes = CryptoJS.AES.decrypt(encryptedText, this.encryptionKey);
-    return bytes.toString(CryptoJS.enc.Utf8);
+    try {
+      const bytes = CryptoJS.AES.decrypt(encryptedText, this.encryptionKey);
+      const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+
+      // If decryption returns empty string for non-empty input, key may have changed
+      if (!decrypted && encryptedText) {
+        logger.warn(
+          'Decryption returned empty string - encryption key may have changed'
+        );
+      }
+
+      return decrypted;
+    } catch (error) {
+      logger.error('Decryption failed', error);
+      return '';
+    }
+  }
+
+  /**
+   * Checks if settings contain any credentials (tokens/keys).
+   */
+  private hasCredentials(settings: UserSettings): boolean {
+    return !!(
+      settings.discogs.token ||
+      settings.discogs.username ||
+      settings.lastfm.apiKey ||
+      settings.lastfm.sessionKey ||
+      settings.lastfm.username
+    );
   }
 
   async getUserSettings(): Promise<UserSettings> {
-    const settings = await this.fileStorage.readJSON<UserSettings>(
-      'settings/user-settings.json'
-    );
+    const fileStats = await this.fileStorage.getStats(SETTINGS_PATH);
 
+    // Try to read existing settings
+    let settings: UserSettings | null = null;
+    let parseError: Error | null = null;
+
+    try {
+      settings = await this.fileStorage.readJSON<UserSettings>(SETTINGS_PATH);
+    } catch (error) {
+      parseError = error instanceof Error ? error : new Error(String(error));
+      logger.error('Failed to parse settings file', {
+        error: parseError.message,
+        fileExists: fileStats.exists,
+        fileSize: fileStats.size,
+      });
+    }
+
+    // If file exists but couldn't be parsed, don't overwrite with defaults
+    if (fileStats.exists && !settings) {
+      logger.error(
+        'Settings file exists but could not be parsed - NOT overwriting with defaults',
+        {
+          fileSize: fileStats.size,
+          mtime: fileStats.mtime,
+          parseError: parseError?.message,
+        }
+      );
+
+      // Return empty settings in memory but DON'T save them
+      // This prevents data loss if there's a temporary issue
+      return {
+        discogs: {},
+        lastfm: {},
+        preferences: {
+          defaultTimestamp: 'now',
+          batchSize: 50,
+          autoScrobble: false,
+        },
+      };
+    }
+
+    // File doesn't exist - create default settings
     if (!settings) {
+      logger.info('No settings file found - creating default settings');
       const defaultSettings: UserSettings = {
         discogs: {},
         lastfm: {},
@@ -55,24 +125,64 @@ export class AuthService {
       return defaultSettings;
     }
 
-    // Decrypt stored tokens
-    if (settings.discogs.token) {
-      settings.discogs.token = this.decrypt(settings.discogs.token);
-    }
-    if (settings.lastfm.apiKey) {
-      settings.lastfm.apiKey = this.decrypt(settings.lastfm.apiKey);
-    }
-    if (settings.lastfm.sessionKey) {
-      settings.lastfm.sessionKey = this.decrypt(settings.lastfm.sessionKey);
+    // Decrypt stored tokens with validation
+    const decryptedSettings = this.decryptSettings(settings);
+
+    // Check if decryption may have failed (had tokens but now empty)
+    if (
+      this.hasCredentials(settings) &&
+      !this.hasCredentials(decryptedSettings)
+    ) {
+      logger.warn(
+        'Settings had credentials but decryption returned empty values - ' +
+          'encryption key may have changed. Credentials NOT cleared.',
+        {
+          hadDiscogsToken: !!settings.discogs.token,
+          hadLastfmApiKey: !!settings.lastfm.apiKey,
+          hadLastfmSessionKey: !!settings.lastfm.sessionKey,
+        }
+      );
+      // Return decrypted (empty) values but don't save - preserve original encrypted data
     }
 
-    return settings;
+    return decryptedSettings;
+  }
+
+  /**
+   * Decrypts sensitive fields in settings, creating a deep copy.
+   */
+  private decryptSettings(settings: UserSettings): UserSettings {
+    // Deep copy to avoid mutating the original
+    const decrypted: UserSettings = {
+      discogs: { ...settings.discogs },
+      lastfm: { ...settings.lastfm },
+      preferences: { ...settings.preferences },
+      temp: settings.temp ? { ...settings.temp } : undefined,
+    };
+
+    if (decrypted.discogs.token) {
+      decrypted.discogs.token = this.decrypt(decrypted.discogs.token);
+    }
+    if (decrypted.lastfm.apiKey) {
+      decrypted.lastfm.apiKey = this.decrypt(decrypted.lastfm.apiKey);
+    }
+    if (decrypted.lastfm.sessionKey) {
+      decrypted.lastfm.sessionKey = this.decrypt(decrypted.lastfm.sessionKey);
+    }
+
+    return decrypted;
   }
 
   async saveUserSettings(settings: UserSettings): Promise<void> {
-    // Encrypt sensitive data before saving
-    const encryptedSettings = { ...settings };
+    // Deep copy to avoid mutating the original settings object
+    const encryptedSettings: UserSettings = {
+      discogs: { ...settings.discogs },
+      lastfm: { ...settings.lastfm },
+      preferences: { ...settings.preferences },
+      temp: settings.temp ? { ...settings.temp } : undefined,
+    };
 
+    // Encrypt sensitive data
     if (encryptedSettings.discogs.token) {
       encryptedSettings.discogs.token = this.encrypt(
         encryptedSettings.discogs.token
@@ -89,8 +199,36 @@ export class AuthService {
       );
     }
 
-    await this.fileStorage.writeJSON(
-      'settings/user-settings.json',
+    // Check if we're about to overwrite credentials with empty values
+    const fileStats = await this.fileStorage.getStats(SETTINGS_PATH);
+    if (fileStats.exists && fileStats.size && fileStats.size > 200) {
+      // File has substantial content
+      const hasNewCredentials = this.hasCredentials(encryptedSettings);
+      if (!hasNewCredentials) {
+        // Read existing to check if it has credentials
+        try {
+          const existing =
+            await this.fileStorage.readJSON<UserSettings>(SETTINGS_PATH);
+          if (existing && this.hasCredentials(existing)) {
+            logger.warn(
+              'Attempting to save settings without credentials when existing file has them',
+              {
+                existingSize: fileStats.size,
+                hasDiscogsToken: !!existing.discogs.token,
+                hasLastfmApiKey: !!existing.lastfm.apiKey,
+              }
+            );
+          }
+        } catch {
+          // Couldn't read existing, proceed with caution
+        }
+      }
+    }
+
+    // Use backup-enabled write for settings
+    logger.debug('Saving user settings with backup');
+    await this.fileStorage.writeJSONWithBackup(
+      SETTINGS_PATH,
       encryptedSettings
     );
   }

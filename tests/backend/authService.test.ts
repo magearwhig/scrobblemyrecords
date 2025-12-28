@@ -156,25 +156,29 @@ describe('AuthService', () => {
   });
 
   describe('Error Handling', () => {
-    it('should handle file read errors by propagating them', async () => {
-      // Mock file storage to throw an error
+    it('should gracefully handle file read errors and return default settings', async () => {
+      // Mock file storage to throw an error on read but report file exists
       jest
         .spyOn(fileStorage, 'readJSON')
         .mockRejectedValue(new Error('File read error'));
+      jest
+        .spyOn(fileStorage, 'getStats')
+        .mockResolvedValue({ exists: true, size: 500 });
 
-      // AuthService doesn't catch errors, so they should propagate
-      await expect(authService.getDiscogsToken()).rejects.toThrow(
-        'File read error'
-      );
-      await expect(authService.getLastFmCredentials()).rejects.toThrow(
-        'File read error'
-      );
+      // AuthService should NOT propagate errors - it returns defaults to prevent crashes
+      // but doesn't save them (to preserve the original file)
+      const token = await authService.getDiscogsToken();
+      const creds = await authService.getLastFmCredentials();
+
+      expect(token).toBeUndefined();
+      expect(creds.apiKey).toBeUndefined();
+      expect(creds.sessionKey).toBeUndefined();
     });
 
     it('should handle file write errors by propagating them', async () => {
       // Mock file storage to throw an error on write
       jest
-        .spyOn(fileStorage, 'writeJSON')
+        .spyOn(fileStorage, 'writeJSONWithBackup')
         .mockRejectedValue(new Error('File write error'));
 
       // AuthService doesn't catch write errors, so they should propagate
