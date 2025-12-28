@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 import { CollectionItem } from '../../shared/types';
 import AlbumCard from '../components/AlbumCard';
@@ -32,6 +32,12 @@ const CollectionPage: React.FC = () => {
     'artist' | 'title' | 'year' | 'date_added'
   >('artist');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Filter state
+  const [filterFormat, setFilterFormat] = useState<string>('');
+  const [filterYearFrom, setFilterYearFrom] = useState<string>('');
+  const [filterYearTo, setFilterYearTo] = useState<string>('');
+  const [filterDateAdded, setFilterDateAdded] = useState<string>('');
   const [usingCache, setUsingCache] = useState<boolean>(false);
   const [authChecked, setAuthChecked] = useState<boolean>(false);
   const [cacheStatus, setCacheStatus] = useState<
@@ -51,6 +57,103 @@ const CollectionPage: React.FC = () => {
 
   const api = getApiService(state.serverUrl);
   const itemsPerPage = 50;
+
+  // Compute available filter options from collection data
+  const filterOptions = useMemo(() => {
+    if (entireCollection.length === 0) {
+      return {
+        formats: [],
+        years: { min: 1970, max: new Date().getFullYear() },
+      };
+    }
+
+    const formats = new Set<string>();
+    let minYear = Infinity;
+    let maxYear = 0;
+
+    entireCollection.forEach(item => {
+      // Collect formats
+      if (item.release.format) {
+        item.release.format.forEach(f => formats.add(f));
+      }
+      // Track year range
+      if (item.release.year && item.release.year > 0) {
+        minYear = Math.min(minYear, item.release.year);
+        maxYear = Math.max(maxYear, item.release.year);
+      }
+    });
+
+    return {
+      formats: Array.from(formats).sort(),
+      years: {
+        min: minYear === Infinity ? 1970 : minYear,
+        max: maxYear === 0 ? new Date().getFullYear() : maxYear,
+      },
+    };
+  }, [entireCollection]);
+
+  // Apply filters to collection
+  const applyFilters = (items: CollectionItem[]): CollectionItem[] => {
+    return items.filter(item => {
+      // Format filter
+      if (filterFormat && item.release.format) {
+        if (!item.release.format.includes(filterFormat)) {
+          return false;
+        }
+      }
+
+      // Year range filter
+      if (filterYearFrom || filterYearTo) {
+        const year = item.release.year || 0;
+        if (filterYearFrom && year < parseInt(filterYearFrom, 10)) {
+          return false;
+        }
+        if (filterYearTo && year > parseInt(filterYearTo, 10)) {
+          return false;
+        }
+      }
+
+      // Date added filter
+      if (filterDateAdded && item.date_added) {
+        const addedDate = new Date(item.date_added);
+        const now = new Date();
+        let cutoffDate: Date;
+
+        switch (filterDateAdded) {
+          case 'week':
+            cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+          case 'month':
+            cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            break;
+          case '3months':
+            cutoffDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+            break;
+          case 'year':
+            cutoffDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+            break;
+          default:
+            cutoffDate = new Date(0); // Beginning of time
+        }
+
+        if (addedDate < cutoffDate) return false;
+      }
+
+      return true;
+    });
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters =
+    filterFormat || filterYearFrom || filterYearTo || filterDateAdded;
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilterFormat('');
+    setFilterYearFrom('');
+    setFilterYearTo('');
+    setFilterDateAdded('');
+  };
 
   useEffect(() => {
     console.log('🔍 useEffect triggered:', {
@@ -107,18 +210,21 @@ const CollectionPage: React.FC = () => {
   }, [isSearchMode, searchQuery]);
 
   useEffect(() => {
-    console.log('🔄 Sorting useEffect triggered:', {
+    console.log('🔄 Sorting/Filtering useEffect triggered:', {
       collectionLength: entireCollection.length,
       isSearchMode,
       sortBy,
       sortOrder,
+      filters: { filterFormat, filterYearFrom, filterYearTo, filterDateAdded },
     });
 
     // Only use local filtering if not in search mode
     if (!isSearchMode && entireCollection.length > 0) {
-      const sorted = sortCollection(entireCollection);
+      // Apply filters first, then sort
+      const filtered = applyFilters(entireCollection);
+      const sorted = sortCollection(filtered);
       console.log(
-        `📊 Setting filtered collection: ${sorted.length} items (original: ${entireCollection.length})`
+        `📊 Setting filtered collection: ${sorted.length} items (original: ${entireCollection.length}, after filters: ${filtered.length})`
       );
       console.log(
         '📋 First few items:',
@@ -131,7 +237,16 @@ const CollectionPage: React.FC = () => {
       console.log('📭 Collection is empty, clearing filtered collection');
       setFilteredCollection([]);
     }
-  }, [entireCollection.length, isSearchMode, sortBy, sortOrder]);
+  }, [
+    entireCollection.length,
+    isSearchMode,
+    sortBy,
+    sortOrder,
+    filterFormat,
+    filterYearFrom,
+    filterYearTo,
+    filterDateAdded,
+  ]);
 
   const loadCollection = async (forceReload: boolean = false) => {
     if (!authStatus.discogs.username) {
@@ -868,6 +983,159 @@ const CollectionPage: React.FC = () => {
           placeholder='Search your collection...'
           disabled={loading}
         />
+
+        {/* Filters Section */}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '1rem',
+            alignItems: 'center',
+            margin: '1rem 0',
+            padding: '0.75rem',
+            backgroundColor: 'var(--bg-tertiary)',
+            borderRadius: '8px',
+            border: '1px solid var(--border-color)',
+          }}
+        >
+          <span
+            style={{
+              fontSize: '0.9rem',
+              color: 'var(--text-secondary)',
+              fontWeight: 500,
+            }}
+          >
+            Filters:
+          </span>
+
+          {/* Format Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <label
+              htmlFor='filter-format'
+              style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}
+            >
+              Format:
+            </label>
+            <select
+              id='filter-format'
+              value={filterFormat}
+              onChange={e => setFilterFormat(e.target.value)}
+              style={{
+                padding: '0.25rem 0.5rem',
+                borderRadius: '4px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: '0.85rem',
+              }}
+            >
+              <option value=''>All Formats</option>
+              {filterOptions.formats.map(format => (
+                <option key={format} value={format}>
+                  {format}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Year Range Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <label
+              style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}
+            >
+              Year:
+            </label>
+            <input
+              type='number'
+              placeholder={String(filterOptions.years.min)}
+              value={filterYearFrom}
+              onChange={e => setFilterYearFrom(e.target.value)}
+              min={filterOptions.years.min}
+              max={filterOptions.years.max}
+              style={{
+                width: '70px',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '4px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: '0.85rem',
+              }}
+            />
+            <span style={{ color: 'var(--text-secondary)' }}>-</span>
+            <input
+              type='number'
+              placeholder={String(filterOptions.years.max)}
+              value={filterYearTo}
+              onChange={e => setFilterYearTo(e.target.value)}
+              min={filterOptions.years.min}
+              max={filterOptions.years.max}
+              style={{
+                width: '70px',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '4px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: '0.85rem',
+              }}
+            />
+          </div>
+
+          {/* Date Added Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <label
+              htmlFor='filter-date-added'
+              style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}
+            >
+              Added:
+            </label>
+            <select
+              id='filter-date-added'
+              value={filterDateAdded}
+              onChange={e => setFilterDateAdded(e.target.value)}
+              style={{
+                padding: '0.25rem 0.5rem',
+                borderRadius: '4px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: '0.85rem',
+              }}
+            >
+              <option value=''>Any Time</option>
+              <option value='week'>Last Week</option>
+              <option value='month'>Last Month</option>
+              <option value='3months'>Last 3 Months</option>
+              <option value='year'>Last Year</option>
+            </select>
+          </div>
+
+          {/* Clear Filters Button */}
+          {hasActiveFilters && (
+            <button
+              className='btn btn-small btn-outline'
+              onClick={clearFilters}
+              style={{ fontSize: '0.85rem' }}
+            >
+              Clear Filters
+            </button>
+          )}
+
+          {/* Filter Results Count */}
+          {hasActiveFilters && (
+            <span
+              style={{
+                fontSize: '0.85rem',
+                color: 'var(--text-secondary)',
+                marginLeft: 'auto',
+              }}
+            >
+              Showing {filteredCollection.length} of {entireCollection.length}{' '}
+              items
+            </span>
+          )}
+        </div>
 
         <div
           style={{
