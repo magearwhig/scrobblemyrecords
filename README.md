@@ -86,6 +86,9 @@ npm run start:web
 - **Dark Mode**: Toggle between light and dark themes
 - **Local Timezone**: All times displayed in your local timezone
 - **Sorting Options**: Sort collection by artist, title, year, or date added
+- **Artist Name Mapping**: Map Discogs artist names to Last.fm names for consistent scrobbling
+- **Disambiguation Warnings**: Alerts when scrobbling artists with Discogs disambiguation suffixes (e.g., "Ghost (32)")
+- **Possible Mappings**: Automatically suggests artists in your collection that may need name mappings
 
 ## 🛠️ Development
 
@@ -117,6 +120,7 @@ src/
 
 - **Local Storage**: All data stored locally in JSON files
 - **Encrypted Tokens**: API credentials encrypted at rest
+- **Automatic Backups**: Settings files backed up before changes (keeps 3 most recent)
 - **No Cloud Dependencies**: Everything runs on your computer
 - **CORS Protected**: Only allows localhost connections
 

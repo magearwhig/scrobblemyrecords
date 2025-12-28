@@ -304,27 +304,39 @@ router.get('/suggestions', async (req: Request, res: Response) => {
     const fileStorage = new FileStorage();
     const DISAMBIGUATION_PATTERN = /\s*\(\d+\)\s*$/;
 
-    // Get collection artists
-    const collectionPath = `collections/${username}.json`;
-    let collectionArtists: string[] = [];
+    // Get collection artists from paginated collection files
+    const artistSet = new Set<string>();
 
     try {
-      const collection = await fileStorage.readJSON<{
-        items: Array<{ release: { artist: string } }>;
-      }>(collectionPath);
-      if (collection?.items) {
-        const artistSet = new Set<string>();
-        collection.items.forEach(item => {
-          if (item.release?.artist) {
-            artistSet.add(item.release.artist);
+      const collectionFiles = await fileStorage.listFiles('collections');
+      // Filter for paginated collection files: {username}-page-{n}.json
+      const pageFiles = collectionFiles.filter(
+        file => file.startsWith(`${username}-page-`) && file.endsWith('.json')
+      );
+
+      for (const pageFile of pageFiles) {
+        try {
+          const page = await fileStorage.readJSON<{
+            success: boolean;
+            data: Array<{ release: { artist: string } }>;
+          }>(`collections/${pageFile}`);
+
+          if (page?.data) {
+            page.data.forEach(item => {
+              if (item.release?.artist) {
+                artistSet.add(item.release.artist);
+              }
+            });
           }
-        });
-        collectionArtists = Array.from(artistSet);
+        } catch {
+          // Skip invalid page files
+        }
       }
     } catch {
-      // Collection not cached yet
-      collectionArtists = [];
+      // Collections directory may not exist
     }
+
+    const collectionArtists = Array.from(artistSet);
 
     // Filter to only disambiguation artists without mappings
     const disambiguationArtists = collectionArtists
