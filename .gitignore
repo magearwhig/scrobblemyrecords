@@ -173,6 +173,7 @@ secrets.json
 analysis-*.md
 research-*.md
 notes-*.txt
+scratch-*.md
 
 # Task files
 # tasks.json
