@@ -92,34 +92,42 @@ const CollectionPage: React.FC = () => {
     };
   }, [entireCollection]);
 
-  // Apply filters to collection
-  const applyFilters = (items: CollectionItem[]): CollectionItem[] => {
+  // Apply filters to collection - accepts filter values as parameters to avoid stale closure issues
+  const applyFilters = (
+    items: CollectionItem[],
+    filters: {
+      format: string;
+      yearFrom: string;
+      yearTo: string;
+      dateAdded: string;
+    }
+  ): CollectionItem[] => {
     return items.filter(item => {
       // Format filter
-      if (filterFormat && item.release.format) {
-        if (!item.release.format.includes(filterFormat)) {
+      if (filters.format && item.release.format) {
+        if (!item.release.format.includes(filters.format)) {
           return false;
         }
       }
 
       // Year range filter
-      if (filterYearFrom || filterYearTo) {
+      if (filters.yearFrom || filters.yearTo) {
         const year = item.release.year || 0;
-        if (filterYearFrom && year < parseInt(filterYearFrom, 10)) {
+        if (filters.yearFrom && year < parseInt(filters.yearFrom, 10)) {
           return false;
         }
-        if (filterYearTo && year > parseInt(filterYearTo, 10)) {
+        if (filters.yearTo && year > parseInt(filters.yearTo, 10)) {
           return false;
         }
       }
 
       // Date added filter
-      if (filterDateAdded && item.date_added) {
+      if (filters.dateAdded && item.date_added) {
         const addedDate = new Date(item.date_added);
         const now = new Date();
         let cutoffDate: Date;
 
-        switch (filterDateAdded) {
+        switch (filters.dateAdded) {
           case 'week':
             cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
             break;
@@ -220,8 +228,14 @@ const CollectionPage: React.FC = () => {
 
     // Only use local filtering if not in search mode
     if (!isSearchMode && entireCollection.length > 0) {
-      // Apply filters first, then sort
-      const filtered = applyFilters(entireCollection);
+      // Apply filters first, then sort - pass filter values explicitly to avoid stale closures
+      const currentFilters = {
+        format: filterFormat,
+        yearFrom: filterYearFrom,
+        yearTo: filterYearTo,
+        dateAdded: filterDateAdded,
+      };
+      const filtered = applyFilters(entireCollection, currentFilters);
       const sorted = sortCollection(filtered);
       console.log(
         `📊 Setting filtered collection: ${sorted.length} items (original: ${entireCollection.length}, after filters: ${filtered.length})`
@@ -233,6 +247,19 @@ const CollectionPage: React.FC = () => {
           .map(item => `${item.release.artist} - ${item.release.title}`)
       );
       setFilteredCollection(sorted);
+
+      // Update total pages based on filtered results when filters are active
+      const hasFilters =
+        filterFormat || filterYearFrom || filterYearTo || filterDateAdded;
+      if (hasFilters) {
+        setTotalPages(Math.ceil(sorted.length / itemsPerPage));
+        // Reset to page 1 if current page would be out of bounds
+        if (currentPage > Math.ceil(sorted.length / itemsPerPage)) {
+          setCurrentPage(1);
+        }
+      } else {
+        setTotalPages(Math.ceil(entireCollection.length / itemsPerPage));
+      }
     } else if (!isSearchMode && entireCollection.length === 0) {
       console.log('📭 Collection is empty, clearing filtered collection');
       setFilteredCollection([]);
@@ -1309,9 +1336,9 @@ const CollectionPage: React.FC = () => {
 
       {!loading && filteredCollection.length > 0 && (
         <div className='collection-grid'>
-          {getCurrentPageItems().map(item => (
+          {getCurrentPageItems().map((item, index) => (
             <AlbumCard
-              key={item.id}
+              key={`${item.id}-${item.date_added || index}`}
               item={item}
               selected={selectedAlbums.has(item.release.id)}
               onSelect={() => handleAlbumSelect(item.release.id)}
