@@ -35,8 +35,16 @@ const ReleaseDetailsPage: React.FC = () => {
     hasMapping: boolean;
     isOriginal: boolean;
   } | null>(null);
+  const [showDisambiguationWarning, setShowDisambiguationWarning] =
+    useState(false);
+  const [disambiguationArtists, setDisambiguationArtists] = useState<string[]>(
+    []
+  );
 
   const api = getApiService(state.serverUrl);
+
+  // Pattern to detect Discogs disambiguation suffix like (2), (11), etc.
+  const DISAMBIGUATION_PATTERN = /\s*\(\d+\)\s*$/;
 
   useEffect(() => {
     loadReleaseDetails();
@@ -129,8 +137,9 @@ const ReleaseDetailsPage: React.FC = () => {
     release.tracklist.forEach((track, _index) => {
       const position = track.position.trim();
 
-      // Check for letter-number format (A1, B1, C1, etc.)
-      const letterMatch = position.match(/^([A-Z])(\d+)$/);
+      // Check for letter-number format (A1, B1, C1, etc.) OR just a single letter (C, D, etc.)
+      // Single letter means the entire side is one track
+      const letterMatch = position.match(/^([A-Z])(\d*)$/);
       if (letterMatch) {
         const side = letterMatch[1];
         if (!sides.includes(side)) {
@@ -227,7 +236,86 @@ const ReleaseDetailsPage: React.FC = () => {
     );
   };
 
+  // Get unique artists from selected tracks
+  const getUniqueArtistsFromSelectedTracks = (): string[] => {
+    if (!release || selectedTracks.size === 0) return [];
+
+    const artists = new Set<string>();
+    const selectedIndices = Array.from(selectedTracks);
+
+    selectedIndices.forEach(index => {
+      const track = release.tracklist?.[index];
+      if (track) {
+        // Use track artist if available, otherwise release artist
+        const artist = track.artist || release.artist;
+        if (artist) {
+          artists.add(artist);
+        }
+      }
+    });
+
+    return Array.from(artists);
+  };
+
+  // Check for disambiguation warning before scrobbling
+  const checkDisambiguationWarning = async () => {
+    if (!release || selectedTracks.size === 0) return;
+
+    // Find artists with (number) suffix
+    const allArtists = getUniqueArtistsFromSelectedTracks();
+    const artistsWithSuffix = allArtists.filter(artist =>
+      DISAMBIGUATION_PATTERN.test(artist)
+    );
+
+    if (artistsWithSuffix.length === 0) {
+      // No disambiguation needed, proceed directly
+      return proceedWithScrobble();
+    }
+
+    // Check which ones already have mappings
+    const unmappedArtists: string[] = [];
+    for (const artist of artistsWithSuffix) {
+      try {
+        const mapping = await api.lookupArtistMapping(artist);
+        // If no mapping exists or mapping is same as original, it's unmapped
+        if (!mapping.hasMapping || mapping.lastfmName === artist) {
+          unmappedArtists.push(artist);
+        }
+      } catch {
+        // If lookup fails, assume unmapped
+        unmappedArtists.push(artist);
+      }
+    }
+
+    if (unmappedArtists.length === 0) {
+      // All have mappings, proceed directly
+      return proceedWithScrobble();
+    }
+
+    // Show warning for unmapped artists
+    setDisambiguationArtists(unmappedArtists);
+    setShowDisambiguationWarning(true);
+  };
+
+  // Navigate to settings with artist pre-filled for mapping
+  const navigateToMappingWithArtist = (artist: string) => {
+    setShowDisambiguationWarning(false);
+    window.location.hash = `#settings?prefillArtist=${encodeURIComponent(artist)}`;
+  };
+
+  // The actual scrobble logic (called after disambiguation check passes)
+  const proceedWithScrobble = async () => {
+    setShowDisambiguationWarning(false);
+    await handleScrobbleInternal();
+  };
+
   const handleScrobble = async () => {
+    if (!release || selectedTracks.size === 0) return;
+    // Check for disambiguation warning before proceeding
+    await checkDisambiguationWarning();
+  };
+
+  const handleScrobbleInternal = async () => {
     if (!release || selectedTracks.size === 0) return;
 
     try {
@@ -448,6 +536,123 @@ const ReleaseDetailsPage: React.FC = () => {
 
   return (
     <div>
+      {/* Disambiguation Warning Modal */}
+      {showDisambiguationWarning && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => setShowDisambiguationWarning(false)}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--bg-primary)',
+              borderRadius: '8px',
+              padding: '1.5rem',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+              border: '1px solid var(--border-color)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3
+              style={{
+                margin: '0 0 1rem 0',
+                color: 'var(--warning-color)',
+              }}
+            >
+              Artist Name Contains Disambiguation
+            </h3>
+            <p
+              style={{
+                margin: '0 0 1rem 0',
+                color: 'var(--text-secondary)',
+                fontSize: '0.95rem',
+              }}
+            >
+              The following artist(s) have Discogs disambiguation suffixes
+              (numbers in parentheses) that may not match Last.fm:
+            </p>
+            <ul
+              style={{
+                margin: '0 0 1.5rem 0',
+                paddingLeft: '1.5rem',
+              }}
+            >
+              {disambiguationArtists.map(artist => (
+                <li
+                  key={artist}
+                  style={{
+                    marginBottom: '0.5rem',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <strong>{artist}</strong>
+                  <a
+                    href={`https://www.discogs.com/search/?q=${encodeURIComponent(artist)}&type=artist`}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    style={{
+                      marginLeft: '0.75rem',
+                      fontSize: '0.85rem',
+                      color: 'var(--accent-color)',
+                    }}
+                  >
+                    View on Discogs
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <p
+              style={{
+                margin: '0 0 1rem 0',
+                fontSize: '0.9rem',
+                color: 'var(--text-muted)',
+              }}
+            >
+              You can create an artist mapping to scrobble with a different name
+              on Last.fm.
+            </p>
+            <div
+              style={{
+                display: 'flex',
+                gap: '0.75rem',
+                justifyContent: 'flex-end',
+                flexWrap: 'wrap',
+              }}
+            >
+              <button
+                className='btn btn-outline'
+                onClick={() => setShowDisambiguationWarning(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className='btn btn-secondary'
+                onClick={() =>
+                  navigateToMappingWithArtist(disambiguationArtists[0])
+                }
+              >
+                Create Mapping
+              </button>
+              <button className='btn btn-primary' onClick={proceedWithScrobble}>
+                Continue Anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className='card'>
         <div
           style={{
