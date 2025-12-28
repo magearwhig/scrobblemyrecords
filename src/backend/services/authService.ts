@@ -173,7 +173,10 @@ export class AuthService {
     return decrypted;
   }
 
-  async saveUserSettings(settings: UserSettings): Promise<void> {
+  async saveUserSettings(
+    settings: UserSettings,
+    options?: { allowCredentialClear?: boolean }
+  ): Promise<void> {
     // Deep copy to avoid mutating the original settings object
     const encryptedSettings: UserSettings = {
       discogs: { ...settings.discogs },
@@ -199,28 +202,49 @@ export class AuthService {
       );
     }
 
-    // Check if we're about to overwrite credentials with empty values
-    const fileStats = await this.fileStorage.getStats(SETTINGS_PATH);
-    if (fileStats.exists && fileStats.size && fileStats.size > 200) {
-      // File has substantial content
-      const hasNewCredentials = this.hasCredentials(encryptedSettings);
-      if (!hasNewCredentials) {
-        // Read existing to check if it has credentials
-        try {
-          const existing =
-            await this.fileStorage.readJSON<UserSettings>(SETTINGS_PATH);
-          if (existing && this.hasCredentials(existing)) {
+    // SAFETY: Block saving empty credentials if existing file has them
+    // This prevents accidental credential loss due to decryption failures
+    // Can be bypassed with allowCredentialClear for intentional clears
+    if (!options?.allowCredentialClear) {
+      const fileStats = await this.fileStorage.getStats(SETTINGS_PATH);
+      if (fileStats.exists && fileStats.size && fileStats.size > 200) {
+        // File has substantial content
+        const hasNewCredentials = this.hasCredentials(encryptedSettings);
+        if (!hasNewCredentials) {
+          // Read existing to check if it has credentials
+          try {
+            const existing =
+              await this.fileStorage.readJSON<UserSettings>(SETTINGS_PATH);
+            if (existing && this.hasCredentials(existing)) {
+              logger.error(
+                'BLOCKED: Refusing to overwrite credentials with empty values',
+                {
+                  existingSize: fileStats.size,
+                  hasDiscogsToken: !!existing.discogs.token,
+                  hasLastfmApiKey: !!existing.lastfm.apiKey,
+                  hasLastfmSessionKey: !!existing.lastfm.sessionKey,
+                }
+              );
+              // Don't save - this would destroy user credentials
+              throw new Error(
+                'Cannot save settings: would overwrite existing credentials with empty values. ' +
+                  'This usually means the encryption key has changed. Restore from backup or re-authenticate.'
+              );
+            }
+          } catch (readError) {
+            // If it's our own error, re-throw it
+            if (
+              readError instanceof Error &&
+              readError.message.includes('Cannot save settings')
+            ) {
+              throw readError;
+            }
+            // Other read errors - proceed with caution but log
             logger.warn(
-              'Attempting to save settings without credentials when existing file has them',
-              {
-                existingSize: fileStats.size,
-                hasDiscogsToken: !!existing.discogs.token,
-                hasLastfmApiKey: !!existing.lastfm.apiKey,
-              }
+              'Could not read existing settings to verify',
+              readError
             );
           }
-        } catch {
-          // Couldn't read existing, proceed with caution
         }
       }
     }
@@ -278,7 +302,8 @@ export class AuthService {
     const settings = await this.getUserSettings();
     settings.discogs = {};
     settings.lastfm = {};
-    await this.saveUserSettings(settings);
+    // Intentional clear - bypass credential protection
+    await this.saveUserSettings(settings, { allowCredentialClear: true });
   }
 
   generateNonce(): string {
