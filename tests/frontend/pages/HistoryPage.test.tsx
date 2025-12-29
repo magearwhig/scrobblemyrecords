@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import React from 'react';
@@ -8,6 +8,15 @@ import HistoryPage from '../../../src/renderer/pages/HistoryPage';
 import * as apiService from '../../../src/renderer/services/api';
 import * as dateUtils from '../../../src/renderer/utils/dateUtils';
 import { AuthStatus, ScrobbleSession } from '../../../src/shared/types';
+
+// Mock LastFmHistoryTab to simplify tests
+jest.mock('../../../src/renderer/components/LastFmHistoryTab', () => {
+  return function MockLastFmHistoryTab() {
+    return (
+      <div data-testid='lastfm-history-tab'>Last.fm History Tab Content</div>
+    );
+  };
+});
 
 // Mock the API service
 jest.mock('../../../src/renderer/services/api');
@@ -93,7 +102,7 @@ describe('HistoryPage', () => {
 
       renderHistoryPageWithProviders(authStatus);
 
-      expect(screen.getByText('Scrobble History')).toBeInTheDocument();
+      expect(screen.getByText('History')).toBeInTheDocument();
       expect(
         screen.getByText(
           'Please authenticate with Last.fm first to view your scrobbling history.'
@@ -530,6 +539,106 @@ describe('HistoryPage', () => {
 
       expect(mockFormatLocalTimeClean).toHaveBeenCalled();
       expect(mockGetTimezoneOffset).toHaveBeenCalled();
+    });
+  });
+
+  describe('Tab Navigation', () => {
+    const authStatus: AuthStatus = {
+      discogs: { authenticated: true, username: 'discogs_user' },
+      lastfm: { authenticated: true, username: 'lastfm_user' },
+    };
+
+    beforeEach(() => {
+      mockApi.getScrobbleHistory.mockResolvedValue([
+        createMockScrobbleSession('session1', 'completed'),
+      ]);
+    });
+
+    it('shows both tab options', async () => {
+      renderHistoryPageWithProviders(authStatus);
+
+      await waitFor(() => {
+        expect(screen.getByText('App Scrobble Sessions')).toBeInTheDocument();
+        expect(
+          screen.getByText('Last.fm Listening History')
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('shows App Sessions tab content by default', async () => {
+      renderHistoryPageWithProviders(authStatus);
+
+      await waitFor(() => {
+        // App Sessions tab shows session data
+        expect(screen.getByText('Scrobbled from This App')).toBeInTheDocument();
+        // Last.fm tab content should not be visible
+        expect(
+          screen.queryByTestId('lastfm-history-tab')
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it('switches to Last.fm History tab when clicked', async () => {
+      const user = userEvent.setup();
+
+      renderHistoryPageWithProviders(authStatus);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Last.fm Listening History')
+        ).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText('Last.fm Listening History'));
+
+      expect(screen.getByTestId('lastfm-history-tab')).toBeInTheDocument();
+      // App Sessions content should not be visible
+      expect(
+        screen.queryByText('Scrobbled from This App')
+      ).not.toBeInTheDocument();
+    });
+
+    it('switches back to App Sessions tab', async () => {
+      const user = userEvent.setup();
+
+      renderHistoryPageWithProviders(authStatus);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Last.fm Listening History')
+        ).toBeInTheDocument();
+      });
+
+      // Switch to Last.fm tab
+      await user.click(screen.getByText('Last.fm Listening History'));
+      expect(screen.getByTestId('lastfm-history-tab')).toBeInTheDocument();
+
+      // Switch back to App Sessions
+      await user.click(screen.getByText('App Scrobble Sessions'));
+      expect(screen.getByText('Scrobbled from This App')).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('lastfm-history-tab')
+      ).not.toBeInTheDocument();
+    });
+
+    it('highlights active tab', async () => {
+      const user = userEvent.setup();
+
+      renderHistoryPageWithProviders(authStatus);
+
+      await waitFor(() => {
+        const sessionsTab = screen.getByText('App Scrobble Sessions');
+        expect(sessionsTab).toHaveClass('active');
+      });
+
+      // Switch to Last.fm tab
+      await user.click(screen.getByText('Last.fm Listening History'));
+
+      const lastfmTab = screen.getByText('Last.fm Listening History');
+      expect(lastfmTab).toHaveClass('active');
+
+      const sessionsTab = screen.getByText('App Scrobble Sessions');
+      expect(sessionsTab).not.toHaveClass('active');
     });
   });
 });

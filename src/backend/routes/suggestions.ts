@@ -445,6 +445,63 @@ export default function createSuggestionsRouter(
   });
 
   // ============================================
+  // Album History Endpoints
+  // ============================================
+
+  /**
+   * GET /api/v1/suggestions/history/albums
+   * Get paginated album history with sorting and search
+   */
+  router.get('/history/albums', async (req: Request, res: Response) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const perPage = Math.min(
+        parseInt(req.query.per_page as string) || 50,
+        100
+      );
+      const sortBy = (req.query.sort_by as string) || 'playCount';
+      const sortOrder = (req.query.sort_order as string) || 'desc';
+      const search = req.query.search as string | undefined;
+
+      // Validate sortBy
+      const validSortBy = ['playCount', 'lastPlayed', 'artist', 'album'];
+      if (!validSortBy.includes(sortBy)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid sort_by. Must be one of: ${validSortBy.join(', ')}`,
+        });
+      }
+
+      // Validate sortOrder
+      if (sortOrder !== 'asc' && sortOrder !== 'desc') {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid sort_order. Must be "asc" or "desc"',
+        });
+      }
+
+      const result = await historyStorage.getAlbumsPaginated(
+        page,
+        perPage,
+        sortBy as 'playCount' | 'lastPlayed' | 'artist' | 'album',
+        sortOrder as 'asc' | 'desc',
+        search
+      );
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      logger.error('Error getting paginated album history', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // ============================================
   // Album History Endpoint (for Release Details page)
   // ============================================
 

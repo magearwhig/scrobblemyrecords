@@ -2033,6 +2033,271 @@ body {
   padding: 0;
 }
 
+/* History Page Tabs */
+.history-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0;
+}
+
+.history-tab {
+  background: none;
+  border: none;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+}
+
+.history-tab:hover {
+  color: var(--text-primary);
+}
+
+.history-tab.active {
+  color: var(--accent-color);
+  border-bottom-color: var(--accent-color);
+}
+
+.history-page-description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.history-sessions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.history-sessions-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.history-sessions-timezone {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.history-sessions-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Last.fm History Tab Styles */
+.lastfm-history-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.lastfm-history-section-title {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.lastfm-history-controls {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.lastfm-history-search {
+  flex: 1;
+  min-width: 200px;
+  position: relative;
+}
+
+.lastfm-history-search-input {
+  width: 100%;
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.lastfm-history-search-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.lastfm-history-search-clear {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+}
+
+.lastfm-history-search-clear:hover {
+  color: var(--text-primary);
+}
+
+.lastfm-history-sort {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lastfm-history-sort label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.lastfm-history-sort-select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.lastfm-history-stats {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.lastfm-history-empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+}
+
+.lastfm-history-empty p {
+  margin: 0 0 0.5rem 0;
+}
+
+.lastfm-history-empty-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.lastfm-history-list-card {
+  padding: 0;
+  position: relative;
+}
+
+.lastfm-history-list-header {
+  display: grid;
+  grid-template-columns: 2fr 2fr 80px 120px;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  border-radius: 8px 8px 0 0;
+}
+
+.lastfm-history-header-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.lastfm-history-header-btn:hover,
+.lastfm-history-header-btn.active {
+  color: var(--text-primary);
+}
+
+.lastfm-history-list {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.lastfm-history-item {
+  display: grid;
+  grid-template-columns: 2fr 2fr 80px 120px;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  align-items: center;
+}
+
+.lastfm-history-item:last-child {
+  border-bottom: none;
+}
+
+.lastfm-history-item:hover {
+  background: var(--bg-secondary);
+}
+
+.lastfm-history-col-artist,
+.lastfm-history-col-album {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.lastfm-history-col-plays {
+  text-align: right;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--accent-color);
+}
+
+.lastfm-history-col-last {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.lastfm-history-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(var(--bg-primary-rgb), 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+.lastfm-history-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+}
+
+.lastfm-history-page-info {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  padding: 0 1rem;
+}
+
 /* Settings Section Boxes */
 .settings-section {
   margin-bottom: 2rem;

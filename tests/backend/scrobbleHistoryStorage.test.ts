@@ -584,6 +584,269 @@ describe('ScrobbleHistoryStorage', () => {
     });
   });
 
+  describe('getAlbumsPaginated', () => {
+    it('should return empty result when no index exists', async () => {
+      // Act
+      const result = await storage.getAlbumsPaginated();
+
+      // Assert
+      expect(result.items).toEqual([]);
+      expect(result.total).toBe(0);
+      expect(result.totalPages).toBe(0);
+      expect(result.page).toBe(1);
+    });
+
+    it('should return paginated results with default sorting (playCount desc)', async () => {
+      // Arrange
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': { lastPlayed: 100, playCount: 10, plays: [] },
+            'pink floyd|animals': { lastPlayed: 200, playCount: 50, plays: [] },
+            'the beatles|abbey road': {
+              lastPlayed: 150,
+              playCount: 25,
+              plays: [],
+            },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getAlbumsPaginated(1, 2);
+
+      // Assert
+      expect(result.items).toHaveLength(2);
+      expect(result.total).toBe(3);
+      expect(result.totalPages).toBe(2);
+      expect(result.items[0].playCount).toBe(50); // Pink Floyd first (highest)
+      expect(result.items[1].playCount).toBe(25); // Beatles second
+    });
+
+    it('should support pagination', async () => {
+      // Arrange
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': { lastPlayed: 100, playCount: 10, plays: [] },
+            'pink floyd|animals': { lastPlayed: 200, playCount: 50, plays: [] },
+            'the beatles|abbey road': {
+              lastPlayed: 150,
+              playCount: 25,
+              plays: [],
+            },
+          },
+        })
+      );
+
+      // Act - get second page
+      const result = await storage.getAlbumsPaginated(2, 2);
+
+      // Assert
+      expect(result.items).toHaveLength(1);
+      expect(result.page).toBe(2);
+      expect(result.items[0].playCount).toBe(10); // Radiohead on page 2
+    });
+
+    it('should sort by lastPlayed', async () => {
+      // Arrange
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': { lastPlayed: 100, playCount: 10, plays: [] },
+            'pink floyd|animals': { lastPlayed: 300, playCount: 50, plays: [] },
+            'the beatles|abbey road': {
+              lastPlayed: 200,
+              playCount: 25,
+              plays: [],
+            },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getAlbumsPaginated(
+        1,
+        10,
+        'lastPlayed',
+        'desc'
+      );
+
+      // Assert
+      expect(result.items[0].artist).toBe('pink floyd'); // Most recent
+      expect(result.items[1].artist).toBe('the beatles');
+      expect(result.items[2].artist).toBe('radiohead'); // Oldest
+    });
+
+    it('should sort by artist alphabetically', async () => {
+      // Arrange
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': { lastPlayed: 100, playCount: 10, plays: [] },
+            'pink floyd|animals': { lastPlayed: 200, playCount: 50, plays: [] },
+            'the beatles|abbey road': {
+              lastPlayed: 150,
+              playCount: 25,
+              plays: [],
+            },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getAlbumsPaginated(1, 10, 'artist', 'asc');
+
+      // Assert
+      expect(result.items[0].artist).toBe('pink floyd');
+      expect(result.items[1].artist).toBe('radiohead');
+      expect(result.items[2].artist).toBe('the beatles');
+    });
+
+    it('should sort by album alphabetically', async () => {
+      // Arrange
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': { lastPlayed: 100, playCount: 10, plays: [] },
+            'pink floyd|animals': { lastPlayed: 200, playCount: 50, plays: [] },
+            'the beatles|abbey road': {
+              lastPlayed: 150,
+              playCount: 25,
+              plays: [],
+            },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getAlbumsPaginated(1, 10, 'album', 'asc');
+
+      // Assert
+      expect(result.items[0].album).toBe('abbey road');
+      expect(result.items[1].album).toBe('animals');
+      expect(result.items[2].album).toBe('kid a');
+    });
+
+    it('should support ascending sort order', async () => {
+      // Arrange
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': { lastPlayed: 100, playCount: 10, plays: [] },
+            'pink floyd|animals': { lastPlayed: 200, playCount: 50, plays: [] },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getAlbumsPaginated(
+        1,
+        10,
+        'playCount',
+        'asc'
+      );
+
+      // Assert
+      expect(result.items[0].playCount).toBe(10); // Lowest first
+      expect(result.items[1].playCount).toBe(50);
+    });
+
+    it('should filter by search query', async () => {
+      // Arrange
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': { lastPlayed: 100, playCount: 10, plays: [] },
+            'pink floyd|animals': { lastPlayed: 200, playCount: 50, plays: [] },
+            'the beatles|abbey road': {
+              lastPlayed: 150,
+              playCount: 25,
+              plays: [],
+            },
+          },
+        })
+      );
+
+      // Act - search for "pink"
+      const result = await storage.getAlbumsPaginated(
+        1,
+        10,
+        'playCount',
+        'desc',
+        'pink'
+      );
+
+      // Assert
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].artist).toBe('pink floyd');
+      expect(result.total).toBe(1);
+    });
+
+    it('should filter by album name in search query', async () => {
+      // Arrange
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': { lastPlayed: 100, playCount: 10, plays: [] },
+            'pink floyd|animals': { lastPlayed: 200, playCount: 50, plays: [] },
+            'the beatles|abbey road': {
+              lastPlayed: 150,
+              playCount: 25,
+              plays: [],
+            },
+          },
+        })
+      );
+
+      // Act - search for "road"
+      const result = await storage.getAlbumsPaginated(
+        1,
+        10,
+        'playCount',
+        'desc',
+        'road'
+      );
+
+      // Assert
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].album).toBe('abbey road');
+    });
+
+    it('should handle case-insensitive search', async () => {
+      // Arrange
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': { lastPlayed: 100, playCount: 10, plays: [] },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getAlbumsPaginated(
+        1,
+        10,
+        'playCount',
+        'desc',
+        'RADIOHEAD'
+      );
+
+      // Assert
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].artist).toBe('radiohead');
+    });
+  });
+
   describe('getStorageStats', () => {
     it('should return zero stats when no index exists', async () => {
       // Act

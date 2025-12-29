@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-827%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-1282%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -82,7 +82,7 @@ npm run start:web
 - **Track Selection**: Choose individual tracks or entire albums
 - **Batch Scrobbling**: Scrobble multiple items with progress tracking
 - **Smart Timing**: Auto timing (simulates just finishing listening) or custom timestamps
-- **History View**: See your scrobbling history and session details
+- **History View**: Dual-tab history showing app scrobble sessions and synced Last.fm listening history
 - **Cache Management**: Force reload collection data when needed
 - **Dark Mode**: Toggle between light and dark themes
 - **Local Timezone**: All times displayed in your local timezone
@@ -125,6 +125,24 @@ Sync your complete Last.fm history for smarter suggestions:
 - Pause/Resume during background sync
 - Clear index for full re-sync
 - Toggle auto-sync on startup
+
+### 📜 History Page
+Two-tab view of your listening activity:
+
+**App Scrobble Sessions Tab:**
+- Sessions scrobbled from this app to Last.fm
+- Status indicators (completed, failed, pending)
+- Album cover thumbnails
+- Resubmit failed sessions
+- Backfill album covers from Discogs
+
+**Last.fm Listening History Tab:**
+- Your complete synced listening history from all sources
+- Search by artist or album name
+- Sort by play count, last played, artist, or album
+- Paginated view for large libraries
+- Play count and last played date for each album
+- Sync controls to update the history index
 
 ### 🔍 Discovery Page
 Find albums you listen to but don't own:

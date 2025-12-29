@@ -325,6 +325,79 @@ export class ScrobbleHistoryStorage {
   }
 
   /**
+   * Get paginated albums with sorting and search
+   */
+  async getAlbumsPaginated(
+    page: number = 1,
+    perPage: number = 50,
+    sortBy: 'playCount' | 'lastPlayed' | 'artist' | 'album' = 'playCount',
+    sortOrder: 'asc' | 'desc' = 'desc',
+    searchQuery?: string
+  ): Promise<{
+    items: Array<{
+      artist: string;
+      album: string;
+      playCount: number;
+      lastPlayed: number;
+    }>;
+    total: number;
+    totalPages: number;
+    page: number;
+  }> {
+    const allAlbums = await this.getAllAlbums();
+
+    // Filter by search query if provided
+    let filtered = allAlbums;
+    if (searchQuery && searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = allAlbums.filter(
+        item =>
+          item.artist.toLowerCase().includes(query) ||
+          item.album.toLowerCase().includes(query)
+      );
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'playCount':
+          comparison = a.history.playCount - b.history.playCount;
+          break;
+        case 'lastPlayed':
+          comparison = a.history.lastPlayed - b.history.lastPlayed;
+          break;
+        case 'artist':
+          comparison = a.artist.localeCompare(b.artist);
+          break;
+        case 'album':
+          comparison = a.album.localeCompare(b.album);
+          break;
+      }
+      return sortOrder === 'desc' ? -comparison : comparison;
+    });
+
+    // Paginate
+    const total = filtered.length;
+    const totalPages = Math.ceil(total / perPage);
+    const startIndex = (page - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const paginatedItems = filtered.slice(startIndex, endIndex);
+
+    return {
+      items: paginatedItems.map(({ artist, album, history }) => ({
+        artist,
+        album,
+        playCount: history.playCount,
+        lastPlayed: history.lastPlayed,
+      })),
+      total,
+      totalPages,
+      page,
+    };
+  }
+
+  /**
    * Get storage statistics
    */
   async getStorageStats(): Promise<{
