@@ -741,8 +741,10 @@ class ApiService {
       collectionSize: number;
     };
   }> {
+    // AI requests can take longer, especially first call when model loads
     const response = await this.api.get('/suggestions/ai/suggestion', {
       params: mood ? { mood } : undefined,
+      timeout: 90000, // 90 seconds for AI requests
     });
     return response.data.data;
   }

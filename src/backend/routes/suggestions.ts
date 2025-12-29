@@ -920,6 +920,7 @@ export default function createSuggestionsRouter(
         timeOfDay: AIPromptBuilder.getTimeOfDay(now),
         recentlyPlayed,
         topArtists,
+        collection: allItems, // Pass the actual collection!
         collectionSize: allItems.length,
         formatBreakdown,
         decadeBreakdown,

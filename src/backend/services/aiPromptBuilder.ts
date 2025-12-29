@@ -18,6 +18,9 @@ export interface AIPromptContext {
   }>;
   topArtists: Array<{ artist: string; playCount: number }>;
 
+  // Collection - the actual albums the user owns
+  collection: CollectionItem[];
+
   // Collection summary
   collectionSize: number;
   formatBreakdown: Record<string, number>;
@@ -79,32 +82,33 @@ export class AIPromptBuilder {
    * Build the system prompt that sets up the AI's role
    */
   static buildSystemPrompt(): string {
-    return `You are a knowledgeable music recommendation assistant helping a vinyl record collector decide what to listen to from their personal collection.
+    return `You are a knowledgeable music recommendation assistant helping a vinyl record collector decide what to listen to.
 
-Your role is to suggest albums they already own, based on:
+CRITICAL: You will be given an EXACT LIST of albums the user owns. You MUST ONLY suggest albums from this list. Copy the artist and album names EXACTLY as they appear in the list - do not modify them.
+
+Your role is to pick albums from their collection based on:
 1. The current time of day and mood it typically brings
 2. Their listening history and preferences
-3. Albums they haven't played in a while
-4. Creative connections between artists and genres
+3. Creative connections between artists and genres
 
 Guidelines:
-- Only suggest albums that are in their collection
+- ONLY suggest albums that appear in the provided collection list
+- Copy artist and album names EXACTLY as shown (spelling, punctuation, etc.)
 - Explain your reasoning in a conversational, music-lover way
 - Consider the context (morning coffee, late night, weekend, etc.)
 - Be specific about why THIS album fits THIS moment
-- If they mention a mood, prioritize that over other factors
 
 Format your response as JSON with this structure:
 {
   "suggestion": {
-    "artist": "Artist Name",
-    "album": "Album Title",
+    "artist": "Artist Name (EXACTLY as in list)",
+    "album": "Album Title (EXACTLY as in list)",
     "reasoning": "Your 2-3 sentence explanation"
   },
   "alternatives": [
     {
-      "artist": "Artist Name",
-      "album": "Album Title",
+      "artist": "Artist Name (EXACTLY as in list)",
+      "album": "Album Title (EXACTLY as in list)",
       "reasoning": "Brief explanation"
     }
   ]
@@ -127,36 +131,43 @@ Format your response as JSON with this structure:
       parts.push(`\nI'm looking for: ${context.userRequest}`);
     }
 
-    // Collection summary
-    parts.push(`\nMy vinyl collection has ${context.collectionSize} albums.`);
+    // THE COLLECTION - This is critical! AI must pick from this list
+    parts.push(
+      `\n=== MY VINYL COLLECTION (${context.collectionSize} albums) ===`
+    );
+    parts.push(
+      `Pick ONLY from this list. Use artist and album names EXACTLY as shown:\n`
+    );
 
-    // Format breakdown
-    if (Object.keys(context.formatBreakdown).length > 0) {
-      const formats = Object.entries(context.formatBreakdown)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([format, count]) => `${count} ${format}`)
-        .join(', ');
-      parts.push(`Formats: ${formats}.`);
+    // Format collection as a simple list - limit to prevent token overflow
+    // Shuffle and take a subset if collection is very large
+    let albumsToShow = context.collection.map(item => ({
+      artist: item.release.artist,
+      title: item.release.title,
+      year: item.release.year,
+    }));
+
+    // If collection is large, randomly sample 100 albums to keep prompt manageable
+    if (albumsToShow.length > 100) {
+      albumsToShow = this.shuffleArray(albumsToShow).slice(0, 100);
+      parts.push(`(Showing 100 random albums from collection)\n`);
     }
 
-    // Decade breakdown
-    if (Object.keys(context.decadeBreakdown).length > 0) {
-      const decades = Object.entries(context.decadeBreakdown)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 4)
-        .map(([decade, count]) => `${decade}s (${count})`)
-        .join(', ');
-      parts.push(`Eras: ${decades}.`);
-    }
+    albumsToShow.forEach(album => {
+      parts.push(
+        `- ${album.artist} | ${album.title}${album.year ? ` (${album.year})` : ''}`
+      );
+    });
 
-    // Top artists
+    parts.push(`\n=== END COLLECTION ===\n`);
+
+    // Top artists from listening history
     if (context.topArtists.length > 0) {
       const topArtistsStr = context.topArtists
         .slice(0, 5)
         .map(a => `${a.artist} (${a.playCount} plays)`)
         .join(', ');
-      parts.push(`\nMy most-played artists: ${topArtistsStr}`);
+      parts.push(`My most-played artists: ${topArtistsStr}`);
     }
 
     // Recently played
@@ -166,21 +177,7 @@ Format your response as JSON with this structure:
         const daysAgo = Math.floor(
           (Date.now() - album.lastPlayed.getTime()) / (1000 * 60 * 60 * 24)
         );
-        parts.push(
-          `- ${album.artist} - ${album.album} (${daysAgo} days ago, ${album.playCount} plays)`
-        );
-      });
-    }
-
-    // Algorithm suggestions for comparison
-    if (context.algorithmPicks && context.algorithmPicks.length > 0) {
-      parts.push(
-        `\nThe algorithm already suggested these (pick something different):`
-      );
-      context.algorithmPicks.slice(0, 3).forEach(pick => {
-        parts.push(
-          `- ${pick.album.release.artist} - ${pick.album.release.title}`
-        );
+        parts.push(`- ${album.artist} - ${album.album} (${daysAgo} days ago)`);
       });
     }
 
@@ -195,10 +192,22 @@ Format your response as JSON with this structure:
     }
 
     parts.push(
-      `\nBased on this context, what album should I pull from the shelf? Give me a thoughtful recommendation.`
+      `\nBased on this context, what album from MY COLLECTION should I play? Remember: pick ONLY from the list above and copy the names exactly.`
     );
 
     return parts.join('\n');
+  }
+
+  /**
+   * Shuffle array using Fisher-Yates algorithm
+   */
+  private static shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
   }
 
   /**

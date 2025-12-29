@@ -85,12 +85,25 @@ const SuggestionsPage: React.FC = () => {
           confidence: first.confidence,
         });
       } else {
+        // AI returned but couldn't match any albums
+        setAiError(
+          "AI couldn't find a matching album in your collection. Try again!"
+        );
         setAiSuggestion(null);
       }
     } catch (err) {
-      setAiError(
-        err instanceof Error ? err.message : 'Failed to get AI suggestion'
-      );
+      const errorMsg =
+        err instanceof Error ? err.message : 'Failed to get AI suggestion';
+      // Provide more helpful error messages
+      if (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT')) {
+        setAiError(
+          'AI request timed out. The model may still be loading - try again in a moment.'
+        );
+      } else if (errorMsg.includes('ECONNREFUSED')) {
+        setAiError('Cannot connect to Ollama. Make sure it is running.');
+      } else {
+        setAiError(errorMsg);
+      }
       setAiSuggestion(null);
     } finally {
       setAiLoading(false);

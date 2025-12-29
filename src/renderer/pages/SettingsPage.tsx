@@ -369,6 +369,17 @@ const SettingsPage: React.FC = () => {
         try {
           const models = await api.getAIModels();
           setAiModels(models);
+
+          // If the saved model is not in the available models list,
+          // auto-select the first available model to prevent mismatch
+          if (
+            models.length > 0 &&
+            !models.some(m => m.name === settings.model)
+          ) {
+            setAiSettings(prev =>
+              prev ? { ...prev, model: models[0].name } : prev
+            );
+          }
         } catch {
           // Models endpoint may fail if Ollama just came online
         }
@@ -381,7 +392,6 @@ const SettingsPage: React.FC = () => {
   const handleTestAIConnection = async () => {
     if (!aiSettings) return;
 
-    // Get the current model from the select/input, which is stored in aiSettings.model
     const testModel = aiSettings.model;
 
     try {
