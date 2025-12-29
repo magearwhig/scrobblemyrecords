@@ -30,6 +30,13 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
       enabled: authStatus.discogs.authenticated,
     },
     {
+      id: 'suggestions',
+      label: 'Play Suggestions',
+      icon: '🎲',
+      enabled:
+        authStatus.discogs.authenticated && authStatus.lastfm.authenticated,
+    },
+    {
       id: 'scrobble',
       label: 'Scrobble Tracks',
       icon: '🎵',
@@ -40,6 +47,12 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
       id: 'history',
       label: 'Scrobble History',
       icon: '📝',
+      enabled: authStatus.lastfm.authenticated,
+    },
+    {
+      id: 'discovery',
+      label: 'Discovery',
+      icon: '🔍',
       enabled: authStatus.lastfm.authenticated,
     },
     {

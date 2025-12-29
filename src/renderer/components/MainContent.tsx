@@ -1,18 +1,34 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 import CollectionPage from '../pages/CollectionPage';
+import DiscoveryPage from '../pages/DiscoveryPage';
 import HistoryPage from '../pages/HistoryPage';
 import HomePage from '../pages/HomePage';
 import ReleaseDetailsPage from '../pages/ReleaseDetailsPage';
 import ScrobblePage from '../pages/ScrobblePage';
 import SettingsPage from '../pages/SettingsPage';
 import SetupPage from '../pages/SetupPage';
+import SuggestionsPage from '../pages/SuggestionsPage';
 
 interface MainContentProps {
   currentPage: string;
 }
 
 const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
+  // Track a unique key to force remount of ReleaseDetailsPage when navigating to it
+  const [releaseKey, setReleaseKey] = useState<string>('0');
+
+  useEffect(() => {
+    // When navigating to release-details, generate a new key to force remount
+    // Use timestamp to always get a fresh key, ensuring the page reloads
+    console.log('[MainContent] useEffect triggered, currentPage:', currentPage);
+    if (currentPage === 'release-details') {
+      const newKey = `release-${Date.now()}`;
+      console.log('[MainContent] Setting new releaseKey:', newKey);
+      setReleaseKey(newKey);
+    }
+  }, [currentPage]);
+
   const renderPage = () => {
     switch (currentPage) {
       case 'home':
@@ -28,7 +44,12 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
       case 'settings':
         return <SettingsPage />;
       case 'release-details':
-        return <ReleaseDetailsPage />;
+        // Use key to force remount when a different release is selected
+        return <ReleaseDetailsPage key={releaseKey} />;
+      case 'suggestions':
+        return <SuggestionsPage />;
+      case 'discovery':
+        return <DiscoveryPage />;
       default:
         return <HomePage />;
     }
