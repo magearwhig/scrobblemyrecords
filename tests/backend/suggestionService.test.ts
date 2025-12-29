@@ -53,6 +53,9 @@ describe('SuggestionService', () => {
 
     mockHistoryStorage = {
       getAlbumHistory: jest.fn().mockResolvedValue(null),
+      getAlbumHistoryFuzzy: jest
+        .fn()
+        .mockResolvedValue({ entry: null, matchType: 'none' }),
       getDaysSinceLastPlayed: jest.fn().mockResolvedValue(null),
     } as unknown as jest.Mocked<ScrobbleHistoryStorage>;
 
@@ -89,7 +92,10 @@ describe('SuggestionService', () => {
     it('should mark album as never played when no history', async () => {
       // Arrange
       const album = createMockCollectionItem();
-      mockHistoryStorage.getAlbumHistory.mockResolvedValue(null);
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+        entry: null,
+        matchType: 'none',
+      });
 
       // Act
       const factors = await suggestionService.calculateFactors(album);
@@ -102,10 +108,13 @@ describe('SuggestionService', () => {
     it('should calculate recency gap from play history', async () => {
       // Arrange
       const album = createMockCollectionItem();
-      mockHistoryStorage.getAlbumHistory.mockResolvedValue({
-        lastPlayed: Math.floor(Date.now() / 1000),
-        playCount: 5,
-        plays: [],
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+        entry: {
+          lastPlayed: Math.floor(Date.now() / 1000),
+          playCount: 5,
+          plays: [],
+        },
+        matchType: 'exact',
       });
       mockHistoryStorage.getDaysSinceLastPlayed.mockResolvedValue(30);
 
@@ -510,14 +519,17 @@ describe('SuggestionService', () => {
       });
       const collection = [recentlyPlayed, notRecent];
 
-      // Mock recently played for first album
-      mockHistoryStorage.getAlbumHistory
+      // Mock recently played for first album using fuzzy matching
+      mockHistoryStorage.getAlbumHistoryFuzzy
         .mockResolvedValueOnce({
-          lastPlayed: Date.now(),
-          playCount: 1,
-          plays: [],
+          entry: {
+            lastPlayed: Date.now(),
+            playCount: 1,
+            plays: [],
+          },
+          matchType: 'exact',
         })
-        .mockResolvedValue(null);
+        .mockResolvedValue({ entry: null, matchType: 'none' });
       mockHistoryStorage.getDaysSinceLastPlayed
         .mockResolvedValueOnce(2) // First album played 2 days ago
         .mockResolvedValue(100); // Others not recently

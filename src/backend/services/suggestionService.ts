@@ -54,8 +54,9 @@ export class SuggestionService {
     const artist = album.release.artist;
     const title = album.release.title;
 
-    // Get album history from local index
-    const albumHistory = await this.historyStorage.getAlbumHistory(
+    // Get album history from local index with fuzzy matching
+    // This allows "Shame Shame" to match "Shame Shame (Deluxe Edition)"
+    const historyResult = await this.historyStorage.getAlbumHistoryFuzzy(
       artist,
       title
     );
@@ -64,7 +65,7 @@ export class SuggestionService {
     let recencyGap = Infinity;
     let neverPlayed = true;
 
-    if (albumHistory && albumHistory.playCount > 0) {
+    if (historyResult.entry && historyResult.entry.playCount > 0) {
       neverPlayed = false;
       const daysSince = await this.historyStorage.getDaysSinceLastPlayed(
         artist,

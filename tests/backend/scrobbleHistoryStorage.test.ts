@@ -91,6 +91,56 @@ describe('ScrobbleHistoryStorage', () => {
           album: 'Kid A (Remastered)',
           expected: 'radiohead|kida',
         },
+        {
+          artist: 'Dr. Dog',
+          album: 'Shame Shame (Deluxe Edition)',
+          expected: 'drdog|shameshame',
+        },
+        {
+          artist: 'The Beatles',
+          album: 'Abbey Road (Special Edition)',
+          expected: 'thebeatles|abbeyroad',
+        },
+        {
+          artist: 'Radiohead',
+          album: 'OK Computer (Remastered 2017)',
+          expected: 'radiohead|okcomputer',
+        },
+        {
+          artist: 'Pink Floyd',
+          album: 'Dark Side of the Moon (50th Anniversary)',
+          expected: 'pinkfloyd|darksideofthemoon',
+        },
+        {
+          artist: 'Artist',
+          album: 'Album [Bonus Tracks]',
+          expected: 'artist|album',
+        },
+        {
+          artist: 'Artist',
+          album: 'Album (Limited Edition)',
+          expected: 'artist|album',
+        },
+        {
+          artist: 'Artist',
+          album: 'Album (Expanded Edition)',
+          expected: 'artist|album',
+        },
+        {
+          artist: 'Artist',
+          album: 'Album - EP',
+          expected: 'artist|album',
+        },
+        {
+          artist: 'Artist',
+          album: 'Album EP',
+          expected: 'artist|album',
+        },
+        {
+          artist: 'Artist',
+          album: 'Album Deluxe Edition',
+          expected: 'artist|album',
+        },
       ];
 
       // Act & Assert
@@ -328,6 +378,272 @@ describe('ScrobbleHistoryStorage', () => {
       // Assert
       expect(history).toBeDefined();
       expect(history?.playCount).toBe(15);
+    });
+  });
+
+  describe('getAlbumHistoryFuzzy', () => {
+    it('should return exact match when available', async () => {
+      // Arrange
+      const albumEntry = {
+        lastPlayed: Math.floor(Date.now() / 1000),
+        playCount: 15,
+        plays: [{ timestamp: Math.floor(Date.now() / 1000) }],
+      };
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': albumEntry,
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getAlbumHistoryFuzzy('Radiohead', 'Kid A');
+
+      // Assert
+      expect(result.matchType).toBe('exact');
+      expect(result.entry?.playCount).toBe(15);
+      expect(result.matchedKeys).toEqual(['radiohead|kid a']);
+    });
+
+    it('should match album with deluxe edition suffix', async () => {
+      // Arrange - simulates "Shame Shame (Deluxe Edition)" matching "Shame Shame"
+      const albumEntry = {
+        lastPlayed: Math.floor(Date.now() / 1000),
+        playCount: 81,
+        plays: [{ timestamp: Math.floor(Date.now() / 1000) }],
+      };
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'dr. dog|shame shame (deluxe edition)': albumEntry,
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getAlbumHistoryFuzzy(
+        'Dr. Dog',
+        'Shame Shame'
+      );
+
+      // Assert
+      expect(result.matchType).toBe('fuzzy');
+      expect(result.entry?.playCount).toBe(81);
+      expect(result.matchedKeys).toContain(
+        'dr. dog|shame shame (deluxe edition)'
+      );
+    });
+
+    it('should match album with special edition suffix', async () => {
+      // Arrange
+      const albumEntry = {
+        lastPlayed: Math.floor(Date.now() / 1000),
+        playCount: 50,
+        plays: [],
+      };
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'the beatles|abbey road (special edition)': albumEntry,
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getAlbumHistoryFuzzy(
+        'The Beatles',
+        'Abbey Road'
+      );
+
+      // Assert
+      expect(result.matchType).toBe('fuzzy');
+      expect(result.entry?.playCount).toBe(50);
+    });
+
+    it('should match album with remastered year suffix', async () => {
+      // Arrange
+      const albumEntry = {
+        lastPlayed: Math.floor(Date.now() / 1000),
+        playCount: 30,
+        plays: [],
+      };
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|ok computer (remastered 2017)': albumEntry,
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getAlbumHistoryFuzzy(
+        'Radiohead',
+        'OK Computer'
+      );
+
+      // Assert
+      expect(result.matchType).toBe('fuzzy');
+      expect(result.entry?.playCount).toBe(30);
+    });
+
+    it('should match artist with Discogs disambiguation number', async () => {
+      // Arrange
+      const albumEntry = {
+        lastPlayed: Math.floor(Date.now() / 1000),
+        playCount: 25,
+        plays: [],
+      };
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead (2)|kid a': albumEntry,
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getAlbumHistoryFuzzy('Radiohead', 'Kid A');
+
+      // Assert
+      expect(result.matchType).toBe('fuzzy');
+      expect(result.entry?.playCount).toBe(25);
+    });
+
+    it('should aggregate multiple fuzzy matches', async () => {
+      // Arrange - when both regular and deluxe versions exist
+      const regularEntry = {
+        lastPlayed: Math.floor(Date.now() / 1000) - 86400, // 1 day ago
+        playCount: 20,
+        plays: [{ timestamp: Math.floor(Date.now() / 1000) - 86400 }],
+      };
+      const deluxeEntry = {
+        lastPlayed: Math.floor(Date.now() / 1000), // now
+        playCount: 30,
+        plays: [{ timestamp: Math.floor(Date.now() / 1000) }],
+      };
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'artist|album': regularEntry,
+            'artist|album (deluxe edition)': deluxeEntry,
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getAlbumHistoryFuzzy(
+        'Artist',
+        'Album (Special Edition)'
+      );
+
+      // Assert
+      expect(result.matchType).toBe('fuzzy');
+      expect(result.entry?.playCount).toBe(50); // 20 + 30 aggregated
+      expect(result.matchedKeys).toHaveLength(2);
+    });
+
+    it('should return none when no match found', async () => {
+      // Arrange
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': { lastPlayed: 0, playCount: 10, plays: [] },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getAlbumHistoryFuzzy(
+        'Completely Different',
+        'Album'
+      );
+
+      // Assert
+      expect(result.matchType).toBe('none');
+      expect(result.entry).toBeNull();
+    });
+
+    it('should match EP suffix', async () => {
+      // Arrange
+      const albumEntry = {
+        lastPlayed: Math.floor(Date.now() / 1000),
+        playCount: 10,
+        plays: [],
+      };
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'artist|album - ep': albumEntry,
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getAlbumHistoryFuzzy('Artist', 'Album');
+
+      // Assert
+      expect(result.matchType).toBe('fuzzy');
+      expect(result.entry?.playCount).toBe(10);
+    });
+
+    it('should match explicit tag in brackets', async () => {
+      // Arrange
+      const albumEntry = {
+        lastPlayed: Math.floor(Date.now() / 1000),
+        playCount: 40,
+        plays: [],
+      };
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'artist|album [explicit]': albumEntry,
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getAlbumHistoryFuzzy('Artist', 'Album');
+
+      // Assert
+      expect(result.matchType).toBe('fuzzy');
+      expect(result.entry?.playCount).toBe(40);
+    });
+
+    it('should match anniversary edition', async () => {
+      // Arrange
+      const albumEntry = {
+        lastPlayed: Math.floor(Date.now() / 1000),
+        playCount: 60,
+        plays: [],
+      };
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'pink floyd|dark side of the moon (50th anniversary)': albumEntry,
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getAlbumHistoryFuzzy(
+        'Pink Floyd',
+        'Dark Side of the Moon'
+      );
+
+      // Assert
+      expect(result.matchType).toBe('fuzzy');
+      expect(result.entry?.playCount).toBe(60);
     });
   });
 

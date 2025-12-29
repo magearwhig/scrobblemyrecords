@@ -16,6 +16,9 @@ export class ScrobbleHistoryStorage {
   private cacheTimestamp: number = 0;
   private readonly CACHE_TTL = 60000; // 1 minute cache
 
+  // Fuzzy index: maps fuzzy keys to arrays of exact keys for O(1) lookups
+  private fuzzyIndex: Map<string, string[]> = new Map();
+
   constructor(fileStorage: FileStorage) {
     this.fileStorage = fileStorage;
   }
@@ -32,6 +35,8 @@ export class ScrobbleHistoryStorage {
    * Fuzzy normalize for matching across naming variations
    * Handles:
    * - "Artist (2)" vs "Artist" (Discogs disambiguation numbers)
+   * - "Album (Deluxe Edition)" vs "Album"
+   * - "Album [Explicit]" vs "Album"
    * - "Album - EP" vs "Album"
    * - Extra spaces or punctuation differences
    */
@@ -40,19 +45,62 @@ export class ScrobbleHistoryStorage {
       // First, remove Discogs disambiguation suffixes like "(2)", "(5)", etc.
       // These are numbers in parentheses at the end of artist names
       let normalized = s.replace(/\s*\(\d+\)\s*$/g, '');
-      // Also remove common album suffixes like "[Explicit]", "(Deluxe)", etc.
+
+      // Remove common album edition/format suffixes in brackets
+      // Matches: [Explicit], [Deluxe], [Remastered], [Vinyl], [LP], etc.
       normalized = normalized.replace(
-        /\s*\[(explicit|deluxe|remastered|vinyl|lp)\]\s*/gi,
+        /\s*\[(explicit|deluxe|deluxe edition|special edition|expanded|expanded edition|remastered|remaster|anniversary|anniversary edition|bonus tracks|bonus track|vinyl|lp|cd|digital|limited|limited edition|collector's edition|collectors edition|japan|japanese|uk|us|import)\]\s*/gi,
         ''
       );
+
+      // Remove common album edition/format suffixes in parentheses
+      // Matches: (Deluxe Edition), (Special Edition), (Remastered 2021), etc.
       normalized = normalized.replace(
-        /\s*\((explicit|deluxe|remastered|vinyl|lp)\)\s*/gi,
+        /\s*\((explicit|deluxe|deluxe edition|special edition|expanded|expanded edition|remastered|remaster|remastered \d{4}|anniversary|anniversary edition|\d+th anniversary|bonus tracks|bonus track|vinyl|lp|cd|digital|limited|limited edition|collector's edition|collectors edition|japan|japanese|uk|us|import)\)\s*/gi,
         ''
       );
+
+      // Remove trailing " - EP", " - Single", " EP", " Single"
+      normalized = normalized.replace(/\s*-?\s*(ep|single)\s*$/gi, '');
+
+      // Remove trailing edition indicators without brackets
+      normalized = normalized.replace(
+        /\s+(deluxe|deluxe edition|special edition|expanded edition|remastered|remaster)\s*$/gi,
+        ''
+      );
+
       // Then remove all remaining non-alphanumeric characters
       return normalized.toLowerCase().replace(/[^a-z0-9]/g, '');
     };
     return `${normalizeString(artist)}|${normalizeString(album)}`;
+  }
+
+  /**
+   * Build the fuzzy index from the current cached index
+   * Maps each fuzzy key to an array of exact keys that match it
+   */
+  private buildFuzzyIndex(): void {
+    this.fuzzyIndex.clear();
+
+    if (!this.cachedIndex) {
+      return;
+    }
+
+    for (const exactKey of Object.keys(this.cachedIndex.albums)) {
+      const [artist, album] = exactKey.split('|');
+      const fuzzyKey = this.fuzzyNormalizeKey(artist, album);
+
+      const existing = this.fuzzyIndex.get(fuzzyKey);
+      if (existing) {
+        existing.push(exactKey);
+      } else {
+        this.fuzzyIndex.set(fuzzyKey, [exactKey]);
+      }
+    }
+
+    this.logger.debug(
+      `Built fuzzy index with ${this.fuzzyIndex.size} unique keys from ${Object.keys(this.cachedIndex.albums).length} albums`
+    );
   }
 
   /**
@@ -72,6 +120,8 @@ export class ScrobbleHistoryStorage {
       if (index) {
         this.cachedIndex = index;
         this.cacheTimestamp = now;
+        // Build fuzzy index for O(1) fuzzy lookups
+        this.buildFuzzyIndex();
       }
       return index;
     } catch {
@@ -86,6 +136,7 @@ export class ScrobbleHistoryStorage {
   invalidateCache(): void {
     this.cachedIndex = null;
     this.cacheTimestamp = 0;
+    this.fuzzyIndex.clear();
   }
 
   /**
@@ -124,7 +175,7 @@ export class ScrobbleHistoryStorage {
   }
 
   /**
-   * Get history for a specific album
+   * Get history for a specific album (exact match only)
    */
   async getAlbumHistory(
     artist: string,
@@ -140,27 +191,95 @@ export class ScrobbleHistoryStorage {
   }
 
   /**
-   * Get last played timestamp for an album
+   * Get history for a specific album with fuzzy matching fallback.
+   * First tries exact match, then falls back to fuzzy matching.
+   * Returns aggregated stats if multiple fuzzy matches are found.
+   *
+   * Example: "Shame Shame" by "Dr. Dog" will match "Shame Shame (Deluxe Edition)" by "Dr. Dog"
+   */
+  async getAlbumHistoryFuzzy(
+    artist: string,
+    album: string
+  ): Promise<{
+    entry: AlbumHistoryEntry | null;
+    matchType: 'exact' | 'fuzzy' | 'none';
+    matchedKeys?: string[];
+  }> {
+    const index = await this.getIndex();
+    if (!index) {
+      return { entry: null, matchType: 'none' };
+    }
+
+    // Try exact match first
+    const exactKey = this.normalizeKey(artist, album);
+    if (index.albums[exactKey]) {
+      return {
+        entry: index.albums[exactKey],
+        matchType: 'exact',
+        matchedKeys: [exactKey],
+      };
+    }
+
+    // Fall back to fuzzy match
+    const fuzzyKey = this.fuzzyNormalizeKey(artist, album);
+    const matchedExactKeys = this.fuzzyIndex.get(fuzzyKey);
+
+    if (!matchedExactKeys || matchedExactKeys.length === 0) {
+      return { entry: null, matchType: 'none' };
+    }
+
+    // Aggregate all matching albums
+    let totalPlayCount = 0;
+    let latestPlayed = 0;
+    const allPlays: Array<{ timestamp: number; track?: string }> = [];
+
+    for (const key of matchedExactKeys) {
+      const entry = index.albums[key];
+      if (entry) {
+        totalPlayCount += entry.playCount;
+        if (entry.lastPlayed > latestPlayed) {
+          latestPlayed = entry.lastPlayed;
+        }
+        allPlays.push(...entry.plays);
+      }
+    }
+
+    // Sort plays by timestamp (most recent first)
+    allPlays.sort((a, b) => b.timestamp - a.timestamp);
+
+    return {
+      entry: {
+        playCount: totalPlayCount,
+        lastPlayed: latestPlayed,
+        plays: allPlays,
+      },
+      matchType: 'fuzzy',
+      matchedKeys: matchedExactKeys,
+    };
+  }
+
+  /**
+   * Get last played timestamp for an album (with fuzzy matching)
    */
   async getLastPlayed(artist: string, album: string): Promise<number | null> {
-    const history = await this.getAlbumHistory(artist, album);
-    return history?.lastPlayed || null;
+    const result = await this.getAlbumHistoryFuzzy(artist, album);
+    return result.entry?.lastPlayed || null;
   }
 
   /**
-   * Get play count for an album
+   * Get play count for an album (with fuzzy matching)
    */
   async getPlayCount(artist: string, album: string): Promise<number> {
-    const history = await this.getAlbumHistory(artist, album);
-    return history?.playCount || 0;
+    const result = await this.getAlbumHistoryFuzzy(artist, album);
+    return result.entry?.playCount || 0;
   }
 
   /**
-   * Check if an album has ever been played
+   * Check if an album has ever been played (with fuzzy matching)
    */
   async hasBeenPlayed(artist: string, album: string): Promise<boolean> {
-    const history = await this.getAlbumHistory(artist, album);
-    return history !== null && history.playCount > 0;
+    const result = await this.getAlbumHistoryFuzzy(artist, album);
+    return result.entry !== null && result.entry.playCount > 0;
   }
 
   /**
