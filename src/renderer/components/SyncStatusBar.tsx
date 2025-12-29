@@ -23,14 +23,23 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
 
   // Use ref to track sync status for interval callback to avoid stale closure
   const syncStatusRef = useRef<SyncStatus | null>(null);
+  // Track previous status to detect transitions
+  const prevStatusRef = useRef<string | null>(null);
+  // Store onSyncComplete in ref to avoid recreating fetchStatus
+  const onSyncCompleteRef = useRef(onSyncComplete);
+  onSyncCompleteRef.current = onSyncComplete;
 
   const api = getApiService();
 
   const fetchStatus = useCallback(async () => {
     try {
       const data = await api.getHistorySyncStatus();
+      const prevStatus = prevStatusRef.current;
+      const newStatus = data.sync.status;
+
       setSyncStatus(data.sync);
       syncStatusRef.current = data.sync; // Keep ref in sync for interval callback
+      prevStatusRef.current = newStatus;
       setStorageStats({
         totalAlbums: data.storage.totalAlbums,
         totalScrobbles: data.storage.totalScrobbles,
@@ -40,9 +49,13 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
       });
       setError(null);
 
-      // Call onSyncComplete when sync finishes
-      if (data.sync.status === 'completed' && onSyncComplete) {
-        onSyncComplete();
+      // Call onSyncComplete only when status TRANSITIONS to completed (not on initial load)
+      if (
+        prevStatus === 'syncing' &&
+        newStatus === 'completed' &&
+        onSyncCompleteRef.current
+      ) {
+        onSyncCompleteRef.current();
       }
     } catch (err) {
       setError(
@@ -51,7 +64,7 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [api, onSyncComplete]);
+  }, [api]);
 
   useEffect(() => {
     fetchStatus();
