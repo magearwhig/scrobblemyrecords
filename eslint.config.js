@@ -48,6 +48,8 @@ module.exports = [
         fetch: 'readonly',
         URL: 'readonly',
         URLSearchParams: 'readonly',
+        HTMLInputElement: 'readonly',
+        FileReader: 'readonly',
 
         // Timer functions
         setTimeout: 'readonly',
