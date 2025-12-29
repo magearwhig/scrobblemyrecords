@@ -464,20 +464,21 @@ describe('LastFmHistoryTab', () => {
 
   describe('Date Formatting', () => {
     it('formats last played dates correctly', async () => {
-      const now = Date.now();
+      // lastPlayed is in Unix seconds, not milliseconds
+      const nowSeconds = Math.floor(Date.now() / 1000);
       mockApi.getAlbumHistoryPaginated.mockResolvedValue({
         items: [
           {
             artist: 'Artist Today',
             album: 'Album Today',
             playCount: 10,
-            lastPlayed: now,
+            lastPlayed: nowSeconds,
           },
           {
             artist: 'Artist Yesterday',
             album: 'Album Yesterday',
             playCount: 5,
-            lastPlayed: now - 86400000, // 1 day ago
+            lastPlayed: nowSeconds - 86400, // 1 day ago (in seconds)
           },
         ],
         total: 2,

@@ -90,7 +90,8 @@ const LastFmHistoryTab: React.FC = () => {
   };
 
   const formatLastPlayed = (timestamp: number): string => {
-    const date = new Date(timestamp);
+    // timestamp is in seconds (Unix timestamp), convert to milliseconds
+    const date = new Date(timestamp * 1000);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
