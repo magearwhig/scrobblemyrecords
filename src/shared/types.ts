@@ -133,3 +133,153 @@ export type LastFmPeriodType =
   | '3month'
   | '6month'
   | '12month';
+
+// ============================================
+// Play Suggestion Types
+// ============================================
+
+export interface SuggestionFactors {
+  recencyGap: number; // Days since last play (uses full Last.fm history)
+  neverPlayed: boolean; // Never scrobbled from any source
+  recentAddition: number; // Days since added to collection
+  artistAffinity: number; // 0-1 score based on top artists
+  eraPreference: number; // 0-1 score based on decade preference
+  userRating: number; // 0-5 rating from Discogs
+  timeOfDay: number; // 0-1 score based on time patterns
+  diversityPenalty: number; // Penalty for recent suggestion repetition
+  albumCompleteness: number; // 0-1 ratio of tracks typically played
+}
+
+export interface SuggestionWeights {
+  recencyGap: number;
+  neverPlayed: number;
+  recentAddition: number;
+  artistAffinity: number;
+  eraPreference: number;
+  userRating: number;
+  timeOfDay: number;
+  diversityPenalty: number;
+  albumCompleteness: number;
+}
+
+export interface SuggestionResult {
+  album: CollectionItem;
+  score: number;
+  factors: SuggestionFactors;
+  reason: string; // Human-readable explanation
+}
+
+export interface SuggestionSettings {
+  weights: SuggestionWeights;
+  excludeRecentlyPlayed: boolean;
+  preferNeverPlayed: boolean;
+}
+
+// ============================================
+// Scrobble History Index Types
+// ============================================
+
+export interface ScrobbleHistoryEntry {
+  timestamp: number;
+  track?: string;
+}
+
+export interface AlbumHistoryEntry {
+  lastPlayed: number;
+  playCount: number;
+  plays: ScrobbleHistoryEntry[];
+}
+
+export interface ScrobbleHistoryIndex {
+  lastSyncTimestamp: number;
+  totalScrobbles: number;
+  oldestScrobbleDate: number;
+  albums: Record<string, AlbumHistoryEntry>; // key: normalized "artist|album"
+}
+
+export interface SyncStatus {
+  status: 'idle' | 'syncing' | 'paused' | 'completed' | 'error';
+  progress: number; // 0-100
+  currentPage: number;
+  totalPages: number;
+  scrobblesFetched: number;
+  totalScrobbles: number;
+  estimatedTimeRemaining?: number; // seconds
+  error?: string;
+  lastSyncTimestamp?: number;
+}
+
+export interface SyncSettings {
+  autoSyncOnStartup: boolean;
+  syncPace: 'fast' | 'normal' | 'slow'; // requests per second
+}
+
+// ============================================
+// Discovery Types (Missing from Collection)
+// ============================================
+
+export interface MissingAlbum {
+  artist: string;
+  album: string;
+  playCount: number;
+  lastPlayed: number;
+}
+
+export interface MissingArtist {
+  artist: string;
+  playCount: number;
+  albumCount: number; // number of different albums scrobbled
+  lastPlayed: number;
+}
+
+/**
+ * Manual mapping from Last.fm album/artist names to Discogs collection items.
+ * Used when automatic matching fails (e.g., different naming conventions).
+ */
+export interface AlbumMapping {
+  // The Last.fm naming (from scrobble history)
+  historyArtist: string;
+  historyAlbum: string;
+  // The Discogs collection item to map to
+  collectionId: number; // CollectionItem.id
+  collectionArtist: string;
+  collectionAlbum: string;
+  // Metadata
+  createdAt: number;
+}
+
+export interface ArtistMapping {
+  // The Last.fm artist name (from scrobble history)
+  historyArtist: string;
+  // The Discogs artist name (from collection)
+  collectionArtist: string;
+  // Metadata
+  createdAt: number;
+}
+
+// ============================================
+// AI Suggestion Types (Ollama)
+// ============================================
+
+export interface AISuggestionResult {
+  album: CollectionItem | null;
+  reasoning: string; // AI's explanation for the pick
+  mood?: string; // Detected or suggested mood
+  confidence: 'high' | 'medium' | 'low'; // Confidence level
+}
+
+// Alias for consistency
+export type AISuggestion = AISuggestionResult;
+
+export interface AISettings {
+  enabled: boolean;
+  ollamaUrl: string;
+  model: string;
+  connectionStatus: 'connected' | 'disconnected' | 'unknown';
+}
+
+export interface OllamaModel {
+  name: string;
+  size: number;
+  modifiedAt: string;
+}
