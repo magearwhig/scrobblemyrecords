@@ -13,7 +13,6 @@ const localStorageMock = {
   length: 0,
   key: jest.fn(),
 };
-Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 
 const mockFactors: SuggestionFactors = {
   recencyGap: 30,
@@ -51,6 +50,12 @@ const mockSuggestion: SuggestionResult = {
 describe('SuggestionCard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Set up localStorage mock before each test
+    Object.defineProperty(window, 'localStorage', {
+      value: localStorageMock,
+      writable: true,
+      configurable: true,
+    });
   });
 
   it('renders suggestion with album title and artist', () => {
