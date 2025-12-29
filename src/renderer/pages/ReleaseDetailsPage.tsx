@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 import { DiscogsRelease } from '../../shared/types';
+import AlbumScrobbleHistory from '../components/AlbumScrobbleHistory';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
@@ -46,8 +47,15 @@ const ReleaseDetailsPage: React.FC = () => {
   // Pattern to detect Discogs disambiguation suffix like (2), (11), etc.
   const DISAMBIGUATION_PATTERN = /\s*\(\d+\)\s*$/;
 
+  // Load release details on mount - the key prop from MainContent ensures
+  // this component remounts when navigating to a different release
   useEffect(() => {
-    loadReleaseDetails();
+    // Small delay to ensure localStorage is fully written before reading
+    // This handles potential race conditions during rapid navigation
+    const timeoutId = setTimeout(() => {
+      loadReleaseDetails();
+    }, 0);
+    return () => clearTimeout(timeoutId);
   }, []);
 
   useEffect(() => {
@@ -63,15 +71,35 @@ const ReleaseDetailsPage: React.FC = () => {
 
       // Get release from localStorage (set by AlbumCard)
       const releaseData = localStorage.getItem('selectedRelease');
+      console.log('[ReleaseDetailsPage] loadReleaseDetails called');
+      console.log(
+        '[ReleaseDetailsPage] releaseData from localStorage:',
+        releaseData ? 'exists' : 'null'
+      );
+
       if (!releaseData) {
         setError('No release data found. Please go back and select an album.');
         return;
       }
 
       const releaseInfo = JSON.parse(releaseData);
+      console.log(
+        '[ReleaseDetailsPage] parsed releaseInfo.id:',
+        releaseInfo.id,
+        'releaseInfo.title:',
+        releaseInfo.title,
+        'releaseInfo.artist:',
+        releaseInfo.artist
+      );
 
       // Fetch full release details from API
       const fullRelease = await api.getReleaseDetails(releaseInfo.id);
+      console.log(
+        '[ReleaseDetailsPage] API returned fullRelease.id:',
+        fullRelease.id,
+        'fullRelease.title:',
+        fullRelease.title
+      );
       setRelease(fullRelease);
 
       // Select all actual tracks by default (filter out section headers)
@@ -736,6 +764,9 @@ const ReleaseDetailsPage: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Scrobble History Section */}
+        <AlbumScrobbleHistory artist={release.artist} album={release.title} />
 
         {scrobbleProgress && (
           <div className='message info' style={{ marginBottom: '1rem' }}>
