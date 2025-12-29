@@ -152,6 +152,8 @@ module.exports = [
         module: 'readonly',
         require: 'readonly',
         exports: 'readonly',
+        AbortController: 'readonly',
+        Infinity: 'readonly',
       },
     },
     rules: {
