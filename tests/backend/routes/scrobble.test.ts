@@ -615,4 +615,263 @@ describe('Scrobble Routes', () => {
       });
     });
   });
+
+  describe('DELETE /session/:sessionId', () => {
+    beforeEach(() => {
+      mockFileStorage.delete = jest.fn().mockResolvedValue(undefined);
+    });
+
+    it('should delete a pending session', async () => {
+      // Arrange
+      const mockSession = {
+        id: 'test-session',
+        status: 'pending',
+        tracks: [],
+      };
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(mockSession);
+
+      // Act
+      const response = await request(app)
+        .delete('/api/v1/scrobble/session/test-session')
+        .expect(200);
+
+      // Assert
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.message).toBe('Session deleted successfully');
+      expect(mockFileStorage.delete).toHaveBeenCalledWith(
+        'scrobbles/session-test-session.json'
+      );
+    });
+
+    it('should delete a failed session', async () => {
+      // Arrange
+      const mockSession = {
+        id: 'test-session',
+        status: 'failed',
+        tracks: [],
+      };
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(mockSession);
+
+      // Act
+      const response = await request(app)
+        .delete('/api/v1/scrobble/session/test-session')
+        .expect(200);
+
+      // Assert
+      expect(response.body.success).toBe(true);
+    });
+
+    it('should return 400 for invalid session ID format', async () => {
+      // Act - Use a sessionId with special characters that fails validation
+      // URL encode the special characters so they reach the route handler
+      const response = await request(app)
+        .delete('/api/v1/scrobble/session/invalid%40session%23id')
+        .expect(400);
+
+      // Assert
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Invalid session ID format');
+    });
+
+    it('should return 404 when session not found', async () => {
+      // Arrange
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(null);
+
+      // Act
+      const response = await request(app)
+        .delete('/api/v1/scrobble/session/nonexistent')
+        .expect(404);
+
+      // Assert
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Session not found');
+    });
+
+    it('should return 400 when trying to delete completed session', async () => {
+      // Arrange
+      const mockSession = {
+        id: 'test-session',
+        status: 'completed',
+        tracks: [],
+      };
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(mockSession);
+
+      // Act
+      const response = await request(app)
+        .delete('/api/v1/scrobble/session/test-session')
+        .expect(400);
+
+      // Assert
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Cannot delete completed sessions');
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockFileStorage.readJSON = jest
+        .fn()
+        .mockRejectedValue(new Error('Delete error'));
+
+      // Act
+      const response = await request(app)
+        .delete('/api/v1/scrobble/session/test-session')
+        .expect(500);
+
+      // Assert
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('POST /session/:sessionId/resubmit', () => {
+    beforeEach(() => {
+      mockLastFmService.resubmitTracks = jest.fn().mockResolvedValue({
+        success: 2,
+        failed: 0,
+        ignored: 0,
+        errors: [],
+      });
+    });
+
+    it('should resubmit a failed session', async () => {
+      // Arrange
+      const mockSession = {
+        id: 'test-session',
+        status: 'failed',
+        tracks: [
+          { artist: 'Artist 1', track: 'Track 1', timestamp: 123 },
+          { artist: 'Artist 2', track: 'Track 2', timestamp: 456 },
+        ],
+      };
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(mockSession);
+
+      // Act
+      const response = await request(app)
+        .post('/api/v1/scrobble/session/test-session/resubmit')
+        .expect(200);
+
+      // Assert
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.message).toBe(
+        'Session resubmitted successfully'
+      );
+      expect(mockLastFmService.resubmitTracks).toHaveBeenCalledWith(
+        mockSession.tracks
+      );
+    });
+
+    it('should resubmit a pending session', async () => {
+      // Arrange
+      const mockSession = {
+        id: 'test-session',
+        status: 'pending',
+        tracks: [{ artist: 'Artist', track: 'Track', timestamp: 123 }],
+      };
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(mockSession);
+
+      // Act
+      const response = await request(app)
+        .post('/api/v1/scrobble/session/test-session/resubmit')
+        .expect(200);
+
+      // Assert
+      expect(response.body.success).toBe(true);
+    });
+
+    it('should return 400 for invalid session ID format', async () => {
+      // Act - Use a sessionId with special characters that fails validation
+      // URL encode the special characters so they reach the route handler
+      const response = await request(app)
+        .post('/api/v1/scrobble/session/invalid%40session%23id/resubmit')
+        .expect(400);
+
+      // Assert
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Invalid session ID format');
+    });
+
+    it('should return 404 when session not found', async () => {
+      // Arrange
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(null);
+
+      // Act
+      const response = await request(app)
+        .post('/api/v1/scrobble/session/nonexistent/resubmit')
+        .expect(404);
+
+      // Assert
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Session not found');
+    });
+
+    it('should return 400 when trying to resubmit completed session', async () => {
+      // Arrange
+      const mockSession = {
+        id: 'test-session',
+        status: 'completed',
+        tracks: [],
+      };
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(mockSession);
+
+      // Act
+      const response = await request(app)
+        .post('/api/v1/scrobble/session/test-session/resubmit')
+        .expect(400);
+
+      // Assert
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Cannot resubmit completed sessions');
+    });
+
+    it('should return 500 when authentication fails', async () => {
+      // Arrange
+      const mockSession = {
+        id: 'test-session',
+        status: 'failed',
+        tracks: [],
+      };
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(mockSession);
+      mockLastFmService.testConnection.mockResolvedValue({
+        success: false,
+        message: 'Authentication failed',
+      });
+
+      // Act
+      const response = await request(app)
+        .post('/api/v1/scrobble/session/test-session/resubmit')
+        .expect(500);
+
+      // Assert
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Authentication failed');
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockFileStorage.readJSON = jest
+        .fn()
+        .mockRejectedValue(new Error('Resubmit error'));
+
+      // Act
+      const response = await request(app)
+        .post('/api/v1/scrobble/session/test-session/resubmit')
+        .expect(500);
+
+      // Assert
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('POST /backfill-covers', () => {
+    it('should return 400 when username is missing', async () => {
+      // Act
+      const response = await request(app)
+        .post('/api/v1/scrobble/backfill-covers')
+        .send({})
+        .expect(400);
+
+      // Assert
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Username is required');
+    });
+  });
 });
