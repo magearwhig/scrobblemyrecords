@@ -110,7 +110,7 @@ const SettingsPage: React.FC = () => {
     authStatus.discogs.authenticated,
     authStatus.discogs.username,
     authStatus.lastfm.authenticated,
-  ]); // eslint-disable-line react-hooks/exhaustive-deps
+  ]);
 
   // Handle query param for pre-filling artist name (e.g., from disambiguation warning)
   useEffect(() => {
@@ -381,21 +381,21 @@ const SettingsPage: React.FC = () => {
   const handleTestAIConnection = async () => {
     if (!aiSettings) return;
 
+    // Get the current model from the select/input, which is stored in aiSettings.model
+    const testModel = aiSettings.model;
+
     try {
       setAiLoading(true);
       setAiError('');
-      const result = await api.testAIConnection(
-        aiSettings.baseUrl,
-        aiSettings.model
-      );
+      const result = await api.testAIConnection(aiSettings.baseUrl, testModel);
 
       setAiStatus({ connected: result.connected, error: result.error });
 
       if (result.connected) {
         setAiSuccess(
           result.modelAvailable
-            ? `Connected! Model "${aiSettings.model}" is available.`
-            : `Connected, but model "${aiSettings.model}" is not installed.`
+            ? `Connected! Model "${testModel}" is available.`
+            : `Connected, but model "${testModel}" is not installed. Available: ${result.availableModels?.join(', ') || 'none'}`
         );
         // Refresh models list
         if (result.availableModels) {
@@ -1433,6 +1433,13 @@ const SettingsPage: React.FC = () => {
                     setAiSettings({ ...aiSettings, model: e.target.value })
                   }
                 >
+                  {/* Add current model as option if not in list */}
+                  {!aiModels.some(m => m.name === aiSettings.model) &&
+                    aiSettings.model && (
+                      <option value={aiSettings.model}>
+                        {aiSettings.model} (not installed)
+                      </option>
+                    )}
                   {aiModels.map(model => (
                     <option key={model.name} value={model.name}>
                       {model.name} ({model.sizeFormatted})
