@@ -1,12 +1,20 @@
 import axios, { AxiosInstance } from 'axios';
 
 import {
+  AlbumMapping,
   ApiResponse,
+  ArtistMapping,
   AuthStatus,
   CollectionItem,
   DiscogsRelease,
+  MissingAlbum,
+  MissingArtist,
   ScrobbleTrack,
   ScrobbleSession,
+  SuggestionResult,
+  SuggestionSettings,
+  SyncSettings,
+  SyncStatus,
 } from '../../shared/types';
 
 class ApiService {
@@ -445,6 +453,296 @@ class ApiService {
   }> {
     const response = await this.api.post('/scrobble/backfill-covers', {
       username,
+    });
+    return response.data.data;
+  }
+
+  // ============================================
+  // Suggestion methods
+  // ============================================
+
+  async getSuggestions(count: number = 5): Promise<SuggestionResult[]> {
+    const response = await this.api.get('/suggestions', {
+      params: { count },
+    });
+    return response.data.data;
+  }
+
+  async dismissSuggestion(albumId: number): Promise<void> {
+    await this.api.post('/suggestions/dismiss', { albumId });
+  }
+
+  async refreshSuggestions(): Promise<void> {
+    await this.api.post('/suggestions/refresh');
+  }
+
+  async getSuggestionSettings(): Promise<SuggestionSettings> {
+    const response = await this.api.get('/suggestions/settings');
+    return response.data.data;
+  }
+
+  async saveSuggestionSettings(settings: SuggestionSettings): Promise<void> {
+    await this.api.post('/suggestions/settings', settings);
+  }
+
+  async getSuggestionDefaults(): Promise<SuggestionSettings> {
+    const response = await this.api.get('/suggestions/settings/defaults');
+    return response.data.data;
+  }
+
+  async getSuggestionAnalytics(): Promise<{
+    hasHistory: boolean;
+    totalScrobbles: number;
+    uniqueAlbums: number;
+    uniqueArtists: number;
+    topArtists: Array<{ artist: string; playCount: number }>;
+    listeningPatterns: {
+      peakHour: number;
+      peakDay: string;
+    };
+  }> {
+    const response = await this.api.get('/suggestions/analytics');
+    return response.data.data;
+  }
+
+  // ============================================
+  // History sync methods
+  // ============================================
+
+  async getHistorySyncStatus(): Promise<{
+    sync: SyncStatus;
+    storage: {
+      totalAlbums: number;
+      totalScrobbles: number;
+      oldestScrobble: Date | null;
+      newestScrobble: Date | null;
+      lastSync: Date | null;
+      estimatedSizeBytes: number;
+    };
+  }> {
+    const response = await this.api.get('/suggestions/history/status');
+    return response.data.data;
+  }
+
+  async startHistorySync(incremental: boolean = false): Promise<{
+    message: string;
+    status: SyncStatus;
+  }> {
+    const response = await this.api.post('/suggestions/history/sync/start', {
+      incremental,
+    });
+    return response.data.data;
+  }
+
+  async pauseHistorySync(): Promise<{
+    message: string;
+    status: SyncStatus;
+  }> {
+    const response = await this.api.post('/suggestions/history/sync/pause');
+    return response.data.data;
+  }
+
+  async resumeHistorySync(): Promise<{
+    message: string;
+    status: SyncStatus;
+  }> {
+    const response = await this.api.post('/suggestions/history/sync/resume');
+    return response.data.data;
+  }
+
+  async clearHistoryIndex(): Promise<void> {
+    await this.api.delete('/suggestions/history/index');
+  }
+
+  async getSyncSettings(): Promise<SyncSettings> {
+    const response = await this.api.get('/suggestions/history/sync/settings');
+    return response.data.data;
+  }
+
+  async saveSyncSettings(
+    settings: Partial<SyncSettings>
+  ): Promise<SyncSettings> {
+    const response = await this.api.post(
+      '/suggestions/history/sync/settings',
+      settings
+    );
+    return response.data.data;
+  }
+
+  // ============================================
+  // Album history methods (for release details)
+  // ============================================
+
+  async getAlbumHistory(
+    artist: string,
+    album: string
+  ): Promise<{
+    found: boolean;
+    artist: string;
+    album: string;
+    lastPlayed: number | null;
+    playCount: number;
+    plays: Array<{ timestamp: number; track?: string }>;
+  }> {
+    const response = await this.api.get(
+      `/suggestions/album-history/${encodeURIComponent(artist)}/${encodeURIComponent(album)}`
+    );
+    return response.data.data;
+  }
+
+  // ============================================
+  // Discovery methods (missing from collection)
+  // ============================================
+
+  async getMissingAlbums(limit: number = 20): Promise<MissingAlbum[]> {
+    const response = await this.api.get(
+      '/suggestions/discovery/missing-albums',
+      {
+        params: { limit },
+      }
+    );
+    return response.data.data;
+  }
+
+  async getMissingArtists(limit: number = 20): Promise<MissingArtist[]> {
+    const response = await this.api.get(
+      '/suggestions/discovery/missing-artists',
+      {
+        params: { limit },
+      }
+    );
+    return response.data.data;
+  }
+
+  // ============================================
+  // Discovery Mapping methods (mark "missing" items as in collection)
+  // ============================================
+
+  async getDiscoveryAlbumMappings(): Promise<AlbumMapping[]> {
+    const response = await this.api.get('/suggestions/mappings/albums');
+    return response.data.data;
+  }
+
+  async createDiscoveryAlbumMapping(mapping: {
+    historyArtist: string;
+    historyAlbum: string;
+    collectionId: number;
+    collectionArtist: string;
+    collectionAlbum: string;
+  }): Promise<void> {
+    await this.api.post('/suggestions/mappings/albums', mapping);
+  }
+
+  async removeDiscoveryAlbumMapping(
+    historyArtist: string,
+    historyAlbum: string
+  ): Promise<void> {
+    await this.api.delete('/suggestions/mappings/albums', {
+      data: { historyArtist, historyAlbum },
+    });
+  }
+
+  async getDiscoveryArtistMappings(): Promise<ArtistMapping[]> {
+    const response = await this.api.get('/suggestions/mappings/artists');
+    return response.data.data;
+  }
+
+  async createDiscoveryArtistMapping(mapping: {
+    historyArtist: string;
+    collectionArtist: string;
+  }): Promise<void> {
+    await this.api.post('/suggestions/mappings/artists', mapping);
+  }
+
+  async removeDiscoveryArtistMapping(historyArtist: string): Promise<void> {
+    await this.api.delete('/suggestions/mappings/artists', {
+      data: { historyArtist },
+    });
+  }
+
+  // ============================================
+  // AI Suggestion methods (Ollama)
+  // ============================================
+
+  async getAIStatus(): Promise<{
+    enabled: boolean;
+    connected: boolean;
+    error?: string;
+    model: string;
+    baseUrl: string;
+  }> {
+    const response = await this.api.get('/suggestions/ai/status');
+    return response.data.data;
+  }
+
+  async getAIModels(): Promise<
+    Array<{
+      name: string;
+      size: number;
+      sizeFormatted: string;
+      modifiedAt: string;
+    }>
+  > {
+    const response = await this.api.get('/suggestions/ai/models');
+    return response.data.data;
+  }
+
+  async getAISettings(): Promise<{
+    enabled: boolean;
+    baseUrl: string;
+    model: string;
+    timeout: number;
+  }> {
+    const response = await this.api.get('/suggestions/ai/settings');
+    return response.data.data;
+  }
+
+  async saveAISettings(settings: {
+    enabled?: boolean;
+    baseUrl?: string;
+    model?: string;
+    timeout?: number;
+  }): Promise<{
+    enabled: boolean;
+    baseUrl: string;
+    model: string;
+    timeout: number;
+  }> {
+    const response = await this.api.post('/suggestions/ai/settings', settings);
+    return response.data.data;
+  }
+
+  async testAIConnection(
+    baseUrl?: string,
+    model?: string
+  ): Promise<{
+    connected: boolean;
+    error?: string;
+    modelAvailable?: boolean;
+    availableModels?: string[];
+  }> {
+    const response = await this.api.post('/suggestions/ai/test', {
+      baseUrl,
+      model,
+    });
+    return response.data.data;
+  }
+
+  async getAISuggestion(mood?: string): Promise<{
+    suggestions: Array<{
+      album: any; // CollectionItem
+      reasoning: string;
+      confidence: 'high' | 'medium' | 'low';
+    }>;
+    rawResponse: string;
+    context: {
+      timeOfDay: string;
+      dayOfWeek: string;
+      collectionSize: number;
+    };
+  }> {
+    const response = await this.api.get('/suggestions/ai/suggestion', {
+      params: mood ? { mood } : undefined,
     });
     return response.data.data;
   }
