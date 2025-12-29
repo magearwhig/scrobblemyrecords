@@ -110,7 +110,7 @@ Thumbs.db
 test-*.js
 debug-*.js
 
-# Electron build artifacts
+# Desktop packaging artifacts (legacy)
 release/
 mac-arm64/
 *.dmg

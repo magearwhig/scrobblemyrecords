@@ -16,24 +16,28 @@ A modern web application that bridges your Discogs collection with Last.fm scrob
 - **Smart Scrobbling**: Select individual tracks or entire albums to scrobble
 - **Batch Operations**: Scrobble multiple albums at once with progress tracking
 - **Time Control**: Auto timing (as if you just finished listening) or set custom timestamps for your scrobbles
-- **Local & Private**: Runs entirely in your browser - your data stays on your computer
+- **Local-first**: Runs on your machine (browser UI + local Node/Express API) - your data stays on your computer
 - **Caching**: 24-hour cache keeps your collection loading fast
 
 ## 🚀 Quick Start
 
-1. **Install & Run**:
+1. **Install**:
    ```bash
    git clone <repository-url>
    cd recordscrobbles
    npm install
+   ```
+
+2. **Configure `.env`**: Copy `.env.example` to `.env` and fill in the required values (see **Configuration** below).
+
+3. **Run (dev)**:
+   ```bash
    npm run dev:app
    ```
 
-2. **Open Browser**: Navigate to `http://localhost:8080`
+4. **Open Browser**: Navigate to `http://localhost:8080`
 
-3. **Setup APIs**: Follow the authentication wizard to connect your Discogs and Last.fm accounts
-
-4. **Start Scrobbling**: Browse your collection and start scrobbling!
+5. **Authenticate & Scrobble**: Use **Setup & Authentication** in the UI to connect Discogs + Last.fm, then start scrobbling.
 
 ## 📋 Prerequisites
 
@@ -52,6 +56,8 @@ A modern web application that bridges your Discogs collection with Last.fm scrob
    - **Callback URL**: `http://localhost:3001/api/v1/auth/discogs/callback`
 4. Save your **Consumer Key** and **Consumer Secret**
 
+**Alternative (no app creation):** You can use a **Discogs Personal Access Token** instead. Generate one from the same Discogs developer settings page and enter it in the in-app **Setup & Authentication** page.
+
 ### Last.fm API (Required)
 1. Visit [Last.fm API Account Creation](https://www.last.fm/api/account/create)
 2. Fill in:
@@ -59,6 +65,29 @@ A modern web application that bridges your Discogs collection with Last.fm scrob
    - **Description**: "Web app for scrobbling Discogs collection"
    - **Callback URL**: `http://localhost:3001/api/v1/auth/lastfm/callback`
 3. Save your **API Key** and **Shared Secret**
+
+## ⚙️ Configuration (.env)
+
+Create a `.env` file in the project root (it is ignored by git). You can start from `.env.example`.
+
+### Required
+- `ENCRYPTION_KEY`: used to encrypt stored credentials at rest (must be **32+ characters**). Generate one:
+  ```bash
+  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  ```
+- `LASTFM_API_KEY` and `LASTFM_SECRET`: from your Last.fm API app
+- Discogs (choose one):
+  - **OAuth (recommended)**: `DISCOGS_CLIENT_ID` + `DISCOGS_CLIENT_SECRET`
+  - **Personal Access Token**: use the in-app Setup flow (no Discogs app required)
+
+### Optional
+- `BACKEND_PORT` (default `3001`)
+- `FRONTEND_PORT` (default `8080`, dev server only)
+- `HOST` (default `127.0.0.1`)
+- `DISCOGS_CALLBACK_URL` / `LASTFM_CALLBACK_URL` (if you need custom callback URLs)
+- `FRONTEND_URL` (additional allowed origin for CORS)
+
+> If you change `BACKEND_PORT`, update the callback URLs in your Discogs/Last.fm apps accordingly.
 
 ## 🏃‍♂️ Running the App
 
@@ -78,12 +107,16 @@ npm run start:web
 ## 🎯 Features
 
 ### Core Features
+- **Home Dashboard**: Server status plus Last.fm recent scrobbles/top tracks/top artists
 - **Collection Browser**: Search and filter your Discogs collection
+- **Release Details**: Side/disc track selection and per-album scrobble history
 - **Track Selection**: Choose individual tracks or entire albums
 - **Batch Scrobbling**: Scrobble multiple items with progress tracking
 - **Smart Timing**: Auto timing (simulates just finishing listening) or custom timestamps
 - **History View**: Dual-tab history showing app scrobble sessions and synced Last.fm listening history
 - **Cache Management**: Force reload collection data when needed
+- **Cache Updates**: Check for new Discogs additions and update the cache incrementally
+- **Discovery + Mapping**: Find “missing” albums/artists and map them to items in your collection
 - **Dark Mode**: Toggle between light and dark themes
 - **Local Timezone**: All times displayed in your local timezone
 - **Sorting Options**: Sort collection by artist, title, year, or date added
@@ -134,6 +167,7 @@ Two-tab view of your listening activity:
 - Status indicators (completed, failed, pending)
 - Album cover thumbnails
 - Resubmit failed sessions
+- Delete pending/failed sessions
 - Backfill album covers from Discogs
 
 **Last.fm Listening History Tab:**
@@ -150,6 +184,7 @@ Find albums you listen to but don't own:
 - **Missing Albums**: Albums in your scrobble history not in your collection
 - **Missing Artists**: Artists you love but don't have on vinyl
 - **Play Count Sorting**: Prioritized by how often you listen
+- **Map to Collection**: Mark a “missing” album/artist as owned by mapping it to an item in your Discogs collection
 - Perfect for building your wishlist!
 
 ### 🤖 AI Suggestions (Optional)
@@ -302,6 +337,7 @@ npm run test:coverage # Run tests with coverage (90% target)
 ### Project Structure
 ```
 src/
+├── server.ts                   # Express server entrypoint
 ├── backend/                    # Node.js API server
 │   ├── routes/                 # API endpoints
 │   │   ├── auth.ts             # Authentication routes
@@ -318,27 +354,27 @@ src/
 │   └── utils/                  # Utilities
 ├── renderer/                   # React frontend
 │   ├── components/             # UI components
-│   │   ├── SuggestionCard.tsx  # Algorithm suggestion display
-│   │   ├── AISuggestionCard.tsx # AI suggestion display
-│   │   ├── SuggestionWeightControls.tsx # Weight sliders
-│   │   ├── SyncStatusBar.tsx   # Sync progress bar
-│   │   ├── AlbumScrobbleHistory.tsx # Album play history
-│   │   └── MissingFromCollection.tsx # Discovery component
 │   ├── pages/                  # Application pages
-│   │   ├── SuggestionsPage.tsx # Play suggestions
-│   │   ├── DiscoveryPage.tsx   # Missing albums discovery
-│   │   └── ...
+│   │   ├── HomePage.tsx
+│   │   ├── SetupPage.tsx
+│   │   ├── CollectionPage.tsx
+│   │   ├── ReleaseDetailsPage.tsx
+│   │   ├── ScrobblePage.tsx
+│   │   ├── SuggestionsPage.tsx
+│   │   ├── DiscoveryPage.tsx
+│   │   ├── HistoryPage.tsx
+│   │   └── SettingsPage.tsx
 │   └── context/                # State management
 └── shared/                     # Shared types
 ```
 
 ## 🔒 Security & Privacy
 
-- **Local Storage**: All data stored locally in JSON files
-- **Encrypted Tokens**: API credentials encrypted at rest
-- **Automatic Backups**: Settings files backed up before changes (keeps 3 most recent)
+- **Local Storage**: App data (cache, history, settings) is stored locally under `./data/` (gitignored)
+- **Encrypted Tokens**: API credentials are encrypted at rest (requires `ENCRYPTION_KEY`)
+- **Automatic Backups**: `data/settings/user-settings.json` is backed up before changes (keeps 3 most recent)
 - **No Cloud Dependencies**: Everything runs on your computer
-- **CORS Protected**: Only allows localhost connections
+- **CORS Protected**: Only allows localhost connections by default (with a strict allowlist)
 
 ## 🐛 Troubleshooting
 

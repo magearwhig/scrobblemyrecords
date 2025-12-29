@@ -110,10 +110,10 @@ A desktop application that allows users to select albums from their Discogs coll
 ## Technical Architecture
 
 ### Technology Stack
-- **Frontend**: Electron + React (for cross-platform desktop app)
+- **Frontend**: React (single-page web app served locally)
 - **Backend**: Node.js
 - **Authentication**: OAuth 1.0a for Discogs, Last.fm session-based auth
-- **Storage**: SQLite for local data cache and user preferences
+- **Storage**: Local JSON files for cache, settings, and history
 - **HTTP Client**: Axios for API calls with rate limiting
 
 ### Key Components
@@ -133,7 +133,7 @@ A desktop application that allows users to select albums from their Discogs coll
    - Provides scrobbling history
 
 4. **Data Layer**
-   - Local SQLite database for caching
+   - Local JSON files for caching and indexing
    - User preferences and settings
    - Scrobbling queue management
 
@@ -219,7 +219,7 @@ A desktop application that allows users to select albums from their Discogs coll
 - API integration and authentication setup
 - Basic collection browsing interface
 - Simple scrobbling functionality
-- Core UI components with React/Electron
+- Core UI components with React
 
 ### Phase 2 (Enhanced Features - 1-2 days)
 - Advanced filtering and search
@@ -230,7 +230,7 @@ A desktop application that allows users to select albums from their Discogs coll
 ### Phase 3 (Polish & Distribution - 1 day)
 - UI/UX improvements and responsive design
 - Performance optimization
-- Electron packaging for distribution
+- Production build and deployment packaging
 - Basic documentation and README
 
 **Total Development Time: 4-6 days**
