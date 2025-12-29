@@ -504,14 +504,16 @@ describe('ReleaseDetailsPage Error Handling and Loading States', () => {
     expect(document.querySelector('.spinner')).toBeInTheDocument();
   });
 
-  it('should show error when no release data is found in localStorage', () => {
+  it('should show error when no release data is found in localStorage', async () => {
     renderWithProviders(<ReleaseDetailsPage />);
 
-    expect(
-      screen.getByText(
-        'No release data found. Please go back and select an album.'
-      )
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'No release data found. Please go back and select an album.'
+        )
+      ).toBeInTheDocument();
+    });
     expect(screen.getByText('Back to Collection')).toBeInTheDocument();
   });
 
@@ -547,23 +549,27 @@ describe('ReleaseDetailsPage Error Handling and Loading States', () => {
     renderWithProviders(<ReleaseDetailsPage />);
 
     await waitFor(() => {
+      // The error message may vary depending on which property is accessed first
       expect(
-        screen.getByText("Cannot read properties of null (reading 'tracklist')")
+        screen.getByText(/Cannot read properties of null/)
       ).toBeInTheDocument();
     });
     expect(screen.getByText('Back to Collection')).toBeInTheDocument();
   });
 
-  it('should handle invalid JSON in localStorage', () => {
+  it('should handle invalid JSON in localStorage', async () => {
     mockLocalStorage.setItem('selectedRelease', 'invalid json');
 
     renderWithProviders(<ReleaseDetailsPage />);
 
-    expect(
-      screen.getByText(
-        /Unexpected token.*in.*JSON|Unexpected token 'i'.*invalid json/i
-      )
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      // Different Node versions may produce slightly different error messages
+      expect(
+        screen.getByText(
+          /Unexpected token|JSON Parse error|Expected property name/i
+        )
+      ).toBeInTheDocument();
+    });
   });
 });
 

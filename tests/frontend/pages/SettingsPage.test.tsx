@@ -26,7 +26,8 @@ describe('SettingsPage', () => {
   it('renders the settings page title', () => {
     renderWithProviders(<SettingsPage />);
 
-    expect(screen.getByText('Settings')).toBeInTheDocument();
+    // Settings appears as both a heading and a tab button
+    expect(screen.getAllByText('Settings').length).toBeGreaterThan(0);
     expect(
       screen.getByRole('heading', { level: 2, name: 'Settings' })
     ).toBeInTheDocument();
@@ -55,7 +56,12 @@ describe('SettingsPage', () => {
   it('renders within a card container', () => {
     renderWithProviders(<SettingsPage />);
 
-    const cardElement = screen.getByText('Settings').closest('.card');
+    // The heading "Settings" is within a card container
+    const headingElement = screen.getByRole('heading', {
+      level: 2,
+      name: 'Settings',
+    });
+    const cardElement = headingElement.closest('.card');
     expect(cardElement).toBeInTheDocument();
   });
 

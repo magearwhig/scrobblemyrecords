@@ -193,8 +193,12 @@ export class ScrobbleHistorySyncService extends EventEmitter {
         continue;
       }
 
-      const artist = track.artist?.['#text'] || track.artist;
-      const album = track.album?.['#text'] || '';
+      const artist =
+        typeof track.artist === 'object' ? track.artist['#text'] : track.artist;
+      const album =
+        typeof track.album === 'object'
+          ? track.album['#text']
+          : track.album || '';
       const trackName = track.name;
       const timestamp = parseInt(track.date?.uts || '0', 10);
 
