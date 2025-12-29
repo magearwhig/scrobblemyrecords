@@ -77,6 +77,7 @@ npm run start:web
 
 ## 🎯 Features
 
+### Core Features
 - **Collection Browser**: Search and filter your Discogs collection
 - **Track Selection**: Choose individual tracks or entire albums
 - **Batch Scrobbling**: Scrobble multiple items with progress tracking
@@ -89,6 +90,184 @@ npm run start:web
 - **Artist Name Mapping**: Map Discogs artist names to Last.fm names for consistent scrobbling
 - **Disambiguation Warnings**: Alerts when scrobbling artists with Discogs disambiguation suffixes (e.g., "Ghost (32)")
 - **Possible Mappings**: Automatically suggests artists in your collection that may need name mappings
+
+### 🎲 Play Suggestions
+Intelligent album recommendations based on 9 weighted factors:
+
+| Factor | Description |
+|--------|-------------|
+| **Recency Gap** | Prioritize albums you haven't played in a while |
+| **Never Played** | Boost albums never scrobbled from any source |
+| **Recent Addition** | Highlight newly added vinyl you may want to spin |
+| **Artist Affinity** | Suggest artists you frequently listen to |
+| **Era Preference** | Match decades you prefer based on listening history |
+| **User Rating** | Prioritize albums you've rated highly |
+| **Time of Day** | Context-aware suggestions based on listening patterns |
+| **Diversity** | Avoid repetitive suggestions from same artist/era |
+| **Completeness** | Favor albums you tend to listen to in full |
+
+**Features:**
+- Adjustable weight controls for each factor
+- Refresh for new suggestions
+- One-click navigation to collection
+- "Why this suggestion?" breakdown
+
+### 📊 Scrobble History Sync
+Sync your complete Last.fm history for smarter suggestions:
+
+- **Progressive Sync**: Quick start with recent scrobbles, full history syncs in background
+- **Auto-Sync**: Automatically updates on startup (configurable)
+- **Storage Efficient**: ~5-10 MB for 50,000+ scrobbles
+- **Source Agnostic**: Captures plays from Spotify, Apple Music, or any Last.fm source
+
+**Sync Controls** (Settings → Scrobble History):
+- Manual "Sync Now" button
+- Pause/Resume during background sync
+- Clear index for full re-sync
+- Toggle auto-sync on startup
+
+### 🔍 Discovery Page
+Find albums you listen to but don't own:
+
+- **Missing Albums**: Albums in your scrobble history not in your collection
+- **Missing Artists**: Artists you love but don't have on vinyl
+- **Play Count Sorting**: Prioritized by how often you listen
+- Perfect for building your wishlist!
+
+### 🤖 AI Suggestions (Optional)
+Local AI-powered recommendations via [Ollama](https://ollama.ai). Runs entirely on your computer with no API fees.
+
+#### Installation
+
+<details>
+<summary><strong>macOS</strong></summary>
+
+**Option 1: Homebrew (Recommended)**
+```bash
+brew install ollama
+```
+
+**Option 2: Direct Download**
+1. Download from [ollama.ai/download](https://ollama.ai/download)
+2. Open the `.dmg` file and drag Ollama to Applications
+3. Launch Ollama from Applications
+
+**Start the Service:**
+```bash
+ollama serve
+```
+Or launch the Ollama app (it runs in the menu bar).
+
+</details>
+
+<details>
+<summary><strong>Windows</strong></summary>
+
+**Option 1: Installer (Recommended)**
+1. Download the Windows installer from [ollama.ai/download](https://ollama.ai/download)
+2. Run `OllamaSetup.exe`
+3. Follow the installation wizard
+4. Ollama starts automatically and runs in the system tray
+
+**Option 2: winget**
+```powershell
+winget install Ollama.Ollama
+```
+
+**Verify Installation:**
+```powershell
+ollama --version
+```
+
+**Note:** On Windows, Ollama runs as a background service automatically after installation.
+
+</details>
+
+<details>
+<summary><strong>Linux</strong></summary>
+
+**One-line Install:**
+```bash
+curl -fsSL https://ollama.ai/install.sh | sh
+```
+
+**Start the Service:**
+```bash
+ollama serve
+```
+
+Or run as a systemd service:
+```bash
+sudo systemctl start ollama
+sudo systemctl enable ollama  # Start on boot
+```
+
+</details>
+
+#### Download a Model
+
+After installing Ollama, download a model:
+
+```bash
+ollama pull mistral
+```
+
+**Recommended Models:**
+
+| Model | Command | Size | RAM Required | Best For |
+|-------|---------|------|--------------|----------|
+| **Mistral 7B** | `ollama pull mistral` | 4.1 GB | 8 GB | Best overall quality/speed balance (recommended) |
+| **Llama 3.2 3B** | `ollama pull llama3.2` | 2.0 GB | 4 GB | Fast responses, good reasoning |
+| **Phi-3 Mini** | `ollama pull phi3` | 2.3 GB | 4-8 GB | Microsoft's efficient model |
+| **Gemma 2B** | `ollama pull gemma:2b` | 1.4 GB | 4 GB | Ultra-lightweight, fastest |
+| **Llama 3.1 8B** | `ollama pull llama3.1` | 4.7 GB | 8 GB | Latest Llama, excellent quality |
+
+**Tips for Model Selection:**
+- **8+ GB RAM**: Use Mistral 7B or Llama 3.1 for best results
+- **4-8 GB RAM**: Llama 3.2 3B offers great balance
+- **Limited RAM (<4 GB)**: Gemma 2B works but with reduced quality
+- First model load takes 10-30 seconds; subsequent calls are faster
+
+#### Enable in App
+
+1. Go to **Settings → AI Recommendations**
+2. Toggle "Enable AI suggestions"
+3. Select your downloaded model from the dropdown
+4. Click "Test Connection" to verify
+5. AI suggestions will appear on the Suggestions page
+
+#### Troubleshooting Ollama
+
+**"Connection refused" error:**
+- Ensure Ollama is running: `ollama serve` (or check system tray on Windows)
+- Default URL is `http://localhost:11434`
+
+**"Model not found" error:**
+- Download the model first: `ollama pull mistral`
+- List installed models: `ollama list`
+
+**Slow first response:**
+- Normal! First call loads model into memory (10-30s)
+- Subsequent calls are much faster
+
+**High memory usage:**
+- Models stay in RAM for fast access
+- Use `ollama stop` to unload, or choose a smaller model
+
+#### Features
+- Contextual awareness (time of day, recent listening patterns)
+- Natural language reasoning explaining picks
+- Confidence level indicator
+- Works alongside algorithm-based suggestions
+- **Cost: $0** - Runs 100% locally, no API fees, works offline
+
+### 📀 Album Scrobble History
+View detailed listening history for any album:
+
+- **Last Played**: When you last scrobbled the album
+- **Total Plays**: Track-level scrobble count
+- **Play Timeline**: Chronological list of listening sessions
+- Visible on the Release Details page
 
 ## 🛠️ Development
 
@@ -105,15 +284,34 @@ npm run test:coverage # Run tests with coverage (90% target)
 ### Project Structure
 ```
 src/
-├── backend/          # Node.js API server
-│   ├── routes/       # API endpoints
-│   ├── services/     # Business logic
-│   └── utils/        # Utilities
-├── renderer/         # React frontend
-│   ├── components/   # UI components
-│   ├── pages/        # Application pages
-│   └── context/      # State management
-└── shared/           # Shared types
+├── backend/                    # Node.js API server
+│   ├── routes/                 # API endpoints
+│   │   ├── auth.ts             # Authentication routes
+│   │   ├── collection.ts       # Discogs collection routes
+│   │   ├── scrobble.ts         # Scrobbling routes
+│   │   └── suggestions.ts      # Suggestions, discovery, AI routes
+│   ├── services/               # Business logic
+│   │   ├── analyticsService.ts # Listening analytics
+│   │   ├── suggestionService.ts # Recommendation algorithm
+│   │   ├── scrobbleHistorySyncService.ts # Last.fm history sync
+│   │   ├── scrobbleHistoryStorage.ts # History index storage
+│   │   ├── ollamaService.ts    # AI integration
+│   │   └── aiPromptBuilder.ts  # AI prompt generation
+│   └── utils/                  # Utilities
+├── renderer/                   # React frontend
+│   ├── components/             # UI components
+│   │   ├── SuggestionCard.tsx  # Algorithm suggestion display
+│   │   ├── AISuggestionCard.tsx # AI suggestion display
+│   │   ├── SuggestionWeightControls.tsx # Weight sliders
+│   │   ├── SyncStatusBar.tsx   # Sync progress bar
+│   │   ├── AlbumScrobbleHistory.tsx # Album play history
+│   │   └── MissingFromCollection.tsx # Discovery component
+│   ├── pages/                  # Application pages
+│   │   ├── SuggestionsPage.tsx # Play suggestions
+│   │   ├── DiscoveryPage.tsx   # Missing albums discovery
+│   │   └── ...
+│   └── context/                # State management
+└── shared/                     # Shared types
 ```
 
 ## 🔒 Security & Privacy
