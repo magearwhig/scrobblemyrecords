@@ -8,6 +8,7 @@ import { AnalyticsService } from '../../../src/backend/services/analyticsService
 import { AuthService } from '../../../src/backend/services/authService';
 import { DiscogsService } from '../../../src/backend/services/discogsService';
 import { MappingService } from '../../../src/backend/services/mappingService';
+import { OllamaService } from '../../../src/backend/services/ollamaService';
 import { ScrobbleHistoryStorage } from '../../../src/backend/services/scrobbleHistoryStorage';
 import { ScrobbleHistorySyncService } from '../../../src/backend/services/scrobbleHistorySyncService';
 import {
@@ -25,6 +26,7 @@ jest.mock('../../../src/backend/services/analyticsService');
 jest.mock('../../../src/backend/services/suggestionService');
 jest.mock('../../../src/backend/services/mappingService');
 jest.mock('../../../src/backend/utils/fileStorage');
+jest.mock('../../../src/backend/services/ollamaService');
 
 const MockedAuthService = AuthService as jest.MockedClass<typeof AuthService>;
 const MockedDiscogsService = DiscogsService as jest.MockedClass<
@@ -45,6 +47,9 @@ const MockedSuggestionService = SuggestionService as jest.MockedClass<
 >;
 const MockedMappingService = MappingService as jest.MockedClass<
   typeof MappingService
+>;
+const MockedOllamaService = OllamaService as jest.MockedClass<
+  typeof OllamaService
 >;
 
 describe('Suggestions Routes', () => {
@@ -148,6 +153,28 @@ describe('Suggestions Routes', () => {
       newestScrobble: null,
       lastSync: null,
       estimatedSizeBytes: 0,
+    });
+
+    // Setup OllamaService mock - mocks the prototype methods
+    MockedOllamaService.prototype.getAvailableModels = jest
+      .fn()
+      .mockResolvedValue([
+        { name: 'mistral', size: 4100000000, modifiedAt: '2024-01-01' },
+        { name: 'llama3', size: 4700000000, modifiedAt: '2024-01-01' },
+      ]);
+    MockedOllamaService.prototype.checkConnection = jest
+      .fn()
+      .mockResolvedValue({ connected: true });
+    MockedOllamaService.prototype.getSettings = jest.fn().mockReturnValue({
+      enabled: false,
+      baseUrl: 'http://localhost:11434',
+      model: 'mistral',
+      timeout: 30000,
+    });
+    MockedOllamaService.prototype.updateSettings = jest.fn();
+    MockedOllamaService.prototype.generate = jest.fn().mockResolvedValue({
+      response: 'Mock AI response',
+      context: [],
     });
 
     // Create Express app
