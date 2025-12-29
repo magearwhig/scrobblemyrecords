@@ -10,9 +10,15 @@ import artistMappingRoutes from './backend/routes/artistMapping';
 import { createAuthRouter } from './backend/routes/auth';
 import createCollectionRouter from './backend/routes/collection';
 import createScrobbleRouter from './backend/routes/scrobble';
+import createSuggestionsRouter from './backend/routes/suggestions';
+import { AnalyticsService } from './backend/services/analyticsService';
 import { AuthService } from './backend/services/authService';
 import { DiscogsService } from './backend/services/discogsService';
 import { LastFmService } from './backend/services/lastfmService';
+import { MappingService } from './backend/services/mappingService';
+import { ScrobbleHistoryStorage } from './backend/services/scrobbleHistoryStorage';
+import { ScrobbleHistorySyncService } from './backend/services/scrobbleHistorySyncService';
+import { SuggestionService } from './backend/services/suggestionService';
 import { FileStorage } from './backend/utils/fileStorage';
 
 const app = express();
@@ -102,6 +108,21 @@ const authService = new AuthService(fileStorage);
 const lastfmService = new LastFmService(fileStorage, authService);
 const discogsService = new DiscogsService(fileStorage, authService);
 
+// Initialize suggestion-related services
+const historyStorage = new ScrobbleHistoryStorage(fileStorage);
+const syncService = new ScrobbleHistorySyncService(
+  fileStorage,
+  authService,
+  historyStorage
+);
+const mappingService = new MappingService(fileStorage);
+const analyticsService = new AnalyticsService(historyStorage, lastfmService);
+analyticsService.setMappingService(mappingService);
+const suggestionService = new SuggestionService(
+  analyticsService,
+  historyStorage
+);
+
 // API routes
 app.use(
   '/api/v1/auth',
@@ -116,6 +137,19 @@ app.use(
   createScrobbleRouter(fileStorage, authService, lastfmService, discogsService)
 );
 app.use('/api/v1/artist-mappings', artistMappingRoutes);
+app.use(
+  '/api/v1/suggestions',
+  createSuggestionsRouter(
+    fileStorage,
+    authService,
+    discogsService,
+    historyStorage,
+    syncService,
+    analyticsService,
+    suggestionService,
+    mappingService
+  )
+);
 
 // API info endpoint
 app.get('/api/v1', (req, res) => {
@@ -126,6 +160,7 @@ app.get('/api/v1', (req, res) => {
       auth: '/api/v1/auth',
       collection: '/api/v1/collection',
       scrobble: '/api/v1/scrobble',
+      suggestions: '/api/v1/suggestions',
     },
   });
 });
