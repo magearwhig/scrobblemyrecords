@@ -1,4 +1,3 @@
-/* global HTMLInputElement, HTMLElement, requestAnimationFrame */
 import React, { useState, useEffect, useRef } from 'react';
 
 interface SearchBarProps {

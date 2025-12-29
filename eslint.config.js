@@ -49,7 +49,9 @@ module.exports = [
         URL: 'readonly',
         URLSearchParams: 'readonly',
         HTMLInputElement: 'readonly',
+        HTMLElement: 'readonly',
         FileReader: 'readonly',
+        requestAnimationFrame: 'readonly',
 
         // Timer functions
         setTimeout: 'readonly',
