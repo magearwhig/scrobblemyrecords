@@ -958,10 +958,10 @@ export default function createSuggestionsRouter(
         .slice(0, 10)
         .map(([artist, playCount]) => ({ artist, playCount }));
 
-      // Get recently played from history
+      // Get recently played from history (truly recent, sorted by lastPlayed)
       const recentlyPlayed: AIPromptContext['recentlyPlayed'] = [];
-      const topAlbums = await historyStorage.getTopAlbumsByPlayCount(10);
-      for (const album of topAlbums.slice(0, 5)) {
+      const recentAlbums = await historyStorage.getRecentlyPlayedAlbums(10);
+      for (const album of recentAlbums.slice(0, 5)) {
         recentlyPlayed.push({
           artist: album.artist,
           album: album.album,
@@ -991,6 +991,12 @@ export default function createSuggestionsRouter(
       // Get recent AI suggestions to avoid repeating within the hour
       const recentAISuggestionsList = getRecentAISuggestions();
 
+      // Get algorithm-based suggestions for comparison/grounding
+      const algorithmPicks = await suggestionService.getSuggestions(
+        allItems,
+        10
+      );
+
       const context: AIPromptContext = {
         currentTime: now,
         dayOfWeek: AIPromptBuilder.getDayOfWeek(now),
@@ -1001,6 +1007,7 @@ export default function createSuggestionsRouter(
         collectionSize: allItems.length,
         formatBreakdown,
         decadeBreakdown,
+        algorithmPicks, // Include algorithm suggestions for AI comparison
         recentAISuggestions: recentAISuggestionsList,
         userRequest: req.query.mood as string | undefined,
       };
@@ -1009,12 +1016,96 @@ export default function createSuggestionsRouter(
       const systemPrompt = AIPromptBuilder.buildSystemPrompt();
       const userPrompt = AIPromptBuilder.buildUserPrompt(context);
 
-      const response = await ollama.chat([
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ]);
+      // Build candidate ID set for validation
+      const candidates = AIPromptBuilder.buildCandidates(context);
+      const candidateIds = new Set(candidates.map(c => c.id));
 
-      const suggestions = AIPromptBuilder.parseAIResponse(response, allItems);
+      // Build avoid ID set (recently played + recent AI suggestions)
+      const avoidIds = new Set<number>();
+      for (const recent of recentlyPlayed) {
+        const match = allItems.find(
+          item =>
+            item.release.artist.toLowerCase() === recent.artist.toLowerCase() &&
+            item.release.title.toLowerCase() === recent.album.toLowerCase()
+        );
+        if (match) avoidIds.add(match.id);
+      }
+      for (const aiSugg of recentAISuggestionsList) {
+        const match = allItems.find(
+          item =>
+            item.release.artist.toLowerCase() === aiSugg.artist.toLowerCase() &&
+            item.release.title.toLowerCase() === aiSugg.album.toLowerCase()
+        );
+        if (match) avoidIds.add(match.id);
+      }
+
+      // Retry logic for robust AI response handling
+      const MAX_RETRIES = 2;
+      let response = '';
+      let suggestions: ReturnType<typeof AIPromptBuilder.parseAIResponse> = [];
+      let lastError = '';
+
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const messages: Array<{
+          role: 'system' | 'user' | 'assistant';
+          content: string;
+        }> = [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ];
+
+        // If retrying, add the previous response and error as context
+        if (attempt > 0 && lastError) {
+          messages.push({ role: 'assistant', content: response });
+          messages.push({
+            role: 'user',
+            content: `Your response was invalid: ${lastError}\n\nPlease try again. Return ONLY valid JSON with IDs from the CANDIDATES list.`,
+          });
+        }
+
+        // Use JSON mode for guaranteed valid JSON output
+        response = await ollama.chat(messages, { jsonMode: true });
+
+        // Parse and validate
+        suggestions = AIPromptBuilder.parseAIResponse(response, allItems);
+        const matchedSuggestions = suggestions.filter(s => s.matchedAlbum);
+
+        if (matchedSuggestions.length > 0) {
+          // Success! We have valid suggestions
+          break;
+        }
+
+        // Try to parse for validation errors
+        try {
+          const jsonMatch = response.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            const errors = AIPromptBuilder.validateResponse(
+              parsed,
+              candidateIds,
+              avoidIds
+            );
+            if (errors.length > 0) {
+              lastError = errors.join('; ');
+              logger.warn(
+                `AI suggestion attempt ${attempt + 1} failed validation: ${lastError}`
+              );
+            } else {
+              lastError = 'No matching albums found in collection';
+            }
+          } else {
+            lastError = 'No valid JSON in response';
+          }
+        } catch {
+          lastError = 'Failed to parse JSON response';
+        }
+
+        if (attempt === MAX_RETRIES) {
+          logger.warn(
+            `AI suggestion exhausted ${MAX_RETRIES + 1} attempts, returning best effort`
+          );
+        }
+      }
 
       // Track the suggestions so we don't repeat them
       const matchedSuggestions = suggestions.filter(s => s.matchedAlbum);
@@ -1035,6 +1126,7 @@ export default function createSuggestionsRouter(
             timeOfDay: context.timeOfDay,
             dayOfWeek: context.dayOfWeek,
             collectionSize: context.collectionSize,
+            candidateCount: candidates.length,
           },
         },
       });

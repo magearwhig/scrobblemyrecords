@@ -870,6 +870,122 @@ describe('ScrobbleHistoryStorage', () => {
     });
   });
 
+  describe('getRecentlyPlayedAlbums', () => {
+    it('should return albums sorted by lastPlayed timestamp (newest first)', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: now - 86400,
+              playCount: 10,
+              plays: [],
+            }, // 1 day ago
+            'pink floyd|animals': {
+              lastPlayed: now - 3600,
+              playCount: 5,
+              plays: [],
+            }, // 1 hour ago
+            'the beatles|abbey road': {
+              lastPlayed: now - 604800,
+              playCount: 25,
+              plays: [],
+            }, // 1 week ago
+          },
+        })
+      );
+
+      // Act
+      const recent = await storage.getRecentlyPlayedAlbums(10);
+
+      // Assert
+      expect(recent).toHaveLength(3);
+      expect(recent[0].album).toBe('animals'); // Most recent
+      expect(recent[1].album).toBe('kid a');
+      expect(recent[2].album).toBe('abbey road'); // Oldest
+    });
+
+    it('should respect limit parameter', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: now - 86400,
+              playCount: 10,
+              plays: [],
+            },
+            'pink floyd|animals': {
+              lastPlayed: now - 3600,
+              playCount: 5,
+              plays: [],
+            },
+            'the beatles|abbey road': {
+              lastPlayed: now - 604800,
+              playCount: 25,
+              plays: [],
+            },
+          },
+        })
+      );
+
+      // Act
+      const recent = await storage.getRecentlyPlayedAlbums(2);
+
+      // Assert
+      expect(recent).toHaveLength(2);
+      expect(recent[0].album).toBe('animals');
+      expect(recent[1].album).toBe('kid a');
+    });
+
+    it('should filter out albums with zero lastPlayed', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: now - 86400,
+              playCount: 10,
+              plays: [],
+            },
+            'pink floyd|animals': { lastPlayed: 0, playCount: 5, plays: [] }, // Never played
+          },
+        })
+      );
+
+      // Act
+      const recent = await storage.getRecentlyPlayedAlbums(10);
+
+      // Assert
+      expect(recent).toHaveLength(1);
+      expect(recent[0].album).toBe('kid a');
+    });
+
+    it('should return empty array when no albums have been played', async () => {
+      // Arrange
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': { lastPlayed: 0, playCount: 0, plays: [] },
+          },
+        })
+      );
+
+      // Act
+      const recent = await storage.getRecentlyPlayedAlbums(10);
+
+      // Assert
+      expect(recent).toHaveLength(0);
+    });
+  });
+
   describe('getUniqueArtists', () => {
     it('should aggregate artists with play counts', async () => {
       // Arrange

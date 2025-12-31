@@ -296,6 +296,84 @@ describe('OllamaService', () => {
       // Act & Assert
       await expect(service.chat([])).rejects.toThrow('Ollama chat error');
     });
+
+    it('should use JSON mode when jsonMode option is true', async () => {
+      // Arrange
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          message: { content: '{"test": "json"}' },
+        }),
+      });
+      const messages = [{ role: 'user' as const, content: 'Hello' }];
+
+      // Act
+      await service.chat(messages, { jsonMode: true });
+
+      // Assert
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+      expect(body.format).toBe('json');
+      expect(body.options.temperature).toBe(0.3); // Lower for JSON mode
+    });
+
+    it('should use default temperature 0.7 when not in JSON mode', async () => {
+      // Arrange
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          message: { content: 'response' },
+        }),
+      });
+      const messages = [{ role: 'user' as const, content: 'Hello' }];
+
+      // Act
+      await service.chat(messages);
+
+      // Assert
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+      expect(body.format).toBeUndefined();
+      expect(body.options.temperature).toBe(0.7);
+    });
+
+    it('should allow custom temperature override', async () => {
+      // Arrange
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          message: { content: 'response' },
+        }),
+      });
+      const messages = [{ role: 'user' as const, content: 'Hello' }];
+
+      // Act
+      await service.chat(messages, { temperature: 0.5 });
+
+      // Assert
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+      expect(body.options.temperature).toBe(0.5);
+    });
+
+    it('should allow custom topP override', async () => {
+      // Arrange
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          message: { content: 'response' },
+        }),
+      });
+      const messages = [{ role: 'user' as const, content: 'Hello' }];
+
+      // Act
+      await service.chat(messages, { topP: 0.8 });
+
+      // Assert
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs[1].body);
+      expect(body.options.top_p).toBe(0.8);
+    });
   });
 
   describe('pullModel', () => {

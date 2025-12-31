@@ -345,6 +345,30 @@ export class ScrobbleHistoryStorage {
   }
 
   /**
+   * Get most recently played albums (sorted by lastPlayed timestamp, newest first)
+   */
+  async getRecentlyPlayedAlbums(limit: number = 10): Promise<
+    Array<{
+      artist: string;
+      album: string;
+      playCount: number;
+      lastPlayed: number;
+    }>
+  > {
+    const albums = await this.getAllAlbums();
+    return albums
+      .filter(a => a.history.lastPlayed > 0)
+      .sort((a, b) => b.history.lastPlayed - a.history.lastPlayed)
+      .slice(0, limit)
+      .map(({ artist, album, history }) => ({
+        artist,
+        album,
+        playCount: history.playCount,
+        lastPlayed: history.lastPlayed,
+      }));
+  }
+
+  /**
    * Get unique artists from the index
    */
   async getUniqueArtists(): Promise<

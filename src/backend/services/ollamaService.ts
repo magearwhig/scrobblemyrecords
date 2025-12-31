@@ -20,6 +20,23 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface ChatOptions {
+  /**
+   * Force JSON output format. When true, Ollama will guarantee valid JSON.
+   * Use lower temperature (0.3) for more deterministic structured output.
+   */
+  jsonMode?: boolean;
+  /**
+   * Temperature for response generation. Lower = more deterministic.
+   * Default: 0.7 for creative, 0.3 for JSON mode
+   */
+  temperature?: number;
+  /**
+   * Top-p sampling. Default: 0.9
+   */
+  topP?: number;
+}
+
 export interface OllamaResponse {
   model: string;
   response: string;
@@ -161,21 +178,35 @@ export class OllamaService {
 
   /**
    * Chat with the model using a conversation history
+   * @param messages - The conversation messages
+   * @param options - Optional settings for JSON mode and temperature
    */
-  async chat(messages: ChatMessage[]): Promise<string> {
+  async chat(messages: ChatMessage[], options?: ChatOptions): Promise<string> {
     try {
+      const jsonMode = options?.jsonMode ?? false;
+      // Use lower temperature for JSON mode to get more deterministic output
+      const temperature = options?.temperature ?? (jsonMode ? 0.3 : 0.7);
+      const topP = options?.topP ?? 0.9;
+
+      const requestBody: Record<string, unknown> = {
+        model: this.settings.model,
+        messages,
+        stream: false,
+        options: {
+          temperature,
+          top_p: topP,
+        },
+      };
+
+      // Add format: "json" for guaranteed valid JSON output
+      if (jsonMode) {
+        requestBody.format = 'json';
+      }
+
       const response = await fetch(`${this.settings.baseUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: this.settings.model,
-          messages,
-          stream: false,
-          options: {
-            temperature: 0.7,
-            top_p: 0.9,
-          },
-        }),
+        body: JSON.stringify(requestBody),
         signal: AbortSignal.timeout(this.settings.timeout),
       });
 
