@@ -811,13 +811,19 @@ describe('Suggestions Routes', () => {
 
   describe('GET /api/v1/suggestions/album-history/:artist/:album', () => {
     beforeEach(() => {
-      mockHistoryStorage.getAlbumHistory = jest.fn().mockResolvedValue(null);
+      mockHistoryStorage.getAlbumHistoryFuzzy = jest.fn().mockResolvedValue({
+        entry: null,
+        matchType: 'none',
+      });
       mockHistoryStorage.invalidateCache = jest.fn();
     });
 
     it('should return not found when no history exists', async () => {
       // Arrange
-      mockHistoryStorage.getAlbumHistory.mockResolvedValue(null);
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+        entry: null,
+        matchType: 'none',
+      });
 
       // Act
       const response = await request(app).get(
@@ -834,13 +840,17 @@ describe('Suggestions Routes', () => {
 
     it('should return history when exists', async () => {
       // Arrange
-      mockHistoryStorage.getAlbumHistory.mockResolvedValue({
-        lastPlayed: 1640000000000,
-        playCount: 5,
-        plays: [
-          { timestamp: 1640000000, track: 'Track 1' },
-          { timestamp: 1639000000, track: 'Track 2' },
-        ],
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+        entry: {
+          lastPlayed: 1640000000000,
+          playCount: 5,
+          plays: [
+            { timestamp: 1640000000, track: 'Track 1' },
+            { timestamp: 1639000000, track: 'Track 2' },
+          ],
+        },
+        matchType: 'exact',
+        matchedKeys: ['test artist|test album'],
       });
 
       // Act
@@ -854,11 +864,12 @@ describe('Suggestions Routes', () => {
       expect(response.body.data.found).toBe(true);
       expect(response.body.data.playCount).toBe(5);
       expect(response.body.data.plays).toHaveLength(2);
+      expect(response.body.data.matchType).toBe('exact');
     });
 
     it('should handle errors gracefully', async () => {
       // Arrange
-      mockHistoryStorage.getAlbumHistory.mockRejectedValue(
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockRejectedValue(
         new Error('History error')
       );
 
@@ -870,6 +881,33 @@ describe('Suggestions Routes', () => {
       // Assert
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
+    });
+
+    it('should return fuzzy match results', async () => {
+      // Arrange - simulates matching "Album (Deluxe Edition)" when looking for "Album"
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+        entry: {
+          lastPlayed: 1640000000,
+          playCount: 10,
+          plays: [{ timestamp: 1640000000 }],
+        },
+        matchType: 'fuzzy',
+        matchedKeys: ['test artist|album (deluxe edition)'],
+      });
+
+      // Act
+      const response = await request(app).get(
+        '/api/v1/suggestions/album-history/Test%20Artist/Album'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.found).toBe(true);
+      expect(response.body.data.matchType).toBe('fuzzy');
+      expect(response.body.data.matchedKeys).toContain(
+        'test artist|album (deluxe edition)'
+      );
     });
   });
 

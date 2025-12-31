@@ -7,6 +7,7 @@ import {
 } from '../../shared/types';
 import { AIPromptBuilder, AIPromptContext } from '../services/aiPromptBuilder';
 import { AnalyticsService } from '../services/analyticsService';
+import { artistMappingService } from '../services/artistMappingService';
 import { AuthService } from '../services/authService';
 import { DiscogsService } from '../services/discogsService';
 import { MappingService } from '../services/mappingService';
@@ -508,6 +509,7 @@ export default function createSuggestionsRouter(
   /**
    * GET /api/v1/suggestions/album-history/:artist/:album
    * Get scrobble history for a specific album
+   * Uses fuzzy matching and checks artist name mappings
    */
   router.get(
     '/album-history/:artist/:album',
@@ -525,12 +527,28 @@ export default function createSuggestionsRouter(
         const decodedArtist = decodeURIComponent(artist);
         const decodedAlbum = decodeURIComponent(album);
 
-        const history = await historyStorage.getAlbumHistory(
+        // First try with fuzzy matching on the original artist name
+        let result = await historyStorage.getAlbumHistoryFuzzy(
           decodedArtist,
           decodedAlbum
         );
 
-        if (!history) {
+        // If not found, check if artist has a scrobble mapping and try that
+        if (result.matchType === 'none') {
+          const mappedArtist =
+            artistMappingService.getLastfmName(decodedArtist);
+          if (mappedArtist !== decodedArtist) {
+            logger.debug(
+              `Album history: trying mapped artist "${mappedArtist}" for "${decodedArtist}"`
+            );
+            result = await historyStorage.getAlbumHistoryFuzzy(
+              mappedArtist,
+              decodedAlbum
+            );
+          }
+        }
+
+        if (result.matchType === 'none' || !result.entry) {
           return res.json({
             success: true,
             data: {
@@ -550,9 +568,11 @@ export default function createSuggestionsRouter(
             found: true,
             artist: decodedArtist,
             album: decodedAlbum,
-            lastPlayed: history.lastPlayed,
-            playCount: history.playCount,
-            plays: history.plays.slice(-50), // Last 50 plays
+            lastPlayed: result.entry.lastPlayed,
+            playCount: result.entry.playCount,
+            plays: result.entry.plays.slice(-50), // Last 50 plays
+            matchType: result.matchType,
+            matchedKeys: result.matchedKeys,
           },
         });
       } catch (error) {
