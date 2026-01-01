@@ -20,6 +20,7 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isStartingSync, setIsStartingSync] = useState(false);
 
   // Use ref to track sync status for interval callback to avoid stale closure
   const syncStatusRef = useRef<SyncStatus | null>(null);
@@ -83,16 +84,28 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
   const handleStartSync = async (incremental: boolean = false) => {
     try {
       setError(null);
+      setIsStartingSync(true);
       // Immediately set status to syncing so polling starts right away
       syncStatusRef.current = {
         ...syncStatusRef.current,
         status: 'syncing',
+        progress: 0,
+        scrobblesFetched: 0,
       } as SyncStatus;
-      setSyncStatus(prev => (prev ? { ...prev, status: 'syncing' } : null));
+      // Update prevStatusRef so we can detect the transition to completed
+      prevStatusRef.current = 'syncing';
+      setSyncStatus(prev =>
+        prev ? { ...prev, status: 'syncing', progress: 0 } : null
+      );
       await api.startHistorySync(incremental);
+      // Start polling immediately after initiating sync
       await fetchStatus();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start sync');
+      // Reset status on error
+      await fetchStatus();
+    } finally {
+      setIsStartingSync(false);
     }
   };
 
@@ -255,9 +268,10 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
           <button
             className='btn btn-small btn-secondary'
             onClick={() => handleStartSync(true)}
+            disabled={isStartingSync}
             title='Fetch new scrobbles since last sync'
           >
-            Refresh
+            {isStartingSync ? 'Syncing...' : 'Refresh'}
           </button>
         </div>
       )}
@@ -276,8 +290,9 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
               <button
                 className='btn btn-small btn-secondary'
                 onClick={() => handleStartSync(true)}
+                disabled={isStartingSync}
               >
-                Sync New
+                {isStartingSync ? 'Syncing...' : 'Sync New'}
               </button>
             </>
           ) : (
@@ -289,8 +304,9 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
               <button
                 className='btn btn-small'
                 onClick={() => handleStartSync(false)}
+                disabled={isStartingSync}
               >
-                Start Full Sync
+                {isStartingSync ? 'Starting...' : 'Start Full Sync'}
               </button>
             </>
           )}
@@ -305,8 +321,9 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
           <button
             className='btn btn-small'
             onClick={() => handleStartSync(false)}
+            disabled={isStartingSync}
           >
-            Retry
+            {isStartingSync ? 'Retrying...' : 'Retry'}
           </button>
         </div>
       )}

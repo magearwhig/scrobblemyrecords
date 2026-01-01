@@ -114,22 +114,31 @@ const SettingsPage: React.FC = () => {
 
   // Handle query param for pre-filling artist name (e.g., from disambiguation warning)
   useEffect(() => {
-    const hash = window.location.hash;
-    const queryStart = hash.indexOf('?');
-    if (queryStart !== -1) {
-      const params = new URLSearchParams(hash.substring(queryStart));
-      const prefillArtist = params.get('prefillArtist');
-      if (prefillArtist) {
-        setNewMapping(prev => ({ ...prev, discogsName: prefillArtist }));
-        setActiveTab('mappings');
-        // Clear the query param from URL without triggering navigation
-        window.history.replaceState(
-          null,
-          '',
-          `${window.location.pathname}#settings`
-        );
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      const queryStart = hash.indexOf('?');
+      if (queryStart !== -1) {
+        const params = new URLSearchParams(hash.substring(queryStart));
+        const prefillArtist = params.get('prefillArtist');
+        if (prefillArtist) {
+          setNewMapping(prev => ({ ...prev, discogsName: prefillArtist }));
+          setActiveTab('mappings');
+          // Clear the query param from URL without triggering navigation
+          window.history.replaceState(
+            null,
+            '',
+            `${window.location.pathname}#settings`
+          );
+        }
       }
-    }
+    };
+
+    // Check on initial mount
+    handleHashChange();
+
+    // Listen for hash changes (e.g., when navigating from disambiguation warning)
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   const loadMappings = async () => {
