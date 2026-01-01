@@ -265,14 +265,24 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
           <span className='sync-time'>
             Last synced: {formatLastSync(storageStats?.lastSync || null)}
           </span>
-          <button
-            className='btn btn-small btn-secondary'
-            onClick={() => handleStartSync(true)}
-            disabled={isStartingSync}
-            title='Fetch new scrobbles since last sync'
-          >
-            {isStartingSync ? 'Syncing...' : 'Refresh'}
-          </button>
+          <div className='sync-button-group'>
+            <button
+              className='btn btn-small btn-secondary'
+              onClick={() => handleStartSync(true)}
+              disabled={isStartingSync}
+              title='Fetch new scrobbles since last sync'
+            >
+              {isStartingSync ? 'Syncing...' : 'Refresh'}
+            </button>
+            <button
+              className='btn btn-small btn-link'
+              onClick={() => handleStartSync(false)}
+              disabled={isStartingSync}
+              title='Re-fetch all scrobbles (use if you edited scrobbles on Last.fm)'
+            >
+              Full Re-sync
+            </button>
+          </div>
         </div>
       )}
 
@@ -287,13 +297,24 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
               <span className='sync-time'>
                 Last synced: {formatLastSync(storageStats.lastSync)}
               </span>
-              <button
-                className='btn btn-small btn-secondary'
-                onClick={() => handleStartSync(true)}
-                disabled={isStartingSync}
-              >
-                {isStartingSync ? 'Syncing...' : 'Sync New'}
-              </button>
+              <div className='sync-button-group'>
+                <button
+                  className='btn btn-small btn-secondary'
+                  onClick={() => handleStartSync(true)}
+                  disabled={isStartingSync}
+                  title='Fetch new scrobbles since last sync'
+                >
+                  {isStartingSync ? 'Syncing...' : 'Sync New'}
+                </button>
+                <button
+                  className='btn btn-small btn-link'
+                  onClick={() => handleStartSync(false)}
+                  disabled={isStartingSync}
+                  title='Re-fetch all scrobbles (use if you edited scrobbles on Last.fm)'
+                >
+                  Full Re-sync
+                </button>
+              </div>
             </>
           ) : (
             <>

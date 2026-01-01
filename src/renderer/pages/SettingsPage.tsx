@@ -277,12 +277,16 @@ const SettingsPage: React.FC = () => {
     }
   }, [api]);
 
-  const handleStartSync = async () => {
+  const handleStartSync = async (incremental: boolean = true) => {
     try {
       setSyncLoading(true);
       setSyncError('');
-      await api.startHistorySync();
-      setSyncSuccess('Sync started successfully');
+      await api.startHistorySync(incremental);
+      setSyncSuccess(
+        incremental
+          ? 'Incremental sync started'
+          : 'Full re-sync started - this may take a while'
+      );
       // Reload status after a brief delay
       setTimeout(loadSyncStatus, 500);
     } catch (error) {
@@ -1285,10 +1289,19 @@ const SettingsPage: React.FC = () => {
             <div className='settings-sync-actions'>
               <button
                 className='btn'
-                onClick={handleStartSync}
+                onClick={() => handleStartSync(true)}
                 disabled={syncLoading || syncData?.sync.status === 'syncing'}
+                title='Fetch new scrobbles since last sync'
               >
-                {syncLoading ? 'Starting...' : 'Sync Now'}
+                {syncLoading ? 'Starting...' : 'Sync New'}
+              </button>
+              <button
+                className='btn btn-secondary'
+                onClick={() => handleStartSync(false)}
+                disabled={syncLoading || syncData?.sync.status === 'syncing'}
+                title='Re-fetch all scrobbles from Last.fm'
+              >
+                Full Re-sync
               </button>
               <button
                 className='btn btn-danger'
@@ -1299,16 +1312,25 @@ const SettingsPage: React.FC = () => {
                   !syncData?.storage.totalScrobbles
                 }
               >
-                Clear History Index
+                Clear Index
               </button>
             </div>
           </div>
 
           <div className='settings-sync-info'>
             <p>
-              <strong>Note:</strong> The initial sync may take several minutes
-              depending on your listening history. The app will fetch your
-              scrobbles gradually to avoid rate limits.
+              <strong>Sync New:</strong> Fetches only scrobbles added since the
+              last sync. Use this for regular updates.
+            </p>
+            <p>
+              <strong>Full Re-sync:</strong> Re-fetches your entire Last.fm
+              history. Use this if you&apos;ve edited scrobble metadata on
+              Last.fm (artist names, album names, etc.) since those changes
+              won&apos;t be picked up by incremental syncs.
+            </p>
+            <p className='settings-hint-text'>
+              The initial sync may take several minutes depending on your
+              listening history.
             </p>
           </div>
         </div>

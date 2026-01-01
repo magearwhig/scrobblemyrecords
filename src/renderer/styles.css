@@ -717,6 +717,17 @@ body {
   color: var(--text-secondary);
 }
 
+.sync-button-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sync-button-group .btn-link {
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.5rem;
+}
+
 /* ============================================
    Suggestion Card Styles
    ============================================ */
