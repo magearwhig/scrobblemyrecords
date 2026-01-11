@@ -7,6 +7,7 @@ import createSuggestionsRouter from '../../../src/backend/routes/suggestions';
 import { AnalyticsService } from '../../../src/backend/services/analyticsService';
 import { AuthService } from '../../../src/backend/services/authService';
 import { DiscogsService } from '../../../src/backend/services/discogsService';
+import { HiddenItemService } from '../../../src/backend/services/hiddenItemService';
 import { MappingService } from '../../../src/backend/services/mappingService';
 import { OllamaService } from '../../../src/backend/services/ollamaService';
 import { ScrobbleHistoryStorage } from '../../../src/backend/services/scrobbleHistoryStorage';
@@ -25,6 +26,7 @@ jest.mock('../../../src/backend/services/scrobbleHistorySyncService');
 jest.mock('../../../src/backend/services/analyticsService');
 jest.mock('../../../src/backend/services/suggestionService');
 jest.mock('../../../src/backend/services/mappingService');
+jest.mock('../../../src/backend/services/hiddenItemService');
 jest.mock('../../../src/backend/utils/fileStorage');
 jest.mock('../../../src/backend/services/ollamaService');
 
@@ -48,6 +50,9 @@ const MockedSuggestionService = SuggestionService as jest.MockedClass<
 const MockedMappingService = MappingService as jest.MockedClass<
   typeof MappingService
 >;
+const MockedHiddenItemService = HiddenItemService as jest.MockedClass<
+  typeof HiddenItemService
+>;
 const MockedOllamaService = OllamaService as jest.MockedClass<
   typeof OllamaService
 >;
@@ -62,6 +67,7 @@ describe('Suggestions Routes', () => {
   let mockAnalyticsService: jest.Mocked<AnalyticsService>;
   let mockSuggestionService: jest.Mocked<SuggestionService>;
   let mockMappingService: jest.Mocked<MappingService>;
+  let mockHiddenItemService: jest.Mocked<HiddenItemService>;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -93,6 +99,9 @@ describe('Suggestions Routes', () => {
     mockMappingService = new MockedMappingService(
       mockFileStorage
     ) as jest.Mocked<MappingService>;
+    mockHiddenItemService = new MockedHiddenItemService(
+      mockFileStorage
+    ) as jest.Mocked<HiddenItemService>;
 
     // Setup default mocks
     mockAuthService.getUserSettings = jest.fn().mockResolvedValue({
@@ -194,7 +203,8 @@ describe('Suggestions Routes', () => {
         mockSyncService,
         mockAnalyticsService,
         mockSuggestionService,
-        mockMappingService
+        mockMappingService,
+        mockHiddenItemService
       )
     );
   });

@@ -10,6 +10,7 @@ import { AnalyticsService } from '../services/analyticsService';
 import { artistMappingService } from '../services/artistMappingService';
 import { AuthService } from '../services/authService';
 import { DiscogsService } from '../services/discogsService';
+import { HiddenItemService } from '../services/hiddenItemService';
 import { MappingService } from '../services/mappingService';
 import {
   DEFAULT_OLLAMA_SETTINGS,
@@ -39,7 +40,8 @@ export default function createSuggestionsRouter(
   syncService: ScrobbleHistorySyncService,
   analyticsService: AnalyticsService,
   suggestionService: SuggestionService,
-  mappingService: MappingService
+  mappingService: MappingService,
+  hiddenItemService: HiddenItemService
 ) {
   const router = express.Router();
   const logger = createLogger('SuggestionsRoutes');
@@ -622,15 +624,29 @@ export default function createSuggestionsRouter(
           pageNumber++;
         }
 
+        // Get more than requested to account for filtering
         const missingAlbums = await analyticsService.getMissingAlbums(
           allItems,
-          limit
+          limit * 2
         );
+
+        // Filter out hidden albums
+        const filteredAlbums = [];
+        for (const album of missingAlbums) {
+          const isHidden = await hiddenItemService.isAlbumHidden(
+            album.artist,
+            album.album
+          );
+          if (!isHidden) {
+            filteredAlbums.push(album);
+            if (filteredAlbums.length >= limit) break;
+          }
+        }
 
         res.json({
           success: true,
-          data: missingAlbums,
-          total: missingAlbums.length,
+          data: filteredAlbums,
+          total: filteredAlbums.length,
         });
       } catch (error) {
         logger.error('Error getting missing albums', error);
@@ -675,15 +691,28 @@ export default function createSuggestionsRouter(
           pageNumber++;
         }
 
+        // Get more than requested to account for filtering
         const missingArtists = await analyticsService.getMissingArtists(
           allItems,
-          limit
+          limit * 2
         );
+
+        // Filter out hidden artists
+        const filteredArtists = [];
+        for (const artist of missingArtists) {
+          const isHidden = await hiddenItemService.isArtistHidden(
+            artist.artist
+          );
+          if (!isHidden) {
+            filteredArtists.push(artist);
+            if (filteredArtists.length >= limit) break;
+          }
+        }
 
         res.json({
           success: true,
-          data: missingArtists,
-          total: missingArtists.length,
+          data: filteredArtists,
+          total: filteredArtists.length,
         });
       } catch (error) {
         logger.error('Error getting missing artists', error);
@@ -1323,6 +1352,190 @@ export default function createSuggestionsRouter(
       });
     } catch (error) {
       logger.error('Error removing artist mapping', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // ============================================
+  // Hidden Items Endpoints (for Discovery)
+  // ============================================
+
+  /**
+   * GET /api/v1/suggestions/hidden/albums
+   * Get all hidden albums
+   */
+  router.get('/hidden/albums', async (_req: Request, res: Response) => {
+    try {
+      const albums = await hiddenItemService.getAllHiddenAlbums();
+      res.json({
+        success: true,
+        albums,
+      });
+    } catch (error) {
+      logger.error('Error getting hidden albums', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * POST /api/v1/suggestions/hidden/albums
+   * Hide an album from Discovery
+   */
+  router.post('/hidden/albums', async (req: Request, res: Response) => {
+    try {
+      const { artist, album } = req.body;
+
+      if (!artist || !album) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required fields: artist, album',
+        });
+      }
+
+      await hiddenItemService.hideAlbum(artist, album);
+
+      res.json({
+        success: true,
+        message: `Hidden album: "${artist}" - "${album}"`,
+      });
+    } catch (error) {
+      logger.error('Error hiding album', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * DELETE /api/v1/suggestions/hidden/albums
+   * Unhide an album
+   */
+  router.delete('/hidden/albums', async (req: Request, res: Response) => {
+    try {
+      const { artist, album } = req.body;
+
+      if (!artist || !album) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required fields: artist, album',
+        });
+      }
+
+      const removed = await hiddenItemService.unhideAlbum(artist, album);
+
+      res.json({
+        success: true,
+        removed,
+      });
+    } catch (error) {
+      logger.error('Error unhiding album', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * GET /api/v1/suggestions/hidden/artists
+   * Get all hidden artists
+   */
+  router.get('/hidden/artists', async (_req: Request, res: Response) => {
+    try {
+      const artists = await hiddenItemService.getAllHiddenArtists();
+      res.json({
+        success: true,
+        artists,
+      });
+    } catch (error) {
+      logger.error('Error getting hidden artists', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * POST /api/v1/suggestions/hidden/artists
+   * Hide an artist from Discovery
+   */
+  router.post('/hidden/artists', async (req: Request, res: Response) => {
+    try {
+      const { artist } = req.body;
+
+      if (!artist) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required field: artist',
+        });
+      }
+
+      await hiddenItemService.hideArtist(artist);
+
+      res.json({
+        success: true,
+        message: `Hidden artist: "${artist}"`,
+      });
+    } catch (error) {
+      logger.error('Error hiding artist', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * DELETE /api/v1/suggestions/hidden/artists
+   * Unhide an artist
+   */
+  router.delete('/hidden/artists', async (req: Request, res: Response) => {
+    try {
+      const { artist } = req.body;
+
+      if (!artist) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required field: artist',
+        });
+      }
+
+      const removed = await hiddenItemService.unhideArtist(artist);
+
+      res.json({
+        success: true,
+        removed,
+      });
+    } catch (error) {
+      logger.error('Error unhiding artist', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * GET /api/v1/suggestions/hidden/counts
+   * Get counts of hidden items
+   */
+  router.get('/hidden/counts', async (_req: Request, res: Response) => {
+    try {
+      const counts = await hiddenItemService.getHiddenCounts();
+      res.json({
+        success: true,
+        ...counts,
+      });
+    } catch (error) {
+      logger.error('Error getting hidden counts', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

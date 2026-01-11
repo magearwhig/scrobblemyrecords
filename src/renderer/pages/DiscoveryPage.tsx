@@ -11,6 +11,8 @@ import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
 
 type TabType = 'albums' | 'artists';
+type AlbumSortOption = 'plays' | 'artist' | 'album' | 'recent';
+type ArtistSortOption = 'plays' | 'artist' | 'albums' | 'recent';
 
 interface MappingModalState {
   isOpen: boolean;
@@ -39,6 +41,10 @@ const DiscoveryPage: React.FC = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [mappingInProgress, setMappingInProgress] = useState(false);
 
+  // Sorting state
+  const [albumSort, setAlbumSort] = useState<AlbumSortOption>('plays');
+  const [artistSort, setArtistSort] = useState<ArtistSortOption>('plays');
+
   const api = getApiService(state.serverUrl);
 
   const loadData = async () => {
@@ -47,8 +53,8 @@ const DiscoveryPage: React.FC = () => {
       setError(null);
 
       const [albums, artists] = await Promise.all([
-        api.getMissingAlbums(50),
-        api.getMissingArtists(50),
+        api.getMissingAlbums(100),
+        api.getMissingArtists(100),
       ]);
 
       setMissingAlbums(albums);
@@ -192,6 +198,64 @@ const DiscoveryPage: React.FC = () => {
     }
   };
 
+  // Hide an album from discovery (e.g., podcasts)
+  const handleHideAlbum = async (album: MissingAlbum) => {
+    try {
+      await api.hideAlbum(album.artist, album.album);
+      // Remove from local state
+      setMissingAlbums(prev =>
+        prev.filter(
+          a => !(a.artist === album.artist && a.album === album.album)
+        )
+      );
+    } catch (err) {
+      console.error('Failed to hide album:', err);
+    }
+  };
+
+  // Hide an artist from discovery (e.g., podcasts)
+  const handleHideArtist = async (artist: MissingArtist) => {
+    try {
+      await api.hideArtist(artist.artist);
+      // Remove from local state
+      setMissingArtists(prev => prev.filter(a => a.artist !== artist.artist));
+    } catch (err) {
+      console.error('Failed to hide artist:', err);
+    }
+  };
+
+  // Sort albums based on selected option
+  const sortedAlbums = [...missingAlbums].sort((a, b) => {
+    switch (albumSort) {
+      case 'plays':
+        return b.playCount - a.playCount;
+      case 'artist':
+        return a.artist.localeCompare(b.artist);
+      case 'album':
+        return a.album.localeCompare(b.album);
+      case 'recent':
+        return b.lastPlayed - a.lastPlayed;
+      default:
+        return 0;
+    }
+  });
+
+  // Sort artists based on selected option
+  const sortedArtists = [...missingArtists].sort((a, b) => {
+    switch (artistSort) {
+      case 'plays':
+        return b.playCount - a.playCount;
+      case 'artist':
+        return a.artist.localeCompare(b.artist);
+      case 'albums':
+        return b.albumCount - a.albumCount;
+      case 'recent':
+        return b.lastPlayed - a.lastPlayed;
+      default:
+        return 0;
+    }
+  });
+
   return (
     <div className='discovery-page'>
       <h1>Discovery</h1>
@@ -235,7 +299,24 @@ const DiscoveryPage: React.FC = () => {
         <div className='discovery-content'>
           {activeTab === 'albums' && (
             <div className='discovery-section'>
-              <h2>Albums You Listen To But Don't Own</h2>
+              <div className='discovery-section-header'>
+                <h2>Albums You Listen To But Don't Own</h2>
+                <div className='discovery-sort'>
+                  <label htmlFor='album-sort'>Sort by:</label>
+                  <select
+                    id='album-sort'
+                    value={albumSort}
+                    onChange={e =>
+                      setAlbumSort(e.target.value as AlbumSortOption)
+                    }
+                  >
+                    <option value='plays'>Most Plays</option>
+                    <option value='artist'>Artist Name</option>
+                    <option value='album'>Album Name</option>
+                    <option value='recent'>Recently Played</option>
+                  </select>
+                </div>
+              </div>
               {missingAlbums.length === 0 ? (
                 <p className='empty-state'>
                   No missing albums found. Either you own everything you listen
@@ -243,7 +324,7 @@ const DiscoveryPage: React.FC = () => {
                 </p>
               ) : (
                 <div className='missing-list'>
-                  {missingAlbums.map((album, index) => (
+                  {sortedAlbums.map((album, index) => (
                     <div
                       key={`${album.artist}-${album.album}-${index}`}
                       className='missing-item'
@@ -290,6 +371,13 @@ const DiscoveryPage: React.FC = () => {
                         >
                           Map
                         </button>
+                        <button
+                          className='btn btn-small btn-link'
+                          onClick={() => handleHideAlbum(album)}
+                          title='Hide from discovery (e.g., podcasts)'
+                        >
+                          Hide
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -300,14 +388,31 @@ const DiscoveryPage: React.FC = () => {
 
           {activeTab === 'artists' && (
             <div className='discovery-section'>
-              <h2>Artists You Listen To But Don't Own</h2>
+              <div className='discovery-section-header'>
+                <h2>Artists You Listen To But Don't Own</h2>
+                <div className='discovery-sort'>
+                  <label htmlFor='artist-sort'>Sort by:</label>
+                  <select
+                    id='artist-sort'
+                    value={artistSort}
+                    onChange={e =>
+                      setArtistSort(e.target.value as ArtistSortOption)
+                    }
+                  >
+                    <option value='plays'>Most Plays</option>
+                    <option value='artist'>Artist Name</option>
+                    <option value='albums'>Most Albums</option>
+                    <option value='recent'>Recently Played</option>
+                  </select>
+                </div>
+              </div>
               {missingArtists.length === 0 ? (
                 <p className='empty-state'>
                   No missing artists found. You have a complete collection!
                 </p>
               ) : (
                 <div className='missing-list'>
-                  {missingArtists.map((artist, index) => (
+                  {sortedArtists.map((artist, index) => (
                     <div
                       key={`${artist.artist}-${index}`}
                       className='missing-item'
@@ -352,6 +457,13 @@ const DiscoveryPage: React.FC = () => {
                           title='Map to collection artist'
                         >
                           Map
+                        </button>
+                        <button
+                          className='btn btn-small btn-link'
+                          onClick={() => handleHideArtist(artist)}
+                          title='Hide from discovery (e.g., podcasts)'
+                        >
+                          Hide
                         </button>
                       </div>
                     </div>

@@ -14,6 +14,7 @@ import createSuggestionsRouter from './backend/routes/suggestions';
 import { AnalyticsService } from './backend/services/analyticsService';
 import { AuthService } from './backend/services/authService';
 import { DiscogsService } from './backend/services/discogsService';
+import { HiddenItemService } from './backend/services/hiddenItemService';
 import { LastFmService } from './backend/services/lastfmService';
 import { MappingService } from './backend/services/mappingService';
 import { ScrobbleHistoryStorage } from './backend/services/scrobbleHistoryStorage';
@@ -116,6 +117,7 @@ const syncService = new ScrobbleHistorySyncService(
   historyStorage
 );
 const mappingService = new MappingService(fileStorage);
+const hiddenItemService = new HiddenItemService(fileStorage);
 const analyticsService = new AnalyticsService(historyStorage, lastfmService);
 analyticsService.setMappingService(mappingService);
 const suggestionService = new SuggestionService(
@@ -147,7 +149,8 @@ app.use(
     syncService,
     analyticsService,
     suggestionService,
-    mappingService
+    mappingService,
+    hiddenItemService
   )
 );
 

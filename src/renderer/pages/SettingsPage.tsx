@@ -4,6 +4,8 @@ import { ArtistMapping } from '../../backend/services/artistMappingService';
 import {
   AlbumMapping,
   ArtistMapping as DiscoveryArtistMapping,
+  HiddenAlbum,
+  HiddenArtist,
   SyncStatus,
   SyncSettings,
 } from '../../shared/types';
@@ -12,7 +14,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
 
-type SettingsTab = 'mappings' | 'sync' | 'settings';
+type SettingsTab = 'mappings' | 'sync' | 'hidden' | 'settings';
 
 const SettingsPage: React.FC = () => {
   const { state } = useApp();
@@ -57,6 +59,11 @@ const SettingsPage: React.FC = () => {
   >([]);
   const [discoveryLoading, setDiscoveryLoading] = useState(false);
 
+  // Hidden items state (for Discovery)
+  const [hiddenAlbums, setHiddenAlbums] = useState<HiddenAlbum[]>([]);
+  const [hiddenArtists, setHiddenArtists] = useState<HiddenArtist[]>([]);
+  const [hiddenLoading, setHiddenLoading] = useState(false);
+
   // Sync settings state
   const [syncData, setSyncData] = useState<{
     sync: SyncStatus;
@@ -98,6 +105,7 @@ const SettingsPage: React.FC = () => {
     loadMappings();
     loadAISettings();
     loadDiscoveryMappings();
+    loadHiddenItems();
     if (authStatus.discogs.authenticated && authStatus.discogs.username) {
       loadArtists();
       loadSuggestions();
@@ -217,6 +225,49 @@ const SettingsPage: React.FC = () => {
     } catch (error) {
       setError(
         error instanceof Error ? error.message : 'Failed to delete mapping'
+      );
+    }
+  };
+
+  // Hidden items functions
+  const loadHiddenItems = async () => {
+    try {
+      setHiddenLoading(true);
+      const [albums, artists] = await Promise.all([
+        api.getHiddenAlbums(),
+        api.getHiddenArtists(),
+      ]);
+      setHiddenAlbums(albums);
+      setHiddenArtists(artists);
+    } catch (error) {
+      console.warn('Failed to load hidden items:', error);
+    } finally {
+      setHiddenLoading(false);
+    }
+  };
+
+  const handleUnhideAlbum = async (artist: string, album: string) => {
+    try {
+      await api.unhideAlbum(artist, album);
+      setHiddenAlbums(prev =>
+        prev.filter(a => !(a.artist === artist && a.album === album))
+      );
+      setSuccess(`Unhidden album: "${album}" by "${artist}"`);
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : 'Failed to unhide album'
+      );
+    }
+  };
+
+  const handleUnhideArtist = async (artist: string) => {
+    try {
+      await api.unhideArtist(artist);
+      setHiddenArtists(prev => prev.filter(a => a.artist !== artist));
+      setSuccess(`Unhidden artist: "${artist}"`);
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : 'Failed to unhide artist'
       );
     }
   };
@@ -675,6 +726,8 @@ const SettingsPage: React.FC = () => {
         return renderMappingsTab();
       case 'sync':
         return renderSyncTab();
+      case 'hidden':
+        return renderHiddenTab();
       case 'settings':
         return renderSettingsTab();
       default:
@@ -1370,6 +1423,101 @@ const SettingsPage: React.FC = () => {
     </>
   );
 
+  const renderHiddenTab = () => (
+    <>
+      {/* Hidden Discovery Items Section */}
+      <div className='card'>
+        <h3>Hidden Discovery Items</h3>
+        <p>
+          Items hidden from the Discovery page (e.g., podcasts, compilations).
+          Hidden items will not appear in the "Missing Albums" or "Missing
+          Artists" lists.
+        </p>
+
+        {hiddenLoading ? (
+          <div className='loading-container'>
+            <div className='loading-spinner' />
+            <p>Loading hidden items...</p>
+          </div>
+        ) : (
+          <>
+            {/* Hidden Albums */}
+            <div className='settings-section'>
+              <h4>Hidden Albums ({hiddenAlbums.length})</h4>
+              {hiddenAlbums.length === 0 ? (
+                <p className='empty-state'>
+                  No hidden albums. Use the "Hide" button on the Discovery page
+                  to hide items.
+                </p>
+              ) : (
+                <div className='mappings-list'>
+                  {hiddenAlbums.map((item, index) => (
+                    <div
+                      key={`${item.artist}-${item.album}-${index}`}
+                      className='mapping-item'
+                    >
+                      <div className='mapping-info'>
+                        <span className='mapping-source'>
+                          "{item.album}" by {item.artist}
+                        </span>
+                        <span className='mapping-date'>
+                          Hidden: {new Date(item.hiddenAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <button
+                        className='btn btn-small btn-secondary'
+                        onClick={() =>
+                          handleUnhideAlbum(item.artist, item.album)
+                        }
+                        title='Unhide this album'
+                      >
+                        Unhide
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Hidden Artists */}
+            <div className='settings-section'>
+              <h4>Hidden Artists ({hiddenArtists.length})</h4>
+              {hiddenArtists.length === 0 ? (
+                <p className='empty-state'>
+                  No hidden artists. Use the "Hide" button on the Discovery page
+                  to hide items.
+                </p>
+              ) : (
+                <div className='mappings-list'>
+                  {hiddenArtists.map((item, index) => (
+                    <div
+                      key={`${item.artist}-${index}`}
+                      className='mapping-item'
+                    >
+                      <div className='mapping-info'>
+                        <span className='mapping-source'>{item.artist}</span>
+                        <span className='mapping-date'>
+                          Hidden: {new Date(item.hiddenAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <button
+                        className='btn btn-small btn-secondary'
+                        onClick={() => handleUnhideArtist(item.artist)}
+                        title='Unhide this artist'
+                      >
+                        Unhide
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  );
+
   const renderSettingsTab = () => (
     <>
       {/* AI Recommendations Section */}
@@ -1566,6 +1714,12 @@ const SettingsPage: React.FC = () => {
           onClick={() => setActiveTab('sync')}
         >
           Sync
+        </button>
+        <button
+          className={`settings-tab ${activeTab === 'hidden' ? 'active' : ''}`}
+          onClick={() => setActiveTab('hidden')}
+        >
+          Hidden
         </button>
         <button
           className={`settings-tab ${activeTab === 'settings' ? 'active' : ''}`}

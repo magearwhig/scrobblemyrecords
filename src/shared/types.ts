@@ -258,6 +258,27 @@ export interface ArtistMapping {
 }
 
 // ============================================
+// Hidden Discovery Items
+// ============================================
+
+/**
+ * Album hidden from Discovery page (e.g., podcasts, compilations)
+ */
+export interface HiddenAlbum {
+  artist: string;
+  album: string;
+  hiddenAt: number; // Timestamp when hidden
+}
+
+/**
+ * Artist hidden from Discovery page (e.g., podcast hosts)
+ */
+export interface HiddenArtist {
+  artist: string;
+  hiddenAt: number; // Timestamp when hidden
+}
+
+// ============================================
 // AI Suggestion Types (Ollama)
 // ============================================
 

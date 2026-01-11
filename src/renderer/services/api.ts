@@ -7,6 +7,8 @@ import {
   AuthStatus,
   CollectionItem,
   DiscogsRelease,
+  HiddenAlbum,
+  HiddenArtist,
   MissingAlbum,
   MissingArtist,
   ScrobbleTrack,
@@ -783,6 +785,47 @@ class ApiService {
       timeout: 90000, // 90 seconds for AI requests
     });
     return response.data.data;
+  }
+
+  // ============================================
+  // Hidden Discovery Items methods
+  // ============================================
+
+  async getHiddenAlbums(): Promise<HiddenAlbum[]> {
+    const response = await this.api.get('/suggestions/hidden/albums');
+    return response.data.albums;
+  }
+
+  async hideAlbum(artist: string, album: string): Promise<void> {
+    await this.api.post('/suggestions/hidden/albums', { artist, album });
+  }
+
+  async unhideAlbum(artist: string, album: string): Promise<boolean> {
+    const response = await this.api.delete('/suggestions/hidden/albums', {
+      data: { artist, album },
+    });
+    return response.data.removed;
+  }
+
+  async getHiddenArtists(): Promise<HiddenArtist[]> {
+    const response = await this.api.get('/suggestions/hidden/artists');
+    return response.data.artists;
+  }
+
+  async hideArtist(artist: string): Promise<void> {
+    await this.api.post('/suggestions/hidden/artists', { artist });
+  }
+
+  async unhideArtist(artist: string): Promise<boolean> {
+    const response = await this.api.delete('/suggestions/hidden/artists', {
+      data: { artist },
+    });
+    return response.data.removed;
+  }
+
+  async getHiddenCounts(): Promise<{ albums: number; artists: number }> {
+    const response = await this.api.get('/suggestions/hidden/counts');
+    return { albums: response.data.albums, artists: response.data.artists };
   }
 
   // Update base URL (for when server URL changes)
