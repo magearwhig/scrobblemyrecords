@@ -398,11 +398,13 @@ const CollectionPage: React.FC = () => {
     try {
       await api.preloadCollection(authStatus.discogs.username);
       console.log('Collection preloading started');
+      // Start monitoring progress - preload runs in background on server
+      startCacheProgressMonitoring();
     } catch (error) {
       console.error('Failed to start preloading:', error);
-    } finally {
       setPreloading(false);
     }
+    // Note: Don't set preloading=false here - startCacheProgressMonitoring will do that when complete
   };
 
   const performSearch = async (query: string, page: number = 1) => {

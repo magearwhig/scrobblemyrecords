@@ -21,6 +21,9 @@ export class DiscogsService {
   private baseUrl = 'https://api.discogs.com';
   private logger = createLogger('DiscogsService');
 
+  // Lock to prevent concurrent preloading
+  private preloadingInProgress: Map<string, boolean> = new Map();
+
   constructor(fileStorage: FileStorage, authService: AuthService) {
     this.fileStorage = fileStorage;
     this.authService = authService;
@@ -445,6 +448,17 @@ export class DiscogsService {
   async preloadAllCollectionPages(username: string): Promise<void> {
     const progressKey = `collections/${username}-progress.json`;
 
+    // Check if preloading is already in progress for this user
+    if (this.preloadingInProgress.get(username)) {
+      this.logger.info(
+        `Preloading already in progress for ${username}, skipping duplicate request`
+      );
+      return;
+    }
+
+    // Set the lock
+    this.preloadingInProgress.set(username, true);
+
     try {
       this.logger.info(
         `Starting progressive collection loading for: ${username}`
@@ -544,6 +558,9 @@ export class DiscogsService {
       progress.status = 'failed';
       progress.error = error instanceof Error ? error.message : 'Unknown error';
       await this.fileStorage.writeJSON(progressKey, progress);
+    } finally {
+      // Always release the lock
+      this.preloadingInProgress.delete(username);
     }
   }
 
