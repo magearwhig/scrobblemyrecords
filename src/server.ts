@@ -9,16 +9,20 @@ dotenv.config();
 import artistMappingRoutes from './backend/routes/artistMapping';
 import { createAuthRouter } from './backend/routes/auth';
 import createCollectionRouter from './backend/routes/collection';
+import createImagesRouter from './backend/routes/images';
 import createScrobbleRouter from './backend/routes/scrobble';
+import createStatsRouter from './backend/routes/stats';
 import createSuggestionsRouter from './backend/routes/suggestions';
 import { AnalyticsService } from './backend/services/analyticsService';
 import { AuthService } from './backend/services/authService';
 import { DiscogsService } from './backend/services/discogsService';
 import { HiddenItemService } from './backend/services/hiddenItemService';
+import { ImageService } from './backend/services/imageService';
 import { LastFmService } from './backend/services/lastfmService';
 import { MappingService } from './backend/services/mappingService';
 import { ScrobbleHistoryStorage } from './backend/services/scrobbleHistoryStorage';
 import { ScrobbleHistorySyncService } from './backend/services/scrobbleHistorySyncService';
+import { StatsService } from './backend/services/statsService';
 import { SuggestionService } from './backend/services/suggestionService';
 import { FileStorage } from './backend/utils/fileStorage';
 
@@ -124,6 +128,8 @@ const suggestionService = new SuggestionService(
   analyticsService,
   historyStorage
 );
+const statsService = new StatsService(fileStorage, historyStorage);
+const imageService = new ImageService(fileStorage, lastfmService);
 
 // API routes
 app.use(
@@ -139,6 +145,14 @@ app.use(
   createScrobbleRouter(fileStorage, authService, lastfmService, discogsService)
 );
 app.use('/api/v1/artist-mappings', artistMappingRoutes);
+app.use(
+  '/api/v1/stats',
+  createStatsRouter(fileStorage, authService, statsService)
+);
+app.use(
+  '/api/v1/images',
+  createImagesRouter(fileStorage, authService, imageService)
+);
 app.use(
   '/api/v1/suggestions',
   createSuggestionsRouter(
@@ -164,6 +178,8 @@ app.get('/api/v1', (req, res) => {
       collection: '/api/v1/collection',
       scrobble: '/api/v1/scrobble',
       suggestions: '/api/v1/suggestions',
+      stats: '/api/v1/stats',
+      images: '/api/v1/images',
     },
   });
 });

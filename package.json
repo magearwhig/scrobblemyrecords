@@ -43,7 +43,8 @@
     "helmet": "^8.1.0",
     "oauth-1.0a": "^2.2.6",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "recharts": "^3.6.0"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [

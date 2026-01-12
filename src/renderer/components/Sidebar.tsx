@@ -56,6 +56,12 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
       enabled: authStatus.lastfm.authenticated,
     },
     {
+      id: 'stats',
+      label: 'Stats Dashboard',
+      icon: '📊',
+      enabled: authStatus.lastfm.authenticated,
+    },
+    {
       id: 'settings',
       label: 'Settings',
       icon: '⚙️',

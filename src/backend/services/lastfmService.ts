@@ -662,6 +662,84 @@ export class LastFmService {
     }
   }
 
+  async getAlbumInfo(
+    artist: string,
+    album: string
+  ): Promise<{
+    name: string;
+    artist: string;
+    image: Array<{ size: string; '#text': string }>;
+    playcount?: number;
+  } | null> {
+    try {
+      const credentials = await this.authService.getLastFmCredentials();
+      if (!credentials.apiKey) {
+        return null;
+      }
+
+      const response = await this.axios.get('', {
+        params: {
+          method: 'album.getInfo',
+          api_key: credentials.apiKey,
+          artist,
+          album,
+          format: 'json',
+        },
+      });
+
+      if (response.data.error) {
+        this.logger.debug('Last.fm album.getInfo error', {
+          error: response.data.error,
+          message: response.data.message,
+          artist,
+          album,
+        });
+        return null;
+      }
+
+      return response.data.album || null;
+    } catch {
+      this.logger.debug('Error getting album info', { artist, album });
+      return null;
+    }
+  }
+
+  async getArtistInfo(artist: string): Promise<{
+    name: string;
+    image: Array<{ size: string; '#text': string }>;
+    stats?: { listeners: string; playcount: string };
+  } | null> {
+    try {
+      const credentials = await this.authService.getLastFmCredentials();
+      if (!credentials.apiKey) {
+        return null;
+      }
+
+      const response = await this.axios.get('', {
+        params: {
+          method: 'artist.getInfo',
+          api_key: credentials.apiKey,
+          artist,
+          format: 'json',
+        },
+      });
+
+      if (response.data.error) {
+        this.logger.debug('Last.fm artist.getInfo error', {
+          error: response.data.error,
+          message: response.data.message,
+          artist,
+        });
+        return null;
+      }
+
+      return response.data.artist || null;
+    } catch {
+      this.logger.debug('Error getting artist info', { artist });
+      return null;
+    }
+  }
+
   async getArtistPlaycount(artistName: string): Promise<number | null> {
     try {
       const credentials = await this.authService.getLastFmCredentials();

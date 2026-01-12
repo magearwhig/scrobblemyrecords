@@ -8,6 +8,7 @@ import ReleaseDetailsPage from '../pages/ReleaseDetailsPage';
 import ScrobblePage from '../pages/ScrobblePage';
 import SettingsPage from '../pages/SettingsPage';
 import SetupPage from '../pages/SetupPage';
+import StatsPage from '../pages/StatsPage';
 import SuggestionsPage from '../pages/SuggestionsPage';
 
 interface MainContentProps {
@@ -50,6 +51,8 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
         return <SuggestionsPage />;
       case 'discovery':
         return <DiscoveryPage />;
+      case 'stats':
+        return <StatsPage />;
       default:
         return <HomePage />;
     }

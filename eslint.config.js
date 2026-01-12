@@ -50,6 +50,9 @@ module.exports = [
         URLSearchParams: 'readonly',
         HTMLInputElement: 'readonly',
         HTMLElement: 'readonly',
+        HTMLDivElement: 'readonly',
+        Event: 'readonly',
+        Node: 'readonly',
         FileReader: 'readonly',
         requestAnimationFrame: 'readonly',
 
@@ -181,6 +184,7 @@ module.exports = [
         afterAll: 'readonly',
         jest: 'readonly',
         MouseEvent: 'readonly',
+        Response: 'readonly',
       },
     },
     rules: {

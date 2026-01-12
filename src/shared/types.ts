@@ -304,3 +304,148 @@ export interface OllamaModel {
   size: number;
   modifiedAt: string;
 }
+
+// ============================================
+// Stats Dashboard Types
+// ============================================
+
+export interface ArtistPlayCount {
+  artist: string;
+  playCount: number;
+  imageUrl?: string;
+}
+
+export interface AlbumPlayCount {
+  artist: string;
+  album: string;
+  playCount: number;
+  lastPlayed: number;
+  coverUrl?: string;
+}
+
+export interface StreakInfo {
+  currentStreak: number;
+  longestStreak: number;
+  currentStreakStart?: number; // Unix timestamp
+  longestStreakStart?: number;
+  longestStreakEnd?: number;
+}
+
+export interface ScrobbleCounts {
+  today: number;
+  thisWeek: number;
+  thisMonth: number;
+  thisYear: number;
+  allTime: number;
+}
+
+export interface ListeningHours {
+  today: number;
+  thisWeek: number;
+  thisMonth: number;
+}
+
+export interface CollectionCoverage {
+  thisMonth: number; // Percentage 0-100
+  thisYear: number;
+  allTime: number;
+  days30: number; // Rolling 30 days
+  days90: number; // Rolling 90 days
+  days365: number; // Rolling 365 days
+  albumsPlayedThisMonth: number;
+  albumsPlayedThisYear: number;
+  albumsPlayedAllTime: number;
+  albumsPlayedDays30: number;
+  albumsPlayedDays90: number;
+  albumsPlayedDays365: number;
+  totalAlbums: number;
+}
+
+export interface MilestoneInfo {
+  total: number;
+  nextMilestone: number;
+  scrobblesToNext: number;
+  progressPercent: number;
+  history: { milestone: number; reachedAt: number }[];
+}
+
+export interface CalendarHeatmapData {
+  date: string; // YYYY-MM-DD
+  count: number;
+}
+
+export interface StatsOverview {
+  streaks: StreakInfo;
+  counts: ScrobbleCounts;
+  listeningHours: ListeningHours;
+  newArtistsThisMonth: number;
+  collectionCoverage: CollectionCoverage;
+  milestones: MilestoneInfo;
+}
+
+export interface SourceBreakdownItem {
+  source: string; // 'RecordScrobbles', 'Other'
+  count: number;
+  percentage: number;
+}
+
+export interface TimelineDataPoint {
+  date: string; // YYYY-MM-DD or YYYY-MM or YYYY-Www depending on granularity
+  count: number;
+}
+
+export interface DustyCornerAlbum {
+  artist: string;
+  album: string;
+  coverUrl?: string;
+  lastPlayed: number;
+  daysSincePlay: number;
+  collectionId: number;
+}
+
+// ============================================
+// Notification System Types
+// ============================================
+
+export interface AppNotification {
+  id: string;
+  type: 'info' | 'success' | 'warning' | 'alert';
+  title: string;
+  message: string;
+  timestamp: number;
+  read: boolean;
+  action?: {
+    label: string;
+    route: string;
+    externalUrl?: string;
+  };
+}
+
+export interface NotificationStore {
+  schemaVersion: 1;
+  notifications: AppNotification[];
+}
+
+// ============================================
+// Stats Cache Types
+// ============================================
+
+export interface StatsCache {
+  schemaVersion: 1;
+  lastUpdated: number; // Unix timestamp UTC
+  streaks: StreakInfo;
+  milestoneHistory: { milestone: number; reachedAt: number }[];
+}
+
+// ============================================
+// Date Range Selection Types
+// ============================================
+
+/**
+ * Custom date range for filtering stats.
+ * Timestamps are in Unix seconds (not milliseconds).
+ */
+export interface DateRange {
+  startDate: number; // Unix timestamp (seconds)
+  endDate: number; // Unix timestamp (seconds)
+}
