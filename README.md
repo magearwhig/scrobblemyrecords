@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-1282%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-1557%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -114,15 +114,32 @@ npm run start:web
 - **Batch Scrobbling**: Scrobble multiple items with progress tracking
 - **Smart Timing**: Auto timing (simulates just finishing listening) or custom timestamps
 - **History View**: Dual-tab history showing app scrobble sessions and synced Last.fm listening history
+- **Stats Dashboard**: Comprehensive listening statistics and visualizations
 - **Cache Management**: Force reload collection data when needed
 - **Cache Updates**: Check for new Discogs additions and update the cache incrementally
-- **Discovery + Mapping**: Find “missing” albums/artists and map them to items in your collection
+- **Discovery + Mapping**: Find "missing" albums/artists and map them to items in your collection
 - **Dark Mode**: Toggle between light and dark themes
 - **Local Timezone**: All times displayed in your local timezone
 - **Sorting Options**: Sort collection by artist, title, year, or date added
 - **Artist Name Mapping**: Map Discogs artist names to Last.fm names for consistent scrobbling
 - **Disambiguation Warnings**: Alerts when scrobbling artists with Discogs disambiguation suffixes (e.g., "Ghost (32)")
 - **Possible Mappings**: Automatically suggests artists in your collection that may need name mappings
+
+### 📈 Stats Dashboard
+Comprehensive listening statistics and visualizations:
+
+- **Listening Streak**: Track your daily listening streak and longest streak ever
+- **Scrobble Counts**: Today, this week, this month, this year, and all-time totals
+- **Listening Hours**: Track how many hours you've spent listening
+- **New Artists**: Count of new artists discovered this month
+- **Collection Coverage**: Percentage of your vinyl collection played over various time periods
+- **Calendar Heatmap**: GitHub-style visualization of daily listening activity by year
+- **Top Artists & Albums**: Leaderboards with period selection (week/month/year/all-time/custom)
+- **Custom Date Range**: Pick specific months or custom date ranges for all stats
+- **Milestone Progress**: Track progress toward scrobble milestones (1K, 5K, 10K, etc.)
+- **Dusty Corners**: Albums in your collection you haven't played in 6+ months
+- **Source Breakdown**: See which sources your scrobbles come from
+- **Listening Timeline**: Visualize listening trends over time
 
 ### 🎲 Play Suggestions
 Intelligent album recommendations based on 9 weighted factors:
@@ -343,9 +360,13 @@ src/
 │   │   ├── auth.ts             # Authentication routes
 │   │   ├── collection.ts       # Discogs collection routes
 │   │   ├── scrobble.ts         # Scrobbling routes
+│   │   ├── stats.ts            # Stats dashboard routes
+│   │   ├── images.ts           # Album/artist image routes
 │   │   └── suggestions.ts      # Suggestions, discovery, AI routes
 │   ├── services/               # Business logic
 │   │   ├── analyticsService.ts # Listening analytics
+│   │   ├── statsService.ts     # Stats dashboard calculations
+│   │   ├── imageService.ts     # Album/artist image fetching
 │   │   ├── suggestionService.ts # Recommendation algorithm
 │   │   ├── scrobbleHistorySyncService.ts # Last.fm history sync
 │   │   ├── scrobbleHistoryStorage.ts # History index storage
@@ -363,6 +384,7 @@ src/
 │   │   ├── SuggestionsPage.tsx
 │   │   ├── DiscoveryPage.tsx
 │   │   ├── HistoryPage.tsx
+│   │   ├── StatsPage.tsx
 │   │   └── SettingsPage.tsx
 │   └── context/                # State management
 └── shared/                     # Shared types
