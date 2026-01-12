@@ -1,0 +1,1238 @@
+# RecordScrobbles Roadmap
+
+## Feature 0: Foundations
+
+Cross-cutting concerns to address before or alongside feature development.
+
+### Status: MOSTLY COMPLETE ✅
+
+**Completed:**
+- 0A: Security Baseline (already in place before this work)
+- 0B: API Conventions - `stats.ts` and `images.ts` routes created following `/api/v1/` pattern
+- 0E: Extended Analytics Infrastructure - `StatsService` created with comprehensive stats methods
+- Image caching service (`imageService.ts`) with Last.fm and Discogs integration
+- All stats-related types defined in `shared/types.ts`
+- Full test coverage for new routes and services
+
+**Not Yet Implemented:**
+- 0C: Data Evolution & Storage (schema versioning for new data files)
+- 0D: In-App Notification System
+
+### 0A: Security Baseline
+
+**Server Binding:**
+- Ensure backend binds to `127.0.0.1` only (not `0.0.0.0`)
+- Document opt-in for LAN exposure if ever needed
+
+**Path Traversal Protection:**
+- Audit all file-based endpoints for path traversal vulnerabilities
+- Validate usernames and file paths before constructing paths
+- Use allowlist approach for file operations
+
+**Token/Secret Hygiene:**
+- Audit logging to ensure tokens, signatures, and API keys are never logged
+- Review `ENCRYPTION_KEY` requirements - require strong key, no weak defaults
+
+### 0B: API Conventions
+
+All new endpoints must follow existing `/api/v1/` prefix pattern:
+- Stats: `/api/v1/stats/...`
+- Wishlist: `/api/v1/wishlist/...`
+- Patterns: `/api/v1/patterns/...`
+- Images: `/api/v1/images/...`
+- Sellers: `/api/v1/sellers/...`
+- Releases: `/api/v1/releases/...`
+
+New route modules:
+- `src/backend/routes/stats.ts`
+- `src/backend/routes/wishlist.ts`
+- `src/backend/routes/patterns.ts`
+- `src/backend/routes/images.ts`
+- `src/backend/routes/sellers.ts`
+- `src/backend/routes/releases.ts`
+
+### 0C: Data Evolution & Storage
+
+**Schema Versioning:**
+- Add `schemaVersion` field to new JSON data files
+- Document expected schema for each data file
+- Plan migration logic for breaking changes
+
+**Timezone Handling (Critical for Streaks):**
+- Store all timestamps in UTC
+- Define "day boundary" for streak calculations (user's local midnight)
+- Document timezone assumptions in code comments
+
+**Storage Bounds:**
+- Define max age for cached data (e.g., purge image cache entries older than 30 days)
+- Implement cleanup routines for orphaned data
+
+### 0D: In-App Notification System
+
+**UI Component: Notification Panel**
+
+Add a notification area to the app UI (e.g., bell icon in header with dropdown):
+- Shows recent alerts/notifications
+- Badge count for unread items
+- Persisted to localStorage
+
+```typescript
+interface AppNotification {
+  id: string;
+  type: 'info' | 'success' | 'warning' | 'alert';
+  title: string;
+  message: string;
+  timestamp: number;
+  read: boolean;
+  action?: {
+    label: string;
+    route: string;           // Navigate to this page (primary action)
+    externalUrl?: string;    // Open in browser (secondary action)
+  };
+}
+```
+
+**Notification Panel Behavior:**
+- Click notification → navigate to `route` (in-app page)
+- If `externalUrl` present, show secondary "Open in Discogs/MusicBrainz" link
+- Both options clearly visible so user can choose
+
+**Use Cases:**
+- "New vinyl pressing available for [Album]" (Feature 2)
+- "Wishlist item at local seller!" (Feature 4)
+- "Artist [X] has a new release" (Feature 5)
+- "You hit a 30-day listening streak!" (Feature 1)
+- Sync errors or warnings
+
+**Implementation:**
+- `src/renderer/components/NotificationPanel.tsx`
+- `src/renderer/hooks/useNotifications.ts`
+- Store in localStorage key: `recordscrobbles.notifications`
+- Max 50 notifications, auto-prune oldest
+
+### 0E: Extend Existing Analytics Infrastructure
+
+**Existing Services:**
+
+`ScrobbleHistoryStorage` (`src/backend/services/scrobbleHistoryStorage.ts`) provides:
+- `getHourlyDistribution()` - Scrobbles by hour of day
+- `getDayOfWeekDistribution()` - Scrobbles by day of week
+- `getAlbumHistory()` - Play history for specific album
+- `getUniqueArtists()` - All artists with play counts
+- `getAllAlbums()` - All albums with play history
+
+`AnalyticsService` (`src/backend/services/analyticsService.ts`) wraps the above and adds:
+- `getTopArtistsMap()` - Top artists with weighted play counts
+- `getAnalyticsSummary()` - Total scrobbles, unique albums/artists, peak hours
+- `getAlbumCompleteness()` - Album completion detection
+- `getTimeOfDayPreference()` - Current listening likelihood
+
+**Strategy for Stats Dashboard:**
+- Create `StatsService` that uses `AnalyticsService` + `ScrobbleHistoryStorage`
+- Add new methods for streaks, source breakdown, collection coverage
+- Avoid duplicating existing logic - call through to existing services
+
+---
+
+## Feature 1: Listening Streaks & Stats Dashboard
+
+### Status: COMPLETE ✅
+
+**Completed:**
+- Stats Dashboard page with all core components
+- Streak calculation (daily listening streaks with consecutive day tracking)
+- Scrobble counts (today, week, month, year, all-time)
+- Listening hours tracking (today, week, month)
+- New artists count (this month)
+- Collection coverage stats (multiple time periods)
+- Top Artists and Top Albums lists with period selectors
+- Custom date range picker for Top Artists, Top Albums, and Timeline
+- Calendar heatmap showing daily scrobble activity with year selector
+- Dusty Corners section (neglected albums with album covers)
+- Milestone progress tracking with history
+- Source breakdown pie chart (with limitations - see below)
+- Listening timeline area chart with period and granularity selectors
+- recharts library integration for charts
+- Image service for album/artist thumbnails (`imageService.ts`, `/api/v1/images/*` routes)
+- Album cover and artist image batch fetching for Top Lists
+- Full test coverage for stats components, StatsPage, and statsApi
+- 1557 tests passing with 60%+ branch coverage
+
+**Not Yet Implemented:**
+- Notification system integration (Feature 0D pending)
+- Streak milestone notifications (depends on 0D)
+
+### Overview
+Comprehensive statistics dashboard showing listening patterns, streaks, source breakdown (this app vs Spotify vs others), and collection engagement metrics.
+
+### Feasibility & Design Decisions
+
+**Source Breakdown - IMPORTANT LIMITATION:**
+
+After investigation, Last.fm's public API does **NOT** expose scrobble source/player information:
+- The `track.scrobble` API accepts a `context` parameter for source, but this data is "not public, only enabled for certain API keys" per Last.fm documentation
+- There is no way to retrieve which app/player submitted a scrobble via the public API
+- Last.fm Pro subscription does not provide additional API access for source data
+- This is an API limitation, not a RecordScrobbles limitation
+
+**Current Implementation (Workaround):**
+- RecordScrobbles identifies its own scrobbles by matching timestamps from saved session files
+- When scrobbles are submitted, session data (including timestamps) is saved locally
+- Source breakdown compares history timestamps against session file timestamps (5-second tolerance)
+- Scrobbles matching session timestamps are marked "RecordScrobbles", others are "Other"
+
+**Limitation of Current Approach:**
+- If session files in `data/scrobbles/sessions/` are deleted, source attribution is lost
+- All scrobbles would then appear as "Other" since there's no way to recover source from Last.fm
+- This is a fragile solution but the best available given Last.fm API constraints
+
+**Original Plan (Not Feasible):**
+- ~~Last.fm scrobble data may not reliably include source for all scrobbles~~
+- ~~Need to investigate what Last.fm API actually returns in scrobble metadata~~
+- ~~Fallback: categorize as "This App" (scrobbles made through recordscrobbles) vs "Other"~~
+- ~~This app's scrobbles can be identified by checking if timestamp matches a known scrobble we submitted~~
+
+**Listening Hours Calculation:**
+- Track duration source: Use Last.fm `track.getInfo` for duration, or estimate ~3.5 min/track if unavailable
+- Gap handling: If gap between consecutive scrobbles > 30 min, assume new session
+- Don't count gap time as listening time
+
+**Streak Day Boundary:**
+- Use user's local timezone for day boundaries
+- A "day" runs from local midnight to local midnight
+- Store streak data with UTC timestamps but calculate boundaries in local time
+
+**Album Completion Detection:**
+- Reuse existing `AnalyticsService.getAlbumCompleteness()` logic
+- "Complete" = played 80%+ of tracks within a 3-hour window
+
+### Phase 1A: Stats Calculation Service
+
+**Backend: `src/backend/services/statsService.ts`**
+
+Calculate stats from synced scrobble history:
+
+```typescript
+interface ListeningStats {
+  // Streaks
+  currentDailyStreak: number;
+  longestDailyStreak: number;
+  currentCollectionStreak: number;  // Days listening to owned albums
+  albumsCompletedThisMonth: number;
+  newArtistsThisMonth: number;
+
+  // Time-based
+  scrobblesToday: number;
+  scrobblesThisWeek: number;
+  scrobblesThisMonth: number;
+  scrobblesThisYear: number;
+  scrobblesAllTime: number;
+
+  listeningHoursToday: number;
+  listeningHoursThisWeek: number;
+  listeningHoursThisMonth: number;
+
+  // Source breakdown
+  sourceBreakdown: {
+    source: string;  // 'recordscrobbles', 'Spotify', 'Apple Music', etc.
+    count: number;
+    percentage: number;
+  }[];
+
+  // Collection stats
+  collectionCoverageThisMonth: number;  // % of owned albums played
+  collectionCoverageThisYear: number;
+  dustyCorners: AlbumInfo[];  // Owned albums not played in 6+ months
+  heavyRotation: AlbumPlayCount[];  // Most played owned albums
+
+  // Top lists
+  topArtistsThisWeek: ArtistPlayCount[];
+  topArtistsThisMonth: ArtistPlayCount[];
+  topArtistsThisYear: ArtistPlayCount[];
+  topArtistsAllTime: ArtistPlayCount[];
+
+  topAlbumsThisWeek: AlbumPlayCount[];
+  topAlbumsThisMonth: AlbumPlayCount[];
+  topAlbumsThisYear: AlbumPlayCount[];
+  topAlbumsAllTime: AlbumPlayCount[];
+
+  // Milestones
+  totalScrobbles: number;
+  nextMilestone: number;  // 10K, 25K, 50K, 100K, etc.
+  scrobblesToNextMilestone: number;
+  milestoneHistory: { milestone: number; date: number }[];
+
+  // Patterns
+  peakListeningHours: { hour: number; dayOfWeek: number; count: number }[];
+  weekdayVsWeekend: { weekday: number; weekend: number };
+}
+```
+
+**API Endpoints:**
+- `GET /api/v1/stats/overview` - Main stats summary
+- `GET /api/v1/stats/streaks` - Streak data
+- `GET /api/v1/stats/sources` - Source breakdown
+- `GET /api/v1/stats/collection` - Collection engagement stats
+- `GET /api/v1/stats/top/:period` - Top artists/albums (week/month/year/all)
+- `GET /api/v1/stats/heatmap` - Calendar heatmap data
+- `GET /api/v1/stats/dusty-corners` - Albums owned but not played recently
+
+**Data Processing:**
+- Parse scrobble history index for play data
+- Cross-reference with collection for owned albums
+- Extract source from scrobble metadata (if available in Last.fm data)
+- Calculate streaks by checking consecutive days with scrobbles
+
+### Phase 1B: Stats Dashboard Page
+
+**New Page: `src/renderer/pages/StatsPage.tsx`**
+
+Layout sections:
+
+**1. Overview Cards (top row)**
+```
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│ 🔥 23 days   │ │ 📊 847       │ │ 🎵 12        │ │ 📀 67%       │
+│ Listening    │ │ Scrobbles    │ │ New Artists  │ │ Collection   │
+│ Streak       │ │ This Month   │ │ This Month   │ │ Coverage     │
+└──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘
+```
+
+**2. Source Breakdown (pie/donut chart)**
+- Show % from each scrobbling source
+- "Physical vs Digital" summary
+
+**3. Calendar Heatmap**
+- GitHub-style contribution grid
+- Color intensity = scrobble count
+- Clickable days to see what was played
+- Day detail popup shows album covers of what was played
+
+**4. Listening Timeline**
+- Line graph showing scrobbles over time
+- Toggle between week/month/year views
+- Optional: overlay multiple years
+
+**5. Top Lists**
+- Tabs: Artists | Albums
+- Period selector: Week | Month | Year | All Time
+- Show play counts and trend indicators
+- **Album list items**: Album cover thumbnail (50-60px), artist, album title, play count
+- **Artist list items**: Artist image thumbnail (50-60px, circular), artist name, play count
+
+```
+Top Albums This Month:
+┌────────────────────────────────────────────────┐
+│ [cover] Radiohead - OK Computer     │ 47 plays │
+│ [cover] Pink Floyd - DSOTM          │ 32 plays │
+│ [cover] Boards of Canada - MHTRTC   │ 28 plays │
+└────────────────────────────────────────────────┘
+
+Top Artists This Month:
+┌────────────────────────────────────────────────┐
+│ (img) Radiohead                     │ 142 plays│
+│ (img) Pink Floyd                    │  87 plays│
+│ (img) Boards of Canada              │  65 plays│
+└────────────────────────────────────────────────┘
+```
+
+**6. Collection Stats**
+- "Dusty Corners" section - albums owned but neglected
+  - Grid/list of album covers with artist/title overlay
+  - "Last played X months ago" indicator
+- "Heavy Rotation" - most played from collection
+  - Album covers prominently displayed
+- Collection coverage progress bar
+
+**7. Milestones**
+- Progress to next milestone
+- History of milestone dates
+
+**8. Recently Played Section** (optional)
+- Scrollable row of recent album covers
+- Quick visual of listening history
+
+### Phase 1C: Stats Components
+
+**New Components:**
+- `src/renderer/components/stats/StreakCard.tsx`
+- `src/renderer/components/stats/SourcePieChart.tsx`
+- `src/renderer/components/stats/CalendarHeatmap.tsx`
+- `src/renderer/components/stats/ListeningTimeline.tsx`
+- `src/renderer/components/stats/TopList.tsx` - Handles both albums (with covers) and artists (with images)
+- `src/renderer/components/stats/MilestoneProgress.tsx`
+- `src/renderer/components/stats/DustyCornersSection.tsx`
+- `src/renderer/components/stats/AlbumCard.tsx` - Reusable album display with cover
+- `src/renderer/components/stats/ArtistCard.tsx` - Reusable artist display with image
+
+**Charting Library:**
+- Consider using lightweight library like `recharts` or `chart.js`
+- Or build simple SVG-based components for basic charts
+
+### Phase 1E: Image Sources & Caching
+
+**Album Cover Sources (in priority order):**
+1. **Discogs collection cache** - Already have cover URLs from collection sync
+2. **Last.fm API** - `album.getInfo` returns album images
+3. **Discogs API** - Fallback for non-collection albums
+
+**Artist Image Sources:**
+1. **Last.fm API** - `artist.getInfo` returns artist images (though Last.fm deprecated large images)
+2. **Discogs API** - `GET /artists/{id}` includes images
+3. **MusicBrainz + Cover Art Archive** - Alternative source
+4. **Spotify API** - Has good artist images (would require additional auth)
+
+**Image Handling:**
+- Cache fetched images locally to avoid repeated API calls
+- Use placeholder/fallback for missing images (generic vinyl icon for albums, silhouette for artists)
+- Lazy load images as they scroll into view
+- Store image URLs in stats cache alongside play data
+
+**Backend: `src/backend/services/imageService.ts`**
+
+```typescript
+interface ImageService {
+  getAlbumCover(artist: string, album: string): Promise<string | null>;
+  getArtistImage(artist: string): Promise<string | null>;
+  getCachedImages(items: { artist: string; album?: string }[]): Promise<ImageCache>;
+}
+
+interface ImageCache {
+  albums: { [key: string]: string };  // "artist|album" -> URL
+  artists: { [key: string]: string }; // "artist" -> URL
+}
+```
+
+**API Endpoints:**
+- `GET /api/v1/images/album?artist=X&album=Y` - Get album cover URL
+- `GET /api/v1/images/artist?name=X` - Get artist image URL
+- `POST /api/v1/images/batch` - Batch fetch multiple images
+
+**Data Storage:**
+- `images/album-covers.json` - Cached album cover URLs
+- `images/artist-images.json` - Cached artist image URLs
+
+### Visual Design Considerations
+
+**Consistent Album Display:**
+- Standard cover sizes: 50px (list items), 100px (cards), 150px (featured)
+- Rounded corners (4-8px) for album covers
+- Subtle shadow/border for depth
+- Fallback: Dark gray placeholder with vinyl icon
+
+**Consistent Artist Display:**
+- Circular crop for artist images
+- Standard sizes: 50px (list), 80px (cards)
+- Fallback: Dark gray circle with music note or silhouette icon
+
+**Color Scheme:**
+- Use existing app color palette
+- Accent colors for charts that complement album art
+- Dark backgrounds make album covers pop
+
+**Typography:**
+- Play counts in monospace or tabular numbers for alignment
+- Artist names slightly bolder than album titles
+- Truncate long names with ellipsis
+
+**Responsive Layout:**
+- Cards reflow on smaller screens
+- Album grids adjust column count
+- Charts resize gracefully
+
+### Phase 1D: Streak Tracking
+
+**Backend Enhancement:**
+
+Track streaks in real-time:
+- Update streak counts when new scrobbles are synced
+- Store streak history for display
+- Detect streak milestones (7 days, 30 days, 100 days, 365 days)
+
+**Streak Types:**
+1. **Daily Listening Streak** - Any scrobble counts
+2. **Collection Streak** - Days playing owned albums (requires cross-referencing)
+3. **Album Completion Streak** - Detect when most/all tracks of album played in sequence
+4. **Discovery Streak** - Days with new artist listens
+
+---
+
+## Feature 2: Discogs Wishlist & Vinyl Availability Tracking
+
+### Overview
+Track albums at the **master release level** (not specific pressings), monitor for vinyl availability, and integrate with Discovery to show which albums are vinyl-available vs CD-only. Focus is exclusively on vinyl - no interest in CD or other formats.
+
+### Feasibility & Design Decisions
+
+**Master vs Release Mapping:**
+- Discogs wishlist stores specific releases, not master releases
+- Each wishlist item has a `master_id` we can extract
+- Strategy: Fetch wishlist, extract master_id from each release, group by master
+- Display shows master-level info but stores original release_id for reference
+
+**API Call Bounding for Version Scanning:**
+- Scanning all versions of all wishlist items could be expensive (1 API call per master)
+- Bound: Max 100 wishlist items scanned per sync
+- Bound: Max 50 versions fetched per master (paginated endpoint)
+- Cache version data for 7 days to avoid repeated lookups
+- Progressive sync: scan 10-20 masters per day rather than all at once
+
+**Vinyl Detection:**
+- Check `format` field in version data for: "Vinyl", "LP", "12\"", "10\"", "7\""
+- Exclude: "CD", "Cassette", "File", "DVD"
+- Store list of vinyl version IDs for each master
+
+**Price Data:**
+- `GET /marketplace/stats/{release_id}` returns price statistics
+- Only fetch for vinyl versions
+- Cache for 24 hours (prices change)
+- Note: Requires separate API call per release - expensive for large wishlists
+
+### Phase 2A: Wishlist Sync Service
+
+**Backend: `src/backend/services/wishlistService.ts`**
+
+Create a new service to sync and manage Discogs wishlist data:
+
+```typescript
+interface WishlistItem {
+  masterId: number;
+  releaseId: number;           // The specific release in wishlist (for reference)
+  artist: string;
+  title: string;
+  dateAdded: number;           // When added to Discogs wishlist
+  hasVinyl: boolean;           // Does ANY vinyl pressing exist?
+  vinylVersionCount: number;   // How many vinyl versions exist
+  vinylPriceRange?: {
+    min: number;
+    max: number;
+    median: number;
+    currency: string;
+  };
+  lastChecked: number;         // When we last scanned versions
+  isAffordable?: boolean;      // Below user's price threshold
+}
+
+interface WishlistSyncStatus {
+  status: 'idle' | 'syncing' | 'completed' | 'error';
+  lastSync: number | null;
+  totalItems: number;
+  itemsWithVinyl: number;
+  itemsCdOnly: number;
+}
+```
+
+**API Endpoints:**
+- `GET /api/v1/wishlist` - Get all wishlist items with vinyl status
+- `GET /api/v1/wishlist/sync` - Get sync status
+- `POST /api/v1/wishlist/sync` - Trigger wishlist sync from Discogs
+- `GET /api/v1/wishlist/:masterId/versions` - Get all versions of a master release
+- `POST /api/v1/wishlist/settings` - Save settings (price threshold, etc.)
+
+**Discogs API Calls:**
+1. `GET /users/{username}/wants` - Fetch full wishlist
+2. `GET /masters/{master_id}/versions` - Get all pressings for each item
+3. `GET /marketplace/stats/{release_id}` - Get price data for vinyl versions
+
+**Data Storage:**
+- `wishlist/wishlist-items.json` - Cached wishlist with vinyl status
+- `wishlist/wishlist-settings.json` - User settings (price threshold)
+- `wishlist/sync-status.json` - Sync progress/status
+
+**Rate Limiting Considerations:**
+- Wishlist sync involves many API calls (1 per master release for versions)
+- Implement progressive sync with delays (similar to collection preloader)
+- Cache version/format data for 7 days (vinyl availability changes rarely)
+- Cache price data for 24 hours (prices change frequently)
+
+### Phase 2B: Wishlist Page (Frontend)
+
+**New Page: `src/renderer/pages/WishlistPage.tsx`**
+
+Features:
+- Display all wishlist items grouped by vinyl availability
+- Filters:
+  - "All Items"
+  - "Has Vinyl" (show only items with vinyl pressings)
+  - "CD Only" (show items without vinyl - for watching)
+  - "Affordable Vinyl" (under price threshold)
+- Sort options:
+  - Date added to wishlist
+  - Price (lowest vinyl)
+  - Artist name
+  - Album title
+- Each item shows:
+  - Artist - Album
+  - Vinyl status badge (green "Vinyl Available", gray "CD Only", yellow "Vinyl $$$")
+  - Price range for vinyl versions (if available)
+  - Link to Discogs marketplace
+  - "Check Versions" button to view all pressings
+
+**Sync Status Bar:**
+- Reuse pattern from `SyncStatusBar.tsx`
+- Show "Last synced: X hours ago"
+- "Sync Now" button
+
+### Phase 2C: Discovery Integration
+
+**Modify: `src/backend/services/vinylAvailabilityService.ts`** (new)
+
+Service to check vinyl availability for Discovery items:
+- When Discovery loads missing albums, check each against Discogs for vinyl versions
+- Cache results to avoid repeated API calls
+- Background job to periodically update availability
+
+**Modify: `src/renderer/pages/DiscoveryPage.tsx`**
+
+Add to each Discovery album card:
+- Vinyl status badge
+- Price indicator (if vinyl available)
+- "Add to Wishlist" button (adds master release to Discogs wishlist)
+- "Watch for Vinyl" button (for CD-only items - local tracking)
+
+**New Filters on Discovery:**
+- "Show All"
+- "Vinyl Available"
+- "CD Only"
+- "Affordable Vinyl (under $X)"
+
+### Phase 2D: Watch for Vinyl Feature
+
+**Backend: `src/backend/services/vinylWatchService.ts`**
+
+For CD-only albums on Discovery that user wants to track:
+- Store list of "watched" albums locally
+- Periodically check if vinyl versions become available
+- Generate notifications when vinyl is added
+
+**Data Storage:**
+- `discovery/vinyl-watch-list.json`
+
+### Phase 2E: Settings
+
+**Modify: `src/renderer/pages/SettingsPage.tsx`**
+
+Add "Wishlist" tab with:
+- Price threshold setting (default: $40)
+- Auto-sync interval (daily, weekly, manual only)
+- Currency preference
+
+---
+
+## Feature 3: Smart Scrobble Scheduling
+
+### Overview
+Make backfilling scrobbles easier with intelligent timestamp suggestions, batch operations, and a listening queue system.
+
+### Feasibility & Design Decisions
+
+**Last.fm Timestamp Constraints:**
+- Last.fm accepts scrobbles with timestamps up to 2 weeks in the past
+- Timestamps must be Unix epoch seconds
+- Cannot scrobble to the future
+- Duplicate detection: same track + timestamp = rejected
+
+**Conflict Resolution UX:**
+- Before scrobbling, check existing scrobbles for that time window
+- Show warning: "You have scrobbles between 7pm-9pm on this date"
+- Options: "Scrobble anyway" / "Adjust times" / "Cancel"
+- Auto-adjust: Shift proposed timestamps to fill gaps around existing scrobbles
+
+**Pattern Learning Approach:**
+- Analyze last 6 months of scrobble history
+- Extract: typical start times per day-of-week, session lengths, gaps between albums
+- Store computed patterns, refresh weekly
+- Use existing `ScrobbleHistoryStorage.getHourlyDistribution()` as foundation
+
+### Phase 3A: Pattern Learning Service
+
+**Backend: `src/backend/services/listeningPatternService.ts`**
+
+Analyze scrobble history to learn user's listening patterns:
+
+```typescript
+interface ListeningPatterns {
+  // Time-of-day patterns by day of week
+  typicalStartTimes: {
+    dayOfWeek: number;  // 0-6
+    morning: number | null;    // Average start time if they listen in morning
+    afternoon: number | null;
+    evening: number | null;
+  }[];
+
+  // Session patterns
+  averageSessionLength: number;  // minutes
+  averageGapBetweenAlbums: number;  // minutes
+  averageAlbumsPerSession: number;
+
+  // Weekday vs weekend
+  weekdayPattern: { start: number; end: number };
+  weekendPattern: { start: number; end: number };
+}
+```
+
+**API Endpoints:**
+- `GET /api/v1/patterns` - Get learned listening patterns
+- `GET /api/v1/patterns/suggest?date=YYYY-MM-DD&count=3` - Suggest timestamps for X albums on date
+
+### Phase 3B: Backfill Mode
+
+**Frontend: Enhance scrobble dialog**
+
+Add "Backfill Mode" option when scrobbling:
+
+1. Select multiple albums (add to backfill queue)
+2. Choose date/time range:
+   - Preset: "Yesterday evening", "Last Saturday afternoon", etc.
+   - Custom: Date picker with start/end time
+3. Preview calculated timestamps based on:
+   - Album durations
+   - User's typical gaps between albums
+   - Learned patterns for that time of day
+4. Adjust if needed
+5. Submit all scrobbles at once
+
+**UI Flow:**
+```
+┌─────────────────────────────────────────────────┐
+│ Backfill Listening Session                      │
+│                                                 │
+│ Albums to scrobble:                             │
+│ ☑ Radiohead - OK Computer (53 min)        [×]  │
+│ ☑ Pink Floyd - DSOTM (42 min)             [×]  │
+│ ☑ Boards of Canada - MHTRTC (62 min)      [×]  │
+│                                                 │
+│ [+ Add Another Album]                           │
+│                                                 │
+│ When did you listen?                            │
+│ ○ Yesterday evening (based on your patterns)   │
+│ ○ Yesterday afternoon                          │
+│ ○ Saturday evening                             │
+│ ○ Custom: [Jan 10, 2026] [6:00 PM] to [11:00 PM]│
+│                                                 │
+│ Preview:                                        │
+│ • OK Computer: Sat 6:15pm - 7:08pm              │
+│ • DSOTM: Sat 7:30pm - 8:12pm                    │
+│ • MHTRTC: Sat 8:45pm - 9:47pm                   │
+│                                                 │
+│ ⚠️ No conflicts with existing scrobbles        │
+│                                                 │
+│ [Cancel]                    [Scrobble All (3)]  │
+└─────────────────────────────────────────────────┘
+```
+
+### Phase 3C: Quick Backdate Presets
+
+**Modify: Scrobble dialog (`ScrobbleDialog.tsx` or similar)**
+
+Add quick preset buttons:
+- "Just now" (current time)
+- "Earlier today" (picks typical afternoon time)
+- "Yesterday evening" (picks typical evening time based on patterns)
+- "Yesterday afternoon"
+- "Custom..." (existing date/time picker)
+
+These presets auto-populate based on learned patterns:
+- "You usually listen at 8pm on weekday evenings"
+- "Your Saturday afternoons typically start around 2pm"
+
+### Phase 3D: Listening Queue
+
+**New Feature: Real-time listening tracker**
+
+For users who want to log as they listen:
+
+1. "Start Listening Session" button
+2. Add album to queue → records current time as start
+3. "Finished" button → scrobbles with correct start time
+4. Automatically calculates gaps and handles overlaps
+
+**State Management:**
+```typescript
+interface ListeningQueue {
+  sessionStarted: number;
+  albums: {
+    releaseId: number;
+    artist: string;
+    album: string;
+    addedAt: number;      // When added to queue
+    finishedAt?: number;  // When marked finished
+    scrobbled: boolean;
+  }[];
+}
+```
+
+**Storage:**
+- Store in localStorage for persistence across page refreshes
+- Auto-save queue state
+
+### Phase 3E: Conflict Detection
+
+**Backend Enhancement:**
+
+When suggesting timestamps:
+- Check against existing scrobbles for that time period
+- Warn if overlap detected
+- Suggest alternative times if conflicts exist
+
+---
+
+## Feature 4: Local Seller Monitoring
+
+### Overview
+Track Discogs inventories of local record shops to find wishlist items available locally. Users maintain a list of seller usernames (typically under 20 local stores), and the app periodically scans their inventories for matches against the user's wishlist.
+
+### Feasibility & Design Decisions
+
+**Scope:**
+- Only tracks items on the user's Discogs wishlist (synced via Feature 2)
+- Vinyl-only focus (consistent with wishlist feature)
+- No price threshold filtering - local availability is the priority
+- Equal notification priority with other wishlist alerts
+
+**API Constraints:**
+- `GET /users/{username}/inventory` - Paginated seller inventory (up to 100 items/page)
+- Rate limit: 60 requests/minute shared with all Discogs operations
+- Seller inventories can be large (1000+ items for active shops)
+- Strategy: Incremental scan with progress saved between sessions
+
+**Scan Frequency:**
+- Full inventory scan: Weekly per seller
+- Quick check for new listings: Daily (fetch page 1 sorted by date added)
+- Cache seller inventory for 24 hours to avoid redundant calls
+
+**Matching Strategy:**
+- Match by master_id when available (consistent with wishlist tracking)
+- Fallback to artist/title fuzzy matching for releases without master_id
+- Only match vinyl formats (LP, 12", 10", 7")
+
+**Wishlist Dependency:**
+- Seller scanning requires wishlist to be synced first
+- If wishlist is empty or not synced: show empty state with "Sync Wishlist First" prompt
+- Don't attempt seller scans until wishlist has items
+
+**Stale Listing Cleanup:**
+- On each scan, compare new matches against existing matches
+- If a listing disappears (sold/removed): mark match as `status: 'sold'`
+- Sold matches hidden from main view, accessible via "Show Sold" toggle
+- Auto-prune sold matches older than 30 days
+
+### Phase 4A: Seller Management Service
+
+**Backend: `src/backend/services/sellerMonitoringService.ts`**
+
+```typescript
+interface MonitoredSeller {
+  username: string;           // Discogs seller username
+  displayName: string;        // User-friendly name (e.g., "Amoeba Music")
+  addedAt: number;            // When user added this seller
+  lastScanned: number;        // Last full inventory scan
+  lastQuickCheck: number;     // Last new listings check
+  inventorySize: number;      // Total items in inventory
+  matchCount: number;         // Current wishlist matches
+}
+
+interface SellerMatch {
+  sellerId: string;           // Seller username
+  releaseId: number;          // Discogs release ID
+  masterId: number;           // Master release ID
+  artist: string;
+  title: string;
+  format: string;             // "LP", "12\"", etc.
+  condition: string;          // "Mint", "VG+", etc.
+  price: number;
+  currency: string;
+  listingUrl: string;         // Direct link to listing
+  listingId: number;          // Discogs listing ID for tracking
+  dateFound: number;          // When we first detected this match
+  notified: boolean;          // Have we alerted the user?
+  status: 'active' | 'sold' | 'seen';  // Lifecycle state
+  statusChangedAt?: number;   // When status last changed
+}
+
+interface SellerInventoryCache {
+  username: string;
+  fetchedAt: number;
+  items: {
+    releaseId: number;
+    masterId?: number;
+    artist: string;
+    title: string;
+    format: string;
+    condition: string;
+    price: number;
+    currency: string;
+    listingId: number;
+  }[];
+}
+```
+
+**API Endpoints:**
+- `GET /api/v1/sellers` - List all monitored sellers with stats
+- `POST /api/v1/sellers` - Add a seller to monitor
+- `DELETE /api/v1/sellers/:username` - Remove a seller
+- `GET /api/v1/sellers/:username/matches` - Get wishlist matches for a seller
+- `GET /api/v1/sellers/matches` - Get all matches across all sellers
+- `POST /api/v1/sellers/scan` - Trigger manual scan of all sellers
+- `GET /api/v1/sellers/scan/status` - Get scan progress
+
+**Discogs API Calls:**
+1. `GET /users/{username}/inventory?sort=listed&sort_order=desc` - Seller inventory (newest first)
+2. For each listing, extract: release_id, master_id, format, condition, price
+
+**Data Storage:**
+- `sellers/monitored-sellers.json` - List of sellers to track
+- `sellers/inventory-cache/{username}.json` - Cached inventory per seller
+- `sellers/matches.json` - Current matches with notification status
+- `sellers/scan-status.json` - Scan progress state
+
+### Phase 4B: Inventory Scanning Logic
+
+**Scan Algorithm:**
+
+```typescript
+async scanSeller(username: string, fullScan: boolean): Promise<SellerMatch[]> {
+  const wishlist = await this.wishlistService.getWishlistItems();
+  const wishlistMasterIds = new Set(wishlist.map(w => w.masterId));
+
+  const matches: SellerMatch[] = [];
+  let page = 1;
+
+  while (true) {
+    const inventory = await this.fetchInventoryPage(username, page);
+
+    for (const item of inventory.listings) {
+      // Only check vinyl formats
+      if (!this.isVinylFormat(item.format)) continue;
+
+      // Check if matches wishlist
+      if (item.master_id && wishlistMasterIds.has(item.master_id)) {
+        matches.push(this.createMatch(username, item));
+      }
+    }
+
+    // For quick check, only scan first page (newest listings)
+    if (!fullScan || !inventory.pagination.next) break;
+
+    page++;
+    await this.rateLimitDelay();
+  }
+
+  return matches;
+}
+```
+
+**Progressive Scan:**
+- On startup, check which sellers need scanning (stale > 7 days)
+- Scan 2-3 sellers per session to spread API load
+- Save progress after each seller to resume on restart
+
+### Phase 4C: Seller Management UI
+
+**New Page: `src/renderer/pages/SellersPage.tsx`**
+
+Layout:
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Local Seller Monitoring                      [+ Add Seller] │
+├─────────────────────────────────────────────────────────────┤
+│ Monitoring 5 sellers · 12 wishlist matches found            │
+│ Last scan: 2 hours ago                    [Scan Now]        │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ 🏪 Amoeba Music                              [Remove]   │ │
+│ │ @amoebamusic · 2,341 items · 3 matches                  │ │
+│ │ Last scanned: Today                                     │ │
+│ │ Matches: [Radiohead - OK Computer] [Bjork - Homogenic]  │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│                                                             │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ 🏪 Vintage Vinyl                             [Remove]   │ │
+│ │ @vintagevinylstl · 892 items · 0 matches                │ │
+│ │ Last scanned: Yesterday                                 │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Add Seller Dialog:**
+```
+┌─────────────────────────────────────────────┐
+│ Add Local Seller                            │
+│                                             │
+│ Discogs Username:                           │
+│ [amoebamusic                          ]     │
+│                                             │
+│ Display Name (optional):                    │
+│ [Amoeba Music                         ]     │
+│                                             │
+│ [Cancel]                    [Add & Scan]    │
+└─────────────────────────────────────────────┘
+```
+
+**Seller Validation:**
+- On add, verify username exists via `GET /users/{username}`
+- Show seller info: avatar, location, feedback score
+- Warn if inventory is very large (>5000 items)
+
+### Phase 4D: Match Notifications
+
+**Integration with Notification System (Feature 0D):**
+
+When a new match is found:
+```typescript
+interface LocalSellerNotification {
+  type: 'alert';
+  title: 'Wishlist item at local seller!';
+  message: '{Artist} - {Album} available at {SellerName} for {Price}';
+  action: {
+    label: 'View Listing';
+    route: '/sellers/{username}/matches';
+    externalUrl: 'https://discogs.com/sell/item/{listingId}';
+  };
+}
+```
+
+**Notification Behavior:**
+- Equal priority with other wishlist notifications
+- One notification per new match (not per scan)
+- Mark match as "notified" after creating notification
+- Don't re-notify for same listing
+
+### Phase 4E: Matches Page
+
+**New Page: `src/renderer/pages/SellerMatchesPage.tsx`**
+
+Displays all wishlist items found at monitored sellers:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Wishlist Items at Local Sellers                             │
+├─────────────────────────────────────────────────────────────┤
+│ 12 matches across 5 sellers                                 │
+│                                                             │
+│ Filter: [All Sellers ▼]  Sort: [Newest First ▼]             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ [cover] Radiohead - OK Computer                         │ │
+│ │ LP, VG+ · $28.00                                        │ │
+│ │ 📍 Amoeba Music · Found 2 days ago                      │ │
+│ │ [View on Discogs]                       [Mark as Seen]  │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│                                                             │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ [cover] Bjork - Homogenic                               │ │
+│ │ 2xLP, NM · $45.00                                       │ │
+│ │ 📍 Amoeba Music · Found today (NEW)                     │ │
+│ │ [View on Discogs]                       [Mark as Seen]  │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Features:**
+- Filter by seller
+- Sort by: newest, price, artist
+- "Mark as Seen" to dismiss without buying
+- "View on Discogs" opens listing in browser
+- Show album cover (from collection cache or Discogs)
+
+### Phase 4F: Settings Integration
+
+**Modify: `src/renderer/pages/SettingsPage.tsx`**
+
+Add "Local Sellers" section:
+- Quick-add seller form
+- List of monitored sellers (manage)
+- Scan frequency option (daily quick-check, weekly full)
+- Enable/disable notifications for local matches
+
+---
+
+## Feature 5: New Release Tracking (MusicBrainz Integration)
+
+### Overview
+Track new and upcoming releases from artists in your collection using MusicBrainz data, combined with Discogs for vinyl availability.
+
+### Feasibility & Design Decisions
+
+**Artist Matching Disambiguation:**
+- MusicBrainz search can return multiple artists with same/similar names
+- Strategy:
+  1. Search by name: `GET /artist?query={name}`
+  2. If single result with high score, auto-match
+  3. If multiple results or low confidence, show disambiguation UI
+  4. User selects correct artist, mapping is stored permanently
+
+**Disambiguation UI:**
+- Show on New Releases page when unmatched artists exist
+- Display: Artist name, country, disambiguation text, release count
+- "This is the right artist" / "None of these" buttons
+- Store confirmed mappings in `releases/artist-mbid-map.json`
+
+**Re-check Cadence:**
+- New release check: Weekly when app starts (if stale > 7 days)
+- Manual "Check Now" button always available
+- Cache release data for 7 days (releases don't change frequently)
+- Desktop app may not run continuously, so on-demand when page loads
+
+**Handling Artist Name Variants:**
+- Store normalized name (lowercase, no punctuation) as lookup key
+- Store original Discogs name for display
+- If Discogs has "The Beatles" and MusicBrainz has "Beatles, The", normalize both
+
+### Phase 5A: MusicBrainz Service
+
+**Backend: `src/backend/services/musicbrainzService.ts`**
+
+```typescript
+interface MusicBrainzRelease {
+  mbid: string;
+  title: string;
+  artist: string;
+  artistMbid: string;
+  releaseDate: string | null;
+  releaseType: 'album' | 'ep' | 'single' | 'compilation';
+  status: 'official' | 'promotion' | 'bootleg';
+}
+
+interface ArtistReleases {
+  artistName: string;
+  artistMbid: string;
+  releases: MusicBrainzRelease[];
+  lastChecked: number;
+}
+```
+
+**API Calls:**
+- `GET /artist/{mbid}?inc=release-groups` - Get all releases by artist
+- Rate limit: 1 request/second (same as Discogs)
+
+**Matching Artists:**
+- Use artist names from collection
+- Search MusicBrainz for matching artist
+- Store mapping: Discogs artist ID → MusicBrainz MBID
+
+### Phase 5B: Release Tracking Service
+
+**Backend: `src/backend/services/releaseTrackingService.ts`**
+
+Track releases from artists in collection:
+1. Get list of artists from collection
+2. For each artist, fetch releases from MusicBrainz
+3. Filter to recent/upcoming releases (past 3 months, future)
+4. Store and compare against previous scan
+5. Generate "new release" notifications
+
+**Data Storage:**
+- `releases/artist-mbid-map.json` - Discogs → MusicBrainz mapping
+- `releases/tracked-releases.json` - Known releases per artist
+- `releases/new-releases.json` - Newly detected releases
+
+### Phase 5C: New Releases Page
+
+**New Page: `src/renderer/pages/NewReleasesPage.tsx`**
+
+Features:
+- List of new/upcoming releases from artists in collection
+- Filter by:
+  - Release type (album, EP, single)
+  - Time frame (last month, last 3 months, upcoming)
+  - Artists (specific artist filter)
+- Each release shows:
+  - Artist - Album
+  - Release date
+  - Release type badge
+  - "Check Vinyl Availability" button (queries Discogs)
+  - "Add to Wishlist" button
+
+### Phase 5D: Vinyl Availability for New Releases
+
+**Integration with Feature 2:**
+
+When viewing a new release:
+- Query Discogs for matching release
+- Show vinyl availability status
+- Show price range if vinyl exists
+- One-click add to Discogs wishlist
+
+---
+
+## Implementation Notes
+
+### Priority Order
+0. **Foundations** - Security baseline, API conventions, notifications - do alongside Feature 1
+1. **Stats Dashboard** - Engaging, uses existing data, high user value
+2. **Wishlist & Vinyl Tracking** - Directly supports purchasing decisions
+3. **Smart Scrobble Scheduling** - Quality of life improvement
+4. **Local Seller Monitoring** - Track local record shops for wishlist items
+5. **New Release Tracking** - Nice to have, requires additional API integration
+
+### Technical Considerations
+
+**Rate Limiting:**
+- All features involve external API calls
+- Implement request queues with delays
+- Cache aggressively (24-hour minimum for version/pricing data)
+- Background sync jobs rather than real-time queries
+
+**Data Storage:**
+- Continue using JSON file storage pattern
+- Add `schemaVersion` to new data files for future migrations
+- Consider indexing for large datasets (stats queries)
+
+**Background Job Execution Model:**
+
+Since this is a desktop app (not a server), background jobs run while the app is open:
+
+| Job | Trigger | Frequency | Notes |
+|-----|---------|-----------|-------|
+| Collection preload | App startup | Once per session | Already implemented |
+| Scrobble history sync | App startup + manual | On-demand | Already implemented |
+| Wishlist sync | App startup + manual | Daily (if stale) | Check `lastSync` timestamp |
+| Version/vinyl scan | After wishlist sync | Progressive (10-20/day) | Rate-limited background |
+| Seller quick check | App startup + manual | Daily (if stale) | Page 1 of each seller, newest listings |
+| Seller full scan | App startup + manual | Weekly (if stale) | 2-3 sellers per session, progressive |
+| Seller match cleanup | After seller scan | Per scan | Mark sold listings, prune >30 days |
+| New release check | App startup + manual | Weekly (if stale) | For mapped artists, on-demand on page load |
+| Pattern recalculation | After history sync | Weekly | Lightweight, local only |
+| Image cache cleanup | App startup | Monthly | Prune entries >30 days old |
+
+**Implementation:**
+- On startup, check timestamps in status files to determine what needs running
+- Long-running jobs (wishlist scan, release check) run in background with progress indicators
+- All jobs are interruptible - save progress to resume on next app launch
+- Manual trigger buttons available in Settings for each sync type
+
+**UI Patterns:**
+- Reuse existing component patterns (cards, tabs, lists)
+- Follow established CSS class conventions
+- No inline styles (per CLAUDE.md guidelines)
+
+### Testing Strategy
+
+**Quality Gates per Feature:**
+
+| Feature | Integration Tests | E2E Happy Path |
+|---------|------------------|----------------|
+| Stats Dashboard | 1 per route in `stats.ts` | Load stats page, verify data displays |
+| Wishlist | 1 per route in `wishlist.ts` | Sync wishlist, view items, filter |
+| Smart Scheduling | 1 per route in `patterns.ts` | Backfill 2 albums with auto-timestamps |
+| Local Sellers | 1 per route in `sellers.ts` | Add seller, scan inventory, view matches |
+| New Releases | 1 per route in `releases.ts` | View releases, disambiguate artist |
+
+**Minimum Requirements:**
+- At least 1 integration test per new route group (test actual HTTP request/response)
+- At least 1 E2E test per new page (user journey from page load to key action)
+- Unit tests for complex service logic (streak calculation, pattern learning)
+- Maintain existing coverage baseline for modified files
+
+### Migration Path
+
+Features are independent and can be released incrementally:
+1. Stats can be built independently using existing scrobble data
+2. Ship wishlist sync without Discovery integration
+3. Add Discovery integration after wishlist is stable
+4. Smart scheduling can be added to existing scrobble flow incrementally
