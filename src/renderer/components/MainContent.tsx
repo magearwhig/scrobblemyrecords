@@ -10,6 +10,7 @@ import SettingsPage from '../pages/SettingsPage';
 import SetupPage from '../pages/SetupPage';
 import StatsPage from '../pages/StatsPage';
 import SuggestionsPage from '../pages/SuggestionsPage';
+import WishlistPage from '../pages/WishlistPage';
 
 interface MainContentProps {
   currentPage: string;
@@ -53,6 +54,8 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
         return <DiscoveryPage />;
       case 'stats':
         return <StatsPage />;
+      case 'wishlist':
+        return <WishlistPage />;
       default:
         return <HomePage />;
     }

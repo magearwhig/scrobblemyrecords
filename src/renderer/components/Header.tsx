@@ -2,10 +2,21 @@ import React from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useNotifications } from '../hooks/useNotifications';
+
+import { NotificationBell } from './NotificationBell';
 
 const Header: React.FC = () => {
   const { authStatus } = useAuth();
   const { isDarkMode, toggleDarkMode } = useTheme();
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    removeNotification,
+    clearAll,
+  } = useNotifications();
   const appVersion = '1.0.0'; // Static version for web app
 
   const getConnectionStatus = () => {
@@ -30,22 +41,21 @@ const Header: React.FC = () => {
         {appVersion && <small style={{ opacity: 0.8 }}>v{appVersion}</small>}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div className='header-actions'>
+        <NotificationBell
+          notifications={notifications}
+          unreadCount={unreadCount}
+          onMarkAsRead={markAsRead}
+          onMarkAllAsRead={markAllAsRead}
+          onRemove={removeNotification}
+          onClearAll={clearAll}
+        />
+
         <button
           onClick={() => {
-            console.log('Dark mode button clicked, current state:', isDarkMode);
             toggleDarkMode();
           }}
-          className='btn btn-small btn-secondary'
-          style={{
-            minWidth: 'auto',
-            padding: '0.5rem',
-            fontSize: '1.2rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: isDarkMode ? '#333' : '#666',
-          }}
+          className='btn btn-small btn-secondary header-theme-toggle'
           title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
         >
           {isDarkMode ? '☀️' : '🌙'}

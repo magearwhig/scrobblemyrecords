@@ -1,4 +1,4 @@
-- use real data whenever possible, always ask for approval when estimating data because data is not available
+- ALWAYS USE REAL DATA, DO NOT MAKE UP DATA UNLESS APPROVAL GIVEN
 - keep unit test coverage baseline at 90% for frontend and backend
 - use nodejs for the back end
 - keep readme.md up to date with anything needed to know to run the application, including directions how to sign up for any api access needed and directions on how to setup environment and start the application

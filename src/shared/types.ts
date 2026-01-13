@@ -449,3 +449,163 @@ export interface DateRange {
   startDate: number; // Unix timestamp (seconds)
   endDate: number; // Unix timestamp (seconds)
 }
+
+// ============================================
+// Wishlist & Vinyl Tracking Types
+// ============================================
+
+/**
+ * Wishlist item from Discogs wants list
+ */
+export interface WishlistItem {
+  id: number; // Discogs want list item ID
+  masterId: number; // Master release ID for grouping versions
+  releaseId: number; // Specific release ID in wishlist
+  artist: string;
+  title: string;
+  year?: number;
+  coverImage?: string;
+  dateAdded: string; // ISO date when added to wishlist
+  notes?: string; // User notes from Discogs
+  rating?: number; // Want priority (0-5)
+}
+
+/**
+ * Marketplace price statistics for a release
+ */
+export interface MarketplaceStats {
+  lowestPrice?: number;
+  medianPrice?: number;
+  highestPrice?: number;
+  numForSale: number;
+  currency: string; // e.g., "USD"
+  lastFetched: number; // Unix timestamp
+}
+
+/**
+ * Version/pressing info from Master release
+ */
+export interface ReleaseVersion {
+  releaseId: number;
+  title: string;
+  format: string[]; // e.g., ["Vinyl", "LP", "Album"]
+  label: string;
+  country: string;
+  year: number;
+  hasVinyl: boolean; // Derived from format
+  marketplaceStats?: MarketplaceStats;
+  lastFetched?: number; // Timestamp for cache invalidation
+}
+
+export type VinylStatus = 'has_vinyl' | 'cd_only' | 'unknown' | 'checking';
+
+/**
+ * Enriched wishlist item with vinyl availability info
+ */
+export interface EnrichedWishlistItem extends WishlistItem {
+  vinylStatus: VinylStatus;
+  vinylVersions: ReleaseVersion[];
+  lowestVinylPrice?: number;
+  priceCurrency?: string;
+  lastChecked?: number; // Unix timestamp
+}
+
+/**
+ * Sync status for wishlist operations
+ */
+export interface WishlistSyncStatus {
+  status: 'idle' | 'syncing' | 'checking_vinyl' | 'completed' | 'error';
+  progress: number; // 0-100
+  currentItem?: string; // Artist - Title being processed
+  itemsProcessed: number;
+  totalItems: number;
+  vinylChecked: number;
+  lastSyncTimestamp?: number;
+  error?: string;
+}
+
+/**
+ * User settings for wishlist feature
+ */
+export interface WishlistSettings {
+  schemaVersion: 1;
+  priceThreshold?: number; // Max price for "affordable" filter (undefined = no limit)
+  currency: string; // Preferred currency
+  autoSyncInterval: number; // Days between auto-sync (0 = manual only)
+  notifyOnVinylAvailable: boolean;
+}
+
+/**
+ * Item being watched for vinyl availability
+ */
+export interface VinylWatchItem {
+  masterId: number;
+  artist: string;
+  title: string;
+  coverImage?: string;
+  addedAt: number; // Unix timestamp when added to watch list
+  lastChecked?: number; // Unix timestamp of last availability check
+  notified: boolean; // Whether user was notified of vinyl availability
+}
+
+/**
+ * Stored wishlist data file
+ */
+export interface WishlistStore {
+  schemaVersion: 1;
+  lastUpdated: number;
+  items: EnrichedWishlistItem[];
+}
+
+/**
+ * Stored vinyl watch list
+ */
+export interface VinylWatchStore {
+  schemaVersion: 1;
+  items: VinylWatchItem[];
+}
+
+/**
+ * Local want list item - albums user wants but aren't on Discogs wantlist
+ * These are tracked locally from the Discovery page
+ */
+export interface LocalWantItem {
+  id: string; // Generated unique ID (artist-album hash)
+  artist: string;
+  album: string;
+  playCount: number; // From Last.fm history
+  lastPlayed: number; // Unix timestamp
+  addedAt: number; // When added to local want list
+  source: 'discovery'; // Where the item came from
+  // Discogs search results (cached)
+  masterId?: number; // If found on Discogs
+  releaseId?: number;
+  coverImage?: string;
+  // Vinyl tracking
+  vinylStatus: 'unknown' | 'checking' | 'has_vinyl' | 'cd_only';
+  lastChecked?: number; // When vinyl status was last checked
+  vinylAvailableSince?: number; // When vinyl first became available (for notifications)
+  notified: boolean; // Whether user was notified of vinyl availability
+}
+
+/**
+ * Stored local want list
+ */
+export interface LocalWantStore {
+  schemaVersion: 1;
+  items: LocalWantItem[];
+}
+
+/**
+ * Stored version cache per master
+ */
+export interface VersionsCacheEntry {
+  masterId: number;
+  versions: ReleaseVersion[];
+  fetchedAt: number;
+}
+
+export interface VersionsCache {
+  schemaVersion: 1;
+  entries: Record<number, VersionsCacheEntry>; // masterId -> cache entry
+}

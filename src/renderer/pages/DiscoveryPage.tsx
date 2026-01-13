@@ -41,6 +41,14 @@ const DiscoveryPage: React.FC = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [mappingInProgress, setMappingInProgress] = useState(false);
 
+  // Want list state - track which albums are being added
+  const [addingToWantList, setAddingToWantList] = useState<Set<string>>(
+    new Set()
+  );
+  const [addedToWantList, setAddedToWantList] = useState<Set<string>>(
+    new Set()
+  );
+
   // Sorting state
   const [albumSort, setAlbumSort] = useState<AlbumSortOption>('plays');
   const [artistSort, setArtistSort] = useState<ArtistSortOption>('plays');
@@ -213,6 +221,31 @@ const DiscoveryPage: React.FC = () => {
     }
   };
 
+  // Add album to local want list (tracks for vinyl availability)
+  const handleAddToWantList = async (album: MissingAlbum) => {
+    const key = `${album.artist}:${album.album}`;
+    if (addingToWantList.has(key) || addedToWantList.has(key)) return;
+
+    try {
+      setAddingToWantList(prev => new Set([...prev, key]));
+      await api.addToLocalWantList({
+        artist: album.artist,
+        album: album.album,
+        playCount: album.playCount,
+        lastPlayed: album.lastPlayed,
+      });
+      setAddedToWantList(prev => new Set([...prev, key]));
+    } catch (err) {
+      console.error('Failed to add to want list:', err);
+    } finally {
+      setAddingToWantList(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
   // Hide an artist from discovery (e.g., podcasts)
   const handleHideArtist = async (artist: MissingArtist) => {
     try {
@@ -370,6 +403,35 @@ const DiscoveryPage: React.FC = () => {
                           title='Map to collection item'
                         >
                           Map
+                        </button>
+                        <button
+                          className={`btn btn-small ${
+                            addedToWantList.has(
+                              `${album.artist}:${album.album}`
+                            )
+                              ? 'btn-success'
+                              : 'btn-primary'
+                          }`}
+                          onClick={() => handleAddToWantList(album)}
+                          disabled={
+                            addingToWantList.has(
+                              `${album.artist}:${album.album}`
+                            ) ||
+                            addedToWantList.has(
+                              `${album.artist}:${album.album}`
+                            )
+                          }
+                          title='Add to want list - tracks vinyl availability'
+                        >
+                          {addingToWantList.has(
+                            `${album.artist}:${album.album}`
+                          )
+                            ? 'Adding...'
+                            : addedToWantList.has(
+                                  `${album.artist}:${album.album}`
+                                )
+                              ? 'Wanted'
+                              : 'Want'}
                         </button>
                         <button
                           className='btn btn-small btn-link'

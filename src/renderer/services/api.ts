@@ -7,16 +7,23 @@ import {
   AuthStatus,
   CollectionItem,
   DiscogsRelease,
+  EnrichedWishlistItem,
   HiddenAlbum,
   HiddenArtist,
+  LocalWantItem,
+  MarketplaceStats,
   MissingAlbum,
   MissingArtist,
+  ReleaseVersion,
   ScrobbleTrack,
   ScrobbleSession,
   SuggestionResult,
   SuggestionSettings,
   SyncSettings,
   SyncStatus,
+  VinylWatchItem,
+  WishlistSettings,
+  WishlistSyncStatus,
 } from '../../shared/types';
 
 class ApiService {
@@ -826,6 +833,148 @@ class ApiService {
   async getHiddenCounts(): Promise<{ albums: number; artists: number }> {
     const response = await this.api.get('/suggestions/hidden/counts');
     return { albums: response.data.albums, artists: response.data.artists };
+  }
+
+  // ============================================
+  // Wishlist methods
+  // ============================================
+
+  async getWishlist(): Promise<EnrichedWishlistItem[]> {
+    const response = await this.api.get('/wishlist');
+    return response.data.data;
+  }
+
+  async getWishlistSyncStatus(): Promise<WishlistSyncStatus> {
+    const response = await this.api.get('/wishlist/sync');
+    return response.data.data;
+  }
+
+  async startWishlistSync(forceRefresh = false): Promise<{
+    message: string;
+    status: WishlistSyncStatus;
+  }> {
+    const response = await this.api.post('/wishlist/sync', { forceRefresh });
+    return {
+      message: response.data.message,
+      status: response.data.data,
+    };
+  }
+
+  async getMasterVersions(masterId: number): Promise<{
+    versions: ReleaseVersion[];
+    vinylCount: number;
+  }> {
+    const response = await this.api.get(`/wishlist/${masterId}/versions`);
+    return {
+      versions: response.data.data,
+      vinylCount: response.data.vinylCount,
+    };
+  }
+
+  async getMarketplaceStats(
+    releaseId: number
+  ): Promise<MarketplaceStats | null> {
+    try {
+      const response = await this.api.get(`/wishlist/${releaseId}/marketplace`);
+      return response.data.data;
+    } catch {
+      return null;
+    }
+  }
+
+  async getWishlistSettings(): Promise<WishlistSettings> {
+    const response = await this.api.get('/wishlist/settings');
+    return response.data.data;
+  }
+
+  async saveWishlistSettings(
+    settings: Partial<WishlistSettings>
+  ): Promise<WishlistSettings> {
+    const response = await this.api.post('/wishlist/settings', settings);
+    return response.data.data;
+  }
+
+  async getVinylWatchList(): Promise<VinylWatchItem[]> {
+    const response = await this.api.get('/wishlist/watch');
+    return response.data.data;
+  }
+
+  async addToVinylWatch(item: {
+    masterId: number;
+    artist: string;
+    title: string;
+    coverImage?: string;
+  }): Promise<void> {
+    await this.api.post('/wishlist/watch', item);
+  }
+
+  async removeFromVinylWatch(masterId: number): Promise<void> {
+    await this.api.delete(`/wishlist/watch/${masterId}`);
+  }
+
+  async checkVinylWatch(): Promise<VinylWatchItem[]> {
+    const response = await this.api.post('/wishlist/watch/check');
+    return response.data.data;
+  }
+
+  // Search Discogs for releases to add to wantlist
+  async searchDiscogsForWishlist(
+    artist: string,
+    album: string
+  ): Promise<
+    {
+      masterId: number;
+      releaseId: number;
+      title: string;
+      artist: string;
+      year?: number;
+      coverImage?: string;
+      formats: string[];
+    }[]
+  > {
+    const response = await this.api.get('/wishlist/search', {
+      params: { artist, album },
+    });
+    return response.data.data;
+  }
+
+  // Add a release to the user's Discogs wantlist
+  async addToDiscogsWantlist(
+    releaseId: number,
+    notes?: string,
+    rating?: number
+  ): Promise<void> {
+    await this.api.post('/wishlist/add', { releaseId, notes, rating });
+  }
+
+  // Remove a release from the user's Discogs wantlist
+  async removeFromDiscogsWantlist(releaseId: number): Promise<void> {
+    await this.api.delete(`/wishlist/remove/${releaseId}`);
+  }
+
+  // Local want list (albums from Discovery)
+  async getLocalWantList(): Promise<LocalWantItem[]> {
+    const response = await this.api.get('/wishlist/local');
+    return response.data.data;
+  }
+
+  async addToLocalWantList(item: {
+    artist: string;
+    album: string;
+    playCount: number;
+    lastPlayed: number;
+  }): Promise<LocalWantItem> {
+    const response = await this.api.post('/wishlist/local', item);
+    return response.data.data;
+  }
+
+  async removeFromLocalWantList(id: string): Promise<void> {
+    await this.api.delete(`/wishlist/local/${id}`);
+  }
+
+  async checkLocalWantListForVinyl(): Promise<LocalWantItem[]> {
+    const response = await this.api.post('/wishlist/local/check');
+    return response.data.data;
   }
 
   // Update base URL (for when server URL changes)

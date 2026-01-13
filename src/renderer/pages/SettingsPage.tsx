@@ -8,13 +8,15 @@ import {
   HiddenArtist,
   SyncStatus,
   SyncSettings,
+  WishlistSettings,
+  VinylWatchItem,
 } from '../../shared/types';
 import SyncStatusBar from '../components/SyncStatusBar';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
 
-type SettingsTab = 'mappings' | 'sync' | 'hidden' | 'settings';
+type SettingsTab = 'mappings' | 'sync' | 'hidden' | 'wishlist' | 'settings';
 
 const SettingsPage: React.FC = () => {
   const { state } = useApp();
@@ -99,6 +101,14 @@ const SettingsPage: React.FC = () => {
   const [aiError, setAiError] = useState<string>('');
   const [aiSuccess, setAiSuccess] = useState<string>('');
 
+  // Wishlist settings state
+  const [wishlistSettings, setWishlistSettings] =
+    useState<WishlistSettings | null>(null);
+  const [vinylWatchList, setVinylWatchList] = useState<VinylWatchItem[]>([]);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [wishlistError, setWishlistError] = useState<string>('');
+  const [wishlistSuccess, setWishlistSuccess] = useState<string>('');
+
   const api = getApiService(state.serverUrl);
 
   useEffect(() => {
@@ -109,6 +119,7 @@ const SettingsPage: React.FC = () => {
     if (authStatus.discogs.authenticated && authStatus.discogs.username) {
       loadArtists();
       loadSuggestions();
+      loadWishlistSettings();
     }
     if (authStatus.lastfm.authenticated) {
       loadSyncStatus();
@@ -533,6 +544,62 @@ const SettingsPage: React.FC = () => {
     setAiSuccess('');
   };
 
+  // Wishlist functions
+  const loadWishlistSettings = useCallback(async () => {
+    try {
+      setWishlistLoading(true);
+      const [settings, watchList] = await Promise.all([
+        api.getWishlistSettings(),
+        api.getVinylWatchList(),
+      ]);
+      setWishlistSettings(settings);
+      setVinylWatchList(watchList);
+    } catch (error) {
+      console.warn('Failed to load wishlist settings:', error);
+    } finally {
+      setWishlistLoading(false);
+    }
+  }, [api]);
+
+  const handleSaveWishlistSettings = async () => {
+    if (!wishlistSettings) return;
+
+    try {
+      setWishlistLoading(true);
+      setWishlistError('');
+      const updated = await api.saveWishlistSettings(wishlistSettings);
+      setWishlistSettings(updated);
+      setWishlistSuccess('Wishlist settings saved');
+    } catch (error) {
+      setWishlistError(
+        error instanceof Error ? error.message : 'Failed to save settings'
+      );
+    } finally {
+      setWishlistLoading(false);
+    }
+  };
+
+  const handleRemoveFromWatchList = async (masterId: number) => {
+    try {
+      await api.removeFromVinylWatch(masterId);
+      setVinylWatchList(prev =>
+        prev.filter(item => item.masterId !== masterId)
+      );
+      setWishlistSuccess('Removed from vinyl watch list');
+    } catch (error) {
+      setWishlistError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to remove from watch list'
+      );
+    }
+  };
+
+  const clearWishlistMessages = () => {
+    setWishlistError('');
+    setWishlistSuccess('');
+  };
+
   const handleQuickAddMapping = async (
     discogsName: string,
     lastfmName: string
@@ -728,6 +795,8 @@ const SettingsPage: React.FC = () => {
         return renderSyncTab();
       case 'hidden':
         return renderHiddenTab();
+      case 'wishlist':
+        return renderWishlistTab();
       case 'settings':
         return renderSettingsTab();
       default:
@@ -1518,6 +1587,240 @@ const SettingsPage: React.FC = () => {
     </>
   );
 
+  const renderWishlistTab = () => (
+    <>
+      {/* Wishlist Settings Section */}
+      <div className='card'>
+        <h3>Wishlist Settings</h3>
+        <p>
+          Configure how your Discogs wishlist is synced and how vinyl
+          availability is tracked.
+        </p>
+
+        {wishlistError && (
+          <div className='error-message'>
+            {wishlistError}
+            <button
+              className='btn btn-small'
+              onClick={clearWishlistMessages}
+              style={{ marginLeft: '1rem' }}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {wishlistSuccess && (
+          <div className='message success'>
+            {wishlistSuccess}
+            <button
+              className='btn btn-small'
+              onClick={clearWishlistMessages}
+              style={{ marginLeft: '1rem' }}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {wishlistLoading ? (
+          <div className='loading'>
+            <div className='spinner'></div>
+            Loading wishlist settings...
+          </div>
+        ) : wishlistSettings ? (
+          <div className='settings-wishlist-config'>
+            {/* Price Threshold */}
+            <div className='form-group'>
+              <label className='form-label'>Price Threshold</label>
+              <div className='settings-price-input'>
+                <input
+                  type='number'
+                  className='form-input'
+                  value={wishlistSettings.priceThreshold || ''}
+                  onChange={e =>
+                    setWishlistSettings({
+                      ...wishlistSettings,
+                      priceThreshold: e.target.value
+                        ? parseFloat(e.target.value)
+                        : undefined,
+                    })
+                  }
+                  placeholder='No limit'
+                  min='0'
+                  step='0.01'
+                />
+                <select
+                  className='form-input'
+                  value={wishlistSettings.currency}
+                  onChange={e =>
+                    setWishlistSettings({
+                      ...wishlistSettings,
+                      currency: e.target.value,
+                    })
+                  }
+                >
+                  <option value='USD'>USD</option>
+                  <option value='EUR'>EUR</option>
+                  <option value='GBP'>GBP</option>
+                  <option value='CAD'>CAD</option>
+                  <option value='AUD'>AUD</option>
+                  <option value='JPY'>JPY</option>
+                </select>
+              </div>
+              <span className='form-hint'>
+                Only show vinyl pressings below this price in the
+                &quot;Affordable&quot; tab
+              </span>
+            </div>
+
+            {/* Auto-Sync Interval */}
+            <div className='form-group'>
+              <label className='form-label'>Auto-Sync Interval</label>
+              <select
+                className='form-input'
+                value={wishlistSettings.autoSyncInterval}
+                onChange={e =>
+                  setWishlistSettings({
+                    ...wishlistSettings,
+                    autoSyncInterval: parseInt(e.target.value, 10),
+                  })
+                }
+              >
+                <option value='0'>Manual only</option>
+                <option value='1'>Every day</option>
+                <option value='3'>Every 3 days</option>
+                <option value='7'>Every week</option>
+                <option value='14'>Every 2 weeks</option>
+                <option value='30'>Every month</option>
+              </select>
+              <span className='form-hint'>
+                How often to automatically sync your Discogs wishlist
+              </span>
+            </div>
+
+            {/* Notify on Vinyl Available */}
+            <div className='settings-sync-toggle'>
+              <label className='settings-toggle-label'>
+                <input
+                  type='checkbox'
+                  checked={wishlistSettings.notifyOnVinylAvailable}
+                  onChange={e =>
+                    setWishlistSettings({
+                      ...wishlistSettings,
+                      notifyOnVinylAvailable: e.target.checked,
+                    })
+                  }
+                />
+                <span>Notify when vinyl becomes available</span>
+              </label>
+              <span className='settings-toggle-hint'>
+                Get notified when a watched item gets a vinyl pressing
+              </span>
+            </div>
+
+            <button
+              className='btn'
+              onClick={handleSaveWishlistSettings}
+              disabled={wishlistLoading}
+            >
+              Save Settings
+            </button>
+          </div>
+        ) : (
+          <div className='settings-empty-state'>
+            {!authStatus.discogs.authenticated ? (
+              <>
+                Please authenticate with Discogs to configure wishlist settings.
+              </>
+            ) : (
+              <>Unable to load wishlist settings. Please try again.</>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Vinyl Watch List Section */}
+      <div className='card'>
+        <h3>Vinyl Watch List</h3>
+        <p>
+          Items you&apos;re watching for vinyl releases. These are albums
+          currently only available on CD or digital that you want to be notified
+          about when vinyl becomes available.
+        </p>
+
+        {vinylWatchList.length === 0 ? (
+          <div className='settings-empty-state'>
+            No items in your vinyl watch list. Add items from the Wishlist page
+            by clicking &quot;Watch for Vinyl&quot; on CD-only releases.
+          </div>
+        ) : (
+          <div className='settings-watch-list'>
+            <div className='settings-watch-list-header'>
+              <span className='settings-watch-list-count'>
+                {vinylWatchList.length} item
+                {vinylWatchList.length !== 1 ? 's' : ''} being watched
+              </span>
+            </div>
+            <div className='settings-watch-list-items'>
+              {vinylWatchList.map(item => (
+                <div key={item.masterId} className='settings-watch-item'>
+                  {item.coverImage && (
+                    <img
+                      src={item.coverImage}
+                      alt={`${item.artist} - ${item.title}`}
+                      className='settings-watch-item-cover'
+                    />
+                  )}
+                  <div className='settings-watch-item-info'>
+                    <div className='settings-watch-item-title'>
+                      {item.title}
+                    </div>
+                    <div className='settings-watch-item-artist'>
+                      {item.artist}
+                    </div>
+                    <div className='settings-watch-item-meta'>
+                      Added: {new Date(item.addedAt).toLocaleDateString()}
+                      {item.lastChecked && (
+                        <span>
+                          {' '}
+                          · Last checked:{' '}
+                          {new Date(item.lastChecked).toLocaleDateString()}
+                        </span>
+                      )}
+                      {item.notified && (
+                        <span className='settings-watch-item-notified'>
+                          {' '}
+                          · Vinyl available!
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className='settings-watch-item-actions'>
+                    <a
+                      href={`https://www.discogs.com/master/${item.masterId}`}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      className='btn btn-small btn-secondary'
+                    >
+                      View on Discogs
+                    </a>
+                    <button
+                      className='btn btn-small btn-danger'
+                      onClick={() => handleRemoveFromWatchList(item.masterId)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+
   const renderSettingsTab = () => (
     <>
       {/* AI Recommendations Section */}
@@ -1720,6 +2023,12 @@ const SettingsPage: React.FC = () => {
           onClick={() => setActiveTab('hidden')}
         >
           Hidden
+        </button>
+        <button
+          className={`settings-tab ${activeTab === 'wishlist' ? 'active' : ''}`}
+          onClick={() => setActiveTab('wishlist')}
+        >
+          Wishlist
         </button>
         <button
           className={`settings-tab ${activeTab === 'settings' ? 'active' : ''}`}

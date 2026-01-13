@@ -13,6 +13,7 @@ import createImagesRouter from './backend/routes/images';
 import createScrobbleRouter from './backend/routes/scrobble';
 import createStatsRouter from './backend/routes/stats';
 import createSuggestionsRouter from './backend/routes/suggestions';
+import createWishlistRouter from './backend/routes/wishlist';
 import { AnalyticsService } from './backend/services/analyticsService';
 import { AuthService } from './backend/services/authService';
 import { DiscogsService } from './backend/services/discogsService';
@@ -24,6 +25,7 @@ import { ScrobbleHistoryStorage } from './backend/services/scrobbleHistoryStorag
 import { ScrobbleHistorySyncService } from './backend/services/scrobbleHistorySyncService';
 import { StatsService } from './backend/services/statsService';
 import { SuggestionService } from './backend/services/suggestionService';
+import { WishlistService } from './backend/services/wishlistService';
 import { FileStorage } from './backend/utils/fileStorage';
 
 const app = express();
@@ -130,6 +132,7 @@ const suggestionService = new SuggestionService(
 );
 const statsService = new StatsService(fileStorage, historyStorage);
 const imageService = new ImageService(fileStorage, lastfmService);
+const wishlistService = new WishlistService(fileStorage, authService);
 
 // API routes
 app.use(
@@ -167,6 +170,10 @@ app.use(
     hiddenItemService
   )
 );
+app.use(
+  '/api/v1/wishlist',
+  createWishlistRouter(fileStorage, authService, wishlistService)
+);
 
 // API info endpoint
 app.get('/api/v1', (req, res) => {
@@ -180,6 +187,7 @@ app.get('/api/v1', (req, res) => {
       suggestions: '/api/v1/suggestions',
       stats: '/api/v1/stats',
       images: '/api/v1/images',
+      wishlist: '/api/v1/wishlist',
     },
   });
 });

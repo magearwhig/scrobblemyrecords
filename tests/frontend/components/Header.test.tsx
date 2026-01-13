@@ -123,10 +123,6 @@ describe('Header', () => {
     await user.click(themeButton);
 
     expect(themeContextValue.toggleDarkMode).toHaveBeenCalledTimes(1);
-    expect(mockConsoleLog).toHaveBeenCalledWith(
-      'Dark mode button clicked, current state:',
-      false
-    );
   });
 
   it('shows sun emoji when in dark mode', () => {
@@ -193,7 +189,7 @@ describe('Header', () => {
     expect(statusDot).toBeInTheDocument();
   });
 
-  it('applies correct background color to theme button based on dark mode state', () => {
+  it('applies correct CSS classes to theme button', () => {
     const authStatus: AuthStatus = {
       discogs: { authenticated: false, username: undefined },
       lastfm: { authenticated: false, username: undefined },
@@ -202,11 +198,21 @@ describe('Header', () => {
     // Test light mode
     renderHeaderWithProviders(authStatus, false);
     let themeButton = screen.getByTitle('Switch to dark mode');
-    expect(themeButton).toHaveStyle('background-color: #666');
+    expect(themeButton).toHaveClass(
+      'btn',
+      'btn-small',
+      'btn-secondary',
+      'header-theme-toggle'
+    );
 
     // Test dark mode
     renderHeaderWithProviders(authStatus, true);
     themeButton = screen.getByTitle('Switch to light mode');
-    expect(themeButton).toHaveStyle('background-color: #333');
+    expect(themeButton).toHaveClass(
+      'btn',
+      'btn-small',
+      'btn-secondary',
+      'header-theme-toggle'
+    );
   });
 });

@@ -201,8 +201,47 @@ Find albums you listen to but don't own:
 - **Missing Albums**: Albums in your scrobble history not in your collection
 - **Missing Artists**: Artists you love but don't have on vinyl
 - **Play Count Sorting**: Prioritized by how often you listen
-- **Map to Collection**: Mark a “missing” album/artist as owned by mapping it to an item in your Discogs collection
-- Perfect for building your wishlist!
+- **Map to Collection**: Mark a "missing" album/artist as owned by mapping it to an item in your Discogs collection
+- **Add to Wanted List**: Track albums you want on vinyl for later
+
+### ❤️ Wishlist Page
+Sync and manage your Discogs wantlist with vinyl availability tracking:
+
+**Discogs Wantlist Sync:**
+- **Auto-Sync**: Sync your Discogs wantlist with one click
+- **Vinyl Status**: See which albums have vinyl pressings available
+- **CD-Only Tracking**: Identify albums only available on CD/digital
+- **Progressive Checking**: Vinyl availability checked progressively to respect API limits
+- **Refresh All**: Force re-check vinyl status for all items
+
+**Filtering & Sorting:**
+- **Tabs**: All Items, Has Vinyl, CD Only, Affordable, Wanted
+- **Sort Options**: Date Added, Price, Artist, Album
+- **Affordable Filter**: Show items under your price threshold
+
+**Version Browser:**
+- View all pressings for any master release
+- Format details (LP, 12", 7", etc.)
+- Country of origin
+- Marketplace pricing (lowest, median, highest)
+- Direct links to Discogs marketplace
+
+**Local Wanted List:**
+- Add albums from Discovery page to track
+- Check for vinyl availability on demand
+- Notifications when vinyl becomes available
+- Independent from Discogs wantlist (track anything)
+
+**Settings (Settings → Wishlist):**
+- **Price Threshold**: Filter by maximum price
+- **Currency**: USD, EUR, GBP, CAD, AUD, JPY
+- **Auto-Sync Interval**: Manual, daily, weekly, etc.
+- **Vinyl Notifications**: Get notified when watched items get vinyl
+
+**Vinyl Watch List:**
+- Watch CD-only albums for future vinyl releases
+- Automatic notifications when vinyl becomes available
+- Manage watch list from Settings page
 
 ### 🤖 AI Suggestions (Optional)
 Local AI-powered recommendations via [Ollama](https://ollama.ai). Runs entirely on your computer with no API fees.
@@ -362,7 +401,8 @@ src/
 │   │   ├── scrobble.ts         # Scrobbling routes
 │   │   ├── stats.ts            # Stats dashboard routes
 │   │   ├── images.ts           # Album/artist image routes
-│   │   └── suggestions.ts      # Suggestions, discovery, AI routes
+│   │   ├── suggestions.ts      # Suggestions, discovery, AI routes
+│   │   └── wishlist.ts         # Wishlist and vinyl tracking routes
 │   ├── services/               # Business logic
 │   │   ├── analyticsService.ts # Listening analytics
 │   │   ├── statsService.ts     # Stats dashboard calculations
@@ -371,7 +411,8 @@ src/
 │   │   ├── scrobbleHistorySyncService.ts # Last.fm history sync
 │   │   ├── scrobbleHistoryStorage.ts # History index storage
 │   │   ├── ollamaService.ts    # AI integration
-│   │   └── aiPromptBuilder.ts  # AI prompt generation
+│   │   ├── aiPromptBuilder.ts  # AI prompt generation
+│   │   └── wishlistService.ts  # Wishlist and vinyl tracking
 │   └── utils/                  # Utilities
 ├── renderer/                   # React frontend
 │   ├── components/             # UI components
@@ -385,6 +426,7 @@ src/
 │   │   ├── DiscoveryPage.tsx
 │   │   ├── HistoryPage.tsx
 │   │   ├── StatsPage.tsx
+│   │   ├── WishlistPage.tsx
 │   │   └── SettingsPage.tsx
 │   └── context/                # State management
 └── shared/                     # Shared types
