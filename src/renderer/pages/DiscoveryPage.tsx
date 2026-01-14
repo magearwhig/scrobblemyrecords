@@ -16,6 +16,21 @@ type TabType = 'albums' | 'artists';
 type AlbumSortOption = 'plays' | 'artist' | 'album' | 'recent';
 type ArtistSortOption = 'plays' | 'artist' | 'albums' | 'recent';
 
+// Normalize album/artist names for matching
+// Removes quotes, edition suffixes, and normalizes to lowercase
+const normalizeForMatching = (str: string): string => {
+  return str
+    .toLowerCase()
+    .replace(/[""''"`]/g, '') // Remove various quote characters
+    .replace(/\s*\[explicit\]\s*/gi, '') // Remove [Explicit] tag
+    .replace(/\s*\(deluxe\s*(edition)?\)\s*/gi, '') // Remove (Deluxe) or (Deluxe Edition)
+    .replace(/\s*\(explicit\)\s*/gi, '') // Remove (Explicit)
+    .replace(/\s*\(remaster(ed)?\)\s*/gi, '') // Remove (Remaster) or (Remastered)
+    .replace(/\s*\(expanded\s*(edition)?\)\s*/gi, '') // Remove (Expanded) or (Expanded Edition)
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+};
+
 interface MappingModalState {
   isOpen: boolean;
   type: 'album' | 'artist';
@@ -51,10 +66,10 @@ const DiscoveryPage: React.FC = () => {
     new Set()
   );
 
-  // Discogs wishlist state - track which albums are in the Discogs wantlist
-  const [inDiscogsWishlist, setInDiscogsWishlist] = useState<Set<string>>(
-    new Set()
-  );
+  // Discogs wishlist state - store normalized wishlist items for flexible matching
+  const [discogsWishlistItems, setDiscogsWishlistItems] = useState<
+    Array<{ artist: string; title: string }>
+  >([]);
 
   // Sorting state
   const [albumSort, setAlbumSort] = useState<AlbumSortOption>('plays');
@@ -86,26 +101,15 @@ const DiscoveryPage: React.FC = () => {
       );
       setAddedToWantList(existingWantedKeys);
 
-      // Pre-populate inDiscogsWishlist with Discogs wantlist items
-      // Normalize names for matching (case-insensitive, removes quotes/suffixes)
-      const normalize = (str: string): string =>
-        str
-          .toLowerCase()
-          .replace(/[""''"`]/g, '')
-          .replace(/\s*\[explicit\]\s*/gi, '')
-          .replace(/\s*\(deluxe\s*(edition)?\)\s*/gi, '')
-          .replace(/\s*\(explicit\)\s*/gi, '')
-          .replace(/\s*\(remaster(ed)?\)\s*/gi, '')
-          .replace(/\s*\(expanded\s*(edition)?\)\s*/gi, '')
-          .replace(/\s+/g, ' ')
-          .trim();
-      const discogsWishlistKeys = new Set(
-        discogsWishlist.map(
-          (item: EnrichedWishlistItem) =>
-            `${normalize(item.artist)}:${normalize(item.title)}`
-        )
+      // Pre-populate discogsWishlistItems with normalized Discogs wantlist items
+      // Store as array for flexible matching (handles Last.fm quirks like "Artist & Album Title")
+      const normalizedWishlist = discogsWishlist.map(
+        (item: EnrichedWishlistItem) => ({
+          artist: normalizeForMatching(item.artist),
+          title: normalizeForMatching(item.title),
+        })
       );
-      setInDiscogsWishlist(discogsWishlistKeys);
+      setDiscogsWishlistItems(normalizedWishlist);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to load discovery data'
@@ -124,26 +128,31 @@ const DiscoveryPage: React.FC = () => {
     return date.toLocaleDateString();
   };
 
-  // Normalize album/artist names for matching
-  // Removes quotes, edition suffixes, and normalizes to lowercase
-  const normalizeForMatching = (str: string): string => {
-    return str
-      .toLowerCase()
-      .replace(/[""''"`]/g, '') // Remove various quote characters
-      .replace(/\s*\[explicit\]\s*/gi, '') // Remove [Explicit] tag
-      .replace(/\s*\(deluxe\s*(edition)?\)\s*/gi, '') // Remove (Deluxe) or (Deluxe Edition)
-      .replace(/\s*\(explicit\)\s*/gi, '') // Remove (Explicit)
-      .replace(/\s*\(remaster(ed)?\)\s*/gi, '') // Remove (Remaster) or (Remastered)
-      .replace(/\s*\(expanded\s*(edition)?\)\s*/gi, '') // Remove (Expanded) or (Expanded Edition)
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .trim();
-  };
-
-  // Check if album is in Discogs wishlist (case-insensitive, quote-insensitive)
+  // Check if album is in Discogs wishlist
+  // Handles: case differences, quotes, edition suffixes, and Last.fm quirks
+  // where artist name may include album title (e.g., "Andrew Bird & The Mysterious Production Of Eggs")
   const isInDiscogsWishlist = (artist: string, album: string): boolean => {
-    return inDiscogsWishlist.has(
-      `${normalizeForMatching(artist)}:${normalizeForMatching(album)}`
-    );
+    const normArtist = normalizeForMatching(artist);
+    const normAlbum = normalizeForMatching(album);
+    const combined = `${normArtist} ${normAlbum}`;
+
+    return discogsWishlistItems.some(item => {
+      // Exact match (artist:title)
+      if (normArtist === item.artist && normAlbum === item.title) {
+        return true;
+      }
+      // Handle Last.fm quirk: artist may include album title
+      // e.g., Last.fm artist="Andrew Bird & The Mysterious Production Of Eggs"
+      //       Discogs artist="Andrew Bird", title="The Mysterious Production Of Eggs"
+      if (
+        combined.includes(item.artist) &&
+        combined.includes(item.title) &&
+        item.title.length >= 10 // Avoid false positives with short titles
+      ) {
+        return true;
+      }
+      return false;
+    });
   };
 
   // Generate Last.fm URLs

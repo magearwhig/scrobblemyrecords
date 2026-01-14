@@ -709,6 +709,47 @@ describe('DiscoveryPage', () => {
     expect(screen.getByText('In Wantlist')).toBeInTheDocument();
   });
 
+  it('matches Discogs wishlist when Last.fm includes album in artist name', async () => {
+    // Mock missing album where Last.fm has album title merged into artist name
+    // This happens with some albums like "Andrew Bird & The Mysterious Production Of Eggs"
+    mockGetMissingAlbums.mockResolvedValue([
+      {
+        artist: 'Andrew Bird & The Mysterious Production Of Eggs',
+        album: 'Andrew Bird & The Mysterious Production Of Eggs',
+        playCount: 25,
+        lastPlayed: 1703894400,
+      },
+    ]);
+
+    // Mock wishlist with correct Discogs format (separate artist/title)
+    mockGetWishlist.mockResolvedValue([
+      {
+        id: 4,
+        masterId: 12345,
+        releaseId: 67890,
+        artist: 'Andrew Bird',
+        title: 'The Mysterious Production Of Eggs',
+        year: 2005,
+        coverImage: 'https://example.com/cover.jpg',
+        dateAdded: '2024-01-01',
+        vinylStatus: 'has_vinyl',
+        vinylVersions: [],
+      },
+    ]);
+
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      // Text appears twice (title and artist), so use getAllByText
+      expect(
+        screen.getAllByText('Andrew Bird & The Mysterious Production Of Eggs')
+      ).toHaveLength(2);
+    });
+
+    // Should match despite Last.fm's quirky formatting
+    expect(screen.getByText('In Wantlist')).toBeInTheDocument();
+  });
+
   it('handles Discogs wishlist API failure gracefully', async () => {
     // Wishlist API fails but page should still load
     mockGetWishlist.mockRejectedValue(new Error('Wishlist unavailable'));
