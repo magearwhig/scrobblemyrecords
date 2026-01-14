@@ -5,6 +5,7 @@ import {
   MissingArtist,
   CollectionItem,
   LocalWantItem,
+  EnrichedWishlistItem,
 } from '../../shared/types';
 import SyncStatusBar from '../components/SyncStatusBar';
 import { useApp } from '../context/AppContext';
@@ -50,6 +51,11 @@ const DiscoveryPage: React.FC = () => {
     new Set()
   );
 
+  // Discogs wishlist state - track which albums are in the Discogs wantlist
+  const [inDiscogsWishlist, setInDiscogsWishlist] = useState<Set<string>>(
+    new Set()
+  );
+
   // Sorting state
   const [albumSort, setAlbumSort] = useState<AlbumSortOption>('plays');
   const [artistSort, setArtistSort] = useState<ArtistSortOption>('plays');
@@ -61,11 +67,13 @@ const DiscoveryPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const [albums, artists, localWantList] = await Promise.all([
-        api.getMissingAlbums(100),
-        api.getMissingArtists(100),
-        api.getLocalWantList(),
-      ]);
+      const [albums, artists, localWantList, discogsWishlist] =
+        await Promise.all([
+          api.getMissingAlbums(100),
+          api.getMissingArtists(100),
+          api.getLocalWantList(),
+          api.getWishlist().catch(() => [] as EnrichedWishlistItem[]), // Don't fail if wishlist unavailable
+        ]);
 
       setMissingAlbums(albums);
       setMissingArtists(artists);
@@ -77,6 +85,16 @@ const DiscoveryPage: React.FC = () => {
         )
       );
       setAddedToWantList(existingWantedKeys);
+
+      // Pre-populate inDiscogsWishlist with Discogs wantlist items
+      // Normalize artist/album names to lowercase for case-insensitive matching
+      const discogsWishlistKeys = new Set(
+        discogsWishlist.map(
+          (item: EnrichedWishlistItem) =>
+            `${item.artist.toLowerCase()}:${item.title.toLowerCase()}`
+        )
+      );
+      setInDiscogsWishlist(discogsWishlistKeys);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to load discovery data'
@@ -93,6 +111,13 @@ const DiscoveryPage: React.FC = () => {
   const formatDate = (timestamp: number): string => {
     const date = new Date(timestamp * 1000);
     return date.toLocaleDateString();
+  };
+
+  // Check if album is in Discogs wishlist (case-insensitive)
+  const isInDiscogsWishlist = (artist: string, album: string): boolean => {
+    return inDiscogsWishlist.has(
+      `${artist.toLowerCase()}:${album.toLowerCase()}`
+    );
   };
 
   // Generate Last.fm URLs
@@ -373,7 +398,17 @@ const DiscoveryPage: React.FC = () => {
                       className='missing-item'
                     >
                       <div className='missing-item-info'>
-                        <div className='missing-item-title'>{album.album}</div>
+                        <div className='missing-item-title'>
+                          {album.album}
+                          {isInDiscogsWishlist(album.artist, album.album) && (
+                            <span
+                              className='discovery-badge discovery-badge-wishlist'
+                              title='In your Discogs wantlist'
+                            >
+                              In Wantlist
+                            </span>
+                          )}
+                        </div>
                         <div className='missing-item-artist'>
                           {album.artist}
                         </div>

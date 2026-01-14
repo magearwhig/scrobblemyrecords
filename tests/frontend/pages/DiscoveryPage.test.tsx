@@ -11,12 +11,14 @@ import {
   CollectionItem,
   LocalWantItem,
   AuthStatus,
+  EnrichedWishlistItem,
 } from '../../../src/shared/types';
 
 // Mock the API service
 const mockGetMissingAlbums = jest.fn();
 const mockGetMissingArtists = jest.fn();
 const mockGetLocalWantList = jest.fn();
+const mockGetWishlist = jest.fn();
 const mockAddToLocalWantList = jest.fn();
 const mockSearchCollection = jest.fn();
 const mockCreateDiscoveryAlbumMapping = jest.fn();
@@ -29,6 +31,7 @@ jest.mock('../../../src/renderer/services/api', () => ({
     getMissingAlbums: mockGetMissingAlbums,
     getMissingArtists: mockGetMissingArtists,
     getLocalWantList: mockGetLocalWantList,
+    getWishlist: mockGetWishlist,
     addToLocalWantList: mockAddToLocalWantList,
     searchCollection: mockSearchCollection,
     createDiscoveryAlbumMapping: mockCreateDiscoveryAlbumMapping,
@@ -113,6 +116,24 @@ const mockCollectionItems: CollectionItem[] = [
   },
 ];
 
+// Mock Discogs wishlist with one album matching a missing album
+const mockDiscogsWishlist: EnrichedWishlistItem[] = [
+  {
+    id: 1,
+    masterId: 12345,
+    releaseId: 67890,
+    artist: 'Radiohead', // Matches missing album
+    title: 'OK Computer', // Matches missing album
+    year: 1997,
+    coverImage: 'https://example.com/cover.jpg',
+    dateAdded: '2024-01-01',
+    vinylStatus: 'has_vinyl',
+    vinylVersions: [],
+    lowestVinylPrice: 25.99,
+    priceCurrency: 'USD',
+  },
+];
+
 const createMockAuthContext = (authStatus: AuthStatus) => ({
   authStatus,
   setAuthStatus: jest.fn(),
@@ -141,6 +162,7 @@ describe('DiscoveryPage', () => {
     mockGetMissingAlbums.mockResolvedValue(mockMissingAlbums);
     mockGetMissingArtists.mockResolvedValue(mockMissingArtists);
     mockGetLocalWantList.mockResolvedValue([]);
+    mockGetWishlist.mockResolvedValue([]);
     mockAddToLocalWantList.mockResolvedValue({ id: 'new-want-1' });
     mockSearchCollection.mockResolvedValue(mockCollectionItems);
     mockHideAlbum.mockResolvedValue(true);
@@ -518,5 +540,76 @@ describe('DiscoveryPage', () => {
     await waitFor(() => {
       expect(mockGetLocalWantList).toHaveBeenCalled();
     });
+  });
+
+  it('fetches Discogs wishlist on page load', async () => {
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(mockGetWishlist).toHaveBeenCalled();
+    });
+  });
+
+  it('shows "In Wantlist" badge for albums in Discogs wishlist', async () => {
+    // Mock Discogs wishlist with Radiohead - OK Computer
+    mockGetWishlist.mockResolvedValue(mockDiscogsWishlist);
+
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Radiohead')).toBeInTheDocument();
+    });
+
+    // Should show "In Wantlist" badge for OK Computer
+    expect(screen.getByText('In Wantlist')).toBeInTheDocument();
+  });
+
+  it('does not show "In Wantlist" badge for albums not in Discogs wishlist', async () => {
+    // Empty wishlist
+    mockGetWishlist.mockResolvedValue([]);
+
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Radiohead')).toBeInTheDocument();
+    });
+
+    // Should not show any "In Wantlist" badges
+    expect(screen.queryByText('In Wantlist')).not.toBeInTheDocument();
+  });
+
+  it('matches Discogs wishlist case-insensitively', async () => {
+    // Mock wishlist with different case
+    mockGetWishlist.mockResolvedValue([
+      {
+        ...mockDiscogsWishlist[0],
+        artist: 'RADIOHEAD', // Uppercase
+        title: 'ok computer', // Lowercase
+      },
+    ]);
+
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Radiohead')).toBeInTheDocument();
+    });
+
+    // Should still match and show the badge
+    expect(screen.getByText('In Wantlist')).toBeInTheDocument();
+  });
+
+  it('handles Discogs wishlist API failure gracefully', async () => {
+    // Wishlist API fails but page should still load
+    mockGetWishlist.mockRejectedValue(new Error('Wishlist unavailable'));
+
+    renderDiscoveryPage();
+
+    // Page should still load missing albums
+    await waitFor(() => {
+      expect(screen.getByText('Radiohead')).toBeInTheDocument();
+    });
+
+    // No badges shown (failed to load wishlist)
+    expect(screen.queryByText('In Wantlist')).not.toBeInTheDocument();
   });
 });

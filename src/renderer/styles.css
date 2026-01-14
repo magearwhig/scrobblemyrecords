@@ -1267,6 +1267,23 @@ body {
   border-color: var(--accent-color);
 }
 
+/* Discovery badges */
+.discovery-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  border-radius: 4px;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.discovery-badge-wishlist {
+  background: var(--accent-color);
+  color: white;
+}
+
 .missing-item-actions {
   margin-left: 1rem;
   flex-shrink: 0;
