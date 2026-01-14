@@ -4,11 +4,12 @@
 
 Cross-cutting concerns to address before or alongside feature development.
 
-### Status: MOSTLY COMPLETE ✅
+### Status: COMPLETE ✅
 
 **Completed:**
 - 0A: Security Baseline (already in place before this work)
-- 0B: API Conventions - `stats.ts` and `images.ts` routes created following `/api/v1/` pattern
+- 0B: API Conventions - `stats.ts`, `images.ts`, and `wishlist.ts` routes created following `/api/v1/` pattern
+- 0D: In-App Notification System - `NotificationBell` component with dropdown, `useNotifications` hook, localStorage persistence
 - 0E: Extended Analytics Infrastructure - `StatsService` created with comprehensive stats methods
 - Image caching service (`imageService.ts`) with Last.fm and Discogs integration
 - All stats-related types defined in `shared/types.ts`
@@ -16,7 +17,6 @@ Cross-cutting concerns to address before or alongside feature development.
 
 **Not Yet Implemented:**
 - 0C: Data Evolution & Storage (schema versioning for new data files)
-- 0D: In-App Notification System
 
 ### 0A: Security Baseline
 
@@ -458,6 +458,26 @@ Track streaks in real-time:
 ---
 
 ## Feature 2: Discogs Wishlist & Vinyl Availability Tracking
+
+### Status: COMPLETE ✅
+
+**Completed:**
+- Wishlist sync service (`wishlistService.ts`) with Discogs integration
+- Wishlist API routes (`/api/v1/wishlist/*`) for sync, versions, settings, and local want list
+- `WishlistPage.tsx` with tabbed interface (All, Has Vinyl, CD Only, Affordable, Wanted)
+- Vinyl version detection and marketplace price fetching
+- Local Want List feature for Discovery integration (albums played frequently but not owned)
+- Watch list for CD-only items with vinyl availability checking
+- Notification integration for vinyl availability alerts
+- Settings integration (price threshold, currency, auto-sync interval)
+- 42 backend integration tests + 19 frontend component tests
+- All wishlist types defined in `shared/types.ts`
+
+**Implementation Details:**
+- Version cache: 7 days for vinyl availability data
+- Price cache: 24 hours for marketplace stats
+- Progressive scanning: 10-20 masters per sync session
+- Vinyl detection: "Vinyl", "LP", "12\"", "10\"", "7\"" formats
 
 ### Overview
 Track albums at the **master release level** (not specific pressings), monitor for vinyl availability, and integrate with Discovery to show which albums are vinyl-available vs CD-only. Focus is exclusively on vinyl - no interest in CD or other formats.
