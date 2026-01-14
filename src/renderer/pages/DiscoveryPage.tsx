@@ -443,6 +443,16 @@ const DiscoveryPage: React.FC = () => {
                               In Wantlist
                             </span>
                           )}
+                          {addedToWantList.has(
+                            `${album.artist}:${album.album}`
+                          ) && (
+                            <span
+                              className='discovery-badge discovery-badge-wanted'
+                              title='In your local want list'
+                            >
+                              Wanted
+                            </span>
+                          )}
                         </div>
                         <div className='missing-item-artist'>
                           {album.artist}

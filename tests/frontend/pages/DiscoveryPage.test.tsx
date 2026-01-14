@@ -287,7 +287,26 @@ describe('DiscoveryPage', () => {
     const wantButtons = screen.getAllByText('Want');
     expect(wantButtons.length).toBe(2);
 
-    expect(screen.getByText('Wanted')).toBeInTheDocument();
+    // Should show Wanted button (disabled state)
+    const wantedButtons = screen.getAllByRole('button', { name: /Wanted/i });
+    expect(wantedButtons.length).toBe(1);
+  });
+
+  it('shows Wanted badge for albums in local want list', async () => {
+    // Mock local want list with Clem Snide album
+    mockGetLocalWantList.mockResolvedValue(mockLocalWantList);
+
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Clem Snide')).toBeInTheDocument();
+    });
+
+    // Should show "Wanted" badge for items in local want list
+    const wantedBadge = screen.getByTitle('In your local want list');
+    expect(wantedBadge).toBeInTheDocument();
+    expect(wantedBadge).toHaveTextContent('Wanted');
+    expect(wantedBadge).toHaveClass('discovery-badge-wanted');
   });
 
   it('adds album to want list when clicking Want button', async () => {
@@ -318,11 +337,14 @@ describe('DiscoveryPage', () => {
       expect(screen.getByText('Radiohead')).toBeInTheDocument();
     });
 
-    const wantButtons = screen.getAllByText('Want');
+    const wantButtons = screen.getAllByRole('button', { name: 'Want' });
     fireEvent.click(wantButtons[0]);
 
     await waitFor(() => {
-      expect(screen.getByText('Wanted')).toBeInTheDocument();
+      // After clicking, button should show "Wanted" and be disabled
+      const wantedButton = screen.getAllByRole('button', { name: 'Wanted' })[0];
+      expect(wantedButton).toBeInTheDocument();
+      expect(wantedButton).toBeDisabled();
     });
   });
 

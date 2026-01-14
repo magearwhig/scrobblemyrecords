@@ -1284,6 +1284,11 @@ body {
   color: white;
 }
 
+.discovery-badge-wanted {
+  background: var(--success-color);
+  color: white;
+}
+
 .missing-item-actions {
   margin-left: 1rem;
   flex-shrink: 0;
