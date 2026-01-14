@@ -635,6 +635,80 @@ describe('DiscoveryPage', () => {
     expect(screen.getByText('In Wantlist')).toBeInTheDocument();
   });
 
+  it('matches Discogs wishlist with [Explicit] suffix', async () => {
+    // Mock missing album with [Explicit] suffix (like Last.fm/Spotify data)
+    mockGetMissingAlbums.mockResolvedValue([
+      {
+        artist: 'Big Boi',
+        album: 'Vicious Lies and Dangerous Rumors [Explicit]',
+        playCount: 30,
+        lastPlayed: 1703894400,
+      },
+    ]);
+
+    // Mock wishlist without suffix (like Discogs data)
+    mockGetWishlist.mockResolvedValue([
+      {
+        id: 3,
+        masterId: 12345,
+        releaseId: 67890,
+        artist: 'Big Boi',
+        title: 'Vicious Lies And Dangerous Rumors',
+        year: 2012,
+        coverImage: 'https://example.com/cover.jpg',
+        dateAdded: '2024-01-01',
+        vinylStatus: 'has_vinyl',
+        vinylVersions: [],
+      },
+    ]);
+
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Big Boi')).toBeInTheDocument();
+    });
+
+    // Should match despite [Explicit] suffix
+    expect(screen.getByText('In Wantlist')).toBeInTheDocument();
+  });
+
+  it('matches Discogs wishlist with (Deluxe) suffix', async () => {
+    // Mock missing album with (Deluxe) suffix
+    mockGetMissingAlbums.mockResolvedValue([
+      {
+        artist: 'Big Boi',
+        album: 'Vicious Lies and Dangerous Rumors (Deluxe)',
+        playCount: 30,
+        lastPlayed: 1703894400,
+      },
+    ]);
+
+    // Mock wishlist without suffix
+    mockGetWishlist.mockResolvedValue([
+      {
+        id: 3,
+        masterId: 12345,
+        releaseId: 67890,
+        artist: 'Big Boi',
+        title: 'Vicious Lies And Dangerous Rumors',
+        year: 2012,
+        coverImage: 'https://example.com/cover.jpg',
+        dateAdded: '2024-01-01',
+        vinylStatus: 'has_vinyl',
+        vinylVersions: [],
+      },
+    ]);
+
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Big Boi')).toBeInTheDocument();
+    });
+
+    // Should match despite (Deluxe) suffix
+    expect(screen.getByText('In Wantlist')).toBeInTheDocument();
+  });
+
   it('handles Discogs wishlist API failure gracefully', async () => {
     // Wishlist API fails but page should still load
     mockGetWishlist.mockRejectedValue(new Error('Wishlist unavailable'));
