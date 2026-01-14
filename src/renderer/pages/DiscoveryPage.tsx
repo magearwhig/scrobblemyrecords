@@ -87,11 +87,17 @@ const DiscoveryPage: React.FC = () => {
       setAddedToWantList(existingWantedKeys);
 
       // Pre-populate inDiscogsWishlist with Discogs wantlist items
-      // Normalize artist/album names to lowercase for case-insensitive matching
+      // Normalize names for matching (case-insensitive, quote-insensitive)
+      const normalize = (str: string): string =>
+        str
+          .toLowerCase()
+          .replace(/[""''"`]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
       const discogsWishlistKeys = new Set(
         discogsWishlist.map(
           (item: EnrichedWishlistItem) =>
-            `${item.artist.toLowerCase()}:${item.title.toLowerCase()}`
+            `${normalize(item.artist)}:${normalize(item.title)}`
         )
       );
       setInDiscogsWishlist(discogsWishlistKeys);
@@ -113,10 +119,20 @@ const DiscoveryPage: React.FC = () => {
     return date.toLocaleDateString();
   };
 
-  // Check if album is in Discogs wishlist (case-insensitive)
+  // Normalize album/artist names for matching
+  // Removes quotes, extra punctuation, and normalizes to lowercase
+  const normalizeForMatching = (str: string): string => {
+    return str
+      .toLowerCase()
+      .replace(/[""''"`]/g, '') // Remove various quote characters
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+  };
+
+  // Check if album is in Discogs wishlist (case-insensitive, quote-insensitive)
   const isInDiscogsWishlist = (artist: string, album: string): boolean => {
     return inDiscogsWishlist.has(
-      `${artist.toLowerCase()}:${album.toLowerCase()}`
+      `${normalizeForMatching(artist)}:${normalizeForMatching(album)}`
     );
   };
 

@@ -598,6 +598,43 @@ describe('DiscoveryPage', () => {
     expect(screen.getByText('In Wantlist')).toBeInTheDocument();
   });
 
+  it('matches Discogs wishlist with quoted album names', async () => {
+    // Mock missing album with quotes in the name (like Last.fm data)
+    mockGetMissingAlbums.mockResolvedValue([
+      {
+        artist: 'How To Dress Well',
+        album: '"What Is This Heart?"', // Last.fm style with quotes
+        playCount: 50,
+        lastPlayed: 1703894400,
+      },
+    ]);
+
+    // Mock wishlist without quotes (like Discogs data)
+    mockGetWishlist.mockResolvedValue([
+      {
+        id: 2,
+        masterId: 700483,
+        releaseId: 8283551,
+        artist: 'How To Dress Well',
+        title: 'What Is This Heart?', // Discogs style without quotes
+        year: 2014,
+        coverImage: 'https://example.com/cover.jpg',
+        dateAdded: '2024-01-01',
+        vinylStatus: 'has_vinyl',
+        vinylVersions: [],
+      },
+    ]);
+
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('How To Dress Well')).toBeInTheDocument();
+    });
+
+    // Should match despite quote differences
+    expect(screen.getByText('In Wantlist')).toBeInTheDocument();
+  });
+
   it('handles Discogs wishlist API failure gracefully', async () => {
     // Wishlist API fails but page should still load
     mockGetWishlist.mockRejectedValue(new Error('Wishlist unavailable'));
