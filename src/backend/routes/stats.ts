@@ -254,6 +254,81 @@ export default function createStatsRouter(
     }
   });
 
+  /**
+   * GET /api/v1/stats/top/tracks/:period
+   * Get top tracks for a time period
+   * Query params:
+   *   limit: number (default: 10)
+   *   startDate: number (Unix timestamp in seconds, for custom period)
+   *   endDate: number (Unix timestamp in seconds, for custom period)
+   */
+  router.get('/top/tracks/:period', async (req: Request, res: Response) => {
+    try {
+      const period = req.params.period as
+        | 'week'
+        | 'month'
+        | 'year'
+        | 'all'
+        | 'days30'
+        | 'days90'
+        | 'days365'
+        | 'custom';
+      const limit = parseInt(req.query.limit as string) || 10;
+      const startDate = req.query.startDate
+        ? parseInt(req.query.startDate as string)
+        : undefined;
+      const endDate = req.query.endDate
+        ? parseInt(req.query.endDate as string)
+        : undefined;
+
+      const validPeriods = [
+        'week',
+        'month',
+        'year',
+        'all',
+        'days30',
+        'days90',
+        'days365',
+        'custom',
+      ];
+      if (!validPeriods.includes(period)) {
+        return res.status(400).json({
+          success: false,
+          error:
+            'Invalid period. Must be week, month, year, all, days30, days90, days365, or custom',
+        });
+      }
+
+      if (period === 'custom' && (!startDate || !endDate)) {
+        return res.status(400).json({
+          success: false,
+          error:
+            'Custom period requires startDate and endDate query parameters',
+        });
+      }
+
+      const topTracks = await statsService.getTopTracks(
+        period,
+        limit,
+        startDate,
+        endDate
+      );
+
+      res.json({
+        success: true,
+        data: topTracks,
+        period,
+        ...(period === 'custom' && { startDate, endDate }),
+      });
+    } catch (error) {
+      logger.error('Error getting top tracks', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
   // ============================================
   // Collection Stats
   // ============================================

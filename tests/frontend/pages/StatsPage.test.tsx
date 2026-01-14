@@ -15,6 +15,7 @@ jest.mock('../../../src/renderer/services/statsApi', () => ({
     getHeatmap: jest.fn(),
     getTopArtists: jest.fn(),
     getTopAlbums: jest.fn(),
+    getTopTracks: jest.fn(),
     getDustyCorners: jest.fn(),
     getSourceBreakdown: jest.fn(),
     getTimeline: jest.fn(),
@@ -89,6 +90,22 @@ describe('StatsPage', () => {
         lastPlayed: Date.now() / 1000 - 86400,
       },
     ],
+    topTracks: [
+      {
+        artist: 'Radiohead',
+        album: 'OK Computer',
+        track: 'Paranoid Android',
+        playCount: 25,
+        lastPlayed: Date.now() / 1000,
+      },
+      {
+        artist: 'The Beatles',
+        album: 'Abbey Road',
+        track: 'Come Together',
+        playCount: 22,
+        lastPlayed: Date.now() / 1000 - 86400,
+      },
+    ],
     dustyCorners: [
       {
         artist: 'Pink Floyd',
@@ -146,6 +163,10 @@ describe('StatsPage', () => {
     mockStatsApi.getTopAlbums.mockResolvedValue({
       success: true,
       data: defaultMockData.topAlbums,
+    });
+    mockStatsApi.getTopTracks.mockResolvedValue({
+      success: true,
+      data: defaultMockData.topTracks,
     });
     mockStatsApi.getDustyCorners.mockResolvedValue({
       success: true,
@@ -321,6 +342,7 @@ describe('StatsPage', () => {
       expect(mockStatsApi.getHeatmap).toHaveBeenCalled();
       expect(mockStatsApi.getTopArtists).toHaveBeenCalled();
       expect(mockStatsApi.getTopAlbums).toHaveBeenCalled();
+      expect(mockStatsApi.getTopTracks).toHaveBeenCalled();
       expect(mockStatsApi.getDustyCorners).toHaveBeenCalled();
       expect(mockStatsApi.getSourceBreakdown).toHaveBeenCalled();
       expect(mockStatsApi.getTimeline).toHaveBeenCalled();
@@ -376,6 +398,7 @@ describe('StatsPage', () => {
   it('should handle empty data gracefully', async () => {
     mockStatsApi.getTopArtists.mockResolvedValue({ success: true, data: [] });
     mockStatsApi.getTopAlbums.mockResolvedValue({ success: true, data: [] });
+    mockStatsApi.getTopTracks.mockResolvedValue({ success: true, data: [] });
 
     render(<StatsPage />);
 

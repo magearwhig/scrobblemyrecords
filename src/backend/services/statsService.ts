@@ -14,6 +14,7 @@ import {
   StatsOverview,
   StreakInfo,
   TimelineDataPoint,
+  TrackPlayCount,
 } from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
@@ -452,6 +453,98 @@ export class StatsService {
     return albumCounts
       .sort((a, b) => b.playCount - a.playCount)
       .slice(0, limit);
+  }
+
+  /**
+   * Get top tracks for a time period or custom date range
+   */
+  async getTopTracks(
+    period:
+      | 'week'
+      | 'month'
+      | 'year'
+      | 'all'
+      | 'days30'
+      | 'days90'
+      | 'days365'
+      | 'custom',
+    limit: number = 10,
+    startDate?: number,
+    endDate?: number
+  ): Promise<TrackPlayCount[]> {
+    const index = await this.historyStorage.getIndex();
+    if (!index) {
+      return [];
+    }
+
+    // Determine time range
+    let cutoffTimestamp: number;
+    let endTimestamp: number = Date.now() / 1000;
+
+    if (
+      period === 'custom' &&
+      startDate !== undefined &&
+      endDate !== undefined
+    ) {
+      cutoffTimestamp = startDate;
+      endTimestamp = endDate;
+    } else {
+      cutoffTimestamp = this.getPeriodCutoff(period);
+    }
+
+    // Count plays per track in the period
+    // Key: normalized "artist|album|track"
+    const trackCounts = new Map<
+      string,
+      {
+        artist: string;
+        album: string;
+        track: string;
+        count: number;
+        lastPlayed: number;
+      }
+    >();
+
+    for (const [key, albumHistory] of Object.entries(index.albums)) {
+      const [artist, album] = key.split('|');
+
+      for (const play of albumHistory.plays) {
+        if (
+          play.timestamp >= cutoffTimestamp &&
+          play.timestamp <= endTimestamp &&
+          play.track
+        ) {
+          const trackKey = `${artist}|${album}|${play.track.toLowerCase()}`;
+          const existing = trackCounts.get(trackKey);
+          if (existing) {
+            existing.count++;
+            if (play.timestamp > existing.lastPlayed) {
+              existing.lastPlayed = play.timestamp;
+            }
+          } else {
+            trackCounts.set(trackKey, {
+              artist,
+              album,
+              track: play.track,
+              count: 1,
+              lastPlayed: play.timestamp,
+            });
+          }
+        }
+      }
+    }
+
+    // Sort and return top tracks
+    return Array.from(trackCounts.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit)
+      .map(item => ({
+        artist: this.capitalizeArtist(item.artist),
+        album: this.capitalizeTitle(item.album),
+        track: this.capitalizeTitle(item.track),
+        playCount: item.count,
+        lastPlayed: item.lastPlayed,
+      }));
   }
 
   /**

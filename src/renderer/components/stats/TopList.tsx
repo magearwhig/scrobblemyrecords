@@ -4,6 +4,7 @@ import {
   AlbumPlayCount,
   ArtistPlayCount,
   DateRange,
+  TrackPlayCount,
 } from '../../../shared/types';
 
 import DateRangePicker from './DateRangePicker';
@@ -20,8 +21,8 @@ type Period =
 
 interface TopListProps {
   title: string;
-  type: 'artists' | 'albums';
-  data: ArtistPlayCount[] | AlbumPlayCount[];
+  type: 'artists' | 'albums' | 'tracks';
+  data: ArtistPlayCount[] | AlbumPlayCount[] | TrackPlayCount[];
   onPeriodChange: (period: Period, dateRange?: DateRange) => void;
   currentPeriod: Period;
   loading?: boolean;
@@ -134,16 +135,31 @@ export const TopList: React.FC<TopListProps> = ({
   ];
 
   const isAlbumData = (
-    item: ArtistPlayCount | AlbumPlayCount
+    item: ArtistPlayCount | AlbumPlayCount | TrackPlayCount
   ): item is AlbumPlayCount => {
-    return 'album' in item;
+    return 'album' in item && !('track' in item);
+  };
+
+  const isTrackData = (
+    item: ArtistPlayCount | AlbumPlayCount | TrackPlayCount
+  ): item is TrackPlayCount => {
+    return 'track' in item;
   };
 
   const getDescription = (): string => {
     if (type === 'artists') {
       return 'Your most played artists by scrobble count.';
     }
+    if (type === 'tracks') {
+      return 'Your most played tracks by scrobble count.';
+    }
     return 'Your most played albums by scrobble count.';
+  };
+
+  const getEmptyMessage = (): string => {
+    if (type === 'artists') return 'artists';
+    if (type === 'tracks') return 'tracks';
+    return 'albums';
   };
 
   const handlePeriodClick = (period: Period) => {
@@ -204,7 +220,7 @@ export const TopList: React.FC<TopListProps> = ({
           <div className='top-list-loading'>Loading...</div>
         ) : data.length === 0 ? (
           <div className='top-list-empty'>
-            No {type === 'artists' ? 'artists' : 'albums'} for this period
+            No {getEmptyMessage()} for this period
           </div>
         ) : (
           <ol className='top-list-items'>
@@ -222,9 +238,11 @@ export const TopList: React.FC<TopListProps> = ({
                     ) : (
                       <AlbumPlaceholder />
                     )
-                  ) : item.imageUrl ? (
+                  ) : isTrackData(item) ? (
+                    <AlbumPlaceholder />
+                  ) : (item as ArtistPlayCount).imageUrl ? (
                     <img
-                      src={item.imageUrl}
+                      src={(item as ArtistPlayCount).imageUrl}
                       alt={`${item.artist}`}
                       loading='lazy'
                     />
@@ -233,7 +251,12 @@ export const TopList: React.FC<TopListProps> = ({
                   )}
                 </div>
                 <div className='top-list-info'>
-                  {isAlbumData(item) ? (
+                  {isTrackData(item) ? (
+                    <>
+                      <div className='top-list-name'>{item.track}</div>
+                      <div className='top-list-artist'>{item.artist}</div>
+                    </>
+                  ) : isAlbumData(item) ? (
                     <>
                       <div className='top-list-name'>{item.album}</div>
                       <div className='top-list-artist'>{item.artist}</div>

@@ -13,6 +13,7 @@ import {
   StatsOverview,
   StreakInfo,
   TimelineDataPoint,
+  TrackPlayCount,
 } from '../../shared/types';
 
 const API_BASE = `http://localhost:${process.env.REACT_APP_BACKEND_PORT || '3001'}/api/v1`;
@@ -110,6 +111,35 @@ export const statsApi = {
     dateRange?: DateRange
   ): Promise<ApiResponse<AlbumPlayCount[]>> {
     let url = `${API_BASE}/stats/top/albums/${period}?limit=${limit}`;
+
+    if (period === 'custom' && dateRange) {
+      url += `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;
+    }
+
+    const response = await fetch(url);
+    return response.json();
+  },
+
+  /**
+   * Get top tracks for a period
+   * @param period - Time period or 'custom' for custom range
+   * @param limit - Maximum number of tracks to return
+   * @param dateRange - Custom date range (required when period is 'custom')
+   */
+  async getTopTracks(
+    period:
+      | 'week'
+      | 'month'
+      | 'year'
+      | 'all'
+      | 'days30'
+      | 'days90'
+      | 'days365'
+      | 'custom',
+    limit: number = 10,
+    dateRange?: DateRange
+  ): Promise<ApiResponse<TrackPlayCount[]>> {
+    let url = `${API_BASE}/stats/top/tracks/${period}?limit=${limit}`;
 
     if (period === 'custom' && dateRange) {
       url += `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;

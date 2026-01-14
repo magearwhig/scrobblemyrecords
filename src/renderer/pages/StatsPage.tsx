@@ -13,6 +13,7 @@ import {
   StreakInfo,
   CollectionCoverage,
   TimelineDataPoint,
+  TrackPlayCount,
 } from '../../shared/types';
 import { CalendarHeatmap } from '../components/stats/CalendarHeatmap';
 import { DustyCornersSection } from '../components/stats/DustyCornersSection';
@@ -66,8 +67,10 @@ export const StatsPage: React.FC = () => {
   const [heatmapYear, setHeatmapYear] = useState(new Date().getFullYear());
   const [topArtists, setTopArtists] = useState<ArtistPlayCount[]>([]);
   const [topAlbums, setTopAlbums] = useState<AlbumPlayCount[]>([]);
+  const [topTracks, setTopTracks] = useState<TrackPlayCount[]>([]);
   const [artistPeriod, setArtistPeriod] = useState<Period>('month');
   const [albumPeriod, setAlbumPeriod] = useState<Period>('month');
+  const [trackPeriod, setTrackPeriod] = useState<Period>('month');
   const [dustyCorners, setDustyCorners] = useState<DustyCornerAlbum[]>([]);
   const [topListsLoading, setTopListsLoading] = useState(false);
   const [dustyLoading] = useState(false);
@@ -83,6 +86,7 @@ export const StatsPage: React.FC = () => {
     DateRange | undefined
   >();
   const [albumDateRange, setAlbumDateRange] = useState<DateRange | undefined>();
+  const [trackDateRange, setTrackDateRange] = useState<DateRange | undefined>();
   const [newArtistsCount, setNewArtistsCount] = useState<number>(0);
   const [listeningHours, setListeningHours] = useState<ListeningHours | null>(
     null
@@ -153,6 +157,7 @@ export const StatsPage: React.FC = () => {
           heatmapRes,
           artistsRes,
           albumsRes,
+          tracksRes,
           dustyRes,
           sourcesRes,
           timelineRes,
@@ -166,6 +171,7 @@ export const StatsPage: React.FC = () => {
           statsApi.getHeatmap(heatmapYear),
           statsApi.getTopArtists(artistPeriod, 10),
           statsApi.getTopAlbums(albumPeriod, 10),
+          statsApi.getTopTracks(trackPeriod, 10),
           statsApi.getDustyCorners(20),
           statsApi.getSourceBreakdown(),
           statsApi.getTimeline(
@@ -201,6 +207,9 @@ export const StatsPage: React.FC = () => {
         if (albumsRes.success && albumsRes.data) {
           setTopAlbums(albumsRes.data);
           enrichAlbumsWithImages(albumsRes.data).then(setTopAlbums);
+        }
+        if (tracksRes.success && tracksRes.data) {
+          setTopTracks(tracksRes.data);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load stats');
@@ -252,6 +261,26 @@ export const StatsPage: React.FC = () => {
       }
     },
     [enrichAlbumsWithImages]
+  );
+
+  // Handle track period change
+  const handleTrackPeriodChange = useCallback(
+    async (period: Period, dateRange?: DateRange) => {
+      setTrackPeriod(period);
+      setTrackDateRange(dateRange);
+      setTopListsLoading(true);
+      try {
+        const res = await statsApi.getTopTracks(period, 10, dateRange);
+        if (res.success && res.data) {
+          setTopTracks(res.data);
+        }
+      } catch (err) {
+        console.error('Failed to load top tracks:', err);
+      } finally {
+        setTopListsLoading(false);
+      }
+    },
+    []
   );
 
   // Handle heatmap year change
@@ -431,6 +460,15 @@ export const StatsPage: React.FC = () => {
           onPeriodChange={handleAlbumPeriodChange}
           loading={topListsLoading}
           customDateRange={albumDateRange}
+        />
+        <TopList
+          title='Top Tracks'
+          type='tracks'
+          data={topTracks}
+          currentPeriod={trackPeriod}
+          onPeriodChange={handleTrackPeriodChange}
+          loading={topListsLoading}
+          customDateRange={trackDateRange}
         />
       </section>
 

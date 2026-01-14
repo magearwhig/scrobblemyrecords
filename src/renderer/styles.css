@@ -1280,7 +1280,7 @@ body {
 }
 
 .discovery-badge-wishlist {
-  background: var(--accent-color);
+  background: #7c3aed;
   color: white;
 }
 

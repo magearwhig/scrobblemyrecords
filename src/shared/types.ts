@@ -323,6 +323,14 @@ export interface AlbumPlayCount {
   coverUrl?: string;
 }
 
+export interface TrackPlayCount {
+  artist: string;
+  album: string;
+  track: string;
+  playCount: number;
+  lastPlayed: number;
+}
+
 export interface StreakInfo {
   currentStreak: number;
   longestStreak: number;
