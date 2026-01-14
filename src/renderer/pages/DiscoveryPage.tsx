@@ -4,6 +4,7 @@ import {
   MissingAlbum,
   MissingArtist,
   CollectionItem,
+  LocalWantItem,
 } from '../../shared/types';
 import SyncStatusBar from '../components/SyncStatusBar';
 import { useApp } from '../context/AppContext';
@@ -60,13 +61,22 @@ const DiscoveryPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const [albums, artists] = await Promise.all([
+      const [albums, artists, localWantList] = await Promise.all([
         api.getMissingAlbums(100),
         api.getMissingArtists(100),
+        api.getLocalWantList(),
       ]);
 
       setMissingAlbums(albums);
       setMissingArtists(artists);
+
+      // Pre-populate addedToWantList with existing local want list items
+      const existingWantedKeys = new Set(
+        localWantList.map(
+          (item: LocalWantItem) => `${item.artist}:${item.album}`
+        )
+      );
+      setAddedToWantList(existingWantedKeys);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to load discovery data'
