@@ -271,9 +271,9 @@ describe('TopList', () => {
       );
 
       // Should show formatted date range instead of "Custom"
-      // The exact format depends on timezone, but should contain month abbreviations
+      // Format varies: "Jan - Feb 2024" (same year) or "Dec '23 - Feb '24" (different years)
       const customButton = screen.getByRole('button', {
-        name: /\d{2}.*-.*\d{2}/,
+        name: /[A-Z][a-z]{2}.*-.*[A-Z][a-z]{2}/,
       });
       expect(customButton).toHaveClass('active');
     });
