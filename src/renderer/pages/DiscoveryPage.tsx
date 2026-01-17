@@ -75,6 +75,9 @@ const DiscoveryPage: React.FC = () => {
   const [albumSort, setAlbumSort] = useState<AlbumSortOption>('plays');
   const [artistSort, setArtistSort] = useState<ArtistSortOption>('plays');
 
+  // Hide wanted items toggle
+  const [hideWantedItems, setHideWantedItems] = useState(false);
+
   const api = getApiService(state.serverUrl);
 
   const loadData = async () => {
@@ -82,9 +85,10 @@ const DiscoveryPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
+      // Fetch more albums than needed to ensure we have 100 after filtering wanted items
       const [albums, artists, localWantList, discogsWishlist] =
         await Promise.all([
-          api.getMissingAlbums(100),
+          api.getMissingAlbums(200),
           api.getMissingArtists(100),
           api.getLocalWantList(),
           api.getWishlist().catch(() => [] as EnrichedWishlistItem[]), // Don't fail if wishlist unavailable
@@ -327,21 +331,36 @@ const DiscoveryPage: React.FC = () => {
     }
   };
 
-  // Sort albums based on selected option
-  const sortedAlbums = [...missingAlbums].sort((a, b) => {
-    switch (albumSort) {
-      case 'plays':
-        return b.playCount - a.playCount;
-      case 'artist':
-        return a.artist.localeCompare(b.artist);
-      case 'album':
-        return a.album.localeCompare(b.album);
-      case 'recent':
-        return b.lastPlayed - a.lastPlayed;
-      default:
-        return 0;
-    }
-  });
+  // Check if an album is wanted (in Discogs wantlist or local want list)
+  const isWantedItem = (artist: string, album: string): boolean => {
+    return (
+      isInDiscogsWishlist(artist, album) ||
+      addedToWantList.has(`${artist}:${album}`)
+    );
+  };
+
+  // Sort and optionally filter albums based on selected options
+  // Limit to 100 items for display
+  const sortedAlbums = [...missingAlbums]
+    .filter(album => {
+      if (!hideWantedItems) return true;
+      return !isWantedItem(album.artist, album.album);
+    })
+    .sort((a, b) => {
+      switch (albumSort) {
+        case 'plays':
+          return b.playCount - a.playCount;
+        case 'artist':
+          return a.artist.localeCompare(b.artist);
+        case 'album':
+          return a.album.localeCompare(b.album);
+        case 'recent':
+          return b.lastPlayed - a.lastPlayed;
+        default:
+          return 0;
+      }
+    })
+    .slice(0, 100);
 
   // Sort artists based on selected option
   const sortedArtists = [...missingArtists].sort((a, b) => {
@@ -374,7 +393,11 @@ const DiscoveryPage: React.FC = () => {
           className={`discovery-tab ${activeTab === 'albums' ? 'active' : ''}`}
           onClick={() => setActiveTab('albums')}
         >
-          Missing Albums ({missingAlbums.length})
+          Missing Albums (
+          {hideWantedItems
+            ? `${sortedAlbums.length}/${missingAlbums.length}`
+            : missingAlbums.length}
+          )
         </button>
         <button
           className={`discovery-tab ${activeTab === 'artists' ? 'active' : ''}`}
@@ -404,26 +427,37 @@ const DiscoveryPage: React.FC = () => {
             <div className='discovery-section'>
               <div className='discovery-section-header'>
                 <h2>Albums You Listen To But Don't Own</h2>
-                <div className='discovery-sort'>
-                  <label htmlFor='album-sort'>Sort by:</label>
-                  <select
-                    id='album-sort'
-                    value={albumSort}
-                    onChange={e =>
-                      setAlbumSort(e.target.value as AlbumSortOption)
-                    }
-                  >
-                    <option value='plays'>Most Plays</option>
-                    <option value='artist'>Artist Name</option>
-                    <option value='album'>Album Name</option>
-                    <option value='recent'>Recently Played</option>
-                  </select>
+                <div className='discovery-controls'>
+                  <label className='discovery-toggle'>
+                    <input
+                      type='checkbox'
+                      checked={hideWantedItems}
+                      onChange={e => setHideWantedItems(e.target.checked)}
+                    />
+                    <span>Hide wanted</span>
+                  </label>
+                  <div className='discovery-sort'>
+                    <label htmlFor='album-sort'>Sort by:</label>
+                    <select
+                      id='album-sort'
+                      value={albumSort}
+                      onChange={e =>
+                        setAlbumSort(e.target.value as AlbumSortOption)
+                      }
+                    >
+                      <option value='plays'>Most Plays</option>
+                      <option value='artist'>Artist Name</option>
+                      <option value='album'>Album Name</option>
+                      <option value='recent'>Recently Played</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-              {missingAlbums.length === 0 ? (
+              {sortedAlbums.length === 0 ? (
                 <p className='empty-state'>
-                  No missing albums found. Either you own everything you listen
-                  to, or you need to sync your history first!
+                  {hideWantedItems && missingAlbums.length > 0
+                    ? 'All albums are in your wantlist. Turn off "Hide wanted" to see them.'
+                    : 'No missing albums found. Either you own everything you listen to, or you need to sync your history first!'}
                 </p>
               ) : (
                 <div className='missing-list'>

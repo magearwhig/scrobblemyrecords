@@ -145,8 +145,8 @@ interface AppNotification {
 - Listening hours tracking (today, week, month)
 - New artists count (this month)
 - Collection coverage stats (multiple time periods)
-- Top Artists and Top Albums lists with period selectors
-- Custom date range picker for Top Artists, Top Albums, and Timeline
+- Top Artists, Top Albums, and Top Tracks lists with period selectors
+- Custom date range picker for Top Artists, Top Albums, Top Tracks, and Timeline
 - Calendar heatmap showing daily scrobble activity with year selector
 - Dusty Corners section (neglected albums with album covers)
 - Milestone progress tracking with history
@@ -156,7 +156,7 @@ interface AppNotification {
 - Image service for album/artist thumbnails (`imageService.ts`, `/api/v1/images/*` routes)
 - Album cover and artist image batch fetching for Top Lists
 - Full test coverage for stats components, StatsPage, and statsApi
-- 1557 tests passing with 60%+ branch coverage
+- 1661 tests passing with 60%+ coverage
 
 **Not Yet Implemented:**
 - Notification system integration (Feature 0D pending)
@@ -470,7 +470,12 @@ Track streaks in real-time:
 - Watch list for CD-only items with vinyl availability checking
 - Notification integration for vinyl availability alerts
 - Settings integration (price threshold, currency, auto-sync interval)
-- 42 backend integration tests + 19 frontend component tests
+- Discovery page enhancements:
+  - "In Wantlist" badge for albums in Discogs wantlist (purple)
+  - "Wanted" badge for albums in local want list (green)
+  - "Hide wanted" toggle to filter out items already on wantlist/wanted
+  - Differentiated badge colors for visual distinction
+- 42 backend integration tests + 19 frontend component tests + 43 Discovery tests
 - All wishlist types defined in `shared/types.ts`
 
 **Implementation Details:**

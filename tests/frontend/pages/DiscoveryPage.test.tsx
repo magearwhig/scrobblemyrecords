@@ -786,4 +786,128 @@ describe('DiscoveryPage', () => {
     // No badges shown (failed to load wishlist)
     expect(screen.queryByText('In Wantlist')).not.toBeInTheDocument();
   });
+
+  it('shows Hide wanted toggle checkbox', async () => {
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Radiohead')).toBeInTheDocument();
+    });
+
+    expect(screen.getByLabelText('Hide wanted')).toBeInTheDocument();
+  });
+
+  it('hides albums in local want list when Hide wanted is checked', async () => {
+    // Setup local want list with Clem Snide album
+    mockGetLocalWantList.mockResolvedValue(mockLocalWantList);
+
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Radiohead')).toBeInTheDocument();
+    });
+
+    // Clem Snide is in local want list (mockLocalWantList)
+    expect(screen.getByText('Clem Snide')).toBeInTheDocument();
+    expect(screen.getByText('End of Love')).toBeInTheDocument();
+
+    // Check the Hide wanted toggle
+    const toggle = screen.getByLabelText('Hide wanted');
+    fireEvent.click(toggle);
+
+    // Clem Snide should now be hidden
+    expect(screen.queryByText('Clem Snide')).not.toBeInTheDocument();
+    expect(screen.queryByText('End of Love')).not.toBeInTheDocument();
+
+    // Other albums should still be visible
+    expect(screen.getByText('Radiohead')).toBeInTheDocument();
+    expect(screen.getByText('The Beatles')).toBeInTheDocument();
+  });
+
+  it('hides albums in Discogs wantlist when Hide wanted is checked', async () => {
+    mockGetWishlist.mockResolvedValue([
+      {
+        id: 1,
+        masterId: 12345,
+        releaseId: 67890,
+        artist: 'Radiohead',
+        title: 'OK Computer',
+        year: 1997,
+        coverImage: 'https://example.com/cover.jpg',
+        dateAdded: '2024-01-01',
+        vinylStatus: 'has_vinyl',
+        vinylVersions: [],
+      },
+    ]);
+
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Radiohead')).toBeInTheDocument();
+    });
+
+    // Should show In Wantlist badge
+    expect(screen.getByText('In Wantlist')).toBeInTheDocument();
+
+    // Check the Hide wanted toggle
+    const toggle = screen.getByLabelText('Hide wanted');
+    fireEvent.click(toggle);
+
+    // Radiohead should now be hidden
+    expect(screen.queryByText('Radiohead')).not.toBeInTheDocument();
+    expect(screen.queryByText('OK Computer')).not.toBeInTheDocument();
+
+    // Other albums should still be visible
+    expect(screen.getByText('The Beatles')).toBeInTheDocument();
+  });
+
+  it('updates tab count when Hide wanted is checked', async () => {
+    // Setup local want list with Clem Snide album
+    mockGetLocalWantList.mockResolvedValue(mockLocalWantList);
+
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Radiohead')).toBeInTheDocument();
+    });
+
+    // Should show "3" albums initially
+    expect(screen.getByText(/Missing Albums.*3.*/)).toBeInTheDocument();
+
+    // Check the Hide wanted toggle
+    const toggle = screen.getByLabelText('Hide wanted');
+    fireEvent.click(toggle);
+
+    // Should show "2/3" format (2 visible out of 3 total)
+    expect(screen.getByText(/Missing Albums.*2\/3.*/)).toBeInTheDocument();
+  });
+
+  it('shows special empty state when all albums are hidden by filter', async () => {
+    // Only one album and it's in local want list
+    mockGetMissingAlbums.mockResolvedValue([
+      {
+        artist: 'Clem Snide',
+        album: 'End of Love',
+        playCount: 50,
+        lastPlayed: 1703894400,
+      },
+    ]);
+    // Setup local want list with that same album
+    mockGetLocalWantList.mockResolvedValue(mockLocalWantList);
+
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Clem Snide')).toBeInTheDocument();
+    });
+
+    // Check the Hide wanted toggle
+    const toggle = screen.getByLabelText('Hide wanted');
+    fireEvent.click(toggle);
+
+    // Should show special message about all albums being in wantlist
+    expect(
+      screen.getByText(/All albums are in your wantlist/)
+    ).toBeInTheDocument();
+  });
 });

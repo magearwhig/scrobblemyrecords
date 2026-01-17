@@ -1177,6 +1177,32 @@ body {
   color: var(--text-primary);
 }
 
+.discovery-controls {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.discovery-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.discovery-toggle input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent-color);
+}
+
+.discovery-toggle span {
+  white-space: nowrap;
+}
+
 .discovery-sort {
   display: flex;
   align-items: center;
