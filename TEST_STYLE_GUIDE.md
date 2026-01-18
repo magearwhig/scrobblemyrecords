@@ -38,6 +38,37 @@ tests/
 - **Mock files**: `__mocks__/moduleName.ts` (when needed)
 - **Test data**: Use factories or fixtures in test files, avoid separate data files unless reused extensively
 
+### Test Types
+
+| Type | Location | Purpose | Mocking Level |
+|------|----------|---------|---------------|
+| **Unit** | `tests/backend/services/`, `tests/frontend/utils/` | Test single function/class in isolation | Mock all dependencies |
+| **Component** | `tests/frontend/components/`, `tests/frontend/pages/` | Test React component behavior | Mock API calls, contexts |
+| **API/Route** | `tests/backend/routes/` | Test HTTP endpoints with supertest | Mock services, use real Express app |
+| **Integration** | `tests/integration/` | Test multiple systems together | Minimal mocking |
+
+**When to use each:**
+- **Unit tests**: Pure functions, service methods, utilities - fast, isolated
+- **Component tests**: UI behavior, user interactions, rendering logic
+- **API tests**: Request/response validation, error handling, auth flows
+- **Integration tests**: Cross-cutting flows (currently placeholder - use sparingly)
+
+> **Note:** `tests/integration/` is currently empty. True integration tests (e.g., frontend → API → service → file system) should be added sparingly for critical flows only.
+
+### Shared Test Utilities
+
+Place reusable test helpers in a shared location:
+
+```
+tests/
+├── utils/                    # Shared test utilities (create if needed)
+│   ├── renderWithProviders.tsx  # React component wrapper
+│   ├── factories.ts             # Data factory functions
+│   └── mockHelpers.ts           # Common mock setups
+```
+
+When a factory or helper is used in 3+ test files, extract it to `tests/utils/`.
+
 ## Test Structure Standards
 
 ### AAA Pattern (Arrange-Act-Assert)
@@ -120,6 +151,77 @@ jest.mock('../../../src/renderer/context/AppContext', () => ({
 }));
 ```
 
+### Typed Mocking with jest.mocked and jest.spyOn
+
+Use `jest.mocked()` for type-safe access to mocked modules:
+
+```typescript
+import { someService } from '../../services/someService';
+
+jest.mock('../../services/someService');
+const mockedService = jest.mocked(someService);
+
+// Now TypeScript knows the mock methods
+mockedService.fetchData.mockResolvedValue({ id: 1 });
+```
+
+Use `jest.spyOn()` for partial mocks when you want to keep some real behavior:
+
+```typescript
+// ✅ Good - Spy on specific method, keep others real
+const spy = jest.spyOn(dateUtils, 'formatDate').mockReturnValue('2024-01-15');
+
+// ✅ Good - Spy on prototype methods
+jest.spyOn(Storage.prototype, 'getItem').mockReturnValue('cached-value');
+
+// Remember to restore after test
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+```
+
+### Timer Mocking
+
+For time-dependent code, use fake timers to avoid flakiness:
+
+```typescript
+describe('Debounced search', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();  // Always restore real timers
+  });
+
+  it('should debounce search calls', async () => {
+    const onSearch = jest.fn();
+    render(<SearchBox onSearch={onSearch} debounceMs={300} />);
+
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    await user.type(screen.getByRole('textbox'), 'test');
+
+    // Fast-forward time
+    jest.advanceTimersByTime(300);
+
+    expect(onSearch).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+For testing specific timestamps:
+
+```typescript
+it('should format relative time correctly', () => {
+  jest.useFakeTimers();
+  jest.setSystemTime(new Date('2024-01-15T12:00:00Z'));
+
+  expect(formatRelativeTime(Date.now() - 3600000)).toBe('1 hour ago');
+
+  jest.useRealTimers();
+});
+```
+
 ### Avoid Over-Mocking
 
 **❌ Bad - Too much mocking:**
@@ -161,7 +263,7 @@ expect(response.body.success).toBeTruthy();
 
 ### Error Testing
 
-Always test both success and error cases:
+Always test both success and error cases. Be specific about error types and messages to avoid false positives:
 
 ```typescript
 describe('Token validation', () => {
@@ -169,11 +271,33 @@ describe('Token validation', () => {
     const result = await service.validateToken('valid-token');
     expect(result.isValid).toBe(true);
   });
-  
+
+  // ✅ Best - Check error type AND message
+  it('should reject invalid token with specific error', async () => {
+    await expect(service.validateToken('invalid-token'))
+      .rejects
+      .toThrow(new ValidationError('Invalid token format'));
+  });
+
+  // ✅ Good - Check error message explicitly
+  it('should reject expired token', async () => {
+    await expect(service.validateToken('expired-token'))
+      .rejects
+      .toThrow('Token has expired');
+  });
+
+  // ✅ Good - Check error instance type
+  it('should throw AuthError for unauthorized access', async () => {
+    await expect(service.accessProtectedResource())
+      .rejects
+      .toBeInstanceOf(AuthError);
+  });
+
+  // ❌ Avoid - Too generic, may pass for wrong reasons
   it('should reject invalid token', async () => {
     await expect(service.validateToken('invalid-token'))
       .rejects
-      .toThrow('Invalid token format');
+      .toThrow();  // This passes for ANY error
   });
 });
 ```
@@ -273,6 +397,38 @@ beforeEach(() => {
 });
 ```
 
+### React Testing Library Cleanup
+
+RTL automatically cleans up rendered components after each test - you don't need to call `cleanup()` manually.
+
+**However, you must still clean up:**
+- Global side effects (window properties, document modifications)
+- Fake timers (`jest.useRealTimers()`)
+- Environment variables
+- LocalStorage/SessionStorage
+
+```typescript
+describe('Component with side effects', () => {
+  const originalLocation = window.location;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // RTL handles component cleanup automatically
+  });
+
+  afterEach(() => {
+    // Clean up global side effects manually
+    window.location = originalLocation;
+    localStorage.clear();
+    jest.useRealTimers();
+  });
+
+  it('should modify window location', () => {
+    // Test that modifies globals...
+  });
+});
+```
+
 ## Component Testing Standards
 
 ### Rendering with Providers
@@ -293,25 +449,41 @@ const renderWithProviders = (component: React.ReactElement) => {
 
 ### User Interaction Testing
 
-Test user interactions, not implementation details:
+**Rule: Always use `userEvent` over `fireEvent`** for user interactions.
+
+`userEvent` simulates real user behavior (typing, clicking with proper event sequences), while `fireEvent` just dispatches DOM events. Use `fireEvent` only when `userEvent` doesn't support the specific event type.
 
 ```typescript
-// ✅ Good - Test user behavior
+// ✅ Good - userEvent with setup()
 it('should show details when view button is clicked', async () => {
   const user = userEvent.setup();
   render(<AlbumCard {...props} />);
-  
+
   await user.click(screen.getByRole('button', { name: /view details/i }));
-  
+
   expect(props.onViewDetails).toHaveBeenCalledWith(props.item.release.id);
 });
 
-// ❌ Bad - Test implementation details
+// ✅ Good - userEvent for typing
+it('should update search input', async () => {
+  const user = userEvent.setup();
+  render(<SearchBox />);
+
+  await user.type(screen.getByRole('textbox'), 'radiohead');
+
+  expect(screen.getByRole('textbox')).toHaveValue('radiohead');
+});
+
+// ❌ Bad - fireEvent for user actions
 it('should call onClick handler', () => {
   render(<AlbumCard {...props} />);
-  fireEvent.click(screen.getByTestId('view-button'));
+  fireEvent.click(screen.getByTestId('view-button'));  // Don't use fireEvent for clicks
   expect(mockHandler).toHaveBeenCalled();
 });
+
+// ⚠️ Acceptable - fireEvent for non-user events
+fireEvent.scroll(container);  // No userEvent equivalent
+fireEvent.transitionEnd(element);  // Animation events
 ```
 
 ## API Testing Standards
@@ -376,18 +548,54 @@ Tests must be completely isolated to support parallel execution.
 
 ### Target Coverage
 
-Maintain minimum coverage thresholds:
+**Enforced thresholds** (jest.config.js):
 - **Statements**: 60%
-- **Branches**: 60%
+- **Branches**: 55%
 - **Functions**: 60%
 - **Lines**: 60%
 
+**Aspirational target**: 90% (see `.plan/tech-debt.md` for improvement plan)
+
+The 60% thresholds are the current enforced baseline. They will be raised incrementally as test coverage improves. Do not lower these thresholds.
+
 ### Coverage Exclusions
 
-Exclude these from coverage:
+Exclude these from coverage (aligned with jest.config.js):
 - Type definitions (`*.d.ts`)
-- Test files (`*.test.ts`, `*.spec.ts`)
-- Entry points (`index.tsx`, `main.ts`)
+- Test files (`*.test.ts`, `*.test.tsx`, `*.spec.ts`, `*.spec.tsx`)
+- Test setup files (`tests/setup*.ts`)
+- Entry points (`index.tsx`, `main.ts`, `preload.ts`)
+- Generated/config files
+
+## Snapshot Testing
+
+**Default stance: Avoid snapshots** unless they provide clear value.
+
+### When Snapshots Are Acceptable
+- Complex serializable data structures that rarely change
+- Error message formatting validation
+- API response shape validation (sparingly)
+
+### When to Avoid Snapshots
+- Component rendering (prefer explicit assertions)
+- Dynamic content that changes frequently
+- Large objects where changes are hard to review
+
+```typescript
+// ❌ Avoid - Component snapshots are brittle
+expect(container).toMatchSnapshot();
+
+// ✅ Better - Explicit assertions
+expect(screen.getByText('Album Title')).toBeInTheDocument();
+expect(screen.getByRole('button', { name: /save/i })).toBeEnabled();
+```
+
+If you must use snapshots:
+- Keep them small and focused
+- Review snapshot diffs carefully in PRs
+- Use inline snapshots for small values: `expect(value).toMatchInlineSnapshot()`
+
+---
 
 ## Common Anti-Patterns to Avoid
 

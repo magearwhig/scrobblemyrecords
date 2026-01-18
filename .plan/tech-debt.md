@@ -17,48 +17,21 @@ This document consolidates feedback from multiple sources and outlines improveme
 
 ## 1. Settings Page Restructure
 
-**Priority: P1** | **Effort: Medium** | **Impact: High (usability)**
+**Priority: P1** | **Effort: Medium** | **Impact: High (usability)** | **Status: ✅ COMPLETE**
 
-### Problem
-The Settings page is a 2,000+ line monolithic component with 5 tabs containing unrelated features. Users must hunt across tabs to find what they need, and the dense information architecture causes cognitive overload.
+> **Completed January 2026:** Settings page has been restructured into 4 tabs with modular section components.
 
-### Current Issues
-- 5 tabs with unrelated features crammed together
-- "Settings" tab being one of 5 tabs is confusing naming
-- Dense Mappings tab has 9+ sub-sections in one scroll
-- Everything uses similar colors and runs together visually
-- Poor mobile experience with cramped horizontal tabs
+### What Was Implemented
+- 4 tabs: Integrations, Mappings, Filters, Wishlist
+- Extracted section components: `SettingsIntegrationsSection.tsx`, `SettingsMappingsSection.tsx`, `SettingsFiltersSection.tsx`, `SettingsWishlistSection.tsx`
+- Badge counts on tabs showing metrics
+- Visual separation with card components and section headers
 
-### Solution: Restructure Tabs by User Goal
+### Remaining Minor Items (Optional)
+- [ ] Mobile viewport testing/optimization
+- [ ] Some inline styles may still exist in section components
 
-Reorganize into 4 clearly-separated tabs:
-
-| New Tab | Contents | Rationale |
-|---------|----------|-----------|
-| **Integrations** | Discogs cache, Last.fm sync, AI/Ollama connection | Infrastructure/connections |
-| **Mappings** | Artist name mappings + Discovery mappings | Data transformation |
-| **Filters** | Hidden items, format preferences | Content filtering |
-| **Wishlist** | Price threshold, notifications, vinyl watch list | Want list management |
-
-### Visual Separation Requirements
-- Add distinct background colors or borders between major sections
-- Use card components with clear visual boundaries
-- Add section headers with icons
-- Increase spacing between logical groups
-- Consider alternating background tints for adjacent sections
-
-### Implementation Steps
-1. [ ] Extract sections into separate components:
-   - `SettingsIntegrationsSection.tsx`
-   - `SettingsMappingsSection.tsx`
-   - `SettingsFiltersSection.tsx`
-   - `SettingsWishlistSection.tsx`
-2. [ ] Create new tab structure with renamed labels
-3. [ ] Add visual separation (cards, spacing, section headers)
-4. [ ] Add badge counts to tabs: "Filters (4)", "Mappings (12)"
-5. [ ] Test on mobile viewports
-
-**Files:** `src/renderer/pages/SettingsPage.tsx`, `src/renderer/styles.css`
+**Files:** `src/renderer/pages/SettingsPage.tsx`, `src/renderer/components/settings/*`
 
 ---
 
@@ -68,14 +41,26 @@ Reorganize into 4 clearly-separated tabs:
 
 **Priority: P0** | **Effort: Medium** | **Impact: High (reliability)**
 
-README specifies 90% coverage target but Jest config enforces only 55-60% thresholds. Critical gaps likely in newer services.
+README and dev_prompt.md specify 90% coverage target but Jest config enforces only 55-60% thresholds. This is a known gap that will be addressed incrementally.
+
+**Current State:**
+- `jest.config.js` thresholds: branches 55%, functions/lines/statements 60%
+- README target: 90%
+- Current actual coverage: ~60%+
+
+**Improvement Plan:**
+The 90% target is aspirational. Thresholds will be raised incrementally as tests are added:
+1. Current baseline (55-60%) prevents regression
+2. As coverage improves, thresholds will be raised in 5-10% increments
+3. Do NOT change jest.config.js until tests are written to support higher thresholds
 
 **Action:**
-- [ ] Incrementally raise Jest thresholds as tests are added
-- [ ] Prioritize coverage for: `wishlistService.ts`, `imageService.ts`, complex frontend components
-- [ ] Align README and jest.config.js
+- [ ] Write tests for services with low coverage: `wishlistService.ts`, `imageService.ts`
+- [ ] After coverage improves, raise jest.config.js thresholds incrementally
+- [ ] Add coverage report to CI output for visibility
+- [ ] Consider separate thresholds for backend vs frontend
 
-**Files:** `jest.config.js`, `README.md`
+**Files:** `jest.config.js`, `README.md`, `dev_prompt.md`
 
 ---
 
@@ -359,7 +344,7 @@ These are nice-to-have features for later consideration:
 - [ ] Align test coverage (README vs jest.config.js)
 
 ### P1 - Do Soon
-- [ ] Settings page restructure with visual separation
+- [x] Settings page restructure with visual separation ✅ COMPLETE
 - [ ] Centralized logging (remove token exposure)
 - [ ] Remove `any` types
 - [ ] Fix missing/duplicate CSS

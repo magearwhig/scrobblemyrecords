@@ -105,11 +105,13 @@ interface BackupSettings {
 
 ### API Endpoints
 
+All backup endpoints follow the `/api/v1/` convention established in roadmap.md (Feature 0B):
+
 ```
-GET  /api/backup/preview
+GET  /api/v1/backup/preview
   → Returns counts of items that would be backed up
 
-POST /api/backup/export
+POST /api/v1/backup/export
   Query params:
     - includeCredentials=true (requires password in body)
     - includePerformanceData=true (optional large caches)
@@ -117,7 +119,7 @@ POST /api/backup/export
     { password: string }
   → Returns JSON file download
 
-POST /api/backup/import
+POST /api/v1/backup/import
   Content-Type: multipart/form-data
   Query params:
     - mode=merge|replace (default: merge)
@@ -127,10 +129,10 @@ POST /api/backup/import
     - password: string (if backup has encrypted credentials)
   → Returns import summary with counts and any conflicts
 
-GET  /api/backup/settings
+GET  /api/v1/backup/settings
   → Returns current auto-backup settings
 
-PUT  /api/backup/settings
+PUT  /api/v1/backup/settings
   Body: Partial<BackupSettings>
   → Updates auto-backup settings
 ```

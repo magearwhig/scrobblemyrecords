@@ -16,7 +16,11 @@ Cross-cutting concerns to address before or alongside feature development.
 - Full test coverage for new routes and services
 
 **Not Yet Implemented:**
-- 0C: Data Evolution & Storage (schema versioning for new data files)
+- 0C: Data Evolution & Storage (schema versioning for new data files) - See `.plan/data-evolution-plan.md`
+
+**Note on Dependencies:**
+- 0C (Data Evolution) is a prerequisite for Feature 9 (Backup & Restore)
+- Streak milestone notifications (Feature 1) require integration with 0D (complete)
 
 ### 0A: Security Baseline
 
@@ -38,28 +42,38 @@ Cross-cutting concerns to address before or alongside feature development.
 All new endpoints must follow existing `/api/v1/` prefix pattern:
 - Stats: `/api/v1/stats/...`
 - Wishlist: `/api/v1/wishlist/...`
-- Patterns: `/api/v1/patterns/...`
 - Images: `/api/v1/images/...`
 - Sellers: `/api/v1/sellers/...`
-- Releases: `/api/v1/releases/...`
+- Patterns: `/api/v1/patterns/...` *(planned - Feature 3)*
+- Releases: `/api/v1/releases/...` *(planned - Feature 5)*
+- Backup: `/api/v1/backup/...` *(planned - Feature 10)*
 
-New route modules:
-- `src/backend/routes/stats.ts`
-- `src/backend/routes/wishlist.ts`
-- `src/backend/routes/patterns.ts`
-- `src/backend/routes/images.ts`
-- `src/backend/routes/sellers.ts`
-- `src/backend/routes/releases.ts`
+Route modules:
+
+**Implemented:**
+- `src/backend/routes/stats.ts` ✅
+- `src/backend/routes/wishlist.ts` ✅
+- `src/backend/routes/images.ts` ✅
+- `src/backend/routes/sellers.ts` ✅
+
+**Planned (not yet created):**
+- `src/backend/routes/patterns.ts` *(Feature 3: Smart Scrobble Scheduling)*
+- `src/backend/routes/releases.ts` *(Feature 5: New Release Tracking)*
+- `src/backend/routes/backup.ts` *(Feature 10: Backup & Restore)*
 
 ### 0C: Data Evolution & Storage
+
+> **Implementation Plan:** See [.plan/data-evolution-plan.md](.plan/data-evolution-plan.md)
 
 **Schema Versioning:**
 - Add `schemaVersion` field to new JSON data files
 - Document expected schema for each data file
 - Plan migration logic for breaking changes
+- **Dependency:** Feature 9 (Backup) relies on this for import/export compatibility
 
 **Timezone Handling (Critical for Streaks):**
-- Store all timestamps in UTC
+- Store all timestamps in UTC milliseconds (codebase standard)
+- Exception: Last.fm API returns seconds - normalize when storing
 - Define "day boundary" for streak calculations (user's local midnight)
 - Document timezone assumptions in code comments
 
@@ -159,8 +173,7 @@ interface AppNotification {
 - 1661 tests passing with 60%+ coverage
 
 **Not Yet Implemented:**
-- Notification system integration (Feature 0D pending)
-- Streak milestone notifications (depends on 0D)
+- Streak milestone notifications (notification system 0D exists, integration pending)
 
 ### Overview
 Comprehensive statistics dashboard showing listening patterns, streaks, source breakdown (this app vs Spotify vs others), and collection engagement metrics.
@@ -646,6 +659,16 @@ Add "Wishlist" tab with:
 
 ## Feature 3: Smart Scrobble Scheduling
 
+### Status: PLANNED
+
+### Implementation Plan
+See `.plan/smart-scrobble-scheduling-plan.md` for full specification including:
+- `ListeningPatternService` for pattern learning from scrobble history
+- `/api/v1/patterns/*` routes for suggestions and conflict detection
+- `QuickTimePresets.tsx` for enhanced timestamp selection
+- `BackfillDialog.tsx` for batch album scrobbling
+- `ListeningQueueWidget.tsx` for real-time session tracking (Phase 4)
+
 ### Overview
 Make backfilling scrobbles easier with intelligent timestamp suggestions, batch operations, and a listening queue system.
 
@@ -698,7 +721,8 @@ interface ListeningPatterns {
 
 **API Endpoints:**
 - `GET /api/v1/patterns` - Get learned listening patterns
-- `GET /api/v1/patterns/suggest?date=YYYY-MM-DD&count=3` - Suggest timestamps for X albums on date
+- `POST /api/v1/patterns/suggest` - Suggest timestamps for albums (body: `{albums: BackfillAlbum[]}`)
+- `POST /api/v1/patterns/check-conflicts` - Check for existing scrobbles in time window
 
 ### Phase 3B: Backfill Mode
 
@@ -1104,6 +1128,17 @@ Add "Local Sellers" section:
 
 ## Feature 5: New Release Tracking (MusicBrainz Integration)
 
+### Status: PLANNED
+
+### Implementation Plan
+See `.plan/new-release-tracking-plan.md` for full specification including:
+- `MusicBrainzService` for artist search and release fetching
+- `ReleaseTrackingService` for sync, mapping, and disambiguation management
+- `/api/v1/releases/*` routes for all operations
+- `NewReleasesPage.tsx` with release grid and filters
+- `DisambiguationDialog.tsx` for artist matching UI
+- Vinyl availability integration via Discogs
+
 ### Overview
 Track new and upcoming releases from artists in your collection using MusicBrainz data, combined with Discogs for vinyl availability.
 
@@ -1220,6 +1255,29 @@ When viewing a new release:
 3. **Smart Scrobble Scheduling** - Quality of life improvement
 4. **Local Seller Monitoring** - Track local record shops for wishlist items
 5. **New Release Tracking** - Nice to have, requires additional API integration
+
+### Feature Dependencies
+
+```
+Feature 0C (Data Evolution)
+    └── Feature 10 (Backup & Restore) - BLOCKED until 0C complete
+
+Feature 1 (Stats Dashboard) - COMPLETE ✅
+    └── Feature 9 (Homepage Dashboard) - uses stats components/APIs
+
+Feature 2 (Wishlist) - COMPLETE ✅
+    ├── Feature 4 (Seller Monitoring) - COMPLETE ✅ - matches against wishlist
+    └── Feature 8 (Wishlist Enhancements) - extends wishlist UI
+
+Feature 5 (New Releases)
+    └── Requires MusicBrainz API integration
+
+All other features are independent and can be implemented in any order.
+```
+
+**Blockers:**
+- Feature 10 (Backup) cannot be implemented until Feature 0C (Data Evolution) is complete
+- Feature 0C provides schema versioning needed for backup import compatibility
 
 ### Technical Considerations
 
@@ -1368,9 +1426,48 @@ See `.plan/wishlist-enhancements-plan.md` for full specification including:
 
 ---
 
-## Feature 9: Backup & Restore
+## Feature 9: Homepage Dashboard
 
 ### Status: PLANNED
+
+### Overview
+Transform the homepage from a basic onboarding page into an **engaging dashboard** that surfaces key metrics and insights from across the entire app. Users should see immediate value when opening the app.
+
+### Key Features
+- **Quick Stats Row** - Current streak, monthly scrobbles, new artists, collection coverage, listening hours
+- **Quick Actions** - Actionable alerts (seller matches, missing albums, want list items, dusty corners)
+- **Recent Albums** - Last 5 albums played (compact, album-focused instead of track-focused)
+- **Monthly Highlights** - Top 5 artists and albums for current month
+- **Calendar Heatmap** - Visual listening activity (reused from Stats page)
+- **Milestone Progress** - Progress toward next scrobble milestone
+- **Collapsible Connection Status** - Server/auth status (collapsed when all connected)
+
+### Problems Solved
+1. Current homepage is onboarding-focused, irrelevant after initial setup
+2. Doesn't leverage rich local data (stats, collection, discovery, sellers)
+3. Duplicates Stats page functionality with period selectors
+4. Uses extensive inline styles (violates CLAUDE.md guidelines)
+
+### Technical Approach
+- **Aggregated Dashboard API** - Single `/api/v1/stats/dashboard` endpoint for fast initial render
+- **Reuse Existing Components** - CalendarHeatmap, MilestoneProgress, TopList from Stats page
+- **CSS Classes** - Replace all inline styles with proper CSS
+- **Conditional Display** - Show/hide sections based on data availability
+
+### Implementation Details
+See `.plan/homepage-dashboard-plan.md` for full specification including:
+- Dashboard layout and wireframes
+- New components (DashboardStatCard, QuickActionsGrid, RecentAlbums, etc.)
+- API response structure
+- Test plan
+
+---
+
+## Feature 10: Backup & Restore
+
+### Status: PLANNED
+
+**Prerequisite:** Feature 0C (Data Evolution & Storage) - Provides schema versioning needed for import compatibility.
 
 ### Overview
 Backup **user-generated data** that cannot be recovered from external APIs. Protects mappings, hidden items, want lists, settings, and monitored sellers from data loss.
