@@ -59,7 +59,9 @@ Route modules:
 
 **Planned (not yet created):**
 - `src/backend/routes/patterns.ts` *(Feature 3: Smart Scrobble Scheduling)*
-- `src/backend/routes/backup.ts` *(Feature 10: Backup & Restore)*
+
+**Recently Implemented:**
+- `src/backend/routes/backup.ts` ✅ *(Feature 10: Backup & Restore)*
 
 ### 0C: Data Evolution & Storage
 
@@ -1540,9 +1542,26 @@ See `.plan/homepage-dashboard-plan.md` for full specification including:
 
 ## Feature 10: Backup & Restore
 
-### Status: PLANNED
+### Status: COMPLETE ✅
 
-**Prerequisite:** Feature 0C (Data Evolution & Storage) - Provides schema versioning needed for import compatibility.
+**Completed:**
+- `BackupService` (`src/backend/services/backupService.ts`) with export/import/checksum logic
+- `/api/v1/backup/*` routes (preview, export, import, settings, auto-backups)
+- Settings page "Backup" tab with export preview, credential encryption, import dialog
+- Auto-backup scheduler with retention (disabled by default)
+- PBKDF2 key derivation + AES-256-GCM encryption for credentials
+- Merge vs Replace import modes with dry-run preview
+- SHA-256 checksum integrity verification
+- Migration registration for backup-settings.json
+- 60 tests passing (35 service tests, 25 route tests)
+- All backup types defined in `shared/types.ts`
+
+**Implementation Details:**
+- JSON backup format (no ZIP needed for ~15-20KB of data)
+- Credentials opt-in with password encryption
+- Stable JSON serialization for deterministic checksums
+- Conflict resolution in merge mode: keep newer timestamp
+- Auto-backup: daily/weekly/monthly frequency options
 
 ### Overview
 Backup **user-generated data** that cannot be recovered from external APIs. Protects mappings, hidden items, want lists, settings, and monitored sellers from data loss.
@@ -1556,15 +1575,12 @@ Backup **user-generated data** that cannot be recovered from external APIs. Prot
 
 ### Critical Data (~15-20KB)
 - API credentials (encrypted, opt-in)
-- Album/artist mappings
-- Hidden albums/artists
+- Album/artist mappings (album, artist, history-artist, MBID)
+- Hidden items (albums, artists, releases)
 - Local want list, vinyl watch list
 - Monitored sellers
-- All preference settings
+- All preference settings (user, suggestion, AI, wishlist, seller, release, sync)
+- Excluded artists for new release tracking
 
-### Implementation Details
-See `.plan/backup-system-plan.md` for full specification including:
-- `BackupService` with export/import/checksum logic
-- `/api/v1/backup/*` routes
-- Settings page UI with preview and import dialog
-- Auto-backup scheduler with retention
+### Data Files Backed Up
+See `.plan/backup-system-plan.md` for full specification including file paths and merge strategies.

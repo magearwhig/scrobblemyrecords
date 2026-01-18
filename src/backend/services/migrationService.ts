@@ -259,6 +259,16 @@ export class MigrationService {
       migrations: [],
       optional: true,
     });
+
+    // ============================================
+    // Backup & Restore Files (Feature 10)
+    // ============================================
+    this.register('backup-settings', {
+      path: 'settings/backup-settings.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
   }
 
   private register(key: string, meta: DataFileMeta): void {

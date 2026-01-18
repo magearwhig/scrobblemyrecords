@@ -53,8 +53,11 @@ module.exports = [
         HTMLDivElement: 'readonly',
         Event: 'readonly',
         Node: 'readonly',
+        File: 'readonly',
+        Blob: 'readonly',
         FileReader: 'readonly',
         requestAnimationFrame: 'readonly',
+        confirm: 'readonly',
 
         // Timer functions
         setTimeout: 'readonly',

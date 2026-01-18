@@ -5,6 +5,13 @@ import {
   ApiResponse,
   ArtistMapping,
   AuthStatus,
+  AutoBackupInfo,
+  BackupExportOptions,
+  BackupImportOptions,
+  BackupImportPreview,
+  BackupImportResult,
+  BackupPreview,
+  BackupSettings,
   CollectionItem,
   DiscogsRelease,
   EnrichedWishlistItem,
@@ -1284,6 +1291,95 @@ class ApiService {
   }> {
     const response = await this.api.get('/releases/filters/counts');
     return response.data.data;
+  }
+
+  // ===================================
+  // Backup & Restore
+  // ===================================
+
+  /**
+   * Get a preview of what would be included in a backup.
+   */
+  async getBackupPreview(): Promise<BackupPreview> {
+    const response = await this.api.get('/backup/preview');
+    return response.data.data;
+  }
+
+  /**
+   * Export a backup file.
+   * Returns the backup as a Blob for download.
+   */
+  async exportBackup(options: BackupExportOptions): Promise<Blob> {
+    const response = await this.api.post('/backup/export', options, {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  /**
+   * Preview what would happen if a backup was imported.
+   */
+  async previewBackupImport(backupJson: string): Promise<BackupImportPreview> {
+    const response = await this.api.post('/backup/import/preview', {
+      backup: backupJson,
+    });
+    return response.data.data;
+  }
+
+  /**
+   * Import a backup file.
+   */
+  async importBackup(
+    backupJson: string,
+    options: BackupImportOptions
+  ): Promise<BackupImportResult> {
+    const response = await this.api.post('/backup/import', {
+      backup: backupJson,
+      ...options,
+    });
+    return response.data.data;
+  }
+
+  /**
+   * Get auto-backup settings.
+   */
+  async getBackupSettings(): Promise<BackupSettings> {
+    const response = await this.api.get('/backup/settings');
+    return response.data.data;
+  }
+
+  /**
+   * Update auto-backup settings.
+   */
+  async updateBackupSettings(
+    settings: Partial<BackupSettings>
+  ): Promise<BackupSettings> {
+    const response = await this.api.put('/backup/settings', settings);
+    return response.data.data;
+  }
+
+  /**
+   * List available auto-backup files.
+   */
+  async listAutoBackups(): Promise<AutoBackupInfo[]> {
+    const response = await this.api.get('/backup/auto-backups');
+    return response.data.data;
+  }
+
+  /**
+   * Delete an auto-backup file.
+   */
+  async deleteAutoBackup(filename: string): Promise<void> {
+    await this.api.delete(
+      `/backup/auto-backups/${encodeURIComponent(filename)}`
+    );
+  }
+
+  /**
+   * Manually trigger an auto-backup.
+   */
+  async runAutoBackup(): Promise<void> {
+    await this.api.post('/backup/auto-backup/run');
   }
 
   // Update base URL (for when server URL changes)

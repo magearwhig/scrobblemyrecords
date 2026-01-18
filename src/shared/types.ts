@@ -1057,3 +1057,173 @@ export interface ReleaseSyncStatusStore extends VersionedStore {
   schemaVersion: 1;
   status: ReleaseTrackingSyncStatus;
 }
+
+// ============================================
+// Backup & Restore Types (Feature 10)
+// ============================================
+
+/**
+ * Data included in a backup file.
+ * Contains all user-generated data that cannot be recovered from external APIs.
+ */
+export interface BackupData {
+  // Settings (credentials only if opt-in)
+  userSettings: Omit<UserSettings, 'discogs' | 'lastfm'> | UserSettings;
+  suggestionSettings: SuggestionSettings | null;
+  aiSettings: AISettings | null;
+  wishlistSettings: WishlistSettings | null;
+  sellerMonitoringSettings: SellerMonitoringSettings | null;
+  releaseTrackingSettings: ReleaseTrackingSettings | null;
+  syncSettings: SyncSettings | null;
+
+  // Mappings
+  albumMappings: AlbumMapping[];
+  artistMappings: ArtistMapping[];
+  historyArtistMappings: ArtistMapping[];
+
+  // Discovery
+  hiddenAlbums: HiddenAlbum[];
+  hiddenArtists: HiddenArtist[];
+
+  // Wishlist
+  localWantList: LocalWantItem[];
+  vinylWatchList: VinylWatchItem[];
+
+  // Sellers
+  monitoredSellers: MonitoredSeller[];
+
+  // Release tracking
+  artistMbidMappings: ArtistMbidMapping[];
+  hiddenReleases: HiddenRelease[];
+  excludedArtists: ExcludedArtist[];
+}
+
+/**
+ * Full backup file structure with metadata and checksum.
+ */
+export interface BackupFile {
+  version: 2; // Backup format version
+  exportedAt: number; // Unix timestamp
+  appVersion: string;
+  includesCredentials: boolean;
+  checksum: string; // SHA-256 of stable JSON serialization of data
+  data: BackupData;
+}
+
+/**
+ * Preview of what would be included in a backup export.
+ */
+export interface BackupPreview {
+  // Settings
+  hasUserSettings: boolean;
+  hasSuggestionSettings: boolean;
+  hasAiSettings: boolean;
+  hasWishlistSettings: boolean;
+  hasSellerSettings: boolean;
+  hasReleaseSettings: boolean;
+  hasSyncSettings: boolean;
+
+  // Counts
+  albumMappingsCount: number;
+  artistMappingsCount: number;
+  historyArtistMappingsCount: number;
+  hiddenAlbumsCount: number;
+  hiddenArtistsCount: number;
+  localWantListCount: number;
+  vinylWatchListCount: number;
+  monitoredSellersCount: number;
+  artistMbidMappingsCount: number;
+  hiddenReleasesCount: number;
+  excludedArtistsCount: number;
+}
+
+/**
+ * Summary of import changes for a specific data category.
+ */
+export interface ImportCategorySummary {
+  new: number;
+  existing: number;
+}
+
+/**
+ * Preview of what would happen during a backup import.
+ */
+export interface BackupImportPreview {
+  valid: boolean;
+  error?: string;
+  exportedAt: number;
+  appVersion: string;
+  includesCredentials: boolean;
+  checksumValid: boolean;
+  summary: {
+    albumMappings: ImportCategorySummary;
+    artistMappings: ImportCategorySummary;
+    historyArtistMappings: ImportCategorySummary;
+    hiddenAlbums: ImportCategorySummary;
+    hiddenArtists: ImportCategorySummary;
+    localWantList: ImportCategorySummary;
+    vinylWatchList: ImportCategorySummary;
+    monitoredSellers: ImportCategorySummary;
+    artistMbidMappings: ImportCategorySummary;
+    hiddenReleases: ImportCategorySummary;
+    excludedArtists: ImportCategorySummary;
+    settingsWillMerge: boolean;
+  };
+}
+
+/**
+ * Result of a backup import operation.
+ */
+export interface BackupImportResult {
+  success: boolean;
+  itemsAdded: number;
+  itemsUpdated: number;
+  settingsMerged: boolean;
+  errors: string[];
+}
+
+/**
+ * Options for exporting a backup.
+ */
+export interface BackupExportOptions {
+  includeCredentials: boolean;
+  password?: string; // Required if includeCredentials is true
+}
+
+/**
+ * Options for importing a backup.
+ */
+export interface BackupImportOptions {
+  mode: 'merge' | 'replace';
+  password?: string; // Required if backup includes encrypted credentials
+}
+
+/**
+ * Auto-backup settings.
+ * Note: Auto-backups never include credentials since they require interactive
+ * password input. Users must use manual export for credential backup.
+ */
+export interface BackupSettings extends VersionedStore {
+  schemaVersion: 1;
+  enabled: boolean;
+  frequency: 'daily' | 'weekly' | 'monthly';
+  retentionCount: number; // Keep last N backups (default: 5)
+  lastBackup?: number; // Unix timestamp of last auto-backup
+}
+
+/**
+ * Information about an auto-backup file.
+ */
+export interface AutoBackupInfo {
+  filename: string;
+  createdAt: number;
+  size: number;
+}
+
+/**
+ * Versioned store for backup settings.
+ */
+export interface BackupSettingsStore extends VersionedStore {
+  schemaVersion: 1;
+  settings: BackupSettings;
+}

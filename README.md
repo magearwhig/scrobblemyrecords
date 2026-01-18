@@ -459,6 +459,39 @@ View detailed listening history for any album:
 - **Play Timeline**: Chronological list of listening sessions
 - Visible on the Release Details page
 
+### 💾 Backup & Restore
+Protect your user-generated data with manual and automatic backups:
+
+**What's Backed Up:**
+- All settings (user, suggestions, AI, wishlist, sellers, releases, sync)
+- Album and artist name mappings
+- Hidden albums and artists (Discovery page)
+- Local want list and vinyl watch list
+- Monitored sellers list
+- MusicBrainz artist mappings and excluded artists
+
+**Manual Backup (Settings → Backup):**
+- **Export Preview**: See exactly what will be backed up before exporting
+- **Credential Protection**: Optionally include API credentials (encrypted with password)
+- **Download as JSON**: Lightweight backup file (~15-20KB)
+
+**Import Options:**
+- **Preview Before Import**: See what will change before applying
+- **Merge Mode**: Add new items, update existing (keeps local-only data)
+- **Replace Mode**: Overwrite all data with backup contents
+- **Checksum Verification**: Ensures backup integrity
+
+**Auto-Backup (Optional):**
+- Disabled by default for privacy
+- Configurable frequency: daily, weekly, or monthly
+- Retention: keeps last 5 backups (configurable)
+- Never includes credentials (requires manual export)
+
+**Security:**
+- Credentials encrypted with PBKDF2 + AES-256-GCM
+- Password required to export/import credentials
+- Checksums prevent tampering
+
 ## 🛠️ Development
 
 ### Scripts
@@ -485,7 +518,8 @@ src/
 │   │   ├── suggestions.ts      # Suggestions, discovery, AI routes
 │   │   ├── wishlist.ts         # Wishlist and vinyl tracking routes
 │   │   ├── sellers.ts          # Local seller monitoring routes
-│   │   └── releases.ts         # New release tracking routes
+│   │   ├── releases.ts         # New release tracking routes
+│   │   └── backup.ts           # Backup and restore routes
 │   ├── services/               # Business logic
 │   │   ├── analyticsService.ts # Listening analytics
 │   │   ├── statsService.ts     # Stats dashboard calculations
@@ -498,7 +532,8 @@ src/
 │   │   ├── wishlistService.ts  # Wishlist and vinyl tracking
 │   │   ├── sellerMonitoringService.ts # Local seller monitoring
 │   │   ├── musicbrainzService.ts # MusicBrainz API integration
-│   │   └── releaseTrackingService.ts # New release tracking
+│   │   ├── releaseTrackingService.ts # New release tracking
+│   │   └── backupService.ts      # Backup and restore logic
 │   └── utils/                  # Utilities
 ├── renderer/                   # React frontend
 │   ├── components/             # UI components

@@ -5,12 +5,18 @@ import {
   SettingsMappingsSection,
   SettingsFiltersSection,
   SettingsWishlistSection,
+  SettingsBackupSection,
 } from '../components/settings';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
 
-type SettingsTab = 'integrations' | 'mappings' | 'filters' | 'wishlist';
+type SettingsTab =
+  | 'integrations'
+  | 'mappings'
+  | 'filters'
+  | 'wishlist'
+  | 'backup';
 
 interface TabConfig {
   id: SettingsTab;
@@ -43,6 +49,12 @@ const TABS: TabConfig[] = [
     label: 'Wishlist',
     icon: '💿',
     description: 'Wishlist & sellers',
+  },
+  {
+    id: 'backup',
+    label: 'Backup',
+    icon: '💾',
+    description: 'Export & restore',
   },
 ];
 
@@ -120,6 +132,8 @@ const SettingsPage: React.FC = () => {
         return <SettingsFiltersSection api={api} />;
       case 'wishlist':
         return <SettingsWishlistSection api={api} />;
+      case 'backup':
+        return <SettingsBackupSection api={api} />;
       default:
         return null;
     }

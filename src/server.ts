@@ -11,6 +11,7 @@ dotenv.config();
 
 import artistMappingRoutes from './backend/routes/artistMapping';
 import { createAuthRouter } from './backend/routes/auth';
+import createBackupRouter from './backend/routes/backup';
 import createCollectionRouter from './backend/routes/collection';
 import createImagesRouter from './backend/routes/images';
 import createReleasesRouter from './backend/routes/releases';
@@ -21,6 +22,7 @@ import createSuggestionsRouter from './backend/routes/suggestions';
 import createWishlistRouter from './backend/routes/wishlist';
 import { AnalyticsService } from './backend/services/analyticsService';
 import { AuthService } from './backend/services/authService';
+import { BackupService } from './backend/services/backupService';
 import { CleanupService } from './backend/services/cleanupService';
 import { DiscogsService } from './backend/services/discogsService';
 import { HiddenItemService } from './backend/services/hiddenItemService';
@@ -221,6 +223,7 @@ const releaseTrackingService = new ReleaseTrackingService(
   wishlistService,
   hiddenReleasesService
 );
+const backupService = new BackupService(fileStorage, 'data');
 
 // API routes
 app.use(
@@ -279,6 +282,7 @@ app.use(
     hiddenReleasesService
   )
 );
+app.use('/api/v1/backup', createBackupRouter(backupService));
 
 // API info endpoint
 app.get('/api/v1', (req, res) => {
@@ -295,6 +299,7 @@ app.get('/api/v1', (req, res) => {
       wishlist: '/api/v1/wishlist',
       sellers: '/api/v1/sellers',
       releases: '/api/v1/releases',
+      backup: '/api/v1/backup',
     },
   });
 });
@@ -367,6 +372,9 @@ async function startServer() {
             `Cleanup completed with ${cleanupReport.errors.length} errors`
           );
         }
+
+        // Check and run auto-backup if due - non-blocking
+        return backupService.checkAndRunAutoBackup();
       })
       .catch(err => {
         log.error('Startup maintenance tasks failed:', err);
@@ -389,6 +397,15 @@ async function startServer() {
       server.on('error', error => {
         log.error('Server error', error);
       });
+
+      // Periodic auto-backup check every 6 hours (in addition to startup check)
+      // This ensures backups happen even during long-running sessions
+      const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+      setInterval(() => {
+        backupService.checkAndRunAutoBackup().catch(err => {
+          log.warn('Periodic auto-backup check failed:', err);
+        });
+      }, SIX_HOURS_MS);
     }
   } catch (error) {
     log.error('Failed to start server', error);
