@@ -6,6 +6,8 @@ import helmet from 'helmet';
 // Load environment variables before any other imports
 dotenv.config();
 
+const log = createLogger('Server');
+
 import artistMappingRoutes from './backend/routes/artistMapping';
 import { createAuthRouter } from './backend/routes/auth';
 import createCollectionRouter from './backend/routes/collection';
@@ -29,6 +31,7 @@ import { StatsService } from './backend/services/statsService';
 import { SuggestionService } from './backend/services/suggestionService';
 import { WishlistService } from './backend/services/wishlistService';
 import { FileStorage } from './backend/utils/fileStorage';
+import { createLogger } from './backend/utils/logger';
 
 const app = express();
 const PORT = parseInt(
@@ -71,7 +74,7 @@ app.use(
       }
 
       // Log rejected CORS requests for security monitoring
-      console.warn(`🚫 CORS request rejected from origin: ${origin || 'null'}`);
+      log.warn(`CORS request rejected from origin: ${origin || 'null'}`);
       return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
@@ -217,7 +220,7 @@ app.use(
     res: express.Response,
     _next: express.NextFunction
   ) => {
-    console.error('Error:', err);
+    log.error('Request error', { message: err.message, path: req.path });
     res.status(500).json({
       success: false,
       error:
@@ -237,27 +240,27 @@ async function startServer() {
   try {
     // Initialize data directories
     await fileStorage.ensureDataDir();
-    console.log('✅ Data directories initialized');
+    log.info('Data directories initialized');
 
     // Only start server if not in test environment
     if (process.env.NODE_ENV !== 'test') {
       const server = app.listen(PORT, HOST, () => {
-        console.log(`🚀 Server running on ${HOST}:${PORT}`);
-        console.log(`📊 Health check: http://${HOST}:${PORT}/health`);
-        console.log(`🔒 Server bound to: ${HOST}:${PORT} (localhost only)`);
+        log.info(`Server running on ${HOST}:${PORT}`);
+        log.info(`Health check: http://${HOST}:${PORT}/health`);
+        log.info(`Server bound to: ${HOST}:${PORT} (localhost only)`);
         if (HOST !== '127.0.0.1' && HOST !== 'localhost') {
-          console.warn(
-            `⚠️  Server bound to ${HOST} - ensure this is intentional for security`
+          log.warn(
+            `Server bound to ${HOST} - ensure this is intentional for security`
           );
         }
       });
 
       server.on('error', error => {
-        console.error('❌ Server error:', error);
+        log.error('Server error', error);
       });
     }
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    log.error('Failed to start server', error);
     process.exit(1);
   }
 }

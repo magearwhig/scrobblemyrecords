@@ -51,23 +51,18 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   });
 
   useEffect(() => {
-    console.log('Theme changed to:', isDarkMode ? 'dark' : 'light');
-
     // Save preference to localStorage
     localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
 
     // Apply theme to document
     if (isDarkMode) {
       document.documentElement.classList.add('dark-mode');
-      console.log('Added dark-mode class to document');
     } else {
       document.documentElement.classList.remove('dark-mode');
-      console.log('Removed dark-mode class from document');
     }
   }, [isDarkMode]);
 
   const toggleDarkMode = () => {
-    console.log('Toggling dark mode from:', isDarkMode, 'to:', !isDarkMode);
     setIsDarkMode(!isDarkMode);
   };
 

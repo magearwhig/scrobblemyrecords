@@ -29,6 +29,9 @@ import {
   WishlistSettings,
   WishlistSyncStatus,
 } from '../../shared/types';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('ApiService');
 
 class ApiService {
   private api: AxiosInstance;
@@ -49,13 +52,11 @@ class ApiService {
     // Request interceptor for logging
     this.api.interceptors.request.use(
       config => {
-        console.log(
-          `API Request: ${config.method?.toUpperCase()} ${config.url}`
-        );
+        log.debug(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
         return config;
       },
       error => {
-        console.error('API Request Error:', error);
+        log.error('API Request Error', error);
         return Promise.reject(error);
       }
     );
@@ -66,7 +67,10 @@ class ApiService {
         return response;
       },
       error => {
-        console.error('API Response Error:', error);
+        log.error('API Response Error', {
+          code: error.code,
+          message: error.message,
+        });
         if (error.code === 'ECONNREFUSED') {
           throw new Error(
             'Unable to connect to server. Please ensure the backend is running.'

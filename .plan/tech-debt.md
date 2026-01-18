@@ -66,25 +66,26 @@ The 90% target is aspirational. Thresholds will be raised incrementally as tests
 
 ### 2.2 Centralized Error Logging
 
-**Priority: P1** | **Effort: Low** | **Impact: Medium (debugging)**
+**Priority: P1** | **Effort: Low** | **Impact: Medium (debugging)** | **Status: ✅ COMPLETE**
 
-20+ scattered `console.error` and `console.log` statements across frontend. Backend has `logger.ts` with redaction, but it's not used consistently.
+> **Completed January 2026:** Created frontend logger utility, removed token exposure, standardized logging across frontend and backend.
 
-**Issues Found:**
-- `MainContent.tsx` - logs on every page change
-- `ThemeContext.tsx` - logs on theme toggles
-- `SetupPage.tsx` - logs auth URLs and tokens (security concern)
-- `api.ts` - logs every request/response error
-- `server.ts` - uses console directly instead of logger
-- `fileStorage.ts` - uses console directly instead of logger
+**What Was Implemented:**
+- Created `src/renderer/utils/logger.ts` matching backend pattern with sensitive data redaction
+- Removed all token/auth URL logging from `SetupPage.tsx` (security fix)
+- Replaced `console.log/error` with secure logger in `api.ts`
+- Removed debug logging from `MainContent.tsx` and `ThemeContext.tsx`
+- Updated `server.ts` to use backend logger instead of console
+- Updated `fileStorage.ts` to use backend logger instead of console
+- Environment-based log level filtering (DEBUG in dev, WARN in production)
 
 **Action:**
-- [ ] Create frontend logger utility matching backend pattern
-- [ ] Remove/gate debug logging that may expose tokens
-- [ ] Use redacting logger consistently in backend
-- [ ] Add environment-based log level filtering
+- [x] Create frontend logger utility matching backend pattern
+- [x] Remove/gate debug logging that may expose tokens
+- [x] Use redacting logger consistently in backend
+- [x] Add environment-based log level filtering
 
-**Files:** `src/renderer/services/api.ts`, `src/renderer/components/MainContent.tsx`, `src/renderer/context/ThemeContext.tsx`, `src/renderer/pages/SetupPage.tsx`, `src/server.ts`, `src/backend/utils/fileStorage.ts`
+**Files:** `src/renderer/utils/logger.ts`, `src/renderer/services/api.ts`, `src/renderer/components/MainContent.tsx`, `src/renderer/context/ThemeContext.tsx`, `src/renderer/pages/SetupPage.tsx`, `src/server.ts`, `src/backend/utils/fileStorage.ts`
 
 ---
 
@@ -345,7 +346,7 @@ These are nice-to-have features for later consideration:
 
 ### P1 - Do Soon
 - [x] Settings page restructure with visual separation ✅ COMPLETE
-- [ ] Centralized logging (remove token exposure)
+- [x] Centralized logging (remove token exposure) ✅ COMPLETE
 - [ ] Remove `any` types
 - [ ] Fix missing/duplicate CSS
 - [ ] Loading skeletons

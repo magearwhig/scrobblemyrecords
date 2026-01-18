@@ -1,6 +1,10 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
+import { createLogger } from './logger';
+
+const log = createLogger('FileStorage');
+
 export class FileStorage {
   private dataDir: string;
   // Strict allowlist pattern for file/directory names
@@ -78,7 +82,7 @@ export class FileStorage {
       await fs.mkdir(path.join(this.dataDir, 'settings'), { recursive: true });
       await fs.mkdir(path.join(this.dataDir, 'scrobbles'), { recursive: true });
     } catch (error) {
-      console.error('Error creating data directories:', error);
+      log.error('Error creating data directories', error);
       throw error;
     }
   }
@@ -104,7 +108,7 @@ export class FileStorage {
       await fs.mkdir(dir, { recursive: true });
       await fs.writeFile(fullPath, JSON.stringify(data, null, 2), 'utf-8');
     } catch (error) {
-      console.error('Error writing JSON file:', error);
+      log.error('Error writing JSON file', { filePath, error });
       throw error;
     }
   }
@@ -173,7 +177,7 @@ export class FileStorage {
 
       return backupPath;
     } catch (error) {
-      console.error('Error creating backup:', error);
+      log.error('Error creating backup', { filePath, error });
       // Don't throw - backup failure shouldn't prevent the operation
       return null;
     }

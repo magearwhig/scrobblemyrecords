@@ -3,6 +3,9 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('SetupPage');
 
 const SetupPage: React.FC = () => {
   const { authStatus, setAuthStatus } = useAuth();
@@ -27,7 +30,7 @@ const SetupPage: React.FC = () => {
     try {
       // Get OAuth URL and open it in a new window
       const authUrl = await api.getDiscogsAuthUrl();
-      console.log('Discogs auth URL:', authUrl);
+      log.debug('Discogs auth URL obtained');
 
       // Open auth URL in a new window
       const authWindow = window.open(
@@ -35,7 +38,7 @@ const SetupPage: React.FC = () => {
         'discogs-auth',
         'width=600,height=600'
       );
-      console.log('Auth window opened:', authWindow);
+      log.debug('Auth window opened', { success: !!authWindow });
 
       // Poll for authentication success
       const checkAuth = setInterval(async () => {
@@ -48,11 +51,13 @@ const SetupPage: React.FC = () => {
 
             const checkStatus = async () => {
               try {
-                console.log(
-                  `Checking auth status (attempt ${retryCount + 1})...`
+                log.debug(
+                  `Checking Discogs auth status (attempt ${retryCount + 1})`
                 );
                 const newStatus = await api.getAuthStatus();
-                console.log('Auth status:', newStatus);
+                log.debug('Discogs auth status checked', {
+                  authenticated: newStatus.discogs.authenticated,
+                });
 
                 if (newStatus.discogs.authenticated) {
                   setAuthStatus(newStatus);
@@ -76,7 +81,9 @@ const SetupPage: React.FC = () => {
                   retryCount++;
                   setTimeout(checkStatus, 2000);
                 } else {
-                  console.error('Failed to check auth status');
+                  log.error(
+                    'Failed to check Discogs auth status after retries'
+                  );
                   setMessage({
                     type: 'error',
                     text: 'Failed to check authentication status',
@@ -128,7 +135,7 @@ const SetupPage: React.FC = () => {
     try {
       // Get auth URL (using environment variable)
       const authUrl = await api.getLastfmAuthUrl();
-      console.log('Last.fm auth URL:', authUrl);
+      log.debug('Last.fm auth URL obtained');
 
       // Open auth URL in a new window
       const authWindow = window.open(
@@ -136,7 +143,7 @@ const SetupPage: React.FC = () => {
         'lastfm-auth',
         'width=600,height=600'
       );
-      console.log('Last.fm auth window opened:', authWindow);
+      log.debug('Last.fm auth window opened', { success: !!authWindow });
 
       // Poll for authentication success
       const checkAuth = setInterval(async () => {
@@ -149,11 +156,13 @@ const SetupPage: React.FC = () => {
 
             const checkStatus = async () => {
               try {
-                console.log(
-                  `Checking Last.fm auth status (attempt ${retryCount + 1})...`
+                log.debug(
+                  `Checking Last.fm auth status (attempt ${retryCount + 1})`
                 );
                 const newStatus = await api.getAuthStatus();
-                console.log('Last.fm auth status:', newStatus);
+                log.debug('Last.fm auth status checked', {
+                  authenticated: newStatus.lastfm.authenticated,
+                });
 
                 if (newStatus.lastfm.authenticated) {
                   setAuthStatus(newStatus);
@@ -177,7 +186,9 @@ const SetupPage: React.FC = () => {
                   retryCount++;
                   setTimeout(checkStatus, 2000);
                 } else {
-                  console.error('Failed to check Last.fm auth status');
+                  log.error(
+                    'Failed to check Last.fm auth status after retries'
+                  );
                   setMessage({
                     type: 'error',
                     text: 'Failed to check Last.fm authentication status',
@@ -191,6 +202,7 @@ const SetupPage: React.FC = () => {
           }
         } catch {
           clearInterval(checkAuth);
+          log.error('Error during Last.fm auth polling');
           setMessage({
             type: 'error',
             text: 'Failed to check Last.fm authentication status',
@@ -226,10 +238,10 @@ const SetupPage: React.FC = () => {
   };
 
   const handleDiscogsPersonalTokenAuth = async () => {
-    console.log('Starting Discogs personal token auth...');
+    log.debug('Starting Discogs personal token auth');
 
     if (!discogsToken) {
-      console.log('No token provided');
+      log.debug('No token provided');
       setMessage({
         type: 'error',
         text: 'Please enter your Personal Access Token',
@@ -237,7 +249,7 @@ const SetupPage: React.FC = () => {
       return;
     }
 
-    console.log('Token provided:', discogsToken);
+    log.debug('Token provided, proceeding with auth');
     setLoading('discogs-personal');
     setMessage(null);
 
@@ -247,13 +259,15 @@ const SetupPage: React.FC = () => {
         ? discogsToken
         : `Discogs token=${discogsToken}`;
 
-      console.log('Saving Discogs token with format:', formattedToken);
+      log.debug('Saving Discogs token');
       await api.saveDiscogsToken(formattedToken, discogsUsername);
-      console.log('Token saved successfully');
+      log.debug('Token saved successfully');
 
-      console.log('Getting auth status...');
+      log.debug('Getting auth status');
       const newStatus = await api.getAuthStatus();
-      console.log('New auth status:', newStatus);
+      log.debug('Auth status retrieved', {
+        authenticated: newStatus.discogs.authenticated,
+      });
       setAuthStatus(newStatus);
 
       setMessage({
@@ -263,7 +277,7 @@ const SetupPage: React.FC = () => {
       setDiscogsToken('');
       setDiscogsUsername('');
     } catch (error) {
-      console.error('Discogs personal token auth error:', error);
+      log.error('Discogs personal token auth error', error);
       setMessage({
         type: 'error',
         text:
@@ -272,7 +286,7 @@ const SetupPage: React.FC = () => {
             : 'Failed to connect to Discogs',
       });
     } finally {
-      console.log('Setting loading to false');
+      log.debug('Personal token auth flow complete');
       setLoading('');
     }
   };
@@ -476,7 +490,6 @@ const SetupPage: React.FC = () => {
           <button
             className='btn'
             onClick={() => {
-              console.log('Button clicked!');
               handleDiscogsPersonalTokenAuth();
             }}
             disabled={

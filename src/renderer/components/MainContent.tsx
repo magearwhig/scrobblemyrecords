@@ -25,11 +25,8 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
   useEffect(() => {
     // When navigating to release-details, generate a new key to force remount
     // Use timestamp to always get a fresh key, ensuring the page reloads
-    console.log('[MainContent] useEffect triggered, currentPage:', currentPage);
     if (currentPage === 'release-details') {
-      const newKey = `release-${Date.now()}`;
-      console.log('[MainContent] Setting new releaseKey:', newKey);
-      setReleaseKey(newKey);
+      setReleaseKey(`release-${Date.now()}`);
     }
   }, [currentPage]);
 
