@@ -1,4 +1,9 @@
-import { AlbumMapping, ArtistMapping } from '../../shared/types';
+import {
+  AlbumMapping,
+  AlbumMappingsStore,
+  ArtistMapping,
+  HistoryArtistMappingsStore,
+} from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -7,6 +12,9 @@ const ARTIST_MAPPINGS_FILE = 'mappings/history-artist-mappings.json';
 
 /**
  * Service for managing manual mappings between Last.fm and Discogs naming.
+ *
+ * NOTE: File format changed from raw array to versioned store.
+ * Migration service handles the conversion automatically.
  */
 export class MappingService {
   private fileStorage: FileStorage;
@@ -36,37 +44,48 @@ export class MappingService {
   }
 
   /**
-   * Load mappings from disk
+   * Load mappings from disk.
+   * Handles both legacy (raw array) and new (versioned store) formats.
    */
   async loadMappings(): Promise<void> {
     if (this.loaded) return;
 
     try {
-      const albumData =
-        await this.fileStorage.readJSON<AlbumMapping[]>(ALBUM_MAPPINGS_FILE);
-      if (albumData) {
-        for (const mapping of albumData) {
+      const rawData = await this.fileStorage.readJSON<
+        AlbumMappingsStore | AlbumMapping[]
+      >(ALBUM_MAPPINGS_FILE);
+      if (rawData) {
+        // Handle both legacy array format and new versioned format
+        const mappings = Array.isArray(rawData)
+          ? rawData
+          : (rawData as AlbumMappingsStore).mappings || [];
+        for (const mapping of mappings) {
           const key = this.albumKey(
             mapping.historyArtist,
             mapping.historyAlbum
           );
           this.albumMappings.set(key, mapping);
         }
-        this.logger.info(`Loaded ${albumData.length} album mappings`);
+        this.logger.info(`Loaded ${mappings.length} album mappings`);
       }
     } catch {
       this.logger.debug('No album mappings file found');
     }
 
     try {
-      const artistData =
-        await this.fileStorage.readJSON<ArtistMapping[]>(ARTIST_MAPPINGS_FILE);
-      if (artistData) {
-        for (const mapping of artistData) {
+      const rawData = await this.fileStorage.readJSON<
+        HistoryArtistMappingsStore | ArtistMapping[]
+      >(ARTIST_MAPPINGS_FILE);
+      if (rawData) {
+        // Handle both legacy array format and new versioned format
+        const mappings = Array.isArray(rawData)
+          ? rawData
+          : (rawData as HistoryArtistMappingsStore).mappings || [];
+        for (const mapping of mappings) {
           const key = this.artistKey(mapping.historyArtist);
           this.artistMappings.set(key, mapping);
         }
-        this.logger.info(`Loaded ${artistData.length} artist mappings`);
+        this.logger.info(`Loaded ${mappings.length} artist mappings`);
       }
     } catch {
       this.logger.debug('No artist mappings file found');
@@ -76,17 +95,20 @@ export class MappingService {
   }
 
   /**
-   * Save mappings to disk
+   * Save mappings to disk using versioned store format.
    */
   private async saveMappings(): Promise<void> {
-    await this.fileStorage.writeJSON(
-      ALBUM_MAPPINGS_FILE,
-      Array.from(this.albumMappings.values())
-    );
-    await this.fileStorage.writeJSON(
-      ARTIST_MAPPINGS_FILE,
-      Array.from(this.artistMappings.values())
-    );
+    const albumStore: AlbumMappingsStore = {
+      schemaVersion: 1,
+      mappings: Array.from(this.albumMappings.values()),
+    };
+    const artistStore: HistoryArtistMappingsStore = {
+      schemaVersion: 1,
+      mappings: Array.from(this.artistMappings.values()),
+    };
+
+    await this.fileStorage.writeJSON(ALBUM_MAPPINGS_FILE, albumStore);
+    await this.fileStorage.writeJSON(ARTIST_MAPPINGS_FILE, artistStore);
   }
 
   /**

@@ -763,23 +763,28 @@ for (const [fileKey, exportedVersion] of Object.entries(backup.dataSchemaVersion
 - [x] Add async startup migration to server.ts (non-blocking)
 - [x] Add comprehensive test coverage for migrationService and timestamps
 
-### Phase 2: Version Stamping
-- [ ] Run migration service on dev data
-- [ ] Verify all backend files have schemaVersion
-- [ ] Add client-side version check for localStorage
+### Phase 2: Version Stamping ✅ COMPLETE (January 2026)
+- [x] Run migration service on dev data
+- [x] Verify all backend files have schemaVersion
+- [x] Add client-side version check for localStorage (already existed in useNotifications.ts)
+- [x] Handle array-based files (hidden-albums, hidden-artists, album-mappings, history-artist-mappings)
+- [x] Add `arrayWrapperKey` support in DataFileMeta for array wrapping during migration
+- [x] Add HiddenAlbumsStore, HiddenArtistsStore, AlbumMappingsStore, HistoryArtistMappingsStore types
+- [x] Update HiddenItemService and MappingService to read/write versioned format
 
-### Phase 3: Cleanup Routines
-- [ ] Create `cleanupService.ts` with all cache types
-- [ ] Integrate image cache cleanup (album + artist)
-- [ ] Integrate sold match cleanup
-- [ ] Integrate versions cache cleanup
-- [ ] Integrate inventory cache cleanup
-- [ ] Add cleanup trigger on app startup
+### Phase 3: Cleanup Routines ✅ COMPLETE (January 2026)
+- [x] Create `cleanupService.ts` with all cache types
+- [x] Integrate image cache cleanup (album + artist) - 30 day retention
+- [x] Integrate sold match cleanup - 30 day retention based on dateFound
+- [x] Integrate versions cache cleanup - 7 day retention
+- [x] Integrate inventory cache cleanup - 7 day retention (file mtime)
+- [x] Add cleanup trigger on app startup (after migrations complete)
+- [x] Add comprehensive test coverage (16 tests)
 
 ### Phase 4: Documentation
-- [ ] Document timestamp conventions (milliseconds) in code comments
-- [ ] Document day boundary logic for streaks
-- [ ] Note Last.fm API returns seconds (normalize on store)
+- [x] Document timestamp conventions (milliseconds) in code comments
+- [x] Document day boundary logic for streaks (in timestamps.ts)
+- [x] Note Last.fm API returns seconds (normalize on store) - documented in timestamps.ts
 
 ---
 
@@ -825,3 +830,21 @@ for (const [fileKey, exportedVersion] of Object.entries(backup.dataSchemaVersion
 - **Dependencies**: None (foundation for Features 1, 10)
 - **Blockers**: Backup system (Feature 10) should wait for this
 - **Key Decision**: Keep milliseconds as timestamp standard (matches existing data)
+
+---
+
+## Status: ✅ FEATURE COMPLETE (January 2026)
+
+All phases of Feature 0C have been implemented:
+- Phase 1: Schema Infrastructure ✅
+- Phase 2: Version Stamping ✅
+- Phase 3: Cleanup Routines ✅
+- Phase 4: Documentation ✅
+
+The application now has:
+1. Consistent schema versioning across all data files
+2. Automatic migration on startup with backup creation
+3. Cache cleanup routines running after migrations
+4. Full test coverage (44 tests for migration + cleanup)
+
+Ready for Feature 10 (Backup & Restore) implementation.

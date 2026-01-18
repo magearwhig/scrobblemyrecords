@@ -1,4 +1,9 @@
-import { HiddenAlbum, HiddenArtist } from '../../shared/types';
+import {
+  HiddenAlbum,
+  HiddenAlbumsStore,
+  HiddenArtist,
+  HiddenArtistsStore,
+} from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -8,6 +13,9 @@ const HIDDEN_ARTISTS_FILE = 'discovery/hidden-artists.json';
 /**
  * Service for managing hidden items in Discovery page.
  * Items can be hidden (e.g., podcasts, compilations) to declutter discovery.
+ *
+ * NOTE: File format changed from raw array to versioned store.
+ * Migration service handles the conversion automatically.
  */
 export class HiddenItemService {
   private fileStorage: FileStorage;
@@ -37,34 +45,45 @@ export class HiddenItemService {
   }
 
   /**
-   * Load hidden items from disk
+   * Load hidden items from disk.
+   * Handles both legacy (raw array) and new (versioned store) formats.
    */
   async loadHiddenItems(): Promise<void> {
     if (this.loaded) return;
 
     try {
-      const albumData =
-        await this.fileStorage.readJSON<HiddenAlbum[]>(HIDDEN_ALBUMS_FILE);
-      if (albumData) {
-        for (const item of albumData) {
+      const rawData = await this.fileStorage.readJSON<
+        HiddenAlbumsStore | HiddenAlbum[]
+      >(HIDDEN_ALBUMS_FILE);
+      if (rawData) {
+        // Handle both legacy array format and new versioned format
+        const items = Array.isArray(rawData)
+          ? rawData
+          : (rawData as HiddenAlbumsStore).items || [];
+        for (const item of items) {
           const key = this.albumKey(item.artist, item.album);
           this.hiddenAlbums.set(key, item);
         }
-        this.logger.info(`Loaded ${albumData.length} hidden albums`);
+        this.logger.info(`Loaded ${items.length} hidden albums`);
       }
     } catch {
       this.logger.debug('No hidden albums file found');
     }
 
     try {
-      const artistData =
-        await this.fileStorage.readJSON<HiddenArtist[]>(HIDDEN_ARTISTS_FILE);
-      if (artistData) {
-        for (const item of artistData) {
+      const rawData = await this.fileStorage.readJSON<
+        HiddenArtistsStore | HiddenArtist[]
+      >(HIDDEN_ARTISTS_FILE);
+      if (rawData) {
+        // Handle both legacy array format and new versioned format
+        const items = Array.isArray(rawData)
+          ? rawData
+          : (rawData as HiddenArtistsStore).items || [];
+        for (const item of items) {
           const key = this.artistKey(item.artist);
           this.hiddenArtists.set(key, item);
         }
-        this.logger.info(`Loaded ${artistData.length} hidden artists`);
+        this.logger.info(`Loaded ${items.length} hidden artists`);
       }
     } catch {
       this.logger.debug('No hidden artists file found');
@@ -74,17 +93,20 @@ export class HiddenItemService {
   }
 
   /**
-   * Save hidden items to disk
+   * Save hidden items to disk using versioned store format.
    */
   private async saveHiddenItems(): Promise<void> {
-    await this.fileStorage.writeJSON(
-      HIDDEN_ALBUMS_FILE,
-      Array.from(this.hiddenAlbums.values())
-    );
-    await this.fileStorage.writeJSON(
-      HIDDEN_ARTISTS_FILE,
-      Array.from(this.hiddenArtists.values())
-    );
+    const albumsStore: HiddenAlbumsStore = {
+      schemaVersion: 1,
+      items: Array.from(this.hiddenAlbums.values()),
+    };
+    const artistsStore: HiddenArtistsStore = {
+      schemaVersion: 1,
+      items: Array.from(this.hiddenArtists.values()),
+    };
+
+    await this.fileStorage.writeJSON(HIDDEN_ALBUMS_FILE, albumsStore);
+    await this.fileStorage.writeJSON(HIDDEN_ARTISTS_FILE, artistsStore);
   }
 
   /**

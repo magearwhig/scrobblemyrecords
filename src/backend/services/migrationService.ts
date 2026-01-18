@@ -75,6 +75,7 @@ export class MigrationService {
     // Mapping Files
     // ============================================
     // Artist mappings for Discogs->Last.fm name transformation (used by artistMappingService)
+    // This file already uses { mappings: [...] } format - just needs schemaVersion
     this.register('artist-mappings', {
       path: 'mappings/artist-mappings.json',
       currentVersion: 1,
@@ -83,28 +84,38 @@ export class MigrationService {
     });
 
     // Artist mappings for History->Collection matching (used by mappingService)
+    // NOTE: This file originally stored raw arrays.
+    // Migration wraps them in versioned objects with 'mappings' key.
     this.register('history-artist-mappings', {
       path: 'mappings/history-artist-mappings.json',
       currentVersion: 1,
       migrations: [],
       optional: true,
+      arrayWrapperKey: 'mappings',
     });
 
+    // Album mappings for History->Collection matching (used by mappingService)
+    // NOTE: This file originally stored raw arrays.
+    // Migration wraps them in versioned objects with 'mappings' key.
     this.register('album-mappings', {
       path: 'mappings/album-mappings.json',
       currentVersion: 1,
       migrations: [],
       optional: true,
+      arrayWrapperKey: 'mappings',
     });
 
     // ============================================
     // Discovery Files
+    // NOTE: These files originally stored raw arrays.
+    // Migration wraps them in versioned objects with 'items' key.
     // ============================================
     this.register('hidden-albums', {
       path: 'discovery/hidden-albums.json',
       currentVersion: 1,
       migrations: [],
       optional: true,
+      arrayWrapperKey: 'items',
     });
 
     this.register('hidden-artists', {
@@ -112,6 +123,7 @@ export class MigrationService {
       currentVersion: 1,
       migrations: [],
       optional: true,
+      arrayWrapperKey: 'items',
     });
 
     // ============================================
@@ -336,22 +348,52 @@ export class MigrationService {
 
         report.checked++;
 
-        const data = await this.storage.readJSON<Record<string, unknown>>(
-          meta.path
-        );
-        if (!data) continue;
+        // Read raw data - could be object or array
+        const rawData = await this.storage.readJSON<unknown>(meta.path);
+        if (rawData === null || rawData === undefined) continue;
+
+        // Handle array-based files that need to be wrapped
+        let data: Record<string, unknown>;
+        let isRawArray = false;
+
+        if (Array.isArray(rawData)) {
+          isRawArray = true;
+          // Array needs to be wrapped in versioned object
+          data = {} as Record<string, unknown>;
+        } else if (typeof rawData === 'object' && rawData !== null) {
+          data = rawData as Record<string, unknown>;
+        } else {
+          // Skip non-object, non-array files
+          continue;
+        }
 
         const fileVersion =
           typeof data.schemaVersion === 'number' ? data.schemaVersion : 0;
 
         if (fileVersion === 0) {
-          // Stamp with version 1 - ONLY add schemaVersion, preserve all other data
+          // Stamp with version 1 - handle array wrapping if needed
           onProgress?.(key, 'migrating');
-          data.schemaVersion = 1;
+
+          let migratedData: Record<string, unknown>;
+          if (isRawArray && meta.arrayWrapperKey) {
+            // Wrap array in versioned object
+            migratedData = {
+              schemaVersion: 1,
+              [meta.arrayWrapperKey]: rawData,
+            };
+            log.info(
+              `Wrapped array in ${key} with key '${meta.arrayWrapperKey}' and schemaVersion: 1`
+            );
+          } else {
+            // Just add schemaVersion to existing object
+            data.schemaVersion = 1;
+            migratedData = data;
+            log.info(`Stamped ${key} with schemaVersion: 1`);
+          }
+
           // Use writeJSONWithBackup to ensure backup is created
-          await this.storage.writeJSONWithBackup(meta.path, data);
+          await this.storage.writeJSONWithBackup(meta.path, migratedData);
           report.stamped++;
-          log.info(`Stamped ${key} with schemaVersion: 1`);
         } else if (fileVersion < meta.currentVersion) {
           // Apply migrations
           onProgress?.(key, 'migrating');

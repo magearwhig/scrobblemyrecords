@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
@@ -17,6 +20,7 @@ import createSuggestionsRouter from './backend/routes/suggestions';
 import createWishlistRouter from './backend/routes/wishlist';
 import { AnalyticsService } from './backend/services/analyticsService';
 import { AuthService } from './backend/services/authService';
+import { CleanupService } from './backend/services/cleanupService';
 import { DiscogsService } from './backend/services/discogsService';
 import { HiddenItemService } from './backend/services/hiddenItemService';
 import { ImageService } from './backend/services/imageService';
@@ -33,6 +37,66 @@ import { FileStorage } from './backend/utils/fileStorage';
 import { createLogger } from './backend/utils/logger';
 
 const log = createLogger('Server');
+
+// Server lock file to prevent multiple instances
+const LOCK_FILE = path.join(process.cwd(), 'data', '.server.lock');
+
+/**
+ * Acquire a lock file to prevent multiple server instances.
+ * Returns true if lock acquired, false if another instance is running.
+ */
+function acquireServerLock(): boolean {
+  try {
+    // Check if lock file exists
+    if (fs.existsSync(LOCK_FILE)) {
+      const lockData = fs.readFileSync(LOCK_FILE, 'utf-8');
+      const { pid, startTime } = JSON.parse(lockData);
+
+      // Check if the process is still running
+      try {
+        process.kill(pid, 0); // Signal 0 just checks if process exists
+        // Process exists - another instance is running
+        log.error(
+          `Another server instance is already running (PID: ${pid}, started: ${new Date(startTime).toISOString()})`
+        );
+        return false;
+      } catch {
+        // Process doesn't exist - stale lock file, remove it
+        log.warn('Removing stale lock file from previous crashed instance');
+        fs.unlinkSync(LOCK_FILE);
+      }
+    }
+
+    // Create lock file with our PID
+    fs.writeFileSync(
+      LOCK_FILE,
+      JSON.stringify({ pid: process.pid, startTime: Date.now() })
+    );
+    return true;
+  } catch (error) {
+    log.error('Failed to acquire server lock', error);
+    return false;
+  }
+}
+
+/**
+ * Release the server lock file on shutdown.
+ */
+function releaseServerLock(): void {
+  try {
+    if (fs.existsSync(LOCK_FILE)) {
+      const lockData = fs.readFileSync(LOCK_FILE, 'utf-8');
+      const { pid } = JSON.parse(lockData);
+      // Only remove if it's our lock
+      if (pid === process.pid) {
+        fs.unlinkSync(LOCK_FILE);
+        log.info('Server lock released');
+      }
+    }
+  } catch (error) {
+    log.warn('Failed to release server lock', error);
+  }
+}
 
 const app = express();
 const PORT = parseInt(
@@ -243,9 +307,23 @@ async function startServer() {
     await fileStorage.ensureDataDir();
     log.info('Data directories initialized');
 
+    // Acquire server lock - prevent multiple instances
+    if (process.env.NODE_ENV !== 'test') {
+      if (!acquireServerLock()) {
+        log.error(
+          'Cannot start server: another instance is already running. ' +
+            'Stop the other instance or delete data/.server.lock if it crashed.'
+        );
+        process.exit(1);
+      }
+      log.info(`Server lock acquired (PID: ${process.pid})`);
+    }
+
     // Run migrations asynchronously - don't block server startup
     // This ensures all data files have proper schema versioning
     const migrationService = new MigrationService(fileStorage);
+    const cleanupService = new CleanupService(fileStorage);
+
     migrationService
       .migrateAllOnStartup((file, status) => {
         if (status === 'migrating') {
@@ -256,10 +334,21 @@ async function startServer() {
         if (report.errors.length > 0) {
           log.warn(`Migration completed with ${report.errors.length} errors`);
         }
+
+        // Run cleanup after migrations complete - non-blocking
+        // This removes stale cache data based on retention policies
+        return cleanupService.runCleanup();
+      })
+      .then(cleanupReport => {
+        if (cleanupReport && cleanupReport.errors.length > 0) {
+          log.warn(
+            `Cleanup completed with ${cleanupReport.errors.length} errors`
+          );
+        }
       })
       .catch(err => {
-        log.error('Migration startup check failed:', err);
-        // Don't crash server - migrations are best-effort on startup
+        log.error('Startup maintenance tasks failed:', err);
+        // Don't crash server - maintenance tasks are best-effort on startup
       });
 
     // Only start server if not in test environment
@@ -281,9 +370,27 @@ async function startServer() {
     }
   } catch (error) {
     log.error('Failed to start server', error);
+    releaseServerLock();
     process.exit(1);
   }
 }
+
+// Graceful shutdown handlers
+process.on('SIGINT', () => {
+  log.info('Received SIGINT, shutting down gracefully...');
+  releaseServerLock();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  log.info('Received SIGTERM, shutting down gracefully...');
+  releaseServerLock();
+  process.exit(0);
+});
+
+process.on('exit', () => {
+  releaseServerLock();
+});
 
 // Initialize the server
 startServer();

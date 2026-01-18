@@ -266,6 +266,22 @@ export interface ArtistMapping {
   createdAt: number;
 }
 
+/**
+ * Versioned store for album mappings (History->Collection)
+ */
+export interface AlbumMappingsStore {
+  schemaVersion: 1;
+  mappings: AlbumMapping[];
+}
+
+/**
+ * Versioned store for artist mappings (History->Collection)
+ */
+export interface HistoryArtistMappingsStore {
+  schemaVersion: 1;
+  mappings: ArtistMapping[];
+}
+
 // ============================================
 // Hidden Discovery Items
 // ============================================
@@ -285,6 +301,22 @@ export interface HiddenAlbum {
 export interface HiddenArtist {
   artist: string;
   hiddenAt: number; // Timestamp when hidden
+}
+
+/**
+ * Versioned store for hidden albums
+ */
+export interface HiddenAlbumsStore {
+  schemaVersion: 1;
+  items: HiddenAlbum[];
+}
+
+/**
+ * Versioned store for hidden artists
+ */
+export interface HiddenArtistsStore {
+  schemaVersion: 1;
+  items: HiddenArtist[];
 }
 
 // ============================================
@@ -776,6 +808,11 @@ export interface DataFileMeta {
   migrations: MigrationDefinition[];
   /** If true, skip stamping (file doesn't exist yet or is optional) */
   optional?: boolean;
+  /**
+   * If set, the file stores a raw array that needs to be wrapped in a versioned object.
+   * The array will be placed under this key (e.g., 'items' -> { schemaVersion: 1, items: [...] })
+   */
+  arrayWrapperKey?: string;
 }
 
 /**

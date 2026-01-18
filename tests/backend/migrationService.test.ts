@@ -479,4 +479,64 @@ describe('MigrationService', () => {
       expect(result).toMatchObject(arrayData);
     });
   });
+
+  describe('array wrapping migration', () => {
+    it('should wrap raw array files in versioned store', async () => {
+      // Arrange - Create a file that stores a raw array (legacy format)
+      await fs.mkdir(`${testDataDir}/discovery`, { recursive: true });
+      const rawArrayData = [
+        { artist: 'Test Artist', album: 'Test Album', hiddenAt: 1234567890 },
+        { artist: 'Another', album: 'Album', hiddenAt: 1234567891 },
+      ];
+      await fs.writeFile(
+        `${testDataDir}/discovery/hidden-albums.json`,
+        JSON.stringify(rawArrayData)
+      );
+
+      // Act
+      const report = await migrationService.migrateAllOnStartup();
+
+      // Assert
+      expect(report.checked).toBeGreaterThanOrEqual(1);
+      expect(report.stamped).toBeGreaterThanOrEqual(1);
+
+      // Verify file was transformed to versioned store
+      const content = JSON.parse(
+        await fs.readFile(
+          `${testDataDir}/discovery/hidden-albums.json`,
+          'utf-8'
+        )
+      );
+      expect(content.schemaVersion).toBe(1);
+      expect(content.items).toEqual(rawArrayData);
+    });
+
+    it('should preserve already versioned array files', async () => {
+      // Arrange - Create a file that already has versioned format
+      await fs.mkdir(`${testDataDir}/discovery`, { recursive: true });
+      const versionedData = {
+        schemaVersion: 1,
+        items: [{ artist: 'Test', album: 'Album', hiddenAt: 1234567890 }],
+      };
+      await fs.writeFile(
+        `${testDataDir}/discovery/hidden-albums.json`,
+        JSON.stringify(versionedData)
+      );
+
+      // Act
+      const report = await migrationService.migrateAllOnStartup();
+
+      // Assert - Should not be modified
+      expect(report.stamped).toBe(0);
+
+      // Verify file unchanged
+      const content = JSON.parse(
+        await fs.readFile(
+          `${testDataDir}/discovery/hidden-albums.json`,
+          'utf-8'
+        )
+      );
+      expect(content).toEqual(versionedData);
+    });
+  });
 });
