@@ -804,6 +804,32 @@ When suggesting timestamps:
 
 ## Feature 4: Local Seller Monitoring
 
+### Status: COMPLETE ✅
+
+**Completed:**
+- Seller monitoring service (`sellerMonitoringService.ts`) with inventory scanning
+- Seller routes (`/api/v1/sellers/*`) for managing monitored sellers and matches
+- `SellersPage.tsx` with seller management UI
+- Full inventory scanning with progressive pagination
+- Page 100+ limit workaround using reverse sort order
+- Quick-check for new listings (newest first, page 1 only)
+- Match detection against Discogs wishlist (master_id matching)
+- Match lifecycle tracking (active/sold/seen status)
+- Stale listing cleanup and sold match detection
+- Notification integration for new matches
+- "View All Matches" page with filtering and sorting
+- Match dismissal and "mark as seen" functionality
+- Settings integration for scan frequency
+- 8 monitored sellers with 10,000+ inventory items scanned
+
+**Implementation Details:**
+- Full scan: Weekly per seller (configurable)
+- Quick check: Daily for newest listings
+- Inventory cache: 24 hours to reduce API calls
+- Match by master_id for consistency with wishlist
+- Vinyl-only filtering (LP, 12", 10", 7")
+- Progressive scan saves progress between sessions
+
 ### Overview
 Track Discogs inventories of local record shops to find wishlist items available locally. Users maintain a list of seller usernames (typically under 20 local stores), and the app periodically scans their inventories for matches against the user's wishlist.
 
@@ -1261,3 +1287,112 @@ Features are independent and can be released incrementally:
 2. Ship wishlist sync without Discovery integration
 3. Add Discovery integration after wishlist is stable
 4. Smart scheduling can be added to existing scrobble flow incrementally
+
+---
+
+## Feature 6: Forgotten Favorites
+
+### Status: PLANNED
+
+### Overview
+A Discovery feature that surfaces **tracks you loved but haven't listened to recently**. Finds tracks with high all-time play counts that have gone dormant, helping answer: "What songs did I used to love that I've forgotten about?"
+
+### Key Features
+- Configurable dormant period (3 months to 3 years)
+- Minimum play count filter (5-100 plays)
+- Copy to clipboard / CSV export
+- Phase 2: Spotify playlist export (opt-in)
+
+### Data Source
+- Scans `ScrobbleHistoryIndex` for tracks with high play counts and old `lastPlayed` timestamps
+- Keys tracks by `artist|album|track` (keeps separate by album for accurate counts)
+- 5-minute in-memory cache to avoid repeated O(n) scans
+
+### Implementation Details
+See `.plan/forgotten-favorites-plan.md` for full specification including:
+- Backend `statsService.getForgottenFavorites()` method
+- `/api/v1/stats/forgotten-favorites` endpoint
+- `ForgottenFavoritesTab.tsx` component for Discovery page
+- Spotify OAuth integration (Phase 2)
+
+---
+
+## Feature 7: Discard Pile
+
+### Status: PLANNED
+
+### Overview
+Track records from your Discogs collection that you want to get rid of during collection cleanup. Supports tracking duplicates, damaged records, and items to sell/gift.
+
+### Key Features
+- Add collection items to discard pile with reason (selling, duplicate, damaged, etc.)
+- Track status lifecycle: marked → listed → sold/gifted/removed
+- Bulk operations from collection view
+- Stats: estimated value, actual sales, by-status/reason breakdown
+- Orphan detection (items removed from Discogs collection externally)
+
+### Data Model
+- Keys by `collectionItemId` (not releaseId) to track duplicate copies separately
+- Stores estimated value and actual sale price with currency
+- Optional marketplace URL for listed items
+
+### Implementation Details
+See `.plan/discard-pile-plan.md` for full specification including:
+- `DiscardPileService` with CRUD and bulk operations
+- `/api/v1/discard-pile/*` routes
+- `DiscardPilePage.tsx` with filtering and stats
+- Collection view integration with badges
+
+---
+
+## Feature 8: Wishlist Enhancements
+
+### Status: PLANNED
+
+### Overview
+Three enhancements for the Wishlist page:
+1. **Sort by scrobble count** - Order items by how often you've listened to that album
+2. **Include monitored albums toggle** - Show local want items alongside Discogs wishlist
+3. **Better naming conventions** - Clarify Discogs wishlist vs local monitoring
+
+### Key Features
+- Batch endpoint for album play count lookup using fuzzy matching
+- Merge/dedupe logic for items in both Discogs wishlist and local monitoring
+- Consistent terminology: "Wishlist" (Discogs) vs "Monitoring" (local)
+
+### Implementation Details
+See `.plan/wishlist-enhancements-plan.md` for full specification including:
+- `POST /api/v1/stats/album-play-counts` batch endpoint
+- `includeTracked` toggle with deduplication
+- UI naming changes across WishlistPage and DiscoveryPage
+
+---
+
+## Feature 9: Backup & Restore
+
+### Status: PLANNED
+
+### Overview
+Backup **user-generated data** that cannot be recovered from external APIs. Protects mappings, hidden items, want lists, settings, and monitored sellers from data loss.
+
+### Key Features
+- Manual export/import via Settings page
+- Optional auto-backups (disabled by default)
+- Password-protected credential export (opt-in)
+- Merge vs Replace import modes with dry-run preview
+- Checksum integrity verification
+
+### Critical Data (~15-20KB)
+- API credentials (encrypted, opt-in)
+- Album/artist mappings
+- Hidden albums/artists
+- Local want list, vinyl watch list
+- Monitored sellers
+- All preference settings
+
+### Implementation Details
+See `.plan/backup-system-plan.md` for full specification including:
+- `BackupService` with export/import/checksum logic
+- `/api/v1/backup/*` routes
+- Settings page UI with preview and import dialog
+- Auto-backup scheduler with retention

@@ -4655,3 +4655,566 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ============================================ */
+/* Seller Monitoring Pages                      */
+/* ============================================ */
+
+/* Sellers Page */
+.sellers-page {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.sellers-page h1 {
+  margin: 0 0 0.5rem;
+  color: var(--text-primary);
+}
+
+.sellers-page .page-description {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+.sellers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+}
+
+.sellers-scan-buttons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.sellers-scan-progress {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-color);
+}
+
+.sellers-scan-progress-text {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.sellers-scan-progress-bar {
+  height: 4px;
+  background: var(--border-color);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sellers-scan-progress-fill {
+  height: 100%;
+  background: var(--accent-color);
+  transition: width 0.3s ease;
+}
+
+.sellers-scan-matches-found {
+  font-size: 0.85rem;
+  color: var(--accent-success, #22c55e);
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
+.sellers-scan-cache-stats {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+/* Master/Release Cache Card */
+.sellers-cache-card {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-color);
+}
+
+.sellers-cache-header {
+  margin-bottom: 0.75rem;
+}
+
+.sellers-cache-header h3 {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sellers-cache-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.sellers-cache-stats {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.sellers-cache-stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.sellers-cache-stat-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sellers-cache-stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sellers-cache-stat-warning .sellers-cache-stat-value {
+  color: var(--accent-warning, #f59e0b);
+}
+
+.sellers-cache-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.sellers-cache-updated {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.sellers-cache-empty-warning {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--accent-warning, #f59e0b);
+}
+
+.sellers-scan-completed {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.sellers-scan-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: var(--accent-danger, #ef4444);
+}
+
+.sellers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.seller-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid var(--border-color);
+  transition: box-shadow 0.2s;
+}
+
+.seller-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.seller-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.seller-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.seller-card-name {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.seller-card-username {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.seller-card-stats {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.seller-card-meta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 0.75rem;
+}
+
+.seller-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.sellers-view-all {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+/* Seller Matches Page */
+.seller-matches-page {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.seller-matches-page h1 {
+  margin: 0 0 0.5rem;
+  color: var(--text-primary);
+}
+
+.seller-matches-page .page-description {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.seller-matches-back {
+  margin-bottom: 1rem;
+}
+
+.seller-matches-controls {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.seller-matches-controls .form-group {
+  min-width: 180px;
+}
+
+.seller-match-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.seller-match-card {
+  display: flex;
+  gap: 1rem;
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  transition: box-shadow 0.2s;
+}
+
+.seller-match-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.seller-match-card-seen {
+  opacity: 0.7;
+}
+
+.seller-match-card-sold {
+  opacity: 0.6;
+  position: relative;
+}
+
+.seller-match-card-sold::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 8px,
+    rgba(128, 128, 128, 0.1) 8px,
+    rgba(128, 128, 128, 0.1) 16px
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.seller-match-cover {
+  width: 80px;
+  height: 80px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.seller-match-cover-placeholder {
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.seller-match-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.seller-match-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.seller-match-details {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.seller-match-price {
+  font-weight: 600;
+  color: var(--accent-success, #22c55e);
+  font-size: 1.1rem;
+  margin-bottom: 0.25rem;
+}
+
+.seller-match-seller {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.seller-match-date {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin-top: 0.25rem;
+}
+
+.seller-match-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.seller-match-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.seller-match-badge-seen {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+}
+
+.seller-match-badge-sold {
+  background: var(--accent-danger, #ef4444);
+  color: white;
+}
+
+/* Settings Page - Seller Section */
+.settings-seller-config {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.settings-add-seller-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.settings-add-seller-row input {
+  flex: 1;
+}
+
+.settings-seller-link {
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Modal Styles (shared) */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: var(--card-bg);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.modal-close:hover {
+  color: var(--text-primary);
+}
+
+.modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+/* Form Styles Enhancements */
+.form-error {
+  color: var(--accent-danger, #ef4444);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 4px;
+}
+
+/* Button variants */
+.btn-danger {
+  background: var(--accent-danger, #ef4444);
+  border-color: var(--accent-danger, #ef4444);
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  border-color: var(--accent-color);
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+}
+
+.empty-state h2 {
+  margin: 0 0 0.5rem;
+  color: var(--text-primary);
+}
+
+.empty-state p {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+/* Loading States */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  gap: 1rem;
+}
+
+.loading-container p {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.error-state {
+  text-align: center;
+  padding: 3rem 2rem;
+}
+
+.error-state p {
+  color: var(--accent-danger, #ef4444);
+  margin-bottom: 1.5rem;
+}

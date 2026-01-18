@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 
 import { AuthService } from '../services/authService';
+import { SellerMonitoringService } from '../services/sellerMonitoringService';
 import { WishlistService } from '../services/wishlistService';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
@@ -13,9 +14,10 @@ import { createLogger } from '../utils/logger';
  * Otherwise, requests like GET /settings would match /:masterId/versions
  */
 export default function createWishlistRouter(
-  fileStorage: FileStorage,
+  _fileStorage: FileStorage,
   authService: AuthService,
-  wishlistService: WishlistService
+  wishlistService: WishlistService,
+  sellerMonitoringService?: SellerMonitoringService
 ) {
   const router = express.Router();
   const logger = createLogger('WishlistRoutes');
@@ -78,6 +80,7 @@ export default function createWishlistRouter(
    *
    * Note: The sync operation runs synchronously and returns after completion.
    * For large wishlists, this may take several minutes due to rate limiting.
+   * After sync, updates the seller monitoring release cache for any new masters.
    */
   router.post('/sync', async (req: Request, res: Response) => {
     try {
@@ -92,10 +95,38 @@ export default function createWishlistRouter(
         });
       }
 
+      // Capture existing master IDs before sync
+      const existingItems = await wishlistService.getWishlistItems();
+      const existingMasterIds = new Set(
+        existingItems
+          .map(item => item.masterId)
+          .filter((id): id is number => !!id)
+      );
+
+      // Run the sync
       const status = await wishlistService.syncWishlist(
         username,
         forceRefresh === true
       );
+
+      // After sync, check for new master IDs and update the release cache
+      let cacheUpdateResult:
+        | { mastersProcessed: number; releasesAdded: number }
+        | undefined;
+      if (sellerMonitoringService) {
+        const updatedItems = await wishlistService.getWishlistItems();
+        const newMasterIds = updatedItems
+          .map(item => item.masterId)
+          .filter((id): id is number => !!id && !existingMasterIds.has(id));
+
+        if (newMasterIds.length > 0) {
+          logger.info(
+            `Found ${newMasterIds.length} new master IDs after wishlist sync, updating release cache...`
+          );
+          cacheUpdateResult =
+            await sellerMonitoringService.updateCacheForMasters(newMasterIds);
+        }
+      }
 
       res.json({
         success: true,
@@ -103,6 +134,7 @@ export default function createWishlistRouter(
           ? 'Full wishlist refresh completed'
           : 'Wishlist sync completed',
         data: status,
+        cacheUpdate: cacheUpdateResult,
       });
     } catch (error) {
       logger.error('Error during wishlist sync', error);

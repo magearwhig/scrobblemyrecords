@@ -180,12 +180,14 @@ export class ScrobbleHistorySyncService extends EventEmitter {
 
   /**
    * Process a batch of scrobbles and update the index
+   * Returns { processed: number, newestTimestamp: number }
    */
   private processScrobbles(
     tracks: LastFmTrack[],
     index: ScrobbleHistoryIndex
-  ): number {
+  ): { processed: number; newestTimestamp: number } {
     let processed = 0;
+    let newestTimestamp = 0;
 
     for (const track of tracks) {
       // Skip currently playing tracks (they don't have a date)
@@ -204,6 +206,11 @@ export class ScrobbleHistorySyncService extends EventEmitter {
 
       if (!artist || !album || !timestamp) {
         continue;
+      }
+
+      // Track newest timestamp seen for accurate lastSyncTimestamp
+      if (timestamp > newestTimestamp) {
+        newestTimestamp = timestamp;
       }
 
       const key = this.normalizeKey(artist, album);
@@ -236,7 +243,7 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       processed++;
     }
 
-    return processed;
+    return { processed, newestTimestamp };
   }
 
   /**
@@ -276,8 +283,15 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       };
       this.emit('statusChange', this.syncStatus);
 
+      // Track the newest scrobble timestamp found (for accurate lastSyncTimestamp)
+      let newestScrobbleTimestamp = 0;
+
       // Process first page
-      let processedCount = this.processScrobbles(firstPage.tracks, index);
+      const firstResult = this.processScrobbles(firstPage.tracks, index);
+      let processedCount = firstResult.processed;
+      if (firstResult.newestTimestamp > newestScrobbleTimestamp) {
+        newestScrobbleTimestamp = firstResult.newestTimestamp;
+      }
       index.totalScrobbles = processedCount;
 
       this.syncStatus.scrobblesFetched = processedCount;
@@ -285,6 +299,8 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       this.emit('statusChange', this.syncStatus);
 
       // Save after first page so suggestions can work with recent data
+      // Use the newest scrobble timestamp (in ms) for accurate sync tracking
+      index.lastSyncTimestamp = newestScrobbleTimestamp * 1000;
       await this.saveIndex(index);
 
       // Fetch remaining pages
@@ -308,8 +324,11 @@ export class ScrobbleHistorySyncService extends EventEmitter {
 
         try {
           const pageData = await this.fetchScrobblePage(page);
-          const pageProcessed = this.processScrobbles(pageData.tracks, index);
-          processedCount += pageProcessed;
+          const pageResult = this.processScrobbles(pageData.tracks, index);
+          processedCount += pageResult.processed;
+          if (pageResult.newestTimestamp > newestScrobbleTimestamp) {
+            newestScrobbleTimestamp = pageResult.newestTimestamp;
+          }
           index.totalScrobbles = processedCount;
 
           this.syncStatus.currentPage = page;
@@ -322,7 +341,7 @@ export class ScrobbleHistorySyncService extends EventEmitter {
 
           // Save progress periodically (every 10 pages)
           if (page % 10 === 0) {
-            index.lastSyncTimestamp = Date.now();
+            index.lastSyncTimestamp = newestScrobbleTimestamp * 1000;
             await this.saveIndex(index);
             this.logger.debug(`Saved progress at page ${page}/${totalPages}`);
           }
@@ -332,8 +351,8 @@ export class ScrobbleHistorySyncService extends EventEmitter {
         }
       }
 
-      // Final save
-      index.lastSyncTimestamp = Date.now();
+      // Final save - use the newest scrobble timestamp (in ms) for accurate sync tracking
+      index.lastSyncTimestamp = newestScrobbleTimestamp * 1000;
       await this.saveIndex(index);
 
       this.syncStatus.status = 'completed';
@@ -380,6 +399,7 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       let page = 1;
       let hasMore = true;
       let newScrobbles = 0;
+      let newestScrobbleTimestamp = existingIndex.lastSyncTimestamp / 1000; // Start with existing (Unix timestamp)
       const lastSyncTime = existingIndex.lastSyncTimestamp / 1000; // Convert to Unix timestamp
 
       this.syncStatus = {
@@ -414,10 +434,18 @@ export class ScrobbleHistorySyncService extends EventEmitter {
             const ts = parseInt(track.date?.uts || '0', 10);
             return ts > lastSyncTime;
           });
-          newScrobbles += this.processScrobbles(newTracks, existingIndex);
+          const result = this.processScrobbles(newTracks, existingIndex);
+          newScrobbles += result.processed;
+          if (result.newestTimestamp > newestScrobbleTimestamp) {
+            newestScrobbleTimestamp = result.newestTimestamp;
+          }
           hasMore = false;
         } else {
-          newScrobbles += this.processScrobbles(pageData.tracks, existingIndex);
+          const result = this.processScrobbles(pageData.tracks, existingIndex);
+          newScrobbles += result.processed;
+          if (result.newestTimestamp > newestScrobbleTimestamp) {
+            newestScrobbleTimestamp = result.newestTimestamp;
+          }
           page++;
           // Safety limit
           if (page > 50) {
@@ -431,7 +459,9 @@ export class ScrobbleHistorySyncService extends EventEmitter {
         this.emit('statusChange', this.syncStatus);
       }
 
-      existingIndex.lastSyncTimestamp = Date.now();
+      // Use the newest scrobble timestamp (in ms) for accurate sync tracking
+      // This ensures we don't skip scrobbles made after sync started but with timestamps before Date.now()
+      existingIndex.lastSyncTimestamp = newestScrobbleTimestamp * 1000;
       existingIndex.totalScrobbles += newScrobbles;
       await this.saveIndex(existingIndex);
 

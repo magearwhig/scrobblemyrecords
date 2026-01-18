@@ -19,7 +19,9 @@ const App: React.FC = () => {
   useEffect(() => {
     // Handle hash-based routing
     const handleHashChange = () => {
-      const hash = window.location.hash.replace('#', '') || 'home';
+      const fullHash = window.location.hash.replace('#', '') || 'home';
+      // Extract page name before any query params (e.g., 'seller-matches?seller=foo' -> 'seller-matches')
+      const hash = fullHash.split('?')[0];
       setCurrentPage(hash);
     };
 

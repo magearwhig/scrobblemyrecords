@@ -11,6 +11,7 @@ import { createAuthRouter } from './backend/routes/auth';
 import createCollectionRouter from './backend/routes/collection';
 import createImagesRouter from './backend/routes/images';
 import createScrobbleRouter from './backend/routes/scrobble';
+import createSellersRouter from './backend/routes/sellers';
 import createStatsRouter from './backend/routes/stats';
 import createSuggestionsRouter from './backend/routes/suggestions';
 import createWishlistRouter from './backend/routes/wishlist';
@@ -23,6 +24,7 @@ import { LastFmService } from './backend/services/lastfmService';
 import { MappingService } from './backend/services/mappingService';
 import { ScrobbleHistoryStorage } from './backend/services/scrobbleHistoryStorage';
 import { ScrobbleHistorySyncService } from './backend/services/scrobbleHistorySyncService';
+import { SellerMonitoringService } from './backend/services/sellerMonitoringService';
 import { StatsService } from './backend/services/statsService';
 import { SuggestionService } from './backend/services/suggestionService';
 import { WishlistService } from './backend/services/wishlistService';
@@ -133,6 +135,11 @@ const suggestionService = new SuggestionService(
 const statsService = new StatsService(fileStorage, historyStorage);
 const imageService = new ImageService(fileStorage, lastfmService);
 const wishlistService = new WishlistService(fileStorage, authService);
+const sellerMonitoringService = new SellerMonitoringService(
+  fileStorage,
+  authService,
+  wishlistService
+);
 
 // API routes
 app.use(
@@ -172,7 +179,16 @@ app.use(
 );
 app.use(
   '/api/v1/wishlist',
-  createWishlistRouter(fileStorage, authService, wishlistService)
+  createWishlistRouter(
+    fileStorage,
+    authService,
+    wishlistService,
+    sellerMonitoringService
+  )
+);
+app.use(
+  '/api/v1/sellers',
+  createSellersRouter(fileStorage, authService, sellerMonitoringService)
 );
 
 // API info endpoint
@@ -188,6 +204,7 @@ app.get('/api/v1', (req, res) => {
       stats: '/api/v1/stats',
       images: '/api/v1/images',
       wishlist: '/api/v1/wishlist',
+      sellers: '/api/v1/sellers',
     },
   });
 });

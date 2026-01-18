@@ -617,3 +617,122 @@ export interface VersionsCache {
   schemaVersion: 1;
   entries: Record<number, VersionsCacheEntry>; // masterId -> cache entry
 }
+
+// ============================================
+// Seller Monitoring Types
+// ============================================
+
+/**
+ * A seller being monitored for inventory matches
+ */
+export interface MonitoredSeller {
+  username: string; // Discogs seller username
+  displayName: string; // Friendly name for UI
+  addedAt: number; // Unix timestamp when added
+  lastScanned?: number; // Last full inventory scan timestamp
+  lastQuickCheck?: number; // Last page-1-only check timestamp
+  inventorySize?: number; // Estimated total items
+  matchCount?: number; // Current active matches
+}
+
+/**
+ * Store for monitored sellers
+ */
+export interface MonitoredSellersStore {
+  schemaVersion: 1;
+  sellers: MonitoredSeller[];
+}
+
+/**
+ * A match found in a seller's inventory
+ */
+export interface SellerMatch {
+  id: string; // Deterministic: `${listingId}` for stable identity
+  sellerId: string; // Seller username
+  releaseId: number; // Discogs release ID
+  masterId?: number; // Master release ID (for grouping)
+  artist: string;
+  title: string;
+  format: string[]; // Format array
+  condition: string; // Vinyl/sleeve condition
+  price: number; // Normalized numeric price
+  currency: string; // Currency code (USD, EUR, etc.)
+  listingUrl: string; // Direct URL to listing
+  listingId: number; // Discogs listing ID (used as stable ID)
+  dateFound: number; // When we found this match
+  notified: boolean; // Whether notification was created (client-side)
+  status: 'active' | 'sold' | 'seen'; // Match status
+  coverImage?: string; // Album cover URL
+}
+
+/**
+ * Store for all matches
+ */
+export interface SellerMatchesStore {
+  schemaVersion: 1;
+  lastUpdated: number;
+  matches: SellerMatch[];
+}
+
+/**
+ * Cached inventory for a seller
+ */
+export interface SellerInventoryCache {
+  username: string;
+  fetchedAt: number; // Full scan timestamp
+  quickCheckAt?: number; // Last page-1 check
+  totalItems: number;
+  items: SellerInventoryItem[];
+}
+
+/**
+ * Single inventory item from a seller
+ */
+export interface SellerInventoryItem {
+  listingId: number;
+  releaseId: number;
+  masterId?: number;
+  artist: string;
+  title: string;
+  format: string[];
+  condition: string;
+  price: number; // Normalized from Discogs { currency, value }
+  currency: string;
+  listingUrl: string;
+  coverImage?: string;
+  listedAt?: string; // ISO date when listed
+}
+
+/**
+ * Scan status tracking
+ */
+export interface SellerScanStatus {
+  status: 'idle' | 'scanning' | 'matching' | 'completed' | 'error';
+  currentSeller?: string;
+  sellersScanned: number;
+  totalSellers: number;
+  currentPage?: number;
+  totalPages?: number;
+  progress: number; // 0-100
+  newMatches: number; // Matches found in this scan
+  lastScanTimestamp?: number;
+  error?: string;
+  // Matching phase progress
+  matchingProgress?: {
+    itemsProcessed: number;
+    totalItems: number;
+    cacheHits: number;
+    apiCalls: number;
+  };
+}
+
+/**
+ * Settings for seller monitoring
+ */
+export interface SellerMonitoringSettings {
+  schemaVersion: 1;
+  scanFrequencyDays: number; // Full scan interval (default: 7)
+  quickCheckFrequencyHours: number; // Page-1 check interval (default: 24)
+  notifyOnNewMatch: boolean; // Enable notifications
+  vinylFormatsOnly: boolean; // Only match vinyl formats (default: true)
+}

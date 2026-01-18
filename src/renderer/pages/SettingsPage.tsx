@@ -6,6 +6,7 @@ import {
   ArtistMapping as DiscoveryArtistMapping,
   HiddenAlbum,
   HiddenArtist,
+  SellerMonitoringSettings,
   SyncStatus,
   SyncSettings,
   WishlistSettings,
@@ -109,6 +110,14 @@ const SettingsPage: React.FC = () => {
   const [wishlistError, setWishlistError] = useState<string>('');
   const [wishlistSuccess, setWishlistSuccess] = useState<string>('');
 
+  // Seller monitoring settings state
+  const [sellerSettings, setSellerSettings] =
+    useState<SellerMonitoringSettings | null>(null);
+  const [sellerLoading, setSellerLoading] = useState(false);
+  const [sellerError, setSellerError] = useState<string>('');
+  const [sellerSuccess, setSellerSuccess] = useState<string>('');
+  const [quickAddUsername, setQuickAddUsername] = useState('');
+
   const api = getApiService(state.serverUrl);
 
   useEffect(() => {
@@ -120,6 +129,7 @@ const SettingsPage: React.FC = () => {
       loadArtists();
       loadSuggestions();
       loadWishlistSettings();
+      loadSellerSettings();
     }
     if (authStatus.lastfm.authenticated) {
       loadSyncStatus();
@@ -598,6 +608,63 @@ const SettingsPage: React.FC = () => {
   const clearWishlistMessages = () => {
     setWishlistError('');
     setWishlistSuccess('');
+  };
+
+  // Seller monitoring functions
+  const loadSellerSettings = useCallback(async () => {
+    try {
+      setSellerLoading(true);
+      const settings = await api.getSellerSettings();
+      setSellerSettings(settings);
+    } catch (error) {
+      console.warn('Failed to load seller settings:', error);
+    } finally {
+      setSellerLoading(false);
+    }
+  }, [api]);
+
+  const handleSaveSellerSettings = async () => {
+    if (!sellerSettings) return;
+
+    try {
+      setSellerLoading(true);
+      setSellerError('');
+      const updated = await api.saveSellerSettings(sellerSettings);
+      setSellerSettings(updated);
+      setSellerSuccess('Seller monitoring settings saved');
+    } catch (error) {
+      setSellerError(
+        error instanceof Error ? error.message : 'Failed to save settings'
+      );
+    } finally {
+      setSellerLoading(false);
+    }
+  };
+
+  const handleQuickAddSeller = async () => {
+    if (!quickAddUsername.trim()) {
+      setSellerError('Username is required');
+      return;
+    }
+
+    try {
+      setSellerLoading(true);
+      setSellerError('');
+      await api.addSeller(quickAddUsername.trim());
+      setQuickAddUsername('');
+      setSellerSuccess(`Added seller: ${quickAddUsername.trim()}`);
+    } catch (error) {
+      setSellerError(
+        error instanceof Error ? error.message : 'Failed to add seller'
+      );
+    } finally {
+      setSellerLoading(false);
+    }
+  };
+
+  const clearSellerMessages = () => {
+    setSellerError('');
+    setSellerSuccess('');
   };
 
   const handleQuickAddMapping = async (
@@ -1815,6 +1882,168 @@ const SettingsPage: React.FC = () => {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Local Sellers Settings Section */}
+      <div className='card'>
+        <h3>Local Sellers</h3>
+        <p>
+          Configure how local seller inventories are scanned for your wishlist
+          items.
+        </p>
+
+        {sellerError && (
+          <div className='error-message'>
+            {sellerError}
+            <button
+              className='btn btn-small'
+              onClick={clearSellerMessages}
+              style={{ marginLeft: '1rem' }}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {sellerSuccess && (
+          <div className='message success'>
+            {sellerSuccess}
+            <button
+              className='btn btn-small'
+              onClick={clearSellerMessages}
+              style={{ marginLeft: '1rem' }}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {sellerLoading ? (
+          <div className='loading'>
+            <div className='spinner'></div>
+            Loading seller settings...
+          </div>
+        ) : sellerSettings ? (
+          <div className='settings-seller-config'>
+            {/* Quick Add Seller */}
+            <div className='form-group'>
+              <label className='form-label'>Quick Add Seller</label>
+              <div className='settings-add-seller-row'>
+                <input
+                  type='text'
+                  className='form-input'
+                  placeholder='Discogs username'
+                  value={quickAddUsername}
+                  onChange={e => setQuickAddUsername(e.target.value)}
+                />
+                <button
+                  className='btn btn-secondary'
+                  onClick={handleQuickAddSeller}
+                  disabled={sellerLoading || !quickAddUsername.trim()}
+                >
+                  Add
+                </button>
+              </div>
+              <span className='form-hint'>
+                Add a seller by their Discogs Marketplace username
+              </span>
+            </div>
+
+            {/* Full Scan Frequency */}
+            <div className='form-group'>
+              <label className='form-label'>Full Scan Frequency</label>
+              <select
+                className='form-input'
+                value={sellerSettings.scanFrequencyDays}
+                onChange={e =>
+                  setSellerSettings({
+                    ...sellerSettings,
+                    scanFrequencyDays: parseInt(e.target.value, 10),
+                  })
+                }
+              >
+                <option value='1'>Daily</option>
+                <option value='3'>Every 3 days</option>
+                <option value='7'>Weekly</option>
+                <option value='14'>Every 2 weeks</option>
+              </select>
+              <span className='form-hint'>
+                How often to do a complete inventory scan of all sellers
+              </span>
+            </div>
+
+            {/* Notify on New Match */}
+            <div className='settings-sync-toggle'>
+              <label className='settings-toggle-label'>
+                <input
+                  type='checkbox'
+                  checked={sellerSettings.notifyOnNewMatch}
+                  onChange={e =>
+                    setSellerSettings({
+                      ...sellerSettings,
+                      notifyOnNewMatch: e.target.checked,
+                    })
+                  }
+                />
+                <span>Notify when matches are found</span>
+              </label>
+              <span className='settings-toggle-hint'>
+                Get notified when wishlist items are found at local sellers
+              </span>
+            </div>
+
+            {/* Vinyl Only */}
+            <div className='settings-sync-toggle'>
+              <label className='settings-toggle-label'>
+                <input
+                  type='checkbox'
+                  checked={sellerSettings.vinylFormatsOnly}
+                  onChange={e =>
+                    setSellerSettings({
+                      ...sellerSettings,
+                      vinylFormatsOnly: e.target.checked,
+                    })
+                  }
+                />
+                <span>Only match vinyl formats</span>
+              </label>
+              <span className='settings-toggle-hint'>
+                Only show matches for vinyl records (LP, 12&quot;, 10&quot;,
+                7&quot;)
+              </span>
+            </div>
+
+            <button
+              className='btn'
+              onClick={handleSaveSellerSettings}
+              disabled={sellerLoading}
+            >
+              Save Settings
+            </button>
+
+            <div className='settings-seller-link'>
+              <button
+                className='btn btn-outline'
+                onClick={() => {
+                  window.location.hash = 'sellers';
+                }}
+              >
+                Manage Sellers &rarr;
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className='settings-empty-state'>
+            {!authStatus.discogs.authenticated ? (
+              <>
+                Please authenticate with Discogs to configure seller monitoring
+                settings.
+              </>
+            ) : (
+              <>Unable to load seller settings. Please try again.</>
+            )}
           </div>
         )}
       </div>

@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-1557%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-1745%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -243,6 +243,39 @@ Sync and manage your Discogs wantlist with vinyl availability tracking:
 - Automatic notifications when vinyl becomes available
 - Manage watch list from Settings page
 
+### 🏪 Local Seller Monitoring
+Track Discogs inventories of your favorite local record shops to find wishlist items available nearby:
+
+**Seller Management:**
+- Add local record stores by their Discogs seller username
+- Custom display names for easy identification
+- View inventory size and match counts at a glance
+- Remove sellers when no longer needed
+
+**Inventory Scanning:**
+- **Full Scan**: Weekly comprehensive inventory scan
+- **Quick Check**: Daily check for newest listings
+- Progressive pagination handles large inventories (10,000+ items)
+- Intelligent caching reduces API calls
+
+**Match Detection:**
+- Automatically matches seller inventory against your Discogs wishlist
+- Vinyl-only filtering (LP, 12", 10", 7")
+- Match by master release ID for accurate detection
+- Track match lifecycle: active → seen → sold
+
+**Match Management:**
+- View all matches across all sellers
+- Filter by seller, sort by newest/price/artist
+- "Mark as Seen" to dismiss without buying
+- Direct links to Discogs marketplace listings
+- Notifications when new matches are found
+
+**Settings (Settings → Sellers):**
+- Configure scan frequency
+- Enable/disable notifications
+- Quick-add sellers directly from settings
+
 ### 🤖 AI Suggestions (Optional)
 Local AI-powered recommendations via [Ollama](https://ollama.ai). Runs entirely on your computer with no API fees.
 
@@ -402,7 +435,8 @@ src/
 │   │   ├── stats.ts            # Stats dashboard routes
 │   │   ├── images.ts           # Album/artist image routes
 │   │   ├── suggestions.ts      # Suggestions, discovery, AI routes
-│   │   └── wishlist.ts         # Wishlist and vinyl tracking routes
+│   │   ├── wishlist.ts         # Wishlist and vinyl tracking routes
+│   │   └── sellers.ts          # Local seller monitoring routes
 │   ├── services/               # Business logic
 │   │   ├── analyticsService.ts # Listening analytics
 │   │   ├── statsService.ts     # Stats dashboard calculations
@@ -412,7 +446,8 @@ src/
 │   │   ├── scrobbleHistoryStorage.ts # History index storage
 │   │   ├── ollamaService.ts    # AI integration
 │   │   ├── aiPromptBuilder.ts  # AI prompt generation
-│   │   └── wishlistService.ts  # Wishlist and vinyl tracking
+│   │   ├── wishlistService.ts  # Wishlist and vinyl tracking
+│   │   └── sellerMonitoringService.ts # Local seller monitoring
 │   └── utils/                  # Utilities
 ├── renderer/                   # React frontend
 │   ├── components/             # UI components
@@ -427,6 +462,7 @@ src/
 │   │   ├── HistoryPage.tsx
 │   │   ├── StatsPage.tsx
 │   │   ├── WishlistPage.tsx
+│   │   ├── SellersPage.tsx
 │   │   └── SettingsPage.tsx
 │   └── context/                # State management
 └── shared/                     # Shared types

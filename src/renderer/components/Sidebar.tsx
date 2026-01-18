@@ -68,6 +68,12 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
       enabled: authStatus.discogs.authenticated,
     },
     {
+      id: 'sellers',
+      label: 'Local Sellers',
+      icon: '🏪',
+      enabled: authStatus.discogs.authenticated,
+    },
+    {
       id: 'settings',
       label: 'Settings',
       icon: '⚙️',

@@ -14,9 +14,13 @@ import {
   MarketplaceStats,
   MissingAlbum,
   MissingArtist,
+  MonitoredSeller,
   ReleaseVersion,
   ScrobbleTrack,
   ScrobbleSession,
+  SellerMatch,
+  SellerMonitoringSettings,
+  SellerScanStatus,
   SuggestionResult,
   SuggestionSettings,
   SyncSettings,
@@ -974,6 +978,91 @@ class ApiService {
 
   async checkLocalWantListForVinyl(): Promise<LocalWantItem[]> {
     const response = await this.api.post('/wishlist/local/check');
+    return response.data.data;
+  }
+
+  // ============================================
+  // Seller Monitoring methods
+  // ============================================
+
+  async getSellers(): Promise<MonitoredSeller[]> {
+    const response = await this.api.get('/sellers');
+    return response.data.data;
+  }
+
+  async addSeller(
+    username: string,
+    displayName?: string
+  ): Promise<MonitoredSeller> {
+    const response = await this.api.post('/sellers', { username, displayName });
+    return response.data.data;
+  }
+
+  async removeSeller(username: string): Promise<void> {
+    await this.api.delete(`/sellers/${encodeURIComponent(username)}`);
+  }
+
+  async getSellerMatches(username?: string): Promise<SellerMatch[]> {
+    const url = username
+      ? `/sellers/${encodeURIComponent(username)}/matches`
+      : '/sellers/matches';
+    const response = await this.api.get(url);
+    return response.data.data;
+  }
+
+  async triggerSellerScan(forceFresh = false): Promise<SellerScanStatus> {
+    const response = await this.api.post('/sellers/scan', { forceFresh });
+    return response.data.data;
+  }
+
+  async getSellerScanStatus(): Promise<SellerScanStatus> {
+    const response = await this.api.get('/sellers/scan/status');
+    return response.data.data;
+  }
+
+  async markMatchAsSeen(matchId: string): Promise<void> {
+    await this.api.post(`/sellers/matches/${matchId}/seen`);
+  }
+
+  async markMatchAsNotified(matchId: string): Promise<void> {
+    await this.api.post(`/sellers/matches/${matchId}/notified`);
+  }
+
+  async getSellerSettings(): Promise<SellerMonitoringSettings> {
+    const response = await this.api.get('/sellers/settings');
+    return response.data.data;
+  }
+
+  async saveSellerSettings(
+    settings: Partial<SellerMonitoringSettings>
+  ): Promise<SellerMonitoringSettings> {
+    const response = await this.api.post('/sellers/settings', settings);
+    return response.data.data;
+  }
+
+  async getReleaseCacheStats(): Promise<{
+    totalReleases: number;
+    totalMasters: number;
+    lastUpdated: number;
+    staleMasters: number;
+  }> {
+    const response = await this.api.get('/sellers/cache/stats');
+    return response.data.data;
+  }
+
+  async refreshReleaseCache(): Promise<{
+    mastersProcessed: number;
+    releasesAdded: number;
+    staleRefreshed: number;
+  }> {
+    // This can take a long time - increase timeout
+    const response = await this.api.post(
+      '/sellers/cache/refresh',
+      {},
+      {
+        timeout: 600000, // 10 minutes
+      }
+    );
     return response.data.data;
   }
 
