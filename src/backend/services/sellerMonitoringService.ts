@@ -1808,6 +1808,7 @@ export class SellerMonitoringService {
       for (const existing of sellerExistingMatches) {
         if (!currentListingIds.has(existing.listingId)) {
           existing.status = 'sold';
+          existing.statusChangedAt = Date.now();
           this.logger.debug(`Marked match ${existing.id} as sold`);
         }
       }

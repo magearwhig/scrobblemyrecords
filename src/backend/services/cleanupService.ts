@@ -155,7 +155,7 @@ export class CleanupService {
     }
 
     if (removed > 0) {
-      await this.storage.writeJSON(filePath, cache);
+      await this.storage.writeJSONWithBackup(filePath, cache);
       log.debug(`Removed ${removed} expired entries from ${filePath}`);
     }
 
@@ -164,11 +164,12 @@ export class CleanupService {
 
   /**
    * Clean up old sold matches.
-   * Removes matches where status is 'sold' and dateFound is older than
+   * Removes matches where status is 'sold' and statusChangedAt is older than
    * SOLD_MATCH_MAX_AGE_MS.
    *
-   * Note: We use dateFound as the timestamp since that's when the match
-   * was discovered. Sold items found more than 30 days ago are cleaned up.
+   * Note: We use statusChangedAt as the timestamp since that's when the match
+   * became sold. If statusChangedAt is not set, we fall back to dateFound.
+   * Sold items older than 30 days are cleaned up.
    *
    * @returns Number of matches removed
    */
@@ -184,16 +185,18 @@ export class CleanupService {
 
     // Keep matches that are:
     // - Not sold, OR
-    // - Sold but found within the retention period
+    // - Sold but statusChangedAt (or dateFound fallback) is within retention period
     store.matches = store.matches.filter(m => {
       if (m.status !== 'sold') return true;
-      return m.dateFound > cutoff;
+      // Use statusChangedAt if available, otherwise fall back to dateFound
+      const timestamp = m.statusChangedAt ?? m.dateFound;
+      return timestamp > cutoff;
     });
 
     const removed = before - store.matches.length;
 
     if (removed > 0) {
-      await this.storage.writeJSON('sellers/matches.json', store);
+      await this.storage.writeJSONWithBackup('sellers/matches.json', store);
       log.debug(`Removed ${removed} old sold matches`);
     }
 
@@ -227,7 +230,10 @@ export class CleanupService {
     }
 
     if (removed > 0) {
-      await this.storage.writeJSON('wishlist/versions-cache.json', cache);
+      await this.storage.writeJSONWithBackup(
+        'wishlist/versions-cache.json',
+        cache
+      );
       log.debug(`Removed ${removed} expired versions cache entries`);
     }
 

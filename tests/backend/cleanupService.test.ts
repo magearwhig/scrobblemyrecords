@@ -139,7 +139,7 @@ describe('CleanupService', () => {
   });
 
   describe('cleanupSoldMatches', () => {
-    it('should remove old sold matches', async () => {
+    it('should remove old sold matches based on statusChangedAt', async () => {
       // Arrange
       await fs.mkdir(`${testDataDir}/sellers`, { recursive: true });
       const store: SellerMatchesStore = {
@@ -158,9 +158,10 @@ describe('CleanupService', () => {
             currency: 'USD',
             listingUrl: 'http://example.com/1',
             listingId: 1,
-            dateFound: daysAgo(35), // 35 days ago - expired
+            dateFound: daysAgo(60), // Found 60 days ago
             notified: true,
             status: 'sold',
+            statusChangedAt: daysAgo(35), // Became sold 35 days ago - expired
           },
           {
             id: '2',
@@ -174,9 +175,10 @@ describe('CleanupService', () => {
             currency: 'USD',
             listingUrl: 'http://example.com/2',
             listingId: 2,
-            dateFound: daysAgo(5), // 5 days ago - fresh
+            dateFound: daysAgo(60), // Found 60 days ago
             notified: true,
             status: 'sold',
+            statusChangedAt: daysAgo(5), // Became sold 5 days ago - fresh
           },
         ],
       };
@@ -197,6 +199,44 @@ describe('CleanupService', () => {
       );
       expect(content.matches).toHaveLength(1);
       expect(content.matches[0].id).toBe('2');
+    });
+
+    it('should fall back to dateFound when statusChangedAt is not set', async () => {
+      // Arrange
+      await fs.mkdir(`${testDataDir}/sellers`, { recursive: true });
+      const store: SellerMatchesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        matches: [
+          {
+            id: '1',
+            sellerId: 'seller1',
+            releaseId: 100,
+            artist: 'Artist 1',
+            title: 'Album 1',
+            format: ['LP'],
+            condition: 'VG+',
+            price: 20,
+            currency: 'USD',
+            listingUrl: 'http://example.com/1',
+            listingId: 1,
+            dateFound: daysAgo(35), // 35 days ago - expired (no statusChangedAt)
+            notified: true,
+            status: 'sold',
+            // No statusChangedAt - should fall back to dateFound
+          },
+        ],
+      };
+      await fs.writeFile(
+        `${testDataDir}/sellers/matches.json`,
+        JSON.stringify(store)
+      );
+
+      // Act
+      const removed = await cleanupService.cleanupSoldMatches();
+
+      // Assert
+      expect(removed).toBe(1);
     });
 
     it('should preserve active and seen matches regardless of age', async () => {

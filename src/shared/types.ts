@@ -703,6 +703,7 @@ export interface SellerMatch {
   dateFound: number; // When we found this match
   notified: boolean; // Whether notification was created (client-side)
   status: 'active' | 'sold' | 'seen'; // Match status
+  statusChangedAt?: number; // When status last changed (for cleanup of sold matches)
   coverImage?: string; // Album cover URL
 }
 

@@ -18,7 +18,20 @@ export function useNotifications() {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        const data: NotificationStore = JSON.parse(stored);
+        const data = JSON.parse(stored);
+
+        // Handle missing schemaVersion (legacy data) - stamp without modifying data
+        if (typeof data.schemaVersion !== 'number') {
+          data.schemaVersion = 1;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }
+
+        // Future: Add client-side migrations here
+        // if (data.schemaVersion < CURRENT_VERSION) {
+        //   data = migrateNotifications(data);
+        //   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        // }
+
         if (data.schemaVersion === 1 && Array.isArray(data.notifications)) {
           setNotifications(data.notifications);
         }

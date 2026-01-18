@@ -214,9 +214,10 @@ describe('StatsService', () => {
     });
 
     it('should count scrobbles correctly', async () => {
-      // Arrange
-      const now = new Date();
-      const todayTimestamp = Math.floor(now.getTime() / 1000);
+      // Arrange - Use noon to avoid midnight boundary issues
+      const today = new Date();
+      today.setHours(12, 0, 0, 0);
+      const todayTimestamp = Math.floor(today.getTime() / 1000);
 
       mockHistoryStorage.getIndex.mockResolvedValue(
         createMockIndex({
@@ -225,8 +226,8 @@ describe('StatsService', () => {
             playCount: 5,
             plays: [
               { timestamp: todayTimestamp },
-              { timestamp: todayTimestamp - 3600 }, // 1 hour ago
-              { timestamp: todayTimestamp - 7200 }, // 2 hours ago
+              { timestamp: todayTimestamp - 3600 }, // 1 hour ago (11am)
+              { timestamp: todayTimestamp - 7200 }, // 2 hours ago (10am)
               { timestamp: todayTimestamp - 86400 * 3 }, // 3 days ago
               { timestamp: todayTimestamp - 86400 * 40 }, // 40 days ago
             ],
