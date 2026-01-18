@@ -223,49 +223,37 @@ export class AuthService {
 
     // SAFETY: Block saving empty tokens if existing file has them
     // This prevents accidental credential loss due to decryption failures
-    // Uses hasAuthTokens to check specifically for tokens, not usernames
     // Can be bypassed with allowCredentialClear for intentional clears
-    if (!options?.allowCredentialClear) {
-      const fileStats = await this.fileStorage.getStats(SETTINGS_PATH);
-      if (fileStats.exists && fileStats.size && fileStats.size > 200) {
-        // File has substantial content
-        const hasNewTokens = this.hasAuthTokens(encryptedSettings);
-        if (!hasNewTokens) {
-          // Read existing to check if it has tokens
-          try {
-            const existing =
-              await this.fileStorage.readJSON<UserSettings>(SETTINGS_PATH);
-            if (existing && this.hasAuthTokens(existing)) {
-              logger.error(
-                'BLOCKED: Refusing to overwrite auth tokens with empty values',
-                {
-                  existingSize: fileStats.size,
-                  hasDiscogsToken: !!existing.discogs.token,
-                  hasLastfmApiKey: !!existing.lastfm.apiKey,
-                  hasLastfmSessionKey: !!existing.lastfm.sessionKey,
-                }
-              );
-              // Don't save - this would destroy user credentials
-              throw new Error(
-                'Cannot save settings: would overwrite existing auth tokens with empty values. ' +
-                  'This usually means the encryption key has changed. Restore from backup or re-authenticate.'
-              );
+    if (
+      !options?.allowCredentialClear &&
+      !this.hasAuthTokens(encryptedSettings)
+    ) {
+      try {
+        const existing =
+          await this.fileStorage.readJSON<UserSettings>(SETTINGS_PATH);
+        if (existing && this.hasAuthTokens(existing)) {
+          logger.error(
+            'BLOCKED: Refusing to overwrite auth tokens with empty values',
+            {
+              hasDiscogsToken: !!existing.discogs.token,
+              hasLastfmApiKey: !!existing.lastfm.apiKey,
+              hasLastfmSessionKey: !!existing.lastfm.sessionKey,
             }
-          } catch (readError) {
-            // If it's our own error, re-throw it
-            if (
-              readError instanceof Error &&
-              readError.message.includes('Cannot save settings')
-            ) {
-              throw readError;
-            }
-            // Other read errors - proceed with caution but log
-            logger.warn(
-              'Could not read existing settings to verify',
-              readError
-            );
-          }
+          );
+          throw new Error(
+            'Cannot save settings: would overwrite existing auth tokens with empty values. ' +
+              'This usually means the encryption key has changed. Restore from backup or re-authenticate.'
+          );
         }
+      } catch (readError) {
+        // If it's our own error, re-throw it
+        if (
+          readError instanceof Error &&
+          readError.message.includes('Cannot save settings')
+        ) {
+          throw readError;
+        }
+        // File doesn't exist or other read error - OK to proceed
       }
     }
 
