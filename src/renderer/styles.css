@@ -5076,6 +5076,299 @@ body {
   border-top: 1px solid var(--border-color);
 }
 
+/* ============================================
+   Settings Page - Redesigned Layout
+   ============================================ */
+
+/* Header Card */
+.settings-header-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border-color);
+}
+
+.settings-header-card h1 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.75rem;
+  color: var(--text-primary);
+}
+
+.settings-page-description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+/* Tabs Container */
+.settings-tabs-container {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 0.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border-color);
+}
+
+.settings-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.settings-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: none;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s;
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
+.settings-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.settings-tab.active {
+  background: var(--accent-color);
+  color: white;
+  border-bottom: none;
+}
+
+.settings-tab-icon {
+  font-size: 1.1rem;
+}
+
+.settings-tab-label {
+  font-weight: 500;
+}
+
+.settings-tab-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: inherit;
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 1.5rem;
+  text-align: center;
+}
+
+.settings-tab:not(.active) .settings-tab-badge {
+  background: var(--bg-tertiary, var(--border-color));
+  color: var(--text-secondary);
+}
+
+/* Section Cards - Visual Separation */
+.settings-section-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 0;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  background: linear-gradient(to bottom, var(--bg-secondary), var(--card-bg));
+  border-bottom: 1px solid var(--border-color);
+}
+
+.settings-section-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary, var(--border-color));
+  border-radius: 8px;
+}
+
+.settings-section-header h3 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.settings-section-description {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.settings-section-badge {
+  margin-left: auto;
+  background: var(--accent-color);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.settings-section-content {
+  padding: 1.5rem;
+}
+
+/* Subsections within cards */
+.settings-subsection {
+  padding-top: 1.5rem;
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.settings-subsection:first-child {
+  padding-top: 0;
+  margin-top: 0;
+  border-top: none;
+}
+
+.settings-subsection h4 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Form Grid Layout */
+.settings-form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Hidden Items List */
+.settings-hidden-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.settings-hidden-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.settings-hidden-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.settings-hidden-title {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settings-hidden-date {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Empty State Inline (within sections) */
+.settings-empty-state-inline {
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.settings-empty-state-inline p {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-secondary);
+}
+
+.settings-empty-state-inline p:last-child {
+  margin-bottom: 0;
+}
+
+/* Import Button Hidden Input */
+.settings-import-btn {
+  cursor: pointer;
+}
+
+.settings-import-btn input {
+  display: none;
+}
+
+/* Inline Edit Input */
+.settings-inline-edit {
+  min-width: 150px;
+  display: inline-block;
+}
+
+/* Responsive: Mobile Tabs */
+@media (max-width: 768px) {
+  .settings-tabs-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .settings-tabs {
+    min-width: max-content;
+  }
+
+  .settings-tab {
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .settings-tab-icon {
+    font-size: 1rem;
+  }
+
+  .settings-section-header {
+    flex-wrap: wrap;
+  }
+
+  .settings-section-badge {
+    margin-left: 0;
+    margin-top: 0.5rem;
+  }
+
+  .settings-section-content {
+    padding: 1rem;
+  }
+
+  .settings-hidden-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .settings-hidden-item button {
+    align-self: flex-end;
+    margin-top: 0.5rem;
+  }
+}
+
 /* Modal Styles (shared) */
 .modal-overlay {
   position: fixed;

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import React from 'react';
 
@@ -26,10 +26,8 @@ describe('SettingsPage', () => {
   it('renders the settings page title', () => {
     renderWithProviders(<SettingsPage />);
 
-    // Settings appears as both a heading and a tab button
-    expect(screen.getAllByText('Settings').length).toBeGreaterThan(0);
     expect(
-      screen.getByRole('heading', { level: 2, name: 'Settings' })
+      screen.getByRole('heading', { level: 1, name: 'Settings' })
     ).toBeInTheDocument();
   });
 
@@ -37,31 +35,27 @@ describe('SettingsPage', () => {
     renderWithProviders(<SettingsPage />);
 
     expect(
-      screen.getByText('Application preferences and configuration options.')
+      screen.getByText('Configure your integrations, mappings, and preferences')
     ).toBeInTheDocument();
   });
 
-  it('renders artist mappings section', () => {
+  it('renders the four tabs', () => {
     renderWithProviders(<SettingsPage />);
 
-    expect(screen.getByText('Artist Name Mappings')).toBeInTheDocument();
+    expect(screen.getByText('Integrations')).toBeInTheDocument();
+    expect(screen.getByText('Mappings')).toBeInTheDocument();
+    expect(screen.getByText('Filters')).toBeInTheDocument();
+    expect(screen.getByText('Wishlist')).toBeInTheDocument();
   });
 
-  it('renders add new mapping section', () => {
+  it('renders within a header card container', () => {
     renderWithProviders(<SettingsPage />);
 
-    expect(screen.getByText('Add New Mapping')).toBeInTheDocument();
-  });
-
-  it('renders within a card container', () => {
-    renderWithProviders(<SettingsPage />);
-
-    // The heading "Settings" is within a card container
     const headingElement = screen.getByRole('heading', {
-      level: 2,
+      level: 1,
       name: 'Settings',
     });
-    const cardElement = headingElement.closest('.card');
+    const cardElement = headingElement.closest('.settings-header-card');
     expect(cardElement).toBeInTheDocument();
   });
 
@@ -70,8 +64,52 @@ describe('SettingsPage', () => {
 
     const mainDiv = container.firstChild;
     expect(mainDiv?.nodeName).toBe('DIV');
+    expect(mainDiv).toHaveClass('settings-page');
 
-    const cardDiv = mainDiv?.firstChild;
-    expect(cardDiv).toHaveClass('card');
+    const headerCard = mainDiv?.firstChild;
+    expect(headerCard).toHaveClass('settings-header-card');
+  });
+
+  it('starts on Integrations tab by default', () => {
+    renderWithProviders(<SettingsPage />);
+
+    // Integrations tab should be active
+    const integrationsTab = screen.getByRole('button', {
+      name: /Integrations/i,
+    });
+    expect(integrationsTab).toHaveClass('active');
+
+    // Should show integration-related content
+    expect(screen.getByText('Last.fm Sync')).toBeInTheDocument();
+  });
+
+  it('can switch to Mappings tab', () => {
+    renderWithProviders(<SettingsPage />);
+
+    const mappingsTab = screen.getByRole('button', { name: /Mappings/i });
+    fireEvent.click(mappingsTab);
+
+    expect(mappingsTab).toHaveClass('active');
+    expect(screen.getByText('Artist Name Mappings')).toBeInTheDocument();
+  });
+
+  it('can switch to Filters tab', () => {
+    renderWithProviders(<SettingsPage />);
+
+    const filtersTab = screen.getByRole('button', { name: /Filters/i });
+    fireEvent.click(filtersTab);
+
+    expect(filtersTab).toHaveClass('active');
+    expect(screen.getByText('Hidden Discovery Items')).toBeInTheDocument();
+  });
+
+  it('can switch to Wishlist tab', () => {
+    renderWithProviders(<SettingsPage />);
+
+    const wishlistTab = screen.getByRole('button', { name: /Wishlist/i });
+    fireEvent.click(wishlistTab);
+
+    expect(wishlistTab).toHaveClass('active');
+    expect(screen.getByText('Wishlist Settings')).toBeInTheDocument();
   });
 });
