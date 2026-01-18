@@ -755,12 +755,13 @@ for (const [fileKey, exportedVersion] of Object.entries(backup.dataSchemaVersion
 
 ## Implementation Checklist
 
-### Phase 1: Schema Infrastructure
-- [ ] Add `VersionedStore`, `DataFileMeta`, `MigrationDefinition` to types.ts
-- [ ] Update all store interfaces to extend VersionedStore
-- [ ] Create `migrationService.ts` with full registry and migration logic
-- [ ] Create `timestamps.ts` utility module (millisecond-based)
-- [ ] Add async startup migration to server.ts (non-blocking)
+### Phase 1: Schema Infrastructure ✅ COMPLETE (January 2026)
+- [x] Add `VersionedStore`, `DataFileMeta`, `MigrationDefinition` to types.ts
+- [x] Update all store interfaces to extend VersionedStore
+- [x] Create `migrationService.ts` with full registry and migration logic
+- [x] Create `timestamps.ts` utility module (millisecond-based)
+- [x] Add async startup migration to server.ts (non-blocking)
+- [x] Add comprehensive test coverage for migrationService and timestamps
 
 ### Phase 2: Version Stamping
 - [ ] Run migration service on dev data

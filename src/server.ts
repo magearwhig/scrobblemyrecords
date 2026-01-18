@@ -6,8 +6,6 @@ import helmet from 'helmet';
 // Load environment variables before any other imports
 dotenv.config();
 
-const log = createLogger('Server');
-
 import artistMappingRoutes from './backend/routes/artistMapping';
 import { createAuthRouter } from './backend/routes/auth';
 import createCollectionRouter from './backend/routes/collection';
@@ -24,6 +22,7 @@ import { HiddenItemService } from './backend/services/hiddenItemService';
 import { ImageService } from './backend/services/imageService';
 import { LastFmService } from './backend/services/lastfmService';
 import { MappingService } from './backend/services/mappingService';
+import { MigrationService } from './backend/services/migrationService';
 import { ScrobbleHistoryStorage } from './backend/services/scrobbleHistoryStorage';
 import { ScrobbleHistorySyncService } from './backend/services/scrobbleHistorySyncService';
 import { SellerMonitoringService } from './backend/services/sellerMonitoringService';
@@ -32,6 +31,8 @@ import { SuggestionService } from './backend/services/suggestionService';
 import { WishlistService } from './backend/services/wishlistService';
 import { FileStorage } from './backend/utils/fileStorage';
 import { createLogger } from './backend/utils/logger';
+
+const log = createLogger('Server');
 
 const app = express();
 const PORT = parseInt(
@@ -241,6 +242,25 @@ async function startServer() {
     // Initialize data directories
     await fileStorage.ensureDataDir();
     log.info('Data directories initialized');
+
+    // Run migrations asynchronously - don't block server startup
+    // This ensures all data files have proper schema versioning
+    const migrationService = new MigrationService(fileStorage);
+    migrationService
+      .migrateAllOnStartup((file, status) => {
+        if (status === 'migrating') {
+          log.info(`Migrating data file: ${file}`);
+        }
+      })
+      .then(report => {
+        if (report.errors.length > 0) {
+          log.warn(`Migration completed with ${report.errors.length} errors`);
+        }
+      })
+      .catch(err => {
+        log.error('Migration startup check failed:', err);
+        // Don't crash server - migrations are best-effort on startup
+      });
 
     // Only start server if not in test environment
     if (process.env.NODE_ENV !== 'test') {

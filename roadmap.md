@@ -15,8 +15,8 @@ Cross-cutting concerns to address before or alongside feature development.
 - All stats-related types defined in `shared/types.ts`
 - Full test coverage for new routes and services
 
-**Not Yet Implemented:**
-- 0C: Data Evolution & Storage (schema versioning for new data files) - See `.plan/data-evolution-plan.md`
+**In Progress:**
+- 0C: Data Evolution & Storage - Phase 1 (Schema Infrastructure) complete, Phase 2-3 pending - See `.plan/data-evolution-plan.md`
 
 **Note on Dependencies:**
 - 0C (Data Evolution) is a prerequisite for Feature 9 (Backup & Restore)
@@ -64,12 +64,24 @@ Route modules:
 ### 0C: Data Evolution & Storage
 
 > **Implementation Plan:** See [.plan/data-evolution-plan.md](.plan/data-evolution-plan.md)
+>
+> **Status: Phase 1 Complete ✅**
 
-**Schema Versioning:**
-- Add `schemaVersion` field to new JSON data files
-- Document expected schema for each data file
-- Plan migration logic for breaking changes
-- **Dependency:** Feature 9 (Backup) relies on this for import/export compatibility
+**Phase 1 - Schema Infrastructure (COMPLETE):**
+- [x] `MigrationService` with full registry for all data files
+- [x] `timestamps.ts` utility module (millisecond-based with Last.fm normalization)
+- [x] Types: `VersionedStore`, `DataFileMeta`, `MigrationDefinition`, `MigrationReport`
+- [x] Server integration with async startup migration
+- [x] Comprehensive tests for migration and timestamp utilities
+
+**Phase 2 - Version Stamping (PENDING):**
+- [ ] Run migration service on dev data to stamp existing files
+- [ ] Verify all backend files have schemaVersion
+- [ ] Add client-side version check for localStorage
+
+**Phase 3 - Cleanup Routines (PENDING):**
+- [ ] Create `cleanupService.ts` with all cache types
+- [ ] Integrate cleanup trigger on app startup
 
 **Timezone Handling (Critical for Streaks):**
 - Store all timestamps in UTC milliseconds (codebase standard)

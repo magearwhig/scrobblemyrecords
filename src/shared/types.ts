@@ -745,3 +745,58 @@ export interface SellerMonitoringSettings {
   notifyOnNewMatch: boolean; // Enable notifications
   vinylFormatsOnly: boolean; // Only match vinyl formats (default: true)
 }
+
+// ============================================
+// Schema Versioning & Migration Types
+// ============================================
+
+/**
+ * Base interface for all versioned data stores.
+ * All data files MUST extend this interface.
+ */
+export interface VersionedStore {
+  schemaVersion: number;
+}
+
+/**
+ * Migration function signature for schema upgrades.
+ * Takes data at version N and returns data at version N+1.
+ */
+export type MigrationFn<TFrom, TTo> = (data: TFrom) => TTo;
+
+/**
+ * Metadata for a registered data file in the migration system.
+ */
+export interface DataFileMeta {
+  /** Relative path from data directory (e.g., 'history/scrobble-history-index.json') */
+  path: string;
+  /** Current schema version expected by the application */
+  currentVersion: number;
+  /** Ordered list of migrations to apply when upgrading */
+  migrations: MigrationDefinition[];
+  /** If true, skip stamping (file doesn't exist yet or is optional) */
+  optional?: boolean;
+}
+
+/**
+ * A single migration step from one version to the next.
+ */
+export interface MigrationDefinition {
+  fromVersion: number;
+  toVersion: number;
+  migrate: MigrationFn<unknown, unknown>;
+  /** Human-readable description for logging */
+  description?: string;
+}
+
+/**
+ * Report generated after running migrations on startup.
+ */
+export interface MigrationReport {
+  checked: number;
+  migrated: number;
+  stamped: number;
+  errors: { file: string; error: string }[];
+  startTime: number;
+  endTime: number;
+}

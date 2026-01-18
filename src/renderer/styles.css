@@ -1,6 +1,7 @@
 /* Dark Mode Styles */
 .dark-mode {
   --bg-primary: #1a1a1a !important;
+  --bg-primary-rgb: 26, 26, 26 !important;
   --bg-secondary: #2d2d2d !important;
   --bg-tertiary: #3d3d3d !important;
   --bg-hover: #4d4d4d !important;
@@ -23,6 +24,7 @@
 /* Light Mode Variables (default) */
 :root {
   --bg-primary: #f5f5f5;
+  --bg-primary-rgb: 245, 245, 245;
   --bg-secondary: #ffffff;
   --bg-tertiary: #f0f0f0;
   --bg-hover: #e8e8e8;
@@ -4289,17 +4291,7 @@ body {
   color: var(--text-tertiary);
 }
 
-/* Sync Status Bar for Wishlist */
-.sync-status-bar {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  background: var(--bg-secondary);
-  border-radius: 6px;
-  margin-bottom: 1rem;
-}
-
+/* Sync Status Info (used by Wishlist) */
 .sync-status-info {
   flex: 1;
   display: flex;

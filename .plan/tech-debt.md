@@ -106,15 +106,18 @@ The 90% target is aspirational. Thresholds will be raised incrementally as tests
 
 ### 2.4 Missing/Duplicate CSS
 
-**Priority: P1** | **Effort: Low** | **Impact: Medium (consistency)**
+**Priority: P1** | **Effort: Low** | **Impact: Medium (consistency)** | **Status: ✅ COMPLETE**
+
+> **Completed January 2026:** All CSS issues have been resolved.
 
 - ~~`--text-tertiary` CSS variable is used but not defined (falls back inconsistently)~~ **RESOLVED**
-- Duplicate `.sync-status-bar` class definitions cause style conflicts
+- ~~Duplicate `.sync-status-bar` class definitions cause style conflicts~~ **RESOLVED**
+- ~~Missing `--bg-primary-rgb` CSS variable~~ **RESOLVED**
 
 **Action:**
 - [x] Define `--text-tertiary` in `:root` and `.dark-mode` - Added in styles.css
-- [ ] Resolve duplicate class definitions
-- [ ] Audit for other missing variables
+- [x] Resolve duplicate class definitions - Removed duplicate at line 4293, kept complete definition at line 636
+- [x] Audit for other missing variables - Added `--bg-primary-rgb` for rgba usage
 
 **Files:** `src/renderer/styles.css`
 
@@ -348,7 +351,7 @@ These are nice-to-have features for later consideration:
 - [x] Settings page restructure with visual separation ✅ COMPLETE
 - [x] Centralized logging (remove token exposure) ✅ COMPLETE
 - [ ] Remove `any` types
-- [ ] Fix missing/duplicate CSS
+- [x] Fix missing/duplicate CSS ✅ COMPLETE
 - [ ] Loading skeletons
 - [ ] Collapsible sidebar
 - [ ] Better empty states
