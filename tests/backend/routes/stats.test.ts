@@ -761,4 +761,202 @@ describe('Stats Routes', () => {
       expect(mockStatsService.getStatsOverview).toHaveBeenCalledWith([]);
     });
   });
+
+  describe('GET /api/v1/stats/forgotten-favorites', () => {
+    beforeEach(() => {
+      mockStatsService.getForgottenFavorites = jest.fn().mockResolvedValue({
+        tracks: [
+          {
+            artist: 'Radiohead',
+            album: 'OK Computer',
+            track: 'Paranoid Android',
+            allTimePlayCount: 50,
+            lastPlayed: 1577836800, // Jan 1, 2020
+            daysSincePlay: 1847,
+          },
+          {
+            artist: 'Pink Floyd',
+            album: 'The Wall',
+            track: 'Comfortably Numb',
+            allTimePlayCount: 35,
+            lastPlayed: 1590969600, // June 1, 2020
+            daysSincePlay: 1693,
+          },
+        ],
+        totalMatching: 25,
+      });
+    });
+
+    it('should return forgotten favorites with default parameters', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/forgotten-favorites'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveLength(2);
+      expect(response.body.meta.dormantDays).toBe(90);
+      expect(response.body.meta.minPlays).toBe(10);
+      expect(response.body.meta.limit).toBe(100);
+      expect(response.body.meta.returned).toBe(2);
+      expect(response.body.meta.totalMatching).toBe(25);
+      expect(mockStatsService.getForgottenFavorites).toHaveBeenCalledWith(
+        90,
+        10,
+        100
+      );
+    });
+
+    it('should accept dormantDays query parameter', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/forgotten-favorites?dormantDays=180'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.meta.dormantDays).toBe(180);
+      expect(mockStatsService.getForgottenFavorites).toHaveBeenCalledWith(
+        180,
+        10,
+        100
+      );
+    });
+
+    it('should accept minPlays query parameter', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/forgotten-favorites?minPlays=20'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.meta.minPlays).toBe(20);
+      expect(mockStatsService.getForgottenFavorites).toHaveBeenCalledWith(
+        90,
+        20,
+        100
+      );
+    });
+
+    it('should accept limit query parameter', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/forgotten-favorites?limit=50'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.meta.limit).toBe(50);
+      expect(mockStatsService.getForgottenFavorites).toHaveBeenCalledWith(
+        90,
+        10,
+        50
+      );
+    });
+
+    it('should accept all query parameters together', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/forgotten-favorites?dormantDays=365&minPlays=5&limit=25'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.meta.dormantDays).toBe(365);
+      expect(response.body.meta.minPlays).toBe(5);
+      expect(response.body.meta.limit).toBe(25);
+      expect(mockStatsService.getForgottenFavorites).toHaveBeenCalledWith(
+        365,
+        5,
+        25
+      );
+    });
+
+    it('should cap limit at 100', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/forgotten-favorites?limit=500'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.meta.limit).toBe(100);
+      expect(mockStatsService.getForgottenFavorites).toHaveBeenCalledWith(
+        90,
+        10,
+        100
+      );
+    });
+
+    it('should enforce minimum values for parameters', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/forgotten-favorites?dormantDays=-5&minPlays=-10&limit=-20'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      // Should be clamped to minimum of 1
+      expect(response.body.meta.dormantDays).toBe(1);
+      expect(response.body.meta.minPlays).toBe(1);
+      expect(response.body.meta.limit).toBe(1);
+    });
+
+    it('should return track data with expected fields', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/forgotten-favorites'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      const firstTrack = response.body.data[0];
+      expect(firstTrack).toHaveProperty('artist', 'Radiohead');
+      expect(firstTrack).toHaveProperty('album', 'OK Computer');
+      expect(firstTrack).toHaveProperty('track', 'Paranoid Android');
+      expect(firstTrack).toHaveProperty('allTimePlayCount', 50);
+      expect(firstTrack).toHaveProperty('lastPlayed');
+      expect(firstTrack).toHaveProperty('daysSincePlay');
+    });
+
+    it('should handle empty results', async () => {
+      // Arrange
+      mockStatsService.getForgottenFavorites.mockResolvedValue({
+        tracks: [],
+        totalMatching: 0,
+      });
+
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/forgotten-favorites'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toEqual([]);
+      expect(response.body.meta.returned).toBe(0);
+      expect(response.body.meta.totalMatching).toBe(0);
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockStatsService.getForgottenFavorites.mockRejectedValue(
+        new Error('Forgotten favorites error')
+      );
+
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/forgotten-favorites'
+      );
+
+      // Assert
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Forgotten favorites error');
+    });
+  });
 });

@@ -6,15 +6,22 @@ import {
   CollectionItem,
   LocalWantItem,
   EnrichedWishlistItem,
+  ForgottenTrack,
 } from '../../shared/types';
+import {
+  MissingAlbumsTab,
+  MissingArtistsTab,
+  ForgottenFavoritesTab,
+} from '../components/discovery';
 import SyncStatusBar from '../components/SyncStatusBar';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
 
-type TabType = 'albums' | 'artists';
+type TabType = 'albums' | 'artists' | 'forgotten';
 type AlbumSortOption = 'plays' | 'artist' | 'album' | 'recent';
 type ArtistSortOption = 'plays' | 'artist' | 'albums' | 'recent';
+type ForgottenSortOption = 'plays' | 'artist' | 'track' | 'dormant';
 
 // Normalize album/artist names for matching
 // Removes quotes, edition suffixes, and normalizes to lowercase
@@ -74,9 +81,19 @@ const DiscoveryPage: React.FC = () => {
   // Sorting state
   const [albumSort, setAlbumSort] = useState<AlbumSortOption>('plays');
   const [artistSort, setArtistSort] = useState<ArtistSortOption>('plays');
+  const [forgottenSort, setForgottenSort] =
+    useState<ForgottenSortOption>('plays');
 
   // Hide wanted items toggle
   const [hideWantedItems, setHideWantedItems] = useState(false);
+
+  // Forgotten favorites state
+  const [forgottenTracks, setForgottenTracks] = useState<ForgottenTrack[]>([]);
+  const [forgottenLoading, setForgottenLoading] = useState(false);
+  const [forgottenError, setForgottenError] = useState<string | null>(null);
+  const [forgottenTotalMatching, setForgottenTotalMatching] = useState(0);
+  const [dormantDays, setDormantDays] = useState(90); // Default 3 months (per plan)
+  const [minPlays, setMinPlays] = useState(10); // Default 10 plays
 
   const api = getApiService(state.serverUrl);
 
@@ -126,6 +143,36 @@ const DiscoveryPage: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Load forgotten favorites (separate from main load since it can be slow)
+  const loadForgottenFavorites = useCallback(async () => {
+    try {
+      setForgottenLoading(true);
+      setForgottenError(null);
+      const result = await api.getForgottenFavorites(
+        dormantDays,
+        minPlays,
+        100
+      );
+      setForgottenTracks(result.tracks);
+      setForgottenTotalMatching(result.meta.totalMatching);
+    } catch (err) {
+      setForgottenError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to load forgotten favorites'
+      );
+    } finally {
+      setForgottenLoading(false);
+    }
+  }, [api, dormantDays, minPlays]);
+
+  // Load forgotten favorites when tab becomes active or params change
+  useEffect(() => {
+    if (activeTab === 'forgotten') {
+      loadForgottenFavorites();
+    }
+  }, [activeTab, dormantDays, minPlays, loadForgottenFavorites]);
 
   const formatDate = (timestamp: number): string => {
     const date = new Date(timestamp * 1000);
@@ -331,52 +378,14 @@ const DiscoveryPage: React.FC = () => {
     }
   };
 
-  // Check if an album is wanted (in Discogs wantlist or local want list)
-  const isWantedItem = (artist: string, album: string): boolean => {
-    return (
-      isInDiscogsWishlist(artist, album) ||
-      addedToWantList.has(`${artist}:${album}`)
-    );
-  };
-
-  // Sort and optionally filter albums based on selected options
-  // Limit to 100 items for display
-  const sortedAlbums = [...missingAlbums]
-    .filter(album => {
-      if (!hideWantedItems) return true;
-      return !isWantedItem(album.artist, album.album);
-    })
-    .sort((a, b) => {
-      switch (albumSort) {
-        case 'plays':
-          return b.playCount - a.playCount;
-        case 'artist':
-          return a.artist.localeCompare(b.artist);
-        case 'album':
-          return a.album.localeCompare(b.album);
-        case 'recent':
-          return b.lastPlayed - a.lastPlayed;
-        default:
-          return 0;
-      }
-    })
-    .slice(0, 100);
-
-  // Sort artists based on selected option
-  const sortedArtists = [...missingArtists].sort((a, b) => {
-    switch (artistSort) {
-      case 'plays':
-        return b.playCount - a.playCount;
-      case 'artist':
-        return a.artist.localeCompare(b.artist);
-      case 'albums':
-        return b.albumCount - a.albumCount;
-      case 'recent':
-        return b.lastPlayed - a.lastPlayed;
-      default:
-        return 0;
-    }
-  });
+  // Calculate filtered album count for tab display
+  const filteredAlbumCount = hideWantedItems
+    ? missingAlbums.filter(
+        album =>
+          !isInDiscogsWishlist(album.artist, album.album) &&
+          !addedToWantList.has(`${album.artist}:${album.album}`)
+      ).length
+    : missingAlbums.length;
 
   return (
     <div className='discovery-page'>
@@ -395,7 +404,7 @@ const DiscoveryPage: React.FC = () => {
         >
           Missing Albums (
           {hideWantedItems
-            ? `${sortedAlbums.length}/${missingAlbums.length}`
+            ? `${Math.min(filteredAlbumCount, 100)}/${missingAlbums.length}`
             : missingAlbums.length}
           )
         </button>
@@ -404,6 +413,12 @@ const DiscoveryPage: React.FC = () => {
           onClick={() => setActiveTab('artists')}
         >
           Missing Artists ({missingArtists.length})
+        </button>
+        <button
+          className={`discovery-tab ${activeTab === 'forgotten' ? 'active' : ''}`}
+          onClick={() => setActiveTab('forgotten')}
+        >
+          Forgotten Favorites ({forgottenTracks.length})
         </button>
       </div>
 
@@ -424,239 +439,55 @@ const DiscoveryPage: React.FC = () => {
       ) : (
         <div className='discovery-content'>
           {activeTab === 'albums' && (
-            <div className='discovery-section'>
-              <div className='discovery-section-header'>
-                <h2>Albums You Listen To But Don't Own</h2>
-                <div className='discovery-controls'>
-                  <label className='discovery-toggle'>
-                    <input
-                      type='checkbox'
-                      checked={hideWantedItems}
-                      onChange={e => setHideWantedItems(e.target.checked)}
-                    />
-                    <span>Hide wanted</span>
-                  </label>
-                  <div className='discovery-sort'>
-                    <label htmlFor='album-sort'>Sort by:</label>
-                    <select
-                      id='album-sort'
-                      value={albumSort}
-                      onChange={e =>
-                        setAlbumSort(e.target.value as AlbumSortOption)
-                      }
-                    >
-                      <option value='plays'>Most Plays</option>
-                      <option value='artist'>Artist Name</option>
-                      <option value='album'>Album Name</option>
-                      <option value='recent'>Recently Played</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-              {sortedAlbums.length === 0 ? (
-                <p className='empty-state'>
-                  {hideWantedItems && missingAlbums.length > 0
-                    ? 'All albums are in your wantlist. Turn off "Hide wanted" to see them.'
-                    : 'No missing albums found. Either you own everything you listen to, or you need to sync your history first!'}
-                </p>
-              ) : (
-                <div className='missing-list'>
-                  {sortedAlbums.map((album, index) => (
-                    <div
-                      key={`${album.artist}-${album.album}-${index}`}
-                      className='missing-item'
-                    >
-                      <div className='missing-item-info'>
-                        <div className='missing-item-title'>
-                          {album.album}
-                          {isInDiscogsWishlist(album.artist, album.album) && (
-                            <span
-                              className='discovery-badge discovery-badge-wishlist'
-                              title='In your Discogs wantlist'
-                            >
-                              In Wantlist
-                            </span>
-                          )}
-                          {addedToWantList.has(
-                            `${album.artist}:${album.album}`
-                          ) && (
-                            <span
-                              className='discovery-badge discovery-badge-wanted'
-                              title='In your local want list'
-                            >
-                              Wanted
-                            </span>
-                          )}
-                        </div>
-                        <div className='missing-item-artist'>
-                          {album.artist}
-                        </div>
-                      </div>
-                      <div className='missing-item-stats'>
-                        <span className='missing-item-playcount'>
-                          {album.playCount} plays
-                        </span>
-                        <span>Last: {formatDate(album.lastPlayed)}</span>
-                      </div>
-                      <div className='missing-item-actions'>
-                        <button
-                          className='btn btn-small btn-icon'
-                          onClick={() =>
-                            openLink(
-                              getLastFmAlbumUrl(album.artist, album.album)
-                            )
-                          }
-                          title='View album on Last.fm'
-                        >
-                          Last.fm
-                        </button>
-                        <button
-                          className='btn btn-small btn-icon'
-                          onClick={() =>
-                            openLink(
-                              getDiscogsAlbumUrl(album.artist, album.album)
-                            )
-                          }
-                          title='Search album on Discogs'
-                        >
-                          Discogs
-                        </button>
-                        <button
-                          className='btn btn-small btn-secondary'
-                          onClick={() => openAlbumMapping(album)}
-                          title='Map to collection item'
-                        >
-                          Map
-                        </button>
-                        <button
-                          className={`btn btn-small ${
-                            addedToWantList.has(
-                              `${album.artist}:${album.album}`
-                            )
-                              ? 'btn-success'
-                              : 'btn-primary'
-                          }`}
-                          onClick={() => handleAddToWantList(album)}
-                          disabled={
-                            addingToWantList.has(
-                              `${album.artist}:${album.album}`
-                            ) ||
-                            addedToWantList.has(
-                              `${album.artist}:${album.album}`
-                            )
-                          }
-                          title='Add to want list - tracks vinyl availability'
-                        >
-                          {addingToWantList.has(
-                            `${album.artist}:${album.album}`
-                          )
-                            ? 'Adding...'
-                            : addedToWantList.has(
-                                  `${album.artist}:${album.album}`
-                                )
-                              ? 'Wanted'
-                              : 'Want'}
-                        </button>
-                        <button
-                          className='btn btn-small btn-link'
-                          onClick={() => handleHideAlbum(album)}
-                          title='Hide from discovery (e.g., podcasts)'
-                        >
-                          Hide
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <MissingAlbumsTab
+              missingAlbums={missingAlbums}
+              albumSort={albumSort}
+              setAlbumSort={setAlbumSort}
+              hideWantedItems={hideWantedItems}
+              setHideWantedItems={setHideWantedItems}
+              addingToWantList={addingToWantList}
+              addedToWantList={addedToWantList}
+              isInDiscogsWishlist={isInDiscogsWishlist}
+              formatDate={formatDate}
+              openLink={openLink}
+              getLastFmAlbumUrl={getLastFmAlbumUrl}
+              getDiscogsAlbumUrl={getDiscogsAlbumUrl}
+              openAlbumMapping={openAlbumMapping}
+              handleAddToWantList={handleAddToWantList}
+              handleHideAlbum={handleHideAlbum}
+            />
           )}
 
           {activeTab === 'artists' && (
-            <div className='discovery-section'>
-              <div className='discovery-section-header'>
-                <h2>Artists You Listen To But Don't Own</h2>
-                <div className='discovery-sort'>
-                  <label htmlFor='artist-sort'>Sort by:</label>
-                  <select
-                    id='artist-sort'
-                    value={artistSort}
-                    onChange={e =>
-                      setArtistSort(e.target.value as ArtistSortOption)
-                    }
-                  >
-                    <option value='plays'>Most Plays</option>
-                    <option value='artist'>Artist Name</option>
-                    <option value='albums'>Most Albums</option>
-                    <option value='recent'>Recently Played</option>
-                  </select>
-                </div>
-              </div>
-              {missingArtists.length === 0 ? (
-                <p className='empty-state'>
-                  No missing artists found. You have a complete collection!
-                </p>
-              ) : (
-                <div className='missing-list'>
-                  {sortedArtists.map((artist, index) => (
-                    <div
-                      key={`${artist.artist}-${index}`}
-                      className='missing-item'
-                    >
-                      <div className='missing-item-info'>
-                        <div className='missing-item-title'>
-                          {artist.artist}
-                        </div>
-                        <div className='missing-item-artist'>
-                          {artist.albumCount} album
-                          {artist.albumCount > 1 ? 's' : ''} in history
-                        </div>
-                      </div>
-                      <div className='missing-item-stats'>
-                        <span className='missing-item-playcount'>
-                          {artist.playCount} plays
-                        </span>
-                        <span>Last: {formatDate(artist.lastPlayed)}</span>
-                      </div>
-                      <div className='missing-item-actions'>
-                        <button
-                          className='btn btn-small btn-icon'
-                          onClick={() =>
-                            openLink(getLastFmArtistUrl(artist.artist))
-                          }
-                          title='View artist on Last.fm'
-                        >
-                          Last.fm
-                        </button>
-                        <button
-                          className='btn btn-small btn-icon'
-                          onClick={() =>
-                            openLink(getDiscogsArtistUrl(artist.artist))
-                          }
-                          title='Search artist on Discogs'
-                        >
-                          Discogs
-                        </button>
-                        <button
-                          className='btn btn-small btn-secondary'
-                          onClick={() => openArtistMapping(artist)}
-                          title='Map to collection artist'
-                        >
-                          Map
-                        </button>
-                        <button
-                          className='btn btn-small btn-link'
-                          onClick={() => handleHideArtist(artist)}
-                          title='Hide from discovery (e.g., podcasts)'
-                        >
-                          Hide
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <MissingArtistsTab
+              missingArtists={missingArtists}
+              artistSort={artistSort}
+              setArtistSort={setArtistSort}
+              formatDate={formatDate}
+              openLink={openLink}
+              getLastFmArtistUrl={getLastFmArtistUrl}
+              getDiscogsArtistUrl={getDiscogsArtistUrl}
+              openArtistMapping={openArtistMapping}
+              handleHideArtist={handleHideArtist}
+            />
+          )}
+
+          {activeTab === 'forgotten' && (
+            <ForgottenFavoritesTab
+              forgottenTracks={forgottenTracks}
+              forgottenLoading={forgottenLoading}
+              forgottenError={forgottenError}
+              forgottenTotalMatching={forgottenTotalMatching}
+              dormantDays={dormantDays}
+              setDormantDays={setDormantDays}
+              minPlays={minPlays}
+              setMinPlays={setMinPlays}
+              forgottenSort={forgottenSort}
+              setForgottenSort={setForgottenSort}
+              loadForgottenFavorites={loadForgottenFavorites}
+              formatDate={formatDate}
+              openLink={openLink}
+            />
           )}
         </div>
       )}

@@ -178,3 +178,4 @@ scratch-*.md
 # Task files
 # tasks.json
 # tasks/ 
+.ideas/

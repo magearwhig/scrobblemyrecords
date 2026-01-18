@@ -12,6 +12,7 @@ import {
   LocalWantItem,
   AuthStatus,
   EnrichedWishlistItem,
+  ForgottenTrack,
 } from '../../../src/shared/types';
 
 // Mock the API service
@@ -25,6 +26,7 @@ const mockCreateDiscoveryAlbumMapping = jest.fn();
 const mockCreateDiscoveryArtistMapping = jest.fn();
 const mockHideAlbum = jest.fn();
 const mockHideArtist = jest.fn();
+const mockGetForgottenFavorites = jest.fn();
 
 jest.mock('../../../src/renderer/services/api', () => ({
   getApiService: () => ({
@@ -38,6 +40,7 @@ jest.mock('../../../src/renderer/services/api', () => ({
     createDiscoveryArtistMapping: mockCreateDiscoveryArtistMapping,
     hideAlbum: mockHideAlbum,
     hideArtist: mockHideArtist,
+    getForgottenFavorites: mockGetForgottenFavorites,
   }),
 }));
 
@@ -908,6 +911,395 @@ describe('DiscoveryPage', () => {
     // Should show special message about all albums being in wantlist
     expect(
       screen.getByText(/All albums are in your wantlist/)
+    ).toBeInTheDocument();
+  });
+});
+
+// Forgotten Favorites test data
+const mockForgottenTracks: ForgottenTrack[] = [
+  {
+    artist: 'Radiohead',
+    album: 'OK Computer',
+    track: 'Paranoid Android',
+    allTimePlayCount: 50,
+    lastPlayed: 1577836800, // Jan 1, 2020
+    daysSincePlay: 1847,
+    firstPlayed: 1500000000,
+  },
+  {
+    artist: 'Pink Floyd',
+    album: 'The Wall',
+    track: 'Comfortably Numb',
+    allTimePlayCount: 35,
+    lastPlayed: 1590969600, // June 1, 2020
+    daysSincePlay: 1693,
+    firstPlayed: 1500000000,
+  },
+  {
+    artist: 'Unknown Artist',
+    album: '', // Single - no album
+    track: 'Single Track',
+    allTimePlayCount: 20,
+    lastPlayed: 1590969600,
+    daysSincePlay: 1693,
+    firstPlayed: 1500000000,
+  },
+];
+
+describe('DiscoveryPage - Forgotten Favorites', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetMissingAlbums.mockResolvedValue([]);
+    mockGetMissingArtists.mockResolvedValue([]);
+    mockGetLocalWantList.mockResolvedValue([]);
+    mockGetWishlist.mockResolvedValue([]);
+    mockGetForgottenFavorites.mockResolvedValue({
+      tracks: mockForgottenTracks,
+      meta: {
+        dormantDays: 90,
+        minPlays: 10,
+        limit: 100,
+        returned: 3,
+        totalMatching: 25,
+      },
+    });
+  });
+
+  it('renders Forgotten Favorites tab', async () => {
+    render(
+      <AppProvider>
+        <AuthProvider
+          value={createMockAuthContext({
+            discogs: { authenticated: true, username: 'testuser' },
+            lastfm: { authenticated: true, username: 'testuser' },
+          })}
+        >
+          <DiscoveryPage />
+        </AuthProvider>
+      </AppProvider>
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Analyzing your listening history...')
+      ).not.toBeInTheDocument();
+    });
+
+    // Tab should be visible
+    expect(screen.getByText(/Forgotten Favorites/)).toBeInTheDocument();
+  });
+
+  it('loads forgotten favorites when tab is clicked', async () => {
+    render(
+      <AppProvider>
+        <AuthProvider
+          value={createMockAuthContext({
+            discogs: { authenticated: true, username: 'testuser' },
+            lastfm: { authenticated: true, username: 'testuser' },
+          })}
+        >
+          <DiscoveryPage />
+        </AuthProvider>
+      </AppProvider>
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Analyzing your listening history...')
+      ).not.toBeInTheDocument();
+    });
+
+    // Click on Forgotten Favorites tab
+    const forgottenTab = screen.getByText(/Forgotten Favorites/);
+    fireEvent.click(forgottenTab);
+
+    // Should show loading state then content
+    await waitFor(() => {
+      expect(mockGetForgottenFavorites).toHaveBeenCalled();
+    });
+
+    // Should display tracks
+    await waitFor(() => {
+      expect(screen.getByText('Paranoid Android')).toBeInTheDocument();
+      expect(screen.getByText('Comfortably Numb')).toBeInTheDocument();
+    });
+  });
+
+  it('displays (Single) for tracks without album', async () => {
+    render(
+      <AppProvider>
+        <AuthProvider
+          value={createMockAuthContext({
+            discogs: { authenticated: true, username: 'testuser' },
+            lastfm: { authenticated: true, username: 'testuser' },
+          })}
+        >
+          <DiscoveryPage />
+        </AuthProvider>
+      </AppProvider>
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Analyzing your listening history...')
+      ).not.toBeInTheDocument();
+    });
+
+    // Click on Forgotten Favorites tab
+    const forgottenTab = screen.getByText(/Forgotten Favorites/);
+    fireEvent.click(forgottenTab);
+
+    await waitFor(() => {
+      expect(screen.getByText('Single Track')).toBeInTheDocument();
+    });
+
+    // Should show (Single) instead of empty album
+    expect(screen.getByText(/\(Single\)/)).toBeInTheDocument();
+  });
+
+  it('displays showing X of Y summary', async () => {
+    render(
+      <AppProvider>
+        <AuthProvider
+          value={createMockAuthContext({
+            discogs: { authenticated: true, username: 'testuser' },
+            lastfm: { authenticated: true, username: 'testuser' },
+          })}
+        >
+          <DiscoveryPage />
+        </AuthProvider>
+      </AppProvider>
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Analyzing your listening history...')
+      ).not.toBeInTheDocument();
+    });
+
+    // Click on Forgotten Favorites tab
+    const forgottenTab = screen.getByText(/Forgotten Favorites/);
+    fireEvent.click(forgottenTab);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Showing 3 of 25 tracks/)).toBeInTheDocument();
+    });
+  });
+
+  it('shows empty state when no forgotten favorites found', async () => {
+    mockGetForgottenFavorites.mockResolvedValue({
+      tracks: [],
+      meta: {
+        dormantDays: 90,
+        minPlays: 10,
+        limit: 100,
+        returned: 0,
+        totalMatching: 0,
+      },
+    });
+
+    render(
+      <AppProvider>
+        <AuthProvider
+          value={createMockAuthContext({
+            discogs: { authenticated: true, username: 'testuser' },
+            lastfm: { authenticated: true, username: 'testuser' },
+          })}
+        >
+          <DiscoveryPage />
+        </AuthProvider>
+      </AppProvider>
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Analyzing your listening history...')
+      ).not.toBeInTheDocument();
+    });
+
+    // Click on Forgotten Favorites tab
+    const forgottenTab = screen.getByText(/Forgotten Favorites/);
+    fireEvent.click(forgottenTab);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/No forgotten favorites found/)
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('shows error state on API failure', async () => {
+    mockGetForgottenFavorites.mockRejectedValue(new Error('API Error'));
+
+    render(
+      <AppProvider>
+        <AuthProvider
+          value={createMockAuthContext({
+            discogs: { authenticated: true, username: 'testuser' },
+            lastfm: { authenticated: true, username: 'testuser' },
+          })}
+        >
+          <DiscoveryPage />
+        </AuthProvider>
+      </AppProvider>
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Analyzing your listening history...')
+      ).not.toBeInTheDocument();
+    });
+
+    // Click on Forgotten Favorites tab
+    const forgottenTab = screen.getByText(/Forgotten Favorites/);
+    fireEvent.click(forgottenTab);
+
+    await waitFor(() => {
+      expect(screen.getByText(/API Error/)).toBeInTheDocument();
+    });
+
+    // Should show retry button
+    expect(screen.getByText('Retry')).toBeInTheDocument();
+  });
+
+  it('changes dormant period filter and reloads data', async () => {
+    render(
+      <AppProvider>
+        <AuthProvider
+          value={createMockAuthContext({
+            discogs: { authenticated: true, username: 'testuser' },
+            lastfm: { authenticated: true, username: 'testuser' },
+          })}
+        >
+          <DiscoveryPage />
+        </AuthProvider>
+      </AppProvider>
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Analyzing your listening history...')
+      ).not.toBeInTheDocument();
+    });
+
+    // Click on Forgotten Favorites tab
+    const forgottenTab = screen.getByText(/Forgotten Favorites/);
+    fireEvent.click(forgottenTab);
+
+    // Wait for initial data to load
+    await waitFor(() => {
+      expect(screen.getByText('Paranoid Android')).toBeInTheDocument();
+    });
+
+    const initialCallCount = mockGetForgottenFavorites.mock.calls.length;
+
+    // Change dormant period to 6 months (180 days)
+    const dormantSelect = screen.getByLabelText('Dormant for:');
+    fireEvent.change(dormantSelect, { target: { value: '180' } });
+
+    // Should reload with new parameter
+    await waitFor(() => {
+      expect(mockGetForgottenFavorites.mock.calls.length).toBeGreaterThan(
+        initialCallCount
+      );
+    });
+  });
+
+  it('displays play count and dormancy for each track', async () => {
+    render(
+      <AppProvider>
+        <AuthProvider
+          value={createMockAuthContext({
+            discogs: { authenticated: true, username: 'testuser' },
+            lastfm: { authenticated: true, username: 'testuser' },
+          })}
+        >
+          <DiscoveryPage />
+        </AuthProvider>
+      </AppProvider>
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Analyzing your listening history...')
+      ).not.toBeInTheDocument();
+    });
+
+    // Click on Forgotten Favorites tab
+    const forgottenTab = screen.getByText(/Forgotten Favorites/);
+    fireEvent.click(forgottenTab);
+
+    await waitFor(() => {
+      expect(screen.getByText('50 plays')).toBeInTheDocument();
+      expect(screen.getByText('35 plays')).toBeInTheDocument();
+    });
+
+    // Check dormancy display (years ago)
+    expect(screen.getAllByText(/years? ago/).length).toBeGreaterThan(0);
+  });
+
+  it('has Copy All and Export CSV buttons', async () => {
+    render(
+      <AppProvider>
+        <AuthProvider
+          value={createMockAuthContext({
+            discogs: { authenticated: true, username: 'testuser' },
+            lastfm: { authenticated: true, username: 'testuser' },
+          })}
+        >
+          <DiscoveryPage />
+        </AuthProvider>
+      </AppProvider>
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Analyzing your listening history...')
+      ).not.toBeInTheDocument();
+    });
+
+    // Click on Forgotten Favorites tab
+    const forgottenTab = screen.getByText(/Forgotten Favorites/);
+    fireEvent.click(forgottenTab);
+
+    await waitFor(() => {
+      expect(screen.getByText('Copy All')).toBeInTheDocument();
+      expect(screen.getByText('Export CSV')).toBeInTheDocument();
+    });
+  });
+
+  it('shows loading state while fetching forgotten favorites', async () => {
+    // Make the API call hang
+    mockGetForgottenFavorites.mockImplementation(
+      () => new Promise(() => {}) // Never resolves
+    );
+
+    render(
+      <AppProvider>
+        <AuthProvider
+          value={createMockAuthContext({
+            discogs: { authenticated: true, username: 'testuser' },
+            lastfm: { authenticated: true, username: 'testuser' },
+          })}
+        >
+          <DiscoveryPage />
+        </AuthProvider>
+      </AppProvider>
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Analyzing your listening history...')
+      ).not.toBeInTheDocument();
+    });
+
+    // Click on Forgotten Favorites tab
+    const forgottenTab = screen.getByText(/Forgotten Favorites/);
+    fireEvent.click(forgottenTab);
+
+    // Should show loading message
+    expect(
+      screen.getByText('Finding your forgotten favorites...')
     ).toBeInTheDocument();
   });
 });

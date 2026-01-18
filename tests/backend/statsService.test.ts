@@ -1000,4 +1000,479 @@ describe('StatsService', () => {
       expect(streaks.currentStreak).toBe(3);
     });
   });
+
+  describe('getForgottenFavorites', () => {
+    // Helper to create index with track info
+    const createMockIndexWithTracks = (
+      albums: Record<
+        string,
+        {
+          lastPlayed: number;
+          playCount: number;
+          plays: { timestamp: number; track?: string }[];
+        }
+      >
+    ): ScrobbleHistoryIndex => ({
+      albums,
+      totalScrobbles: Object.values(albums).reduce(
+        (sum, a) => sum + a.playCount,
+        0
+      ),
+      lastSyncTimestamp: Math.floor(Date.now() / 1000),
+      oldestScrobbleDate: 0,
+    });
+
+    it('should return empty array when no history', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex.mockResolvedValue(null);
+
+      // Act
+      const result = await statsService.getForgottenFavorites(90, 10, 100);
+
+      // Assert
+      expect(result.tracks).toEqual([]);
+      expect(result.totalMatching).toBe(0);
+    });
+
+    it('should return empty array when no tracks meet criteria', async () => {
+      // Arrange - Recent plays with few plays
+      const now = Math.floor(Date.now() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'artist|album': {
+            lastPlayed: now,
+            playCount: 5,
+            plays: Array.from({ length: 5 }, (_, i) => ({
+              timestamp: now - i * 86400,
+              track: 'Track 1',
+            })),
+          },
+        })
+      );
+
+      // Act
+      const result = await statsService.getForgottenFavorites(90, 10, 100);
+
+      // Assert
+      expect(result.tracks).toEqual([]);
+      expect(result.totalMatching).toBe(0);
+    });
+
+    it('should return forgotten tracks that meet criteria', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const sixMonthsAgo = now - 180 * 24 * 60 * 60;
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'radiohead|ok computer': {
+            lastPlayed: sixMonthsAgo,
+            playCount: 20,
+            plays: Array.from({ length: 20 }, () => ({
+              timestamp: sixMonthsAgo,
+              track: 'Paranoid Android',
+            })),
+          },
+        })
+      );
+
+      // Act
+      const result = await statsService.getForgottenFavorites(90, 10, 100);
+
+      // Assert
+      expect(result.tracks).toHaveLength(1);
+      expect(result.tracks[0].artist).toBe('Radiohead');
+      expect(result.tracks[0].track).toBe('Paranoid Android');
+      expect(result.tracks[0].allTimePlayCount).toBe(20);
+      expect(result.tracks[0].daysSincePlay).toBeGreaterThanOrEqual(179);
+    });
+
+    it('should exclude tracks played recently', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const oneMonthAgo = now - 30 * 24 * 60 * 60;
+      const sixMonthsAgo = now - 180 * 24 * 60 * 60;
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'artist|album1': {
+            lastPlayed: oneMonthAgo, // Recent - should be excluded
+            playCount: 50,
+            plays: Array.from({ length: 50 }, () => ({
+              timestamp: oneMonthAgo,
+              track: 'Recent Track',
+            })),
+          },
+          'artist|album2': {
+            lastPlayed: sixMonthsAgo, // Dormant - should be included
+            playCount: 15,
+            plays: Array.from({ length: 15 }, () => ({
+              timestamp: sixMonthsAgo,
+              track: 'Old Track',
+            })),
+          },
+        })
+      );
+
+      // Act - 90 day dormant period
+      const result = await statsService.getForgottenFavorites(90, 10, 100);
+
+      // Assert
+      expect(result.tracks).toHaveLength(1);
+      expect(result.tracks[0].track).toBe('Old Track');
+    });
+
+    it('should exclude tracks with insufficient plays', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const sixMonthsAgo = now - 180 * 24 * 60 * 60;
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'artist|album1': {
+            lastPlayed: sixMonthsAgo,
+            playCount: 5, // Below threshold
+            plays: Array.from({ length: 5 }, () => ({
+              timestamp: sixMonthsAgo,
+              track: 'Low Play Track',
+            })),
+          },
+          'artist|album2': {
+            lastPlayed: sixMonthsAgo,
+            playCount: 15, // Above threshold
+            plays: Array.from({ length: 15 }, () => ({
+              timestamp: sixMonthsAgo,
+              track: 'High Play Track',
+            })),
+          },
+        })
+      );
+
+      // Act
+      const result = await statsService.getForgottenFavorites(90, 10, 100);
+
+      // Assert
+      expect(result.tracks).toHaveLength(1);
+      expect(result.tracks[0].track).toBe('High Play Track');
+    });
+
+    it('should sort by play count descending', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const sixMonthsAgo = now - 180 * 24 * 60 * 60;
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'artist|album1': {
+            lastPlayed: sixMonthsAgo,
+            playCount: 20,
+            plays: Array.from({ length: 20 }, () => ({
+              timestamp: sixMonthsAgo,
+              track: 'Medium Track',
+            })),
+          },
+          'artist|album2': {
+            lastPlayed: sixMonthsAgo,
+            playCount: 50,
+            plays: Array.from({ length: 50 }, () => ({
+              timestamp: sixMonthsAgo,
+              track: 'Popular Track',
+            })),
+          },
+          'artist|album3': {
+            lastPlayed: sixMonthsAgo,
+            playCount: 15,
+            plays: Array.from({ length: 15 }, () => ({
+              timestamp: sixMonthsAgo,
+              track: 'Less Popular Track',
+            })),
+          },
+        })
+      );
+
+      // Act
+      const result = await statsService.getForgottenFavorites(90, 10, 100);
+
+      // Assert
+      expect(result.tracks).toHaveLength(3);
+      expect(result.tracks[0].track).toBe('Popular Track');
+      expect(result.tracks[0].allTimePlayCount).toBe(50);
+      expect(result.tracks[1].track).toBe('Medium Track');
+      expect(result.tracks[2].track).toBe('Less Popular Track');
+    });
+
+    it('should respect limit parameter', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const sixMonthsAgo = now - 180 * 24 * 60 * 60;
+
+      const albums: Record<string, any> = {};
+      for (let i = 0; i < 20; i++) {
+        albums[`artist|album${i}`] = {
+          lastPlayed: sixMonthsAgo,
+          playCount: 15 + i,
+          plays: Array.from({ length: 15 + i }, () => ({
+            timestamp: sixMonthsAgo,
+            track: `Track ${i}`,
+          })),
+        };
+      }
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks(albums)
+      );
+
+      // Act
+      const result = await statsService.getForgottenFavorites(90, 10, 5);
+
+      // Assert
+      expect(result.tracks).toHaveLength(5);
+      expect(result.totalMatching).toBe(20);
+    });
+
+    it('should cap limit at 100', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const sixMonthsAgo = now - 180 * 24 * 60 * 60;
+
+      const albums: Record<string, any> = {};
+      for (let i = 0; i < 150; i++) {
+        albums[`artist${i}|album`] = {
+          lastPlayed: sixMonthsAgo,
+          playCount: 15,
+          plays: Array.from({ length: 15 }, () => ({
+            timestamp: sixMonthsAgo,
+            track: `Track ${i}`,
+          })),
+        };
+      }
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks(albums)
+      );
+
+      // Act
+      const result = await statsService.getForgottenFavorites(90, 10, 500); // Request more than cap
+
+      // Assert
+      expect(result.tracks.length).toBeLessThanOrEqual(100);
+      expect(result.totalMatching).toBe(150);
+    });
+
+    it('should aggregate plays for same track across plays array', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const sixMonthsAgo = now - 180 * 24 * 60 * 60;
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'artist|album': {
+            lastPlayed: sixMonthsAgo,
+            playCount: 15,
+            plays: [
+              // Same track played multiple times
+              { timestamp: sixMonthsAgo, track: 'Repeated Track' },
+              { timestamp: sixMonthsAgo - 1000, track: 'Repeated Track' },
+              { timestamp: sixMonthsAgo - 2000, track: 'Repeated Track' },
+              { timestamp: sixMonthsAgo - 3000, track: 'repeated track' }, // Different case
+              { timestamp: sixMonthsAgo - 4000, track: 'Repeated Track' },
+              { timestamp: sixMonthsAgo - 5000, track: 'Repeated Track' },
+              { timestamp: sixMonthsAgo - 6000, track: 'Repeated Track' },
+              { timestamp: sixMonthsAgo - 7000, track: 'Repeated Track' },
+              { timestamp: sixMonthsAgo - 8000, track: 'Repeated Track' },
+              { timestamp: sixMonthsAgo - 9000, track: 'Repeated Track' },
+              { timestamp: sixMonthsAgo - 10000, track: 'Other Track' },
+              { timestamp: sixMonthsAgo - 11000, track: 'Other Track' },
+              { timestamp: sixMonthsAgo - 12000, track: 'Other Track' },
+              { timestamp: sixMonthsAgo - 13000, track: 'Other Track' },
+              { timestamp: sixMonthsAgo - 14000, track: 'Other Track' },
+            ],
+          },
+        })
+      );
+
+      // Act - Need at least 10 plays per track
+      const result = await statsService.getForgottenFavorites(90, 10, 100);
+
+      // Assert
+      expect(result.tracks).toHaveLength(1);
+      expect(result.tracks[0].track).toBe('Repeated Track');
+      expect(result.tracks[0].allTimePlayCount).toBe(10); // 9 + 1 case-insensitive match
+    });
+
+    it('should skip plays without track info', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const sixMonthsAgo = now - 180 * 24 * 60 * 60;
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'artist|album': {
+            lastPlayed: sixMonthsAgo,
+            playCount: 15,
+            plays: [
+              // Plays without track names
+              { timestamp: sixMonthsAgo },
+              { timestamp: sixMonthsAgo - 1000 },
+              { timestamp: sixMonthsAgo - 2000 },
+              // Plays with track names
+              ...Array.from({ length: 12 }, (_, i) => ({
+                timestamp: sixMonthsAgo - (3000 + i * 1000),
+                track: 'Named Track',
+              })),
+            ],
+          },
+        })
+      );
+
+      // Act
+      const result = await statsService.getForgottenFavorites(90, 10, 100);
+
+      // Assert
+      expect(result.tracks).toHaveLength(1);
+      expect(result.tracks[0].allTimePlayCount).toBe(12); // Only plays with track names
+    });
+
+    it('should use cache for repeated calls with same parameters', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const sixMonthsAgo = now - 180 * 24 * 60 * 60;
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'artist|album': {
+            lastPlayed: sixMonthsAgo,
+            playCount: 15,
+            plays: Array.from({ length: 15 }, () => ({
+              timestamp: sixMonthsAgo,
+              track: 'Track',
+            })),
+          },
+        })
+      );
+
+      // Act - Call twice with same parameters
+      await statsService.getForgottenFavorites(90, 10, 100);
+      await statsService.getForgottenFavorites(90, 10, 100);
+
+      // Assert - getIndex should only be called once due to caching
+      expect(mockHistoryStorage.getIndex).toHaveBeenCalledTimes(1);
+    });
+
+    it('should invalidate cache when parameters change', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const sixMonthsAgo = now - 180 * 24 * 60 * 60;
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'artist|album': {
+            lastPlayed: sixMonthsAgo,
+            playCount: 15,
+            plays: Array.from({ length: 15 }, () => ({
+              timestamp: sixMonthsAgo,
+              track: 'Track',
+            })),
+          },
+        })
+      );
+
+      // Act - Call with different parameters
+      await statsService.getForgottenFavorites(90, 10, 100);
+      await statsService.getForgottenFavorites(180, 10, 100); // Different dormant period
+
+      // Assert - getIndex should be called twice (different params = cache miss)
+      expect(mockHistoryStorage.getIndex).toHaveBeenCalledTimes(2);
+    });
+
+    it('should invalidate cache after TTL expires', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const sixMonthsAgo = now - 180 * 24 * 60 * 60;
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'artist|album': {
+            lastPlayed: sixMonthsAgo,
+            playCount: 15,
+            plays: Array.from({ length: 15 }, () => ({
+              timestamp: sixMonthsAgo,
+              track: 'Track',
+            })),
+          },
+        })
+      );
+
+      // Act - First call populates cache
+      await statsService.getForgottenFavorites(90, 10, 100);
+
+      // Simulate TTL expiry by manipulating the cache timestamp
+      // Access private cache property for testing
+      const service = statsService as any;
+      service.forgottenFavoritesCache.timestamp = Date.now() - 6 * 60 * 1000; // 6 minutes ago (TTL is 5 min)
+
+      // Second call should refetch due to expired TTL
+      await statsService.getForgottenFavorites(90, 10, 100);
+
+      // Assert - getIndex should be called twice (TTL expired)
+      expect(mockHistoryStorage.getIndex).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle malformed album keys gracefully', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const sixMonthsAgo = now - 180 * 24 * 60 * 60;
+
+      // Create index with various malformed keys
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          // Normal key
+          'artist|album': {
+            lastPlayed: sixMonthsAgo,
+            playCount: 15,
+            plays: Array.from({ length: 15 }, () => ({
+              timestamp: sixMonthsAgo,
+              track: 'Normal Track',
+            })),
+          },
+          // Key with empty artist (malformed)
+          '|album': {
+            lastPlayed: sixMonthsAgo,
+            playCount: 12,
+            plays: Array.from({ length: 12 }, () => ({
+              timestamp: sixMonthsAgo,
+              track: 'No Artist Track',
+            })),
+          },
+          // Key with empty album (single)
+          'artist|': {
+            lastPlayed: sixMonthsAgo,
+            playCount: 11,
+            plays: Array.from({ length: 11 }, () => ({
+              timestamp: sixMonthsAgo,
+              track: 'Single Track',
+            })),
+          },
+          // Key with only pipe (very malformed)
+          '|': {
+            lastPlayed: sixMonthsAgo,
+            playCount: 10,
+            plays: Array.from({ length: 10 }, () => ({
+              timestamp: sixMonthsAgo,
+              track: 'Malformed Track',
+            })),
+          },
+        })
+      );
+
+      // Act - Should not throw
+      const result = await statsService.getForgottenFavorites(90, 10, 100);
+
+      // Assert - Should return results without crashing
+      expect(result.tracks.length).toBeGreaterThan(0);
+      // Normal track should be included
+      expect(result.tracks.some(t => t.track === 'Normal Track')).toBe(true);
+    });
+  });
 });

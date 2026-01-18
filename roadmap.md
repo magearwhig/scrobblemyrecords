@@ -1408,7 +1408,24 @@ Features are independent and can be released incrementally:
 
 ## Feature 6: Forgotten Favorites
 
-### Status: PLANNED
+### Status: COMPLETE ✅
+
+**Completed:**
+- `ForgottenTrack` type in `shared/types.ts`
+- `statsService.getForgottenFavorites()` method with 5-minute in-memory caching
+- `/api/v1/stats/forgotten-favorites` endpoint with query params (dormantDays, minPlays, limit)
+- Forgotten Favorites tab in Discovery page
+- Configurable dormant period (3 months to 3 years)
+- Configurable minimum play count (5-100 plays)
+- Copy to clipboard (single track and all tracks)
+- CSV export functionality
+- Sorting by play count, artist, track, or dormancy
+- Last.fm link for each track
+- 12 unit tests for statsService.getForgottenFavorites()
+- 11 route tests for /forgotten-favorites endpoint
+
+**Not Yet Implemented:**
+- Spotify playlist export (Phase 2)
 
 ### Overview
 A Discovery feature that surfaces **tracks you loved but haven't listened to recently**. Finds tracks with high all-time play counts that have gone dormant, helping answer: "What songs did I used to love that I've forgotten about?"

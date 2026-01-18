@@ -196,13 +196,27 @@ Two-tab view of your listening activity:
 - Sync controls to update the history index
 
 ### 🔍 Discovery Page
-Find albums you listen to but don't own:
+Find albums you listen to but don't own, and rediscover forgotten favorites:
 
+**Missing Albums Tab:**
 - **Missing Albums**: Albums in your scrobble history not in your collection
+- **Play Count Sorting**: Prioritized by how often you listen
+- **Map to Collection**: Mark a "missing" album as owned by mapping it to an item in your Discogs collection
+- **Add to Wanted List**: Track albums you want on vinyl for later
+
+**Missing Artists Tab:**
 - **Missing Artists**: Artists you love but don't have on vinyl
 - **Play Count Sorting**: Prioritized by how often you listen
-- **Map to Collection**: Mark a "missing" album/artist as owned by mapping it to an item in your Discogs collection
-- **Add to Wanted List**: Track albums you want on vinyl for later
+- **Map to Collection**: Map artist to a release in your collection
+
+**Forgotten Favorites Tab:**
+- **Rediscover Tracks**: Surface tracks with high all-time play counts that you haven't listened to recently
+- **Configurable Dormant Period**: Set how long "forgotten" means (3 months to 3 years)
+- **Configurable Min Plays**: Filter by minimum play count (5 to 100+)
+- **Sorting Options**: Sort by play count, artist name, track name, or dormancy
+- **Copy to Clipboard**: Copy single track or all tracks for playlist creation
+- **CSV Export**: Export your forgotten favorites for external use
+- **Last.fm Links**: Quick access to track pages on Last.fm
 
 ### ❤️ Wishlist Page
 Sync and manage your Discogs wantlist with vinyl availability tracking:

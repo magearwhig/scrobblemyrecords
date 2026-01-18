@@ -242,6 +242,20 @@ export interface MissingArtist {
 }
 
 /**
+ * A track that was frequently played but hasn't been listened to recently.
+ * Used by the Forgotten Favorites feature to resurface dormant favorites.
+ */
+export interface ForgottenTrack {
+  artist: string;
+  album: string; // Empty string means single/unknown
+  track: string;
+  allTimePlayCount: number; // Total plays ever
+  lastPlayed: number; // Unix timestamp (seconds)
+  daysSincePlay: number; // Calculated for display
+  firstPlayed?: number; // When first scrobbled (optional)
+}
+
+/**
  * Manual mapping from Last.fm album/artist names to Discogs collection items.
  * Used when automatic matching fails (e.g., different naming conventions).
  */

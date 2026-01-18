@@ -327,6 +327,216 @@ Repeated patterns across pages: section headers, empty states, info boxes, actio
 
 ---
 
+### 4.4 Component Extraction Roadmap
+
+**Priority: P2** | **Effort: High** | **Impact: High (maintainability, consistency)**
+
+> **Comprehensive analysis completed January 2026:** The frontend codebase relies heavily on CSS classes for consistency (good!) but duplicates JSX structure in many places (bad!). This section documents all extraction opportunities.
+
+#### 4.4.1 Core UI Primitives
+
+These foundational components should replace raw HTML elements and CSS classes everywhere.
+
+##### `Button` Component
+
+**Current State:** Repetitive `<button className="btn btn-primary ...">` elements. Loading states are manually handled with spinners inside buttons.
+
+**Locations:** Every page file (`CollectionPage`, `DiscoveryPage`, `WishlistPage`, `SellersPage`, etc.)
+
+**Requirements:**
+| Feature | Options |
+|---------|---------|
+| Variants | `primary`, `secondary`, `danger`, `outline`, `link` |
+| Sizes | `normal`, `small` |
+| States | `isLoading` (replaces text with spinner), `disabled`, `active` |
+| Props | `icon` (left/right), `fluid` (width: 100%) |
+
+**Action:**
+- [ ] Create `src/renderer/components/ui/Button.tsx`
+- [ ] Define CSS classes `.btn-*` variants in styles or use CSS-in-JS
+- [ ] Add unit tests for all states and variants
+
+---
+
+##### `Card` Component
+
+**Current State:** Hundreds of `div.card` elements. Some have headers/actions defined ad-hoc.
+
+**Locations:** `StatsPage.tsx`, `SellersPage.tsx`, `HistoryPage.tsx`
+
+**Requirements:**
+| Feature | Options |
+|---------|---------|
+| Props | `title` (optional header), `subtitle`, `actions` (header buttons), `padding` (default/none) |
+| Slots | `children` (body), `footer` |
+
+**Action:**
+- [ ] Create `src/renderer/components/ui/Card.tsx`
+- [ ] Support `Card.Header`, `Card.Body`, `Card.Footer` compound pattern
+
+---
+
+##### `Modal` Component
+
+**Current State:** 4+ duplicate implementations of the Overlay → Container → Header/Body/Footer structure.
+
+**Locations:**
+- `DiscoveryPage.tsx` (`MappingModal`)
+- `WishlistPage.tsx` (`VersionsModal`)
+- `SellersPage.tsx` (`AddSellerModal`)
+- `NewReleasesPage.tsx` (`DisambiguationModal`)
+
+**Requirements:**
+| Feature | Options |
+|---------|---------|
+| Props | `isOpen`, `onClose`, `title`, `size` (`sm`, `md`, `lg`), `isLoading` |
+| Behavior | `stopPropagation` on click, close on overlay click, generic close button |
+
+**Action:**
+- [ ] Create `src/renderer/components/ui/Modal.tsx`
+- [ ] Refactor all 4 page modals to use the shared component
+- [ ] Add keyboard support (Esc to close)
+
+---
+
+##### `ProgressBar` Component
+
+**Current State:** 3 different implementations with slightly different HTML structures.
+
+**Locations:**
+- `SyncStatusBar.tsx` (Sync progress)
+- `MilestoneProgress.tsx` (Stats progress)
+- `SellersPage.tsx` (Scan progress)
+
+**Requirements:**
+| Feature | Options |
+|---------|---------|
+| Props | `value` (0-100), `label` (optional text), `showPercentage` (boolean), `color` (optional override), `height` |
+
+**Action:**
+- [ ] Create `src/renderer/components/ui/ProgressBar.tsx`
+- [ ] Unify all 3 implementations to use shared component
+- [ ] Add animation support for value changes
+
+---
+
+##### `Badge` Component
+
+**Current State:** `span` elements with various classes (`badge`, `discovery-badge`, `wishlist-badge`).
+
+**Locations:** `DiscoveryPage`, `WishlistPage`, `NewReleasesPage`, `SellerMatchesPage`
+
+**Requirements:**
+| Feature | Options |
+|---------|---------|
+| Variants | `success`, `warning`, `error`, `info`, `neutral`, `purple` (Wishlist) |
+| Props | `label`, `icon` (optional) |
+
+**Action:**
+- [ ] Create `src/renderer/components/ui/Badge.tsx`
+- [ ] Consolidate all badge CSS classes
+
+---
+
+#### 4.4.2 Feature-Specific Lists & Cards
+
+Complex items currently defined inline within large page files.
+
+##### `DiscoveryItemCard`
+
+**Source:** `DiscoveryPage.tsx` (inline, ~100+ lines per card type)
+
+**Description:** Displays a missing album/artist with stats and action buttons (Last.fm, Discogs, Map, etc.)
+
+**Impact:** `DiscoveryPage` is over 1000 lines; extracting these will reduce it by ~300 lines.
+
+**Action:**
+- [ ] Create `src/renderer/components/discovery/DiscoveryItemCard.tsx`
+- [ ] Support both album and artist variants
+
+---
+
+##### `WishlistItemCard`
+
+**Source:** `WishlistPage.tsx` (inline, ~130 lines)
+
+**Description:** Displays a wishlist item or local want item with price data, cover art, and vinyl status.
+
+**Variation:** Needs to handle both "Discogs Wishlist" items and "Local Want List" items (slightly different metadata).
+
+**Action:**
+- [ ] Create `src/renderer/components/wishlist/WishlistItemCard.tsx`
+- [ ] Add prop to distinguish between Discogs and Local variants
+
+---
+
+##### `ReleaseCard`
+
+**Source:** `NewReleasesPage.tsx` (inline, ~115 lines)
+
+**Description:** Displays a new release with "Upcoming" badges, vinyl availability, and hide/exclude actions.
+
+**Action:**
+- [ ] Create `src/renderer/components/releases/ReleaseCard.tsx`
+
+---
+
+##### `SellerCard` & `MatchCard`
+
+**Source:** `SellersPage.tsx` and `SellerMatchesPage.tsx`
+
+**Description:** Seller info card and Match result card. Both share similar "cover + info + actions" layouts.
+
+**Action:**
+- [ ] Create `src/renderer/components/sellers/SellerCard.tsx`
+- [ ] Create `src/renderer/components/sellers/MatchCard.tsx`
+
+---
+
+##### `ScrobbleSessionCard`
+
+**Source:** `HistoryPage.tsx` (inline, ~230 lines)
+
+**Description:** A complex expandable card showing session status, track list, and album thumbnails.
+
+**Action:**
+- [ ] Create `src/renderer/components/history/ScrobbleSessionCard.tsx`
+
+---
+
+#### 4.4.3 Complex Logic Blocks
+
+Large chunks of logic/UI that should be their own files to reduce page complexity.
+
+| Block | Source | Target Path |
+|-------|--------|-------------|
+| `ForgottenFavoritesTab` | `DiscoveryPage.tsx` (~150 lines) | `src/renderer/components/discovery/ForgottenFavoritesTab.tsx` |
+| `CollectionFilterControls` | `CollectionPage.tsx` (~150 lines) | `src/renderer/components/collection/CollectionFilters.tsx` |
+| `CacheStatusIndicator` | `CollectionPage.tsx` (~185 lines) | `src/renderer/components/collection/CacheStatus.tsx` |
+
+**Action:**
+- [ ] Extract `ForgottenFavoritesTab` to its own component
+- [ ] Extract `CollectionFilterControls` to its own component
+- [ ] Extract `CacheStatusIndicator` to its own component
+
+---
+
+#### 4.4.4 Implementation Priority
+
+| Level | Components | Risk | Effort |
+|-------|------------|------|--------|
+| **Level 1** (Quick Wins) | `Button`, `Badge`, `ProgressBar` | Low | Low |
+| **Level 2** (Cleanup) | `Modal` + refactor 4 page modals | Low | Medium |
+| **Level 3** (Page Diet) | `DiscoveryItemCard`, `WishlistItemCard` | Medium | Medium |
+| **Level 4** (Logic Separation) | `ForgottenFavoritesTab`, `CollectionFilterControls`, `CacheStatus` | Medium | Medium |
+
+**Recommended Order:**
+1. Start with Level 1 - these can be swapped in immediately with low risk
+2. Level 2 significantly reduces code duplication across 4 files
+3. Levels 3-4 reduce the largest page files (DiscoveryPage, CollectionPage)
+
+---
+
 ## 5. Future Enhancements (P3)
 
 These are nice-to-have features for later consideration:
@@ -365,6 +575,11 @@ These are nice-to-have features for later consideration:
 - [ ] Reduce inline styles
 - [ ] Split styles.css
 - [ ] Extract shared UI patterns
+- [ ] Component extraction (see 4.4 for full roadmap):
+  - [ ] Level 1: `Button`, `Badge`, `ProgressBar` components
+  - [ ] Level 2: `Modal` component + refactor 4 page modals
+  - [ ] Level 3: `DiscoveryItemCard`, `WishlistItemCard` extraction
+  - [ ] Level 4: `ForgottenFavoritesTab`, `CollectionFilters`, `CacheStatus` extraction
 
 ### P3 - Nice to Have
 - [ ] Keyboard shortcuts

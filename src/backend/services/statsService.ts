@@ -5,6 +5,7 @@ import {
   CollectionCoverage,
   CollectionItem,
   DustyCornerAlbum,
+  ForgottenTrack,
   ListeningHours,
   MilestoneInfo,
   ScrobbleCounts,
@@ -45,6 +46,14 @@ export class StatsService {
   private fileStorage: FileStorage;
   private historyStorage: ScrobbleHistoryStorage;
   private logger = createLogger('StatsService');
+
+  // In-memory cache for forgotten favorites (5 minute TTL)
+  private forgottenFavoritesCache: {
+    data: ForgottenTrack[];
+    params: string; // JSON of {dormantPeriodDays, minPlayCount}
+    timestamp: number;
+  } | null = null;
+  private readonly FORGOTTEN_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
   constructor(
     fileStorage: FileStorage,
@@ -1134,6 +1143,127 @@ export class StatsService {
     return Array.from(counts.entries())
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  /**
+   * Get tracks with high play counts that haven't been played recently.
+   * Surfaces forgotten favorites from the scrobble history.
+   *
+   * Performance: O(n) scan of all plays in history index.
+   * Results are cached for 5 minutes to avoid repeated scans.
+   *
+   * @param dormantPeriodDays - Days since last play to consider "forgotten" (default: 90)
+   * @param minPlayCount - Minimum all-time plays to qualify (default: 10)
+   * @param limit - Max tracks to return (capped at 100)
+   * @returns Tracks and total count of matching tracks
+   */
+  async getForgottenFavorites(
+    dormantPeriodDays: number = 90,
+    minPlayCount: number = 10,
+    limit: number = 100
+  ): Promise<{ tracks: ForgottenTrack[]; totalMatching: number }> {
+    // Cap limit at 100
+    const cappedLimit = Math.min(limit, 100);
+
+    // Check cache (keyed by params excluding limit - we store all results)
+    const cacheKey = JSON.stringify({ dormantPeriodDays, minPlayCount });
+    if (
+      this.forgottenFavoritesCache &&
+      this.forgottenFavoritesCache.params === cacheKey &&
+      Date.now() - this.forgottenFavoritesCache.timestamp <
+        this.FORGOTTEN_CACHE_TTL_MS
+    ) {
+      return {
+        tracks: this.forgottenFavoritesCache.data.slice(0, cappedLimit),
+        totalMatching: this.forgottenFavoritesCache.data.length,
+      };
+    }
+
+    const index = await this.historyStorage.getIndex();
+    if (!index) {
+      return { tracks: [], totalMatching: 0 };
+    }
+
+    const now = Date.now() / 1000;
+    const cutoffTimestamp = now - dormantPeriodDays * 24 * 60 * 60;
+
+    // Build track play counts from all albums
+    // Key: "artist|album|track" (normalized)
+    const trackStats = new Map<
+      string,
+      {
+        artist: string;
+        album: string;
+        track: string;
+        count: number;
+        lastPlayed: number;
+        firstPlayed: number;
+      }
+    >();
+
+    for (const [key, albumHistory] of Object.entries(index.albums)) {
+      const [artist, album] = key.split('|');
+
+      for (const play of albumHistory.plays) {
+        // Skip plays without track info
+        if (!play.track) continue;
+
+        const trackKey = `${artist}|${album}|${play.track.toLowerCase()}`;
+        const existing = trackStats.get(trackKey);
+
+        if (existing) {
+          existing.count++;
+          if (play.timestamp > existing.lastPlayed) {
+            existing.lastPlayed = play.timestamp;
+          }
+          if (play.timestamp < existing.firstPlayed) {
+            existing.firstPlayed = play.timestamp;
+          }
+        } else {
+          trackStats.set(trackKey, {
+            artist,
+            album,
+            track: play.track,
+            count: 1,
+            lastPlayed: play.timestamp,
+            firstPlayed: play.timestamp,
+          });
+        }
+      }
+    }
+
+    // Filter to forgotten tracks only
+    const forgottenTracks: ForgottenTrack[] = [];
+
+    for (const stats of trackStats.values()) {
+      // Must have enough plays AND be dormant (not played since cutoff)
+      if (stats.count >= minPlayCount && stats.lastPlayed < cutoffTimestamp) {
+        forgottenTracks.push({
+          artist: this.capitalizeArtist(stats.artist),
+          album: stats.album ? this.capitalizeTitle(stats.album) : '',
+          track: this.capitalizeTitle(stats.track),
+          allTimePlayCount: stats.count,
+          lastPlayed: stats.lastPlayed,
+          daysSincePlay: Math.floor((now - stats.lastPlayed) / (24 * 60 * 60)),
+          firstPlayed: stats.firstPlayed,
+        });
+      }
+    }
+
+    // Sort by play count (most played forgotten tracks first)
+    forgottenTracks.sort((a, b) => b.allTimePlayCount - a.allTimePlayCount);
+
+    // Update cache (store all results, not just limited)
+    this.forgottenFavoritesCache = {
+      data: forgottenTracks,
+      params: cacheKey,
+      timestamp: Date.now(),
+    };
+
+    return {
+      tracks: forgottenTracks.slice(0, cappedLimit),
+      totalMatching: forgottenTracks.length,
+    };
   }
 
   // ============================================

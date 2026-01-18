@@ -439,6 +439,56 @@ export default function createStatsRouter(
     }
   });
 
+  /**
+   * GET /api/v1/stats/forgotten-favorites
+   * Get tracks with high play counts that haven't been played recently.
+   * Query params:
+   *   dormantDays: number (default: 90) - Days since last play to consider "forgotten"
+   *   minPlays: number (default: 10) - Minimum all-time play count
+   *   limit: number (default: 100, max: 100) - Max results
+   */
+  router.get('/forgotten-favorites', async (req: Request, res: Response) => {
+    try {
+      // Parse and validate query params with sensible defaults and bounds
+      const dormantDays = Math.max(
+        1,
+        parseInt(req.query.dormantDays as string) || 90
+      );
+      const minPlays = Math.max(
+        1,
+        parseInt(req.query.minPlays as string) || 10
+      );
+      const limit = Math.min(
+        100,
+        Math.max(1, parseInt(req.query.limit as string) || 100)
+      );
+
+      const result = await statsService.getForgottenFavorites(
+        dormantDays,
+        minPlays,
+        limit
+      );
+
+      res.json({
+        success: true,
+        data: result.tracks,
+        meta: {
+          dormantDays,
+          minPlays,
+          limit,
+          returned: result.tracks.length,
+          totalMatching: result.totalMatching,
+        },
+      });
+    } catch (error) {
+      logger.error('Error getting forgotten favorites', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
   // ============================================
   // Heatmap
   // ============================================

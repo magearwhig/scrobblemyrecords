@@ -8,6 +8,7 @@ import {
   CollectionItem,
   DiscogsRelease,
   EnrichedWishlistItem,
+  ForgottenTrack,
   HiddenAlbum,
   HiddenArtist,
   LocalWantItem,
@@ -666,6 +667,32 @@ class ApiService {
       }
     );
     return response.data.data;
+  }
+
+  /**
+   * Get tracks with high play counts that haven't been played recently.
+   * @param dormantDays - Days since last play to consider "forgotten" (default: 90)
+   * @param minPlays - Minimum all-time play count (default: 10)
+   * @param limit - Max results (default: 100, max: 100)
+   */
+  async getForgottenFavorites(
+    dormantDays: number = 90,
+    minPlays: number = 10,
+    limit: number = 100
+  ): Promise<{
+    tracks: ForgottenTrack[];
+    meta: {
+      dormantDays: number;
+      minPlays: number;
+      limit: number;
+      returned: number;
+      totalMatching: number;
+    };
+  }> {
+    const response = await this.api.get('/stats/forgotten-favorites', {
+      params: { dormantDays, minPlays, limit },
+    });
+    return { tracks: response.data.data, meta: response.data.meta };
   }
 
   // ============================================

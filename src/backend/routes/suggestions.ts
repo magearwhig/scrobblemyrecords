@@ -572,7 +572,7 @@ export default function createSuggestionsRouter(
             album: decodedAlbum,
             lastPlayed: result.entry.lastPlayed,
             playCount: result.entry.playCount,
-            plays: result.entry.plays.slice(-50), // Last 50 plays
+            plays: result.entry.plays.slice(0, 50), // Most recent 50 plays (array is sorted newest-first)
             matchType: result.matchType,
             matchedKeys: result.matchedKeys,
           },
