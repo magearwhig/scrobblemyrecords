@@ -4,6 +4,7 @@ import { ArtistMapping } from '../../../backend/services/artistMappingService';
 import {
   AlbumMapping,
   ArtistMapping as DiscoveryArtistMapping,
+  ArtistMbidMapping,
 } from '../../../shared/types';
 import { useAuth } from '../../context/AuthContext';
 import ApiService from '../../services/api';
@@ -55,9 +56,14 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
   >([]);
   const [discoveryLoading, setDiscoveryLoading] = useState(false);
 
+  // MusicBrainz mapping state (for New Release Tracking)
+  const [mbidMappings, setMbidMappings] = useState<ArtistMbidMapping[]>([]);
+  const [mbidMappingsLoading, setMbidMappingsLoading] = useState(false);
+
   useEffect(() => {
     loadMappings();
     loadDiscoveryMappings();
+    loadMbidMappings();
     if (authStatus.discogs.authenticated && authStatus.discogs.username) {
       loadArtists();
       loadSuggestions();
@@ -118,6 +124,39 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
       console.warn('Failed to load discovery mappings:', error);
     } finally {
       setDiscoveryLoading(false);
+    }
+  };
+
+  const loadMbidMappings = async () => {
+    try {
+      setMbidMappingsLoading(true);
+      const result = await api.getArtistMbidMappings();
+      setMbidMappings(result.mappings);
+    } catch (error) {
+      console.warn('Failed to load MusicBrainz mappings:', error);
+    } finally {
+      setMbidMappingsLoading(false);
+    }
+  };
+
+  const handleDeleteMbidMapping = async (artistName: string) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete the MusicBrainz mapping for "${artistName}"?`
+      )
+    ) {
+      return;
+    }
+    try {
+      await api.removeArtistMbidMapping(artistName);
+      setMbidMappings(prev =>
+        prev.filter(m => m.discogsArtistName !== artistName)
+      );
+      setSuccess('MusicBrainz mapping deleted');
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : 'Failed to delete mapping'
+      );
     }
   };
 
@@ -861,6 +900,94 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                 )}
               </div>
             </>
+          )}
+        </div>
+      </div>
+
+      {/* MusicBrainz Mappings (for New Release Tracking) */}
+      <div className='settings-section-card'>
+        <div className='settings-section-header'>
+          <span className='settings-section-icon'>🎵</span>
+          <div>
+            <h3>MusicBrainz Artist Mappings</h3>
+            <p className='settings-section-description'>
+              Link Discogs artists to MusicBrainz IDs for new release tracking
+            </p>
+          </div>
+          <span className='settings-section-badge'>{mbidMappings.length}</span>
+        </div>
+
+        <div className='settings-section-content'>
+          <div className='settings-info-box'>
+            These mappings are created automatically when you sync releases or
+            resolve artist disambiguations. Artists mapped to &quot;None&quot;
+            will be skipped during release sync.
+          </div>
+
+          {mbidMappingsLoading ? (
+            <div className='loading'>
+              <div className='spinner'></div>
+              Loading MusicBrainz mappings...
+            </div>
+          ) : mbidMappings.length === 0 ? (
+            <div className='settings-empty-text'>
+              No MusicBrainz mappings yet. They will be created when you sync
+              releases from the New Releases page.
+            </div>
+          ) : (
+            <div className='settings-subsection'>
+              <h4>Mapped Artists ({mbidMappings.length})</h4>
+              <div className='settings-discovery-list'>
+                {mbidMappings.map(mapping => (
+                  <div
+                    key={mapping.discogsArtistName}
+                    className='settings-discovery-item'
+                  >
+                    <div className='settings-discovery-info'>
+                      <div className='settings-discovery-source'>
+                        <span className='settings-discovery-label source'>
+                          Discogs:
+                        </span>
+                        {mapping.discogsArtistName}
+                      </div>
+                      <div className='settings-discovery-target'>
+                        <span className='settings-discovery-label target'>
+                          MusicBrainz:
+                        </span>
+                        {mapping.mbid ? (
+                          <a
+                            href={`https://musicbrainz.org/artist/${mapping.mbid}`}
+                            target='_blank'
+                            rel='noopener noreferrer'
+                            className='settings-external-link-small'
+                          >
+                            {mapping.mbid.substring(0, 8)}...
+                          </a>
+                        ) : (
+                          <span className='settings-mapping-skipped'>
+                            (None / Skipped)
+                          </span>
+                        )}
+                      </div>
+                      <div className='settings-mapping-meta'>
+                        {mapping.confirmedBy === 'auto'
+                          ? 'Auto-matched'
+                          : 'User confirmed'}{' '}
+                        on {new Date(mapping.confirmedAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <button
+                      className='btn btn-small btn-danger'
+                      onClick={() =>
+                        handleDeleteMbidMapping(mapping.discogsArtistName)
+                      }
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>

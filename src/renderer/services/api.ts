@@ -15,6 +15,7 @@ import {
   MissingAlbum,
   MissingArtist,
   MonitoredSeller,
+  ReleaseTrackingSyncStatus,
   ReleaseVersion,
   ScrobbleTrack,
   ScrobbleSession,
@@ -1067,6 +1068,194 @@ class ApiService {
         timeout: 600000, // 10 minutes
       }
     );
+    return response.data.data;
+  }
+
+  // ============================================
+  // Release Tracking methods (Feature 5)
+  // ============================================
+
+  async getTrackedReleases(options?: {
+    types?: string;
+    vinylOnly?: boolean;
+    upcomingOnly?: boolean;
+    artistMbid?: string;
+    sortBy?: string;
+    sortOrder?: string;
+    limit?: number;
+  }): Promise<{
+    releases: any[];
+    total: number;
+  }> {
+    const response = await this.api.get('/releases', { params: options });
+    return { releases: response.data.data, total: response.data.total };
+  }
+
+  async getReleaseTrackingSyncStatus(): Promise<ReleaseTrackingSyncStatus> {
+    const response = await this.api.get('/releases/sync');
+    return response.data.data;
+  }
+
+  async startReleaseTrackingSync(): Promise<{
+    message: string;
+    status: ReleaseTrackingSyncStatus;
+  }> {
+    // This can take a long time - increase timeout
+    const response = await this.api.post(
+      '/releases/sync',
+      {},
+      {
+        timeout: 600000, // 10 minutes
+      }
+    );
+    return { message: response.data.message, status: response.data.data };
+  }
+
+  async getReleaseTrackingSettings(): Promise<{
+    autoCheckOnStartup: boolean;
+    checkFrequencyDays: number;
+    notifyOnNewRelease: boolean;
+    includeEps: boolean;
+    includeSingles: boolean;
+    includeCompilations: boolean;
+  }> {
+    const response = await this.api.get('/releases/settings');
+    return response.data.data;
+  }
+
+  async saveReleaseTrackingSettings(settings: {
+    autoCheckOnStartup?: boolean;
+    checkFrequencyDays?: number;
+    notifyOnNewRelease?: boolean;
+    includeEps?: boolean;
+    includeSingles?: boolean;
+    includeCompilations?: boolean;
+  }): Promise<any> {
+    const response = await this.api.post('/releases/settings', settings);
+    return response.data.data;
+  }
+
+  async getPendingDisambiguations(): Promise<{
+    disambiguations: any[];
+    total: number;
+  }> {
+    const response = await this.api.get('/releases/disambiguations');
+    return { disambiguations: response.data.data, total: response.data.total };
+  }
+
+  async resolveDisambiguation(id: string, mbid: string | null): Promise<any> {
+    const response = await this.api.post(
+      `/releases/disambiguations/${id}/resolve`,
+      { mbid }
+    );
+    return response.data.data;
+  }
+
+  async skipDisambiguation(id: string): Promise<void> {
+    await this.api.post(`/releases/disambiguations/${id}/skip`);
+  }
+
+  async getArtistMbidMappings(): Promise<{
+    mappings: any[];
+    total: number;
+  }> {
+    const response = await this.api.get('/releases/mappings');
+    return { mappings: response.data.data, total: response.data.total };
+  }
+
+  async setArtistMbidMapping(
+    artistName: string,
+    mbid: string | null
+  ): Promise<any> {
+    const response = await this.api.post('/releases/mappings', {
+      artistName,
+      mbid,
+    });
+    return response.data.data;
+  }
+
+  async removeArtistMbidMapping(artistName: string): Promise<void> {
+    await this.api.delete(
+      `/releases/mappings/${encodeURIComponent(artistName)}`
+    );
+  }
+
+  async searchMusicBrainzArtist(name: string): Promise<any[]> {
+    const response = await this.api.get('/releases/search/artist', {
+      params: { name },
+    });
+    return response.data.data;
+  }
+
+  async checkVinylAvailability(): Promise<{ checked: number }> {
+    const response = await this.api.post('/releases/check-vinyl');
+    return response.data.data;
+  }
+
+  async checkSingleReleaseVinyl(mbid: string): Promise<any> {
+    const response = await this.api.post(`/releases/check-vinyl/${mbid}`);
+    return response.data.data;
+  }
+
+  async fetchReleaseCoverArt(): Promise<{ updated: number }> {
+    const response = await this.api.post('/releases/fetch-covers');
+    return response.data.data;
+  }
+
+  async addReleaseToWishlist(mbid: string): Promise<void> {
+    await this.api.post(`/releases/${mbid}/wishlist`);
+  }
+
+  async getCollectionArtistsForReleases(): Promise<{
+    artists: any[];
+    total: number;
+  }> {
+    const response = await this.api.get('/releases/collection-artists');
+    return { artists: response.data.data, total: response.data.total };
+  }
+
+  // Hidden releases and excluded artists
+
+  async getHiddenReleases(): Promise<any[]> {
+    const response = await this.api.get('/releases/hidden');
+    return response.data.data;
+  }
+
+  async hideRelease(
+    mbid: string,
+    title: string,
+    artistName: string
+  ): Promise<void> {
+    await this.api.post('/releases/hidden', { mbid, title, artistName });
+  }
+
+  async unhideRelease(mbid: string): Promise<void> {
+    await this.api.delete(`/releases/hidden/${mbid}`);
+  }
+
+  async getExcludedArtists(): Promise<any[]> {
+    const response = await this.api.get('/releases/excluded-artists');
+    return response.data.data;
+  }
+
+  async excludeArtist(artistName: string, artistMbid?: string): Promise<void> {
+    await this.api.post('/releases/excluded-artists', {
+      artistName,
+      artistMbid,
+    });
+  }
+
+  async includeArtist(artistName: string): Promise<void> {
+    await this.api.delete(
+      `/releases/excluded-artists/${encodeURIComponent(artistName)}`
+    );
+  }
+
+  async getReleaseFiltersCounts(): Promise<{
+    releases: number;
+    artists: number;
+  }> {
+    const response = await this.api.get('/releases/filters/counts');
     return response.data.data;
   }
 

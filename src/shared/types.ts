@@ -838,3 +838,208 @@ export interface MigrationReport {
   startTime: number;
   endTime: number;
 }
+
+// ============================================
+// New Release Tracking Types (Feature 5)
+// ============================================
+
+/**
+ * MusicBrainz artist match result for disambiguation
+ */
+export interface MusicBrainzArtistMatch {
+  mbid: string; // MusicBrainz artist ID
+  name: string; // Artist name
+  disambiguation?: string; // Disambiguation text (e.g., "UK rock band")
+  country?: string; // Country of origin
+  beginYear?: number; // Year artist started
+  endYear?: number; // Year artist ended (if applicable)
+  releaseCount?: number; // Number of releases
+  score: number; // Match score (0-100)
+}
+
+/**
+ * Stored artist mapping from Discogs to MusicBrainz
+ */
+export interface ArtistMbidMapping {
+  discogsArtistId?: number; // Discogs artist ID (if available)
+  discogsArtistName: string; // Original name from Discogs (canonical)
+  normalizedName: string; // Lowercase, normalized for lookup
+  mbid: string | null; // MusicBrainz ID (null if "none of these" selected)
+  confirmedAt: number; // When user confirmed this mapping
+  confirmedBy: 'auto' | 'user'; // How it was confirmed
+}
+
+/**
+ * A release from MusicBrainz
+ */
+export interface MusicBrainzRelease {
+  mbid: string; // Release group MBID
+  title: string;
+  artistName: string;
+  artistMbid: string;
+  releaseDate: string | null; // ISO date string (YYYY-MM-DD or YYYY-MM or YYYY)
+  releaseType: 'album' | 'ep' | 'single' | 'compilation' | 'other';
+  primaryType?: string; // MusicBrainz primary type
+  secondaryTypes?: string[]; // MusicBrainz secondary types
+  coverArtUrl?: string; // Cover art URL from Cover Art Archive
+}
+
+/**
+ * A tracked release with vinyl availability info
+ */
+export interface TrackedRelease {
+  mbid: string;
+  title: string;
+  artistName: string;
+  artistMbid: string;
+  releaseDate: string | null;
+  releaseType: MusicBrainzRelease['releaseType'];
+  coverArtUrl?: string;
+
+  // Vinyl availability (from Discogs lookup)
+  vinylStatus: 'unknown' | 'checking' | 'available' | 'cd-only' | 'not-found';
+  vinylPriceRange?: {
+    min: number;
+    max: number;
+    currency: string;
+  };
+  discogsUrl?: string; // Link to Discogs release/master
+  discogsMasterId?: number; // For wishlist integration
+
+  // Tracking
+  firstSeen: number; // When we first detected this release
+  isUpcoming: boolean; // Release date is in the future
+  inWishlist: boolean; // Already in user's wishlist
+  vinylCheckedAt?: number; // When vinyl availability was last checked
+}
+
+/**
+ * Artist disambiguation status
+ */
+export interface ArtistDisambiguationStatus {
+  id: string; // Unique ID for this disambiguation request
+  artistName: string;
+  normalizedName: string;
+  status: 'pending' | 'resolved' | 'skipped';
+  candidates?: MusicBrainzArtistMatch[];
+  selectedMbid?: string | null;
+  createdAt: number; // When this was added to pending list
+  resolvedAt?: number; // When user resolved (for cleanup)
+}
+
+/**
+ * Release tracking sync status
+ */
+export interface ReleaseTrackingSyncStatus {
+  status: 'idle' | 'syncing' | 'completed' | 'error';
+  lastSync: number | null;
+  artistsProcessed: number;
+  totalArtists: number;
+  releasesFound: number;
+  pendingDisambiguations: number;
+  error?: string;
+  // Progress details (for live UI updates)
+  progress: number; // 0-100 percentage
+  currentArtist?: string; // Artist currently being processed
+  estimatedTimeRemaining?: number; // Seconds remaining
+}
+
+/**
+ * Release tracking settings
+ */
+export interface ReleaseTrackingSettings extends VersionedStore {
+  schemaVersion: 1;
+  autoCheckOnStartup: boolean; // Check for new releases on app startup
+  checkFrequencyDays: number; // How often to re-check (default: 7)
+  notifyOnNewRelease: boolean; // Create notification for new releases
+  includeEps: boolean; // Include EPs in results
+  includeSingles: boolean; // Include singles in results
+  includeCompilations: boolean; // Include compilations in results
+}
+
+/**
+ * Collection artist entry (for caching)
+ */
+export interface CollectionArtist {
+  name: string;
+  id?: number; // Discogs artist ID if available
+  normalizedName: string;
+}
+
+/**
+ * Stored artist MBID mappings
+ */
+export interface ArtistMbidMappingsStore extends VersionedStore {
+  schemaVersion: 1;
+  mappings: ArtistMbidMapping[];
+}
+
+/**
+ * Stored tracked releases
+ */
+export interface TrackedReleasesStore extends VersionedStore {
+  schemaVersion: 1;
+  lastUpdated: number;
+  releases: TrackedRelease[];
+}
+
+/**
+ * Hidden release from New Releases page
+ */
+export interface HiddenRelease {
+  mbid: string;
+  title: string;
+  artistName: string;
+  hiddenAt: number;
+}
+
+/**
+ * Excluded artist from release tracking sync
+ */
+export interface ExcludedArtist {
+  artistName: string;
+  normalizedName: string;
+  artistMbid?: string;
+  excludedAt: number;
+}
+
+/**
+ * Versioned store for hidden releases
+ */
+export interface HiddenReleasesStore extends VersionedStore {
+  schemaVersion: 1;
+  items: HiddenRelease[];
+}
+
+/**
+ * Versioned store for excluded artists (release tracking)
+ */
+export interface ExcludedArtistsStore extends VersionedStore {
+  schemaVersion: 1;
+  items: ExcludedArtist[];
+}
+
+/**
+ * Stored pending disambiguations
+ */
+export interface PendingDisambiguationsStore extends VersionedStore {
+  schemaVersion: 1;
+  pending: ArtistDisambiguationStatus[];
+}
+
+/**
+ * Stored collection artists cache
+ */
+export interface CollectionArtistsCacheStore extends VersionedStore {
+  schemaVersion: 1;
+  fetchedAt: number;
+  artists: CollectionArtist[];
+}
+
+/**
+ * Release tracking sync status store
+ */
+export interface ReleaseSyncStatusStore extends VersionedStore {
+  schemaVersion: 1;
+  status: ReleaseTrackingSyncStatus;
+}

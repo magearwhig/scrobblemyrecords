@@ -4,6 +4,7 @@ import CollectionPage from '../pages/CollectionPage';
 import DiscoveryPage from '../pages/DiscoveryPage';
 import HistoryPage from '../pages/HistoryPage';
 import HomePage from '../pages/HomePage';
+import NewReleasesPage from '../pages/NewReleasesPage';
 import ReleaseDetailsPage from '../pages/ReleaseDetailsPage';
 import ScrobblePage from '../pages/ScrobblePage';
 import SellerMatchesPage from '../pages/SellerMatchesPage';
@@ -55,6 +56,8 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
         return <StatsPage />;
       case 'wishlist':
         return <WishlistPage />;
+      case 'releases':
+        return <NewReleasesPage />;
       case 'sellers':
         return <SellersPage />;
       case 'seller-matches':

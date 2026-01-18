@@ -13,6 +13,7 @@ import artistMappingRoutes from './backend/routes/artistMapping';
 import { createAuthRouter } from './backend/routes/auth';
 import createCollectionRouter from './backend/routes/collection';
 import createImagesRouter from './backend/routes/images';
+import createReleasesRouter from './backend/routes/releases';
 import createScrobbleRouter from './backend/routes/scrobble';
 import createSellersRouter from './backend/routes/sellers';
 import createStatsRouter from './backend/routes/stats';
@@ -23,10 +24,13 @@ import { AuthService } from './backend/services/authService';
 import { CleanupService } from './backend/services/cleanupService';
 import { DiscogsService } from './backend/services/discogsService';
 import { HiddenItemService } from './backend/services/hiddenItemService';
+import { HiddenReleasesService } from './backend/services/hiddenReleasesService';
 import { ImageService } from './backend/services/imageService';
 import { LastFmService } from './backend/services/lastfmService';
 import { MappingService } from './backend/services/mappingService';
 import { MigrationService } from './backend/services/migrationService';
+import { MusicBrainzService } from './backend/services/musicbrainzService';
+import { ReleaseTrackingService } from './backend/services/releaseTrackingService';
 import { ScrobbleHistoryStorage } from './backend/services/scrobbleHistoryStorage';
 import { ScrobbleHistorySyncService } from './backend/services/scrobbleHistorySyncService';
 import { SellerMonitoringService } from './backend/services/sellerMonitoringService';
@@ -194,6 +198,7 @@ const syncService = new ScrobbleHistorySyncService(
 );
 const mappingService = new MappingService(fileStorage);
 const hiddenItemService = new HiddenItemService(fileStorage);
+const hiddenReleasesService = new HiddenReleasesService(fileStorage);
 const analyticsService = new AnalyticsService(historyStorage, lastfmService);
 analyticsService.setMappingService(mappingService);
 const suggestionService = new SuggestionService(
@@ -207,6 +212,14 @@ const sellerMonitoringService = new SellerMonitoringService(
   fileStorage,
   authService,
   wishlistService
+);
+const musicBrainzService = new MusicBrainzService();
+const releaseTrackingService = new ReleaseTrackingService(
+  fileStorage,
+  discogsService,
+  musicBrainzService,
+  wishlistService,
+  hiddenReleasesService
 );
 
 // API routes
@@ -258,6 +271,14 @@ app.use(
   '/api/v1/sellers',
   createSellersRouter(fileStorage, authService, sellerMonitoringService)
 );
+app.use(
+  '/api/v1/releases',
+  createReleasesRouter(
+    authService,
+    releaseTrackingService,
+    hiddenReleasesService
+  )
+);
 
 // API info endpoint
 app.get('/api/v1', (req, res) => {
@@ -273,6 +294,7 @@ app.get('/api/v1', (req, res) => {
       images: '/api/v1/images',
       wishlist: '/api/v1/wishlist',
       sellers: '/api/v1/sellers',
+      releases: '/api/v1/releases',
     },
   });
 });

@@ -10,9 +10,14 @@
  * - Sold matches: 30 days max age after status changed to 'sold'
  * - Versions cache (wishlist): 7 days max age
  * - Seller inventory cache: 7 days max age (based on file mtime)
+ * - Collection artists cache (releases): 24 hours max age (uses fetchedAt timestamp)
  */
 
-import { SellerMatchesStore, VersionsCache } from '../../shared/types';
+import {
+  CollectionArtistsCacheStore,
+  SellerMatchesStore,
+  VersionsCache,
+} from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 import { nowUnixMs } from '../utils/timestamps';
@@ -40,6 +45,7 @@ export interface CleanupReport {
   soldMatchesRemoved: number;
   versionsCacheEntriesRemoved: number;
   inventoryCacheFilesRemoved: number;
+  collectionArtistsCacheCleared: boolean;
   errors: string[];
   durationMs: number;
 }
@@ -52,6 +58,7 @@ export class CleanupService {
   private readonly SOLD_MATCH_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
   private readonly VERSIONS_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
   private readonly INVENTORY_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+  private readonly COLLECTION_ARTISTS_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
   constructor(storage: FileStorage) {
     this.storage = storage;
@@ -69,6 +76,7 @@ export class CleanupService {
       soldMatchesRemoved: 0,
       versionsCacheEntriesRemoved: 0,
       inventoryCacheFilesRemoved: 0,
+      collectionArtistsCacheCleared: false,
       errors: [],
       durationMs: 0,
     };
@@ -116,6 +124,16 @@ export class CleanupService {
       log.error(msg);
     }
 
+    // Collection artists cache (release tracking)
+    try {
+      report.collectionArtistsCacheCleared =
+        await this.cleanupCollectionArtistsCache();
+    } catch (e) {
+      const msg = `Collection artists cache cleanup failed: ${e instanceof Error ? e.message : String(e)}`;
+      report.errors.push(msg);
+      log.error(msg);
+    }
+
     report.durationMs = nowUnixMs() - startTime;
 
     log.info(
@@ -124,8 +142,10 @@ export class CleanupService {
         `${report.soldMatchesRemoved} sold matches, ` +
         `${report.versionsCacheEntriesRemoved} version cache entries, ` +
         `${report.inventoryCacheFilesRemoved} inventory cache files removed${
-          report.errors.length > 0 ? ` (${report.errors.length} errors)` : ''
-        }`
+          report.collectionArtistsCacheCleared
+            ? ', collection artists cache cleared'
+            : ''
+        }${report.errors.length > 0 ? ` (${report.errors.length} errors)` : ''}`
     );
 
     return report;
@@ -269,6 +289,30 @@ export class CleanupService {
   }
 
   /**
+   * Clean up expired collection artists cache.
+   * Removes the entire cache file if fetchedAt is older than
+   * COLLECTION_ARTISTS_CACHE_MAX_AGE_MS.
+   *
+   * @returns True if cache was cleared, false otherwise
+   */
+  async cleanupCollectionArtistsCache(): Promise<boolean> {
+    const cutoff = nowUnixMs() - this.COLLECTION_ARTISTS_CACHE_MAX_AGE_MS;
+    const filePath = 'releases/collection-artists-cache.json';
+
+    const cache =
+      await this.storage.readJSON<CollectionArtistsCacheStore>(filePath);
+    if (!cache?.fetchedAt) return false;
+
+    if (cache.fetchedAt < cutoff) {
+      await this.storage.delete(filePath);
+      log.debug('Removed stale collection artists cache');
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Get the retention period settings (for testing/debugging).
    */
   getRetentionSettings(): {
@@ -276,12 +320,14 @@ export class CleanupService {
     soldMatchMaxAgeMs: number;
     versionsCacheMaxAgeMs: number;
     inventoryCacheMaxAgeMs: number;
+    collectionArtistsCacheMaxAgeMs: number;
   } {
     return {
       imageCacheMaxAgeMs: this.IMAGE_CACHE_MAX_AGE_MS,
       soldMatchMaxAgeMs: this.SOLD_MATCH_MAX_AGE_MS,
       versionsCacheMaxAgeMs: this.VERSIONS_CACHE_MAX_AGE_MS,
       inventoryCacheMaxAgeMs: this.INVENTORY_CACHE_MAX_AGE_MS,
+      collectionArtistsCacheMaxAgeMs: this.COLLECTION_ARTISTS_CACHE_MAX_AGE_MS,
     };
   }
 }

@@ -2735,6 +2735,11 @@ body {
   color: var(--text-muted);
 }
 
+.settings-mapping-skipped {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .settings-mapping-actions {
   display: flex;
   gap: 0.5rem;

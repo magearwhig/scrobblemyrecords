@@ -11,3 +11,9 @@
 - reference TEST_STYLE_GUIDE.md when writing tests
 - NEVER USE AMEND ON A COMMIT UNLESS EXPLICITLY TOLD TO DO SO
 - BEFORE COMITTING YOU MUST MAKE SURE TESTS PASS AND MEET COVERAGE THRESHOLDS WHEN RUN THE SAME WAY AS THE CI PIPELINE
+- all data files must include `schemaVersion: 1` as a top-level field
+- register new data files in `migrationService.ts` with path, currentVersion, and optional flag
+- files that store raw arrays must use `arrayWrapperKey` in registration to wrap as `{schemaVersion: 1, [key]: [...]}` (e.g., `items` or `mappings`)
+- use `writeJSONWithBackup()` for critical data files (creates `.bak` before overwriting)
+- add new store types to `src/shared/types.ts` extending `VersionedStore` interface
+- cache files should have defined retention periods and be added to `cleanupService.ts` if they need automated cleanup

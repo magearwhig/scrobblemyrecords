@@ -55,16 +55,14 @@ Route modules:
 - `src/backend/routes/wishlist.ts` ✅
 - `src/backend/routes/images.ts` ✅
 - `src/backend/routes/sellers.ts` ✅
+- `src/backend/routes/releases.ts` ✅
 
 **Planned (not yet created):**
 - `src/backend/routes/patterns.ts` *(Feature 3: Smart Scrobble Scheduling)*
-- `src/backend/routes/releases.ts` *(Feature 5: New Release Tracking)*
 - `src/backend/routes/backup.ts` *(Feature 10: Backup & Restore)*
 
 ### 0C: Data Evolution & Storage
 
-> **Implementation Plan:** See [.plan/data-evolution-plan.md](.plan/data-evolution-plan.md)
->
 > **Status: COMPLETE ✅** (January 2026)
 
 **All phases complete:**
@@ -1126,16 +1124,28 @@ Add "Local Sellers" section:
 
 ## Feature 5: New Release Tracking (MusicBrainz Integration)
 
-### Status: PLANNED
+### Status: COMPLETE ✅
 
-### Implementation Plan
-See `.plan/new-release-tracking-plan.md` for full specification including:
-- `MusicBrainzService` for artist search and release fetching
+**Completed:**
+- `MusicBrainzService` for artist search and release fetching (rate-limited, exponential backoff)
 - `ReleaseTrackingService` for sync, mapping, and disambiguation management
-- `/api/v1/releases/*` routes for all operations
-- `NewReleasesPage.tsx` with release grid and filters
-- `DisambiguationDialog.tsx` for artist matching UI
-- Vinyl availability integration via Discogs
+- `/api/v1/releases/*` routes for all operations (sync, settings, disambiguations, mappings, search, etc.)
+- `NewReleasesPage.tsx` with release grid, tabs (All, Upcoming, Recent, Vinyl Available), and filters
+- `DisambiguationDialog.tsx` for artist matching UI with candidate selection
+- Vinyl availability integration via Discogs search
+- Cover Art Archive integration for album artwork
+- Auto-match logic for high-confidence artist results (score >= 95)
+- Collection artists cache (24-hour retention)
+- Data migration registration for 6 new data files
+- 36 MusicBrainzService tests + 47 ReleaseTrackingService tests
+- All Feature 5 types defined in `shared/types.ts`
+
+**Implementation Details:**
+- MusicBrainz rate limit: 1 req/sec with exponential backoff
+- Cover Art Archive: 5 req/sec, 30-day caching
+- Artist disambiguation: pending → resolved/skipped workflow
+- Release types: album, EP, single, compilation, other
+- Vinyl status: unknown, checking, available, cd-only, not-found
 
 ### Overview
 Track new and upcoming releases from artists in your collection using MusicBrainz data, combined with Discogs for vinyl availability.
@@ -1244,6 +1254,55 @@ When viewing a new release:
 
 ---
 
+## Feature 5.5: Wishlist New Release Tracking
+
+### Status: PLANNED
+
+### Implementation Plan
+See `.plan/wishlist-new-release-tracking-plan.md` for full specification.
+
+### Overview
+Track new vinyl pressings for albums on your wishlist by monitoring the Discogs master ID to release ID cache. When a master release gets a new vinyl version, notify the user so they can consider purchasing it.
+
+This feature complements Feature 5 (MusicBrainz new release tracking) by focusing on **new pressings of existing albums** rather than **new albums from artists**.
+
+### Key Differences from Feature 5
+
+| Aspect | Feature 5 (MusicBrainz) | Feature 5.5 (Wishlist) |
+|--------|-------------------------|------------------------|
+| **What it tracks** | New albums from artists | New pressings of existing albums |
+| **Data source** | MusicBrainz release groups | Discogs versions cache |
+| **Scope** | Artists in your collection | Albums on your wishlist |
+| **Trigger** | Artist creates new album | Label releases new pressing |
+| **Use case** | Discover new music | Don't miss limited vinyl runs |
+
+### Data Sources
+- **Discogs Wishlist** - `WishlistItem.masterId`
+- **Local Want List** - `LocalWantItem.discogsMasterId` (new field)
+- **Vinyl Watch List** - `VinylWatchItem.masterId`
+
+### Detection Algorithm
+1. Collect master IDs from wishlist, local want list, and vinyl watch list
+2. For each master, compare current versions cache against fresh API fetch
+3. New release ID detected = vinyl pressing we haven't seen before
+4. Filter to vinyl formats only, create notification
+
+### Key Features
+- "New Releases" tab on existing Wishlist page
+- Notification integration for new pressings
+- Source filtering (Discogs wishlist vs local want list)
+- Time-based filtering (past 7 days, 30 days)
+- Dismiss/acknowledge workflow
+- Weekly batch checking with rate limit respect
+
+### Phases
+1. **Core Infrastructure** - Types, storage, detection logic, API routes
+2. **UI Implementation** - New tab, release cards, filters
+3. **Settings & Notifications** - Preferences, notification integration
+4. **Optimization** - Batch processing, cleanup routines
+
+---
+
 ## Implementation Notes
 
 ### Priority Order
@@ -1265,10 +1324,11 @@ Feature 1 (Stats Dashboard) - COMPLETE ✅
 
 Feature 2 (Wishlist) - COMPLETE ✅
     ├── Feature 4 (Seller Monitoring) - COMPLETE ✅ - matches against wishlist
+    ├── Feature 5.5 (Wishlist New Releases) - tracks new pressings for wishlist items
     └── Feature 8 (Wishlist Enhancements) - extends wishlist UI
 
-Feature 5 (New Releases)
-    └── Requires MusicBrainz API integration
+Feature 5 (New Releases) - COMPLETE ✅
+    └── Uses MusicBrainz API + Cover Art Archive integration
 
 All other features are independent and can be implemented in any order.
 ```

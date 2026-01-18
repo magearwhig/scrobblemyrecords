@@ -214,6 +214,51 @@ export class MigrationService {
       migrations: [],
       optional: true,
     });
+
+    // ============================================
+    // Release Tracking Files (Feature 5)
+    // ============================================
+    this.register('release-artist-mappings', {
+      path: 'releases/artist-mbid-map.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('release-tracked-releases', {
+      path: 'releases/tracked-releases.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('release-sync-status', {
+      path: 'releases/sync-status.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('release-settings', {
+      path: 'releases/settings.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('release-pending-disambiguations', {
+      path: 'releases/pending-disambiguations.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('release-collection-artists-cache', {
+      path: 'releases/collection-artists-cache.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
   }
 
   private register(key: string, meta: DataFileMeta): void {

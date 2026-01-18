@@ -828,12 +828,14 @@ export class WishlistService {
   > {
     try {
       const headers = await this.getAuthHeaders();
-      const query = `${artist} ${album}`;
 
+      // Use separate artist and release_title params for more precise matching
+      // instead of a generic 'q' query which can match unrelated results
       const response = await this.axios.get('/database/search', {
         headers,
         params: {
-          q: query,
+          artist,
+          release_title: album,
           type: 'master',
           per_page: 10,
         },
@@ -849,15 +851,30 @@ export class WishlistService {
           year?: string;
           cover_image?: string;
           format?: string[];
-        }) => ({
-          masterId: result.master_id || result.id,
-          releaseId: result.id,
-          title: result.title,
-          artist, // Use the search artist since Discogs combines artist-title
-          year: result.year ? parseInt(result.year, 10) : undefined,
-          coverImage: result.cover_image,
-          formats: result.format || [],
-        })
+        }) => {
+          // Discogs returns title in format "Artist - Album Title" or "Artist* - Album Title (...)"
+          // Parse out the actual artist and album from the combined title
+          let resultArtist = artist; // fallback to search artist
+          let resultTitle = result.title;
+
+          const titleParts = result.title.split(' - ');
+          if (titleParts.length >= 2) {
+            // First part is artist (may have trailing * for various artists)
+            resultArtist = titleParts[0].replace(/\*$/, '').trim();
+            // Rest is album title (may have extra info in parentheses)
+            resultTitle = titleParts.slice(1).join(' - ').trim();
+          }
+
+          return {
+            masterId: result.master_id || result.id,
+            releaseId: result.id,
+            title: resultTitle,
+            artist: resultArtist,
+            year: result.year ? parseInt(result.year, 10) : undefined,
+            coverImage: result.cover_image,
+            formats: result.format || [],
+          };
+        }
       );
     } catch (error) {
       this.logger.error('Error searching Discogs', error);

@@ -64,14 +64,17 @@ const SettingsPage: React.FC = () => {
       try {
         // Load mappings count
         const mappingsData = await api.getArtistMappings();
-        const [discoveryAlbums, discoveryArtists] = await Promise.all([
-          api.getDiscoveryAlbumMappings(),
-          api.getDiscoveryArtistMappings(),
-        ]);
+        const [discoveryAlbums, discoveryArtists, mbidMappings] =
+          await Promise.all([
+            api.getDiscoveryAlbumMappings(),
+            api.getDiscoveryArtistMappings(),
+            api.getArtistMbidMappings(),
+          ]);
         setMappingsCount(
           mappingsData.stats.totalMappings +
             discoveryAlbums.length +
-            discoveryArtists.length
+            discoveryArtists.length +
+            mbidMappings.mappings.length
         );
 
         // Load hidden counts

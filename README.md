@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-1761%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-1940%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -276,6 +276,40 @@ Track Discogs inventories of your favorite local record shops to find wishlist i
 - Enable/disable notifications
 - Quick-add sellers directly from settings
 
+### 🎵 New Releases Tracking
+Track new and upcoming releases from artists in your collection using MusicBrainz data:
+
+**Release Discovery:**
+- **Automatic Detection**: Scans MusicBrainz for new releases from artists in your Discogs collection
+- **Upcoming Releases**: See what's coming before release dates
+- **Recent Releases**: Discover albums released in the past 3 months
+- **Release Types**: Albums, EPs, singles, compilations - filter by type
+
+**Artist Disambiguation:**
+- **Smart Matching**: Auto-matches artists with high confidence (score >= 95%)
+- **Manual Resolution**: Disambiguation dialog for artists with multiple MusicBrainz matches
+- **Persistent Mappings**: Once confirmed, artist mappings are stored permanently
+
+**Vinyl Integration:**
+- **Availability Check**: On-demand Discogs search for vinyl pressings
+- **Price Range**: See marketplace pricing when vinyl is available
+- **Wishlist Integration**: One-click add to your Discogs wishlist
+- **Status Badges**: Vinyl Available, CD Only, or Not Found
+
+**Cover Art:**
+- Album artwork from Cover Art Archive (MusicBrainz)
+- Lazy loading with 30-day caching
+
+**Filtering & Tabs:**
+- All Releases, Upcoming Only, Recent Only, Vinyl Available
+- Filter by release type (album, EP, single, compilation)
+- Hide releases already in wishlist
+
+**Settings (Settings → Releases):**
+- Enable/disable release notifications
+- Include/exclude EPs and singles
+- Configure check frequency
+
 ### 🤖 AI Suggestions (Optional)
 Local AI-powered recommendations via [Ollama](https://ollama.ai). Runs entirely on your computer with no API fees.
 
@@ -436,7 +470,8 @@ src/
 │   │   ├── images.ts           # Album/artist image routes
 │   │   ├── suggestions.ts      # Suggestions, discovery, AI routes
 │   │   ├── wishlist.ts         # Wishlist and vinyl tracking routes
-│   │   └── sellers.ts          # Local seller monitoring routes
+│   │   ├── sellers.ts          # Local seller monitoring routes
+│   │   └── releases.ts         # New release tracking routes
 │   ├── services/               # Business logic
 │   │   ├── analyticsService.ts # Listening analytics
 │   │   ├── statsService.ts     # Stats dashboard calculations
@@ -447,7 +482,9 @@ src/
 │   │   ├── ollamaService.ts    # AI integration
 │   │   ├── aiPromptBuilder.ts  # AI prompt generation
 │   │   ├── wishlistService.ts  # Wishlist and vinyl tracking
-│   │   └── sellerMonitoringService.ts # Local seller monitoring
+│   │   ├── sellerMonitoringService.ts # Local seller monitoring
+│   │   ├── musicbrainzService.ts # MusicBrainz API integration
+│   │   └── releaseTrackingService.ts # New release tracking
 │   └── utils/                  # Utilities
 ├── renderer/                   # React frontend
 │   ├── components/             # UI components
@@ -464,6 +501,7 @@ src/
 │   │   ├── StatsPage.tsx
 │   │   ├── WishlistPage.tsx
 │   │   ├── SellersPage.tsx
+│   │   ├── NewReleasesPage.tsx
 │   │   └── SettingsPage.tsx
 │   └── context/                # State management
 └── shared/                     # Shared types
