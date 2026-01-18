@@ -15,8 +15,8 @@ Cross-cutting concerns to address before or alongside feature development.
 - All stats-related types defined in `shared/types.ts`
 - Full test coverage for new routes and services
 
-**In Progress:**
-- 0C: Data Evolution & Storage - Phase 1 (Schema Infrastructure) complete, Phase 2-3 pending - See `.plan/data-evolution-plan.md`
+**Completed (continued):**
+- 0C: Data Evolution & Storage - All 4 phases complete ✅ - See `.plan/data-evolution-plan.md`
 
 **Note on Dependencies:**
 - 0C (Data Evolution) is a prerequisite for Feature 9 (Backup & Restore)
@@ -65,33 +65,19 @@ Route modules:
 
 > **Implementation Plan:** See [.plan/data-evolution-plan.md](.plan/data-evolution-plan.md)
 >
-> **Status: Phase 1 Complete ✅**
+> **Status: COMPLETE ✅** (January 2026)
 
-**Phase 1 - Schema Infrastructure (COMPLETE):**
-- [x] `MigrationService` with full registry for all data files
-- [x] `timestamps.ts` utility module (millisecond-based with Last.fm normalization)
-- [x] Types: `VersionedStore`, `DataFileMeta`, `MigrationDefinition`, `MigrationReport`
-- [x] Server integration with async startup migration
-- [x] Comprehensive tests for migration and timestamp utilities
+**All phases complete:**
+- [x] Phase 1: Schema Infrastructure - `MigrationService`, `timestamps.ts`, types, server integration
+- [x] Phase 2: Version Stamping - Array wrapping for legacy files, client-side localStorage stamping
+- [x] Phase 3: Cleanup Routines - `cleanupService.ts` with image/seller/versions cache cleanup
+- [x] Phase 4: Documentation - Timestamp conventions documented in code
 
-**Phase 2 - Version Stamping (PENDING):**
-- [ ] Run migration service on dev data to stamp existing files
-- [ ] Verify all backend files have schemaVersion
-- [ ] Add client-side version check for localStorage
-
-**Phase 3 - Cleanup Routines (PENDING):**
-- [ ] Create `cleanupService.ts` with all cache types
-- [ ] Integrate cleanup trigger on app startup
-
-**Timezone Handling (Critical for Streaks):**
-- Store all timestamps in UTC milliseconds (codebase standard)
-- Exception: Last.fm API returns seconds - normalize when storing
-- Define "day boundary" for streak calculations (user's local midnight)
-- Document timezone assumptions in code comments
-
-**Storage Bounds:**
-- Define max age for cached data (e.g., purge image cache entries older than 30 days)
-- Implement cleanup routines for orphaned data
+**Key Implementations:**
+- Server lock file to prevent multiple instances (prevents credential corruption)
+- Credential protection: blocks saving empty tokens over existing tokens
+- Array-based files wrapped in versioned objects during migration
+- Cache cleanup runs after migrations on startup (non-blocking)
 
 ### 0D: In-App Notification System
 
