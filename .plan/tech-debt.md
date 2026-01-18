@@ -92,11 +92,11 @@ The 90% target is aspirational. Thresholds will be raised incrementally as tests
 
 **Priority: P1** | **Effort: Low** | **Impact: Medium (type safety)**
 
-Types like `notes?: any[]` in CollectionItem and `payload?: any` in AppAction bypass TypeScript safety.
+~~Types like `notes?: any[]` in CollectionItem and `payload?: any` in AppAction bypass TypeScript safety.~~
 
 **Action:**
-- [ ] Audit codebase for `any` types
-- [ ] Define proper interfaces for each usage
+- [x] Audit codebase for `any` types - Replaced `notes?: any[]` with `notes?: CollectionNote[]`
+- [x] Define proper interfaces for each usage - Added `CollectionNote` interface
 - [ ] Enable stricter TypeScript checks
 
 **Files:** `src/shared/types.ts`, various component files
@@ -107,11 +107,11 @@ Types like `notes?: any[]` in CollectionItem and `payload?: any` in AppAction by
 
 **Priority: P1** | **Effort: Low** | **Impact: Medium (consistency)**
 
-- `--text-tertiary` CSS variable is used but not defined (falls back inconsistently)
+- ~~`--text-tertiary` CSS variable is used but not defined (falls back inconsistently)~~ **RESOLVED**
 - Duplicate `.sync-status-bar` class definitions cause style conflicts
 
 **Action:**
-- [ ] Define `--text-tertiary` in `:root` and `.dark-mode`
+- [x] Define `--text-tertiary` in `:root` and `.dark-mode` - Added in styles.css
 - [ ] Resolve duplicate class definitions
 - [ ] Audit for other missing variables
 

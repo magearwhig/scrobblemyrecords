@@ -19,13 +19,22 @@ export interface Track {
   artist?: string;
 }
 
+/**
+ * Custom note field from Discogs collection.
+ * Users can define custom fields in their collection settings.
+ */
+export interface CollectionNote {
+  field_id: number;
+  value: string;
+}
+
 export interface CollectionItem {
   id: number;
   release: DiscogsRelease;
   folder_id?: number;
   date_added: string;
   rating?: number;
-  notes?: any[];
+  notes?: CollectionNote[];
   selected?: boolean;
 }
 

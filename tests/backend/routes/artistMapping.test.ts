@@ -14,7 +14,7 @@ process.env.DATA_DIR = testDataDir;
 if (fs.existsSync(testDataDir)) {
   fs.rmSync(testDataDir, { recursive: true, force: true });
 }
-fs.mkdirSync(testDataDir, { recursive: true });
+fs.mkdirSync(path.join(testDataDir, 'mappings'), { recursive: true });
 
 // Import after setting DATA_DIR
 import artistMappingRouter from '../../../src/backend/routes/artistMapping';
@@ -30,7 +30,7 @@ describe('Artist Mapping Routes', () => {
     if (fs.existsSync(testDataDir)) {
       fs.rmSync(testDataDir, { recursive: true, force: true });
     }
-    fs.mkdirSync(testDataDir, { recursive: true });
+    fs.mkdirSync(path.join(testDataDir, 'mappings'), { recursive: true });
 
     // Reimport for fresh state - but routes are already loaded
     // For these tests we'll work with whatever state exists

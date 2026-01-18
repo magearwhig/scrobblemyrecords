@@ -87,7 +87,10 @@ describe('MappingService', () => {
         createArtistMapping({ historyArtist: 'Artist1' }),
         createArtistMapping({ historyArtist: 'Artist2' }),
       ];
-      await fileStorage.writeJSON('mappings/artist-mappings.json', mappings);
+      await fileStorage.writeJSON(
+        'mappings/history-artist-mappings.json',
+        mappings
+      );
 
       // Act
       await service.loadMappings();

@@ -1,8 +1,13 @@
 - ALWAYS USE REAL DATA, DO NOT MAKE UP DATA UNLESS APPROVAL GIVEN
-- keep unit test coverage baseline at 90% for frontend and backend
+- keep unit test coverage at 90% target (current enforced: 60%, see .plan/tech-debt.md for improvement plan)
+- use milliseconds (Date.now()) for all timestamps; normalize Last.fm API seconds on storage
 - use nodejs for the back end
+- review .plan/ directory and roadmap.md before implementing new features
 - keep readme.md up to date with anything needed to know to run the application, including directions how to sign up for any api access needed and directions on how to setup environment and start the application
 - always make sure there are no whitespace issues in `git diff` results
 - make sure code is safe to commit to public repo, no secrets or api keys
 - make sure code compiles successfully
 - make sure you remove any temporary debugging code
+- reference TEST_STYLE_GUIDE.md when writing tests
+- NEVER USE AMEND ON A COMMIT UNLESS EXPLICITLY TOLD TO DO SO
+- BEFORE COMITTING YOU MUST MAKE SURE TESTS PASS AND MEET COVERAGE THRESHOLDS WHEN RUN THE SAME WAY AS THE CI PIPELINE

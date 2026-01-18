@@ -24,10 +24,11 @@ class ArtistMappingService {
   constructor() {
     // Store mappings in a separate file from cache
     const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data');
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
+    const mappingsDir = path.join(dataDir, 'mappings');
+    if (!fs.existsSync(mappingsDir)) {
+      fs.mkdirSync(mappingsDir, { recursive: true });
     }
-    this.mappingsFilePath = path.join(dataDir, 'artist-mappings.json');
+    this.mappingsFilePath = path.join(mappingsDir, 'artist-mappings.json');
     this.loadMappings();
   }
 

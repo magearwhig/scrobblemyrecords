@@ -34,17 +34,18 @@ The following files **already have** `schemaVersion: 1`:
 | Suggestion Settings | `settings/suggestion-settings.json` | Medium |
 | AI Settings | `settings/ai-settings.json` | Low |
 | Sync Settings | `history/sync-settings.json` | Medium |
-| Artist Mappings | `data/artist-mappings.json` | Medium |
+| Artist Mappings (Discogs→Last.fm) | `mappings/artist-mappings.json` | Medium |
+| Artist Mappings (History→Collection) | `mappings/history-artist-mappings.json` | Medium |
 | Album Mappings | `mappings/album-mappings.json` | Medium |
 | Hidden Albums | `discovery/hidden-albums.json` | Low |
 | Hidden Artists | `discovery/hidden-artists.json` | Low |
 | Image Caches | `images/*.json` | Low (recoverable) |
 
-> **⚠️ Known Issue:** Artist mappings have conflicting paths in code:
-> - `artistMappingService.ts` uses `data/artist-mappings.json` (root data dir)
-> - `mappingService.ts` uses `mappings/artist-mappings.json`
+> **✅ Resolved:** Artist mappings path conflict has been fixed:
+> - `artistMappingService.ts` now uses `mappings/artist-mappings.json` (Discogs→Last.fm name mapping for scrobbling)
+> - `mappingService.ts` now uses `mappings/history-artist-mappings.json` (History→Collection mapping for discovery/analytics)
 >
-> This is a real code bug that should be resolved before Feature 0C implementation. Album mappings are consistently at `mappings/album-mappings.json`. The recommended fix is to standardize on `mappings/artist-mappings.json` to match album mappings.
+> Both mapping systems are now in the `mappings/` directory, consistent with `album-mappings.json`.
 
 ### Timestamp Format Audit
 
@@ -52,7 +53,7 @@ The following files **already have** `schemaVersion: 1`:
 
 Examples from existing files:
 - `sellers/monitored-sellers.json`: `"addedAt": 1768682866907` (ms)
-- `data/artist-mappings.json`: `"dateAdded": 1759018990959` (ms)
+- `mappings/artist-mappings.json`: `"dateAdded": 1759018990959` (ms)
 - `history/scrobble-history-index.json`: `"lastSyncTimestamp": 1768705983000` (ms)
 
 **Decision:** Maintain milliseconds as the standard. Do NOT migrate to seconds - this would break existing data and require complex migrations. The plan originally specified seconds, but milliseconds is already the established convention.
@@ -207,10 +208,16 @@ export class MigrationService {
     });
 
     // Mapping files
-    // TODO: Resolve path conflict - artistMappingService uses data/, mappingService uses mappings/
-    // Standardize to mappings/artist-mappings.json before implementing migration service
+    // Artist mappings for Discogs→Last.fm name transformation (used by artistMappingService)
     this.register('artist-mappings', {
-      path: 'mappings/artist-mappings.json',  // Standardized path (requires code fix first)
+      path: 'mappings/artist-mappings.json',
+      currentVersion: 1,
+      migrations: [],
+    });
+
+    // Artist mappings for History→Collection matching (used by mappingService)
+    this.register('history-artist-mappings', {
+      path: 'mappings/history-artist-mappings.json',
       currentVersion: 1,
       migrations: [],
     });

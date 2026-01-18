@@ -3,7 +3,7 @@ import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
 const ALBUM_MAPPINGS_FILE = 'mappings/album-mappings.json';
-const ARTIST_MAPPINGS_FILE = 'mappings/artist-mappings.json';
+const ARTIST_MAPPINGS_FILE = 'mappings/history-artist-mappings.json';
 
 /**
  * Service for managing manual mappings between Last.fm and Discogs naming.

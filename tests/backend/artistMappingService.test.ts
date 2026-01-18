@@ -16,7 +16,7 @@ describe('ArtistMappingService', () => {
     if (fs.existsSync(testDataDir)) {
       fs.rmSync(testDataDir, { recursive: true, force: true });
     }
-    fs.mkdirSync(testDataDir, { recursive: true });
+    fs.mkdirSync(path.join(testDataDir, 'mappings'), { recursive: true });
 
     // Reset module cache to get fresh instance
     jest.resetModules();
@@ -109,7 +109,11 @@ describe('ArtistMappingService', () => {
       artistMappingService.setMapping('Persisted', 'PersistedLastfm');
 
       // Act - Check file exists
-      const filePath = path.join(testDataDir, 'artist-mappings.json');
+      const filePath = path.join(
+        testDataDir,
+        'mappings',
+        'artist-mappings.json'
+      );
       const exists = fs.existsSync(filePath);
 
       // Assert
@@ -338,7 +342,11 @@ describe('ArtistMappingService', () => {
   describe('persistence', () => {
     it('should load mappings from existing file', () => {
       // Arrange - Write mappings file directly
-      const filePath = path.join(testDataDir, 'artist-mappings.json');
+      const filePath = path.join(
+        testDataDir,
+        'mappings',
+        'artist-mappings.json'
+      );
       const data = {
         mappings: [
           {
@@ -365,7 +373,11 @@ describe('ArtistMappingService', () => {
 
     it('should handle corrupted mappings file', () => {
       // Arrange - Write invalid JSON
-      const filePath = path.join(testDataDir, 'artist-mappings.json');
+      const filePath = path.join(
+        testDataDir,
+        'mappings',
+        'artist-mappings.json'
+      );
       fs.writeFileSync(filePath, 'not valid json');
 
       // Reset module to reload
