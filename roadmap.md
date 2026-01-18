@@ -1505,7 +1505,24 @@ See `.plan/wishlist-enhancements-plan.md` for full specification including:
 
 ## Feature 9: Homepage Dashboard
 
-### Status: PLANNED
+### Status: COMPLETE ✅
+
+**Completed:**
+- `GET /api/v1/stats/dashboard` aggregated endpoint with isolated error handling
+- Dashboard components: `DashboardStatCard`, `QuickActionsGrid`, `RecentAlbums`, `MonthlyHighlights`, `ConnectionStatus`
+- Reuses `CalendarHeatmap` and `MilestoneProgress` from Stats page
+- All inline styles removed from HomePage.tsx - uses CSS classes
+- Secondary data (heatmap, milestones) loads non-blocking after initial render
+- Collapsible connection status (auto-collapses when all connected)
+- Dashboard types in `shared/types.ts` (`DashboardData`, `DashboardQuickStats`, etc.)
+- Tests updated for new dashboard functionality
+
+**Implementation Details:**
+- Quick Stats: streak, monthly scrobbles, new artists, collection coverage, listening hours
+- Quick Actions: seller matches, missing albums, dusty corners with navigation
+- Recent Albums: last 5 albums played (album-focused, not track-focused)
+- Monthly Highlights: top 5 artists and albums for current month
+- Fast initial render with progressive loading of secondary data
 
 ### Overview
 Transform the homepage from a basic onboarding page into an **engaging dashboard** that surfaces key metrics and insights from across the entire app. Users should see immediate value when opening the app.
@@ -1518,25 +1535,6 @@ Transform the homepage from a basic onboarding page into an **engaging dashboard
 - **Calendar Heatmap** - Visual listening activity (reused from Stats page)
 - **Milestone Progress** - Progress toward next scrobble milestone
 - **Collapsible Connection Status** - Server/auth status (collapsed when all connected)
-
-### Problems Solved
-1. Current homepage is onboarding-focused, irrelevant after initial setup
-2. Doesn't leverage rich local data (stats, collection, discovery, sellers)
-3. Duplicates Stats page functionality with period selectors
-4. Uses extensive inline styles (violates CLAUDE.md guidelines)
-
-### Technical Approach
-- **Aggregated Dashboard API** - Single `/api/v1/stats/dashboard` endpoint for fast initial render
-- **Reuse Existing Components** - CalendarHeatmap, MilestoneProgress, TopList from Stats page
-- **CSS Classes** - Replace all inline styles with proper CSS
-- **Conditional Display** - Show/hide sections based on data availability
-
-### Implementation Details
-See `.plan/homepage-dashboard-plan.md` for full specification including:
-- Dashboard layout and wireframes
-- New components (DashboardStatCard, QuickActionsGrid, RecentAlbums, etc.)
-- API response structure
-- Test plan
 
 ---
 

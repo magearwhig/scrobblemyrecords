@@ -6,7 +6,7 @@ import React from 'react';
 import { AuthProvider } from '../../../src/renderer/context/AuthContext';
 import HomePage from '../../../src/renderer/pages/HomePage';
 import * as apiService from '../../../src/renderer/services/api';
-import { AuthStatus, AppState } from '../../../src/shared/types';
+import { AuthStatus, DashboardData } from '../../../src/shared/types';
 
 // Mock the API service
 jest.mock('../../../src/renderer/services/api');
@@ -33,12 +33,77 @@ const createMockAuthContext = (authStatus: AuthStatus) => ({
   setAuthStatus: jest.fn(),
 });
 
-const createMockApiInstance = () => ({
-  healthCheck: jest.fn(),
-  getAuthStatus: jest.fn(),
-  getLastfmRecentScrobbles: jest.fn(),
-  getLastfmTopTracks: jest.fn(),
-  getLastfmTopArtists: jest.fn(),
+const createMockApiInstance = () => {
+  const apiGet = jest.fn();
+  // Mock both heatmap and milestones endpoints to return empty/null data
+  apiGet.mockImplementation((path: string) => {
+    if (path === '/stats/heatmap') {
+      return Promise.resolve({ data: { data: [] } });
+    }
+    if (path === '/stats/milestones') {
+      return Promise.resolve({ data: { data: null } });
+    }
+    return Promise.resolve({ data: { data: null } });
+  });
+
+  return {
+    healthCheck: jest.fn(),
+    getAuthStatus: jest.fn(),
+    getDashboard: jest.fn(),
+    api: {
+      get: apiGet,
+    },
+  };
+};
+
+const createMockDashboardData = (): DashboardData => ({
+  errors: {},
+  quickStats: {
+    currentStreak: 5,
+    longestStreak: 10,
+    scrobblesThisMonth: 200,
+    averageMonthlyScrobbles: 150,
+    newArtistsThisMonth: 3,
+    collectionCoverageThisMonth: 25,
+    listeningHoursThisMonth: 12,
+    totalScrobbles: 5000,
+    nextMilestone: 10000,
+  },
+  quickActions: {
+    newSellerMatches: 2,
+    missingAlbumsCount: 5,
+    wantListCount: 10,
+    dustyCornersCount: 8,
+  },
+  recentAlbums: [
+    {
+      artist: 'Radiohead',
+      album: 'Kid A',
+      coverUrl: 'https://example.com/cover.jpg',
+      lastPlayed: Date.now() / 1000 - 3600, // 1 hour ago
+      releaseId: 123,
+      inCollection: true,
+    },
+    {
+      artist: 'Pink Floyd',
+      album: 'The Dark Side of the Moon',
+      coverUrl: null,
+      lastPlayed: Date.now() / 1000 - 86400, // 1 day ago
+      inCollection: false,
+    },
+  ],
+  monthlyTopArtists: [
+    { name: 'Radiohead', playCount: 100, imageUrl: null },
+    { name: 'Pink Floyd', playCount: 80, imageUrl: null },
+  ],
+  monthlyTopAlbums: [
+    {
+      artist: 'Radiohead',
+      album: 'Kid A',
+      playCount: 50,
+      coverUrl: 'https://example.com/cover.jpg',
+    },
+  ],
 });
 
 const renderHomePageWithProviders = (
@@ -58,234 +123,163 @@ const renderHomePageWithProviders = (
   };
 };
 
-describe('HomePage', () => {
+describe('HomePage Dashboard', () => {
   let mockApi: ReturnType<typeof createMockApiInstance>;
 
   beforeEach(() => {
     mockApi = createMockApiInstance();
     mockApiService.getApiService.mockReturnValue(mockApi as any);
-    jest.clearAllMocks();
+    // Note: Don't call jest.clearAllMocks() here as it resets the mock implementation
   });
 
-  it('renders the welcome message and description', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: false, username: undefined },
-      lastfm: { authenticated: false, username: undefined },
-    };
-
-    renderHomePageWithProviders(authStatus);
-
-    expect(
-      screen.getByText('Welcome to Discogs to Last.fm Scrobbler')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/This application allows you to connect/)
-    ).toBeInTheDocument();
-  });
-
-  describe('Server Status', () => {
-    it('shows checking status initially', () => {
-      const authStatus: AuthStatus = {
-        discogs: { authenticated: false, username: undefined },
-        lastfm: { authenticated: false, username: undefined },
-      };
-
-      mockApi.healthCheck.mockImplementation(() => new Promise(() => {})); // Never resolves
-
-      renderHomePageWithProviders(authStatus);
-
-      expect(
-        screen.getByText('Checking server connection...')
-      ).toBeInTheDocument();
-      expect(screen.getByText('Server Status')).toBeInTheDocument();
-    });
-
-    it('shows connected status when server is healthy', async () => {
-      const authStatus: AuthStatus = {
-        discogs: { authenticated: false, username: undefined },
-        lastfm: { authenticated: false, username: undefined },
-      };
-
-      mockApi.healthCheck.mockResolvedValue(undefined);
-      mockApi.getAuthStatus.mockResolvedValue(authStatus);
-
-      renderHomePageWithProviders(authStatus);
-
-      await waitFor(() => {
-        expect(
-          screen.getByText('✓ Successfully connected to backend server')
-        ).toBeInTheDocument();
-      });
-    });
-
-    it('shows error status when server connection fails', async () => {
-      const authStatus: AuthStatus = {
-        discogs: { authenticated: false, username: undefined },
-        lastfm: { authenticated: false, username: undefined },
-      };
-
-      mockApi.healthCheck.mockRejectedValue(new Error('Connection failed'));
-
-      renderHomePageWithProviders(authStatus);
-
-      await waitFor(() => {
-        expect(
-          screen.getByText(/✗ Unable to connect to backend server/)
-        ).toBeInTheDocument();
-        expect(screen.getByText(/Connection failed/)).toBeInTheDocument();
-      });
-    });
-
-    it('allows retry when server connection fails', async () => {
-      const user = userEvent.setup();
-      const authStatus: AuthStatus = {
-        discogs: { authenticated: false, username: undefined },
-        lastfm: { authenticated: false, username: undefined },
-      };
-
-      mockApi.healthCheck.mockRejectedValueOnce(new Error('Connection failed'));
-      mockApi.healthCheck.mockResolvedValue(undefined);
-      mockApi.getAuthStatus.mockResolvedValue(authStatus);
-
-      renderHomePageWithProviders(authStatus);
-
-      await waitFor(() => {
-        expect(screen.getByText('Retry')).toBeInTheDocument();
-      });
-
-      const retryButton = screen.getByText('Retry');
-      await user.click(retryButton);
-
-      await waitFor(() => {
-        expect(
-          screen.getByText('✓ Successfully connected to backend server')
-        ).toBeInTheDocument();
-      });
-
-      expect(mockApi.healthCheck).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe('Authentication Status', () => {
-    it('displays authentication status when server is connected', async () => {
-      const authStatus: AuthStatus = {
-        discogs: { authenticated: true, username: 'discogs_user' },
-        lastfm: { authenticated: false, username: undefined },
-      };
-
-      mockApi.healthCheck.mockResolvedValue(undefined);
-      mockApi.getAuthStatus.mockResolvedValue(authStatus);
-
-      renderHomePageWithProviders(authStatus);
-
-      await waitFor(() => {
-        expect(screen.getByText('Authentication Status')).toBeInTheDocument();
-      });
-
-      expect(screen.getByText('Discogs')).toBeInTheDocument();
-      expect(screen.getByText('Last.fm')).toBeInTheDocument();
-      expect(screen.getByText('Connected')).toBeInTheDocument();
-      expect(screen.getByText('Not connected')).toBeInTheDocument();
-      expect(screen.getByText('User: discogs_user')).toBeInTheDocument();
-    });
-
-    it('does not display authentication status when server is not connected', () => {
-      const authStatus: AuthStatus = {
-        discogs: { authenticated: false, username: undefined },
-        lastfm: { authenticated: false, username: undefined },
-      };
-
-      mockApi.healthCheck.mockRejectedValue(new Error('Connection failed'));
-
-      renderHomePageWithProviders(authStatus);
-
-      expect(
-        screen.queryByText('Authentication Status')
-      ).not.toBeInTheDocument();
-    });
-  });
-
-  describe('Last.fm Activity', () => {
-    const createMockLastfmData = () => ({
-      recentScrobbles: [
-        {
-          name: 'Test Track 1',
-          artist: { '#text': 'Test Artist 1' },
-          album: { '#text': 'Test Album 1' },
-          date: { '#text': '2023-01-01T10:00:00Z' },
-          image: [null, null, { '#text': 'http://example.com/image.jpg' }],
-        },
-        {
-          name: 'Test Track 2',
-          artist: { '#text': 'Test Artist 2' },
-          album: { '#text': 'Test Album 2' },
-          date: { '#text': '2023-01-01T09:00:00Z' },
-        },
-      ],
-      topTracks: [
-        {
-          name: 'Popular Track 1',
-          artist: { name: 'Popular Artist 1' },
-          playcount: '100',
-        },
-        {
-          name: 'Popular Track 2',
-          artist: { name: 'Popular Artist 2' },
-          playcount: '95',
-        },
-      ],
-      topArtists: [
-        {
-          name: 'Top Artist 1',
-          playcount: '200',
-        },
-        {
-          name: 'Top Artist 2',
-          playcount: '180',
-        },
-      ],
-    });
-
-    it('displays Last.fm activity when authenticated', async () => {
+  describe('Loading State', () => {
+    it('shows loading spinner while fetching dashboard data', async () => {
       const authStatus: AuthStatus = {
         discogs: { authenticated: true, username: 'discogs_user' },
         lastfm: { authenticated: true, username: 'lastfm_user' },
       };
 
-      const mockData = createMockLastfmData();
       mockApi.healthCheck.mockResolvedValue(undefined);
       mockApi.getAuthStatus.mockResolvedValue(authStatus);
-      mockApi.getLastfmRecentScrobbles.mockResolvedValue(
-        mockData.recentScrobbles
-      );
-      mockApi.getLastfmTopTracks.mockResolvedValue(mockData.topTracks);
-      mockApi.getLastfmTopArtists.mockResolvedValue(mockData.topArtists);
+      mockApi.getDashboard.mockImplementation(() => new Promise(() => {})); // Never resolves
+      // Note: api.get mock is set in createMockApiInstance
 
       renderHomePageWithProviders(authStatus);
 
       await waitFor(() => {
-        expect(screen.getByText('Your Last.fm Activity')).toBeInTheDocument();
+        expect(
+          screen.getByText('Loading your dashboard...')
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Onboarding State', () => {
+    it('shows welcome message when not onboarded', async () => {
+      const authStatus: AuthStatus = {
+        discogs: { authenticated: false, username: undefined },
+        lastfm: { authenticated: false, username: undefined },
+      };
+
+      mockApi.healthCheck.mockResolvedValue(undefined);
+      mockApi.getAuthStatus.mockResolvedValue(authStatus);
+      mockApi.getDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderHomePageWithProviders(authStatus);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Welcome to RecordScrobbles')
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('shows connect accounts button when not onboarded', async () => {
+      const authStatus: AuthStatus = {
+        discogs: { authenticated: false, username: undefined },
+        lastfm: { authenticated: false, username: undefined },
+      };
+
+      mockApi.healthCheck.mockResolvedValue(undefined);
+      mockApi.getAuthStatus.mockResolvedValue(authStatus);
+      mockApi.getDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderHomePageWithProviders(authStatus);
+
+      await waitFor(() => {
+        expect(screen.getByText('Connect Accounts')).toBeInTheDocument();
+      });
+    });
+
+    it('shows how it works section when not onboarded', async () => {
+      const authStatus: AuthStatus = {
+        discogs: { authenticated: false, username: undefined },
+        lastfm: { authenticated: false, username: undefined },
+      };
+
+      mockApi.healthCheck.mockResolvedValue(undefined);
+      mockApi.getAuthStatus.mockResolvedValue(authStatus);
+      mockApi.getDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderHomePageWithProviders(authStatus);
+
+      await waitFor(() => {
+        expect(screen.getByText('How It Works')).toBeInTheDocument();
       });
 
-      // Check recent scrobbles
-      expect(screen.getByText('Recent Scrobbles')).toBeInTheDocument();
-      expect(screen.getByText('Test Track 1')).toBeInTheDocument();
-      expect(screen.getByText('Test Artist 1')).toBeInTheDocument();
-      expect(screen.getByText('Test Album 1')).toBeInTheDocument();
+      expect(screen.getByText('1. Connect')).toBeInTheDocument();
+      expect(screen.getByText('2. Scrobble')).toBeInTheDocument();
+      expect(screen.getByText('3. Discover')).toBeInTheDocument();
+    });
+  });
 
-      // Check top tracks
-      expect(screen.getByText('Top Tracks')).toBeInTheDocument();
-      expect(screen.getByText('Popular Track 1')).toBeInTheDocument();
-      expect(screen.getByText('Popular Artist 1')).toBeInTheDocument();
-      expect(screen.getByText('100 plays')).toBeInTheDocument();
+  describe('Dashboard View (Onboarded)', () => {
+    it('shows quick stats when fully authenticated', async () => {
+      const authStatus: AuthStatus = {
+        discogs: { authenticated: true, username: 'discogs_user' },
+        lastfm: { authenticated: true, username: 'lastfm_user' },
+      };
 
-      // Check top artists
+      mockApi.healthCheck.mockResolvedValue(undefined);
+      mockApi.getAuthStatus.mockResolvedValue(authStatus);
+      mockApi.getDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderHomePageWithProviders(authStatus);
+
+      await waitFor(() => {
+        expect(screen.getByText('Day Streak')).toBeInTheDocument();
+      });
+
+      // "This Month" appears both as stat label and section header, so use getAllByText
+      expect(screen.getAllByText('This Month').length).toBeGreaterThan(0);
+      expect(screen.getByText('New Artists')).toBeInTheDocument();
+      expect(screen.getByText('Collection Played')).toBeInTheDocument();
+      expect(screen.getByText('Listening Time')).toBeInTheDocument();
+    });
+
+    it('shows recent albums section', async () => {
+      const authStatus: AuthStatus = {
+        discogs: { authenticated: true, username: 'discogs_user' },
+        lastfm: { authenticated: true, username: 'lastfm_user' },
+      };
+
+      mockApi.healthCheck.mockResolvedValue(undefined);
+      mockApi.getAuthStatus.mockResolvedValue(authStatus);
+      mockApi.getDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderHomePageWithProviders(authStatus);
+
+      await waitFor(() => {
+        expect(screen.getByText('Recent Activity')).toBeInTheDocument();
+      });
+
+      // "Kid A" and "Radiohead" appear in multiple sections (recent albums and monthly highlights)
+      expect(screen.getAllByText('Kid A').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Radiohead').length).toBeGreaterThan(0);
+    });
+
+    it('shows monthly highlights section', async () => {
+      const authStatus: AuthStatus = {
+        discogs: { authenticated: true, username: 'discogs_user' },
+        lastfm: { authenticated: true, username: 'lastfm_user' },
+      };
+
+      mockApi.healthCheck.mockResolvedValue(undefined);
+      mockApi.getAuthStatus.mockResolvedValue(authStatus);
+      mockApi.getDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderHomePageWithProviders(authStatus);
+
+      await waitFor(() => {
+        // "This Month" appears as both stat label and section header
+        expect(screen.getAllByText('This Month').length).toBeGreaterThan(0);
+      });
+
       expect(screen.getByText('Top Artists')).toBeInTheDocument();
-      expect(screen.getByText('Top Artist 1')).toBeInTheDocument();
-      expect(screen.getByText('200 plays')).toBeInTheDocument();
+      expect(screen.getByText('Top Albums')).toBeInTheDocument();
     });
 
-    it('shows loading state while fetching Last.fm data', async () => {
+    it('shows quick actions when there are actionable items', async () => {
       const authStatus: AuthStatus = {
         discogs: { authenticated: true, username: 'discogs_user' },
         lastfm: { authenticated: true, username: 'lastfm_user' },
@@ -293,161 +287,73 @@ describe('HomePage', () => {
 
       mockApi.healthCheck.mockResolvedValue(undefined);
       mockApi.getAuthStatus.mockResolvedValue(authStatus);
-      mockApi.getLastfmRecentScrobbles.mockImplementation(
-        () => new Promise(() => {})
-      ); // Never resolves
+      mockApi.getDashboard.mockResolvedValue(createMockDashboardData());
 
       renderHomePageWithProviders(authStatus);
 
       await waitFor(() => {
-        expect(screen.getByText('Your Last.fm Activity')).toBeInTheDocument();
+        expect(screen.getByText('Quick Actions')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('Loading Last.fm data...')).toBeInTheDocument();
+      // Should show the action items
+      expect(screen.getByText('2 new')).toBeInTheDocument(); // seller matches
+      expect(screen.getByText('seller matches')).toBeInTheDocument();
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('shows error state when dashboard fails to load', async () => {
+      const authStatus: AuthStatus = {
+        discogs: { authenticated: true, username: 'discogs_user' },
+        lastfm: { authenticated: true, username: 'lastfm_user' },
+      };
+
+      mockApi.healthCheck.mockResolvedValue(undefined);
+      mockApi.getAuthStatus.mockResolvedValue(authStatus);
+      mockApi.getDashboard.mockRejectedValue(new Error('Network error'));
+
+      renderHomePageWithProviders(authStatus);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('Unable to load dashboard')
+        ).toBeInTheDocument();
+      });
+
+      expect(screen.getByText('Try Again')).toBeInTheDocument();
     });
 
-    it('allows changing time period for charts', async () => {
+    it('allows retry when dashboard fails', async () => {
       const user = userEvent.setup();
       const authStatus: AuthStatus = {
         discogs: { authenticated: true, username: 'discogs_user' },
         lastfm: { authenticated: true, username: 'lastfm_user' },
       };
 
-      const mockData = createMockLastfmData();
       mockApi.healthCheck.mockResolvedValue(undefined);
       mockApi.getAuthStatus.mockResolvedValue(authStatus);
-      mockApi.getLastfmRecentScrobbles.mockResolvedValue(
-        mockData.recentScrobbles
-      );
-      mockApi.getLastfmTopTracks.mockResolvedValue(mockData.topTracks);
-      mockApi.getLastfmTopArtists.mockResolvedValue(mockData.topArtists);
+      mockApi.getDashboard
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockResolvedValue(createMockDashboardData());
 
       renderHomePageWithProviders(authStatus);
 
       await waitFor(() => {
-        expect(screen.getByText('Time Period:')).toBeInTheDocument();
+        expect(screen.getByText('Try Again')).toBeInTheDocument();
       });
 
-      const periodSelect = screen.getByRole('combobox');
-      await user.selectOptions(periodSelect, '1month');
-
-      expect(mockApi.getLastfmTopTracks).toHaveBeenCalledWith('1month', 10);
-      expect(mockApi.getLastfmTopArtists).toHaveBeenCalledWith('1month', 10);
-    });
-
-    it('does not display Last.fm activity when not authenticated', async () => {
-      const authStatus: AuthStatus = {
-        discogs: { authenticated: true, username: 'discogs_user' },
-        lastfm: { authenticated: false, username: undefined },
-      };
-
-      mockApi.healthCheck.mockResolvedValue(undefined);
-      mockApi.getAuthStatus.mockResolvedValue(authStatus);
-
-      renderHomePageWithProviders(authStatus);
+      await user.click(screen.getByText('Try Again'));
 
       await waitFor(() => {
-        expect(screen.getByText('Authentication Status')).toBeInTheDocument();
+        expect(screen.getByText('Day Streak')).toBeInTheDocument();
       });
 
-      expect(
-        screen.queryByText('Your Last.fm Activity')
-      ).not.toBeInTheDocument();
+      expect(mockApi.getDashboard).toHaveBeenCalledTimes(2);
     });
   });
 
-  describe('Next Steps', () => {
-    it('shows server setup steps when server is not connected', async () => {
-      const authStatus: AuthStatus = {
-        discogs: { authenticated: false, username: undefined },
-        lastfm: { authenticated: false, username: undefined },
-      };
-
-      mockApi.healthCheck.mockRejectedValue(new Error('Connection failed'));
-
-      renderHomePageWithProviders(authStatus);
-
-      await waitFor(() => {
-        expect(screen.getByText('Next Steps')).toBeInTheDocument();
-      });
-
-      expect(
-        screen.getByText('Ensure the backend server is running')
-      ).toBeInTheDocument();
-      expect(screen.getByText('Check your connection')).toBeInTheDocument();
-    });
-
-    it('shows authentication setup steps when no services are connected', async () => {
-      const authStatus: AuthStatus = {
-        discogs: { authenticated: false, username: undefined },
-        lastfm: { authenticated: false, username: undefined },
-      };
-
-      mockApi.healthCheck.mockResolvedValue(undefined);
-      mockApi.getAuthStatus.mockResolvedValue(authStatus);
-
-      renderHomePageWithProviders(authStatus);
-
-      await waitFor(() => {
-        expect(
-          screen.getByText('Set up your Discogs and Last.fm API credentials')
-        ).toBeInTheDocument();
-      });
-
-      expect(
-        screen.getByText('Go to Setup & Authentication to get started')
-      ).toBeInTheDocument();
-    });
-
-    it('shows Discogs setup steps when only Last.fm is connected', async () => {
-      const authStatus: AuthStatus = {
-        discogs: { authenticated: false, username: undefined },
-        lastfm: { authenticated: true, username: 'lastfm_user' },
-      };
-
-      mockApi.healthCheck.mockResolvedValue(undefined);
-      mockApi.getAuthStatus.mockResolvedValue(authStatus);
-      // Mock Last.fm data since user is authenticated
-      mockApi.getLastfmRecentScrobbles.mockResolvedValue([]);
-      mockApi.getLastfmTopTracks.mockResolvedValue([]);
-      mockApi.getLastfmTopArtists.mockResolvedValue([]);
-
-      renderHomePageWithProviders(authStatus);
-
-      await waitFor(() => {
-        expect(
-          screen.getByText('Complete Discogs authentication')
-        ).toBeInTheDocument();
-      });
-
-      expect(
-        screen.getByText('Add your Discogs Personal Access Token')
-      ).toBeInTheDocument();
-    });
-
-    it('shows Last.fm setup steps when only Discogs is connected', async () => {
-      const authStatus: AuthStatus = {
-        discogs: { authenticated: true, username: 'discogs_user' },
-        lastfm: { authenticated: false, username: undefined },
-      };
-
-      mockApi.healthCheck.mockResolvedValue(undefined);
-      mockApi.getAuthStatus.mockResolvedValue(authStatus);
-
-      renderHomePageWithProviders(authStatus);
-
-      await waitFor(() => {
-        expect(
-          screen.getByText('Complete Last.fm authentication')
-        ).toBeInTheDocument();
-      });
-
-      expect(
-        screen.getByText('Connect your Last.fm account')
-      ).toBeInTheDocument();
-    });
-
-    it('shows usage steps when both services are connected', async () => {
+  describe('Connection Status', () => {
+    it('shows connection status section', async () => {
       const authStatus: AuthStatus = {
         discogs: { authenticated: true, username: 'discogs_user' },
         lastfm: { authenticated: true, username: 'lastfm_user' },
@@ -455,61 +361,84 @@ describe('HomePage', () => {
 
       mockApi.healthCheck.mockResolvedValue(undefined);
       mockApi.getAuthStatus.mockResolvedValue(authStatus);
-      mockApi.getLastfmRecentScrobbles.mockResolvedValue([]);
-      mockApi.getLastfmTopTracks.mockResolvedValue([]);
-      mockApi.getLastfmTopArtists.mockResolvedValue([]);
+      mockApi.getDashboard.mockResolvedValue(createMockDashboardData());
 
       renderHomePageWithProviders(authStatus);
 
       await waitFor(() => {
-        expect(
-          screen.getByText('Browse your Discogs collection')
-        ).toBeInTheDocument();
+        expect(screen.getByText('All services connected')).toBeInTheDocument();
       });
-
-      expect(
-        screen.getByText('Select albums to scrobble to Last.fm')
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText('View your scrobbling history')
-      ).toBeInTheDocument();
     });
   });
 
-  it('displays how it works section', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: false, username: undefined },
-      lastfm: { authenticated: false, username: undefined },
-    };
+  describe('Empty State', () => {
+    it('shows empty state when no listening data', async () => {
+      const authStatus: AuthStatus = {
+        discogs: { authenticated: true, username: 'discogs_user' },
+        lastfm: { authenticated: true, username: 'lastfm_user' },
+      };
 
-    renderHomePageWithProviders(authStatus);
+      const emptyDashboard: DashboardData = {
+        errors: {},
+        quickStats: {
+          currentStreak: 0,
+          longestStreak: 0,
+          scrobblesThisMonth: 0,
+          averageMonthlyScrobbles: 0,
+          newArtistsThisMonth: 0,
+          collectionCoverageThisMonth: 0,
+          listeningHoursThisMonth: 0,
+          totalScrobbles: 0,
+          nextMilestone: 100,
+        },
+        quickActions: {
+          newSellerMatches: 0,
+          missingAlbumsCount: 0,
+          wantListCount: 0,
+          dustyCornersCount: 0,
+        },
+        recentAlbums: [],
+        monthlyTopArtists: [],
+        monthlyTopAlbums: [],
+      };
 
-    expect(screen.getByText('How It Works')).toBeInTheDocument();
-    expect(screen.getByText('1. Connect Your Accounts')).toBeInTheDocument();
-    expect(screen.getByText('2. Browse Your Collection')).toBeInTheDocument();
-    expect(screen.getByText('3. Select & Scrobble')).toBeInTheDocument();
+      mockApi.healthCheck.mockResolvedValue(undefined);
+      mockApi.getAuthStatus.mockResolvedValue(authStatus);
+      mockApi.getDashboard.mockResolvedValue(emptyDashboard);
+
+      renderHomePageWithProviders(authStatus);
+
+      await waitFor(() => {
+        expect(screen.getByText('No listening data yet')).toBeInTheDocument();
+      });
+
+      expect(screen.getByText('Browse Collection')).toBeInTheDocument();
+    });
   });
 
-  it('updates auth status when server check succeeds', async () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: false, username: undefined },
-      lastfm: { authenticated: false, username: undefined },
-    };
+  describe('Auth Status Updates', () => {
+    it('updates auth status when server check succeeds', async () => {
+      const authStatus: AuthStatus = {
+        discogs: { authenticated: false, username: undefined },
+        lastfm: { authenticated: false, username: undefined },
+      };
 
-    const newAuthStatus: AuthStatus = {
-      discogs: { authenticated: true, username: 'test_user' },
-      lastfm: { authenticated: false, username: undefined },
-    };
+      const newAuthStatus: AuthStatus = {
+        discogs: { authenticated: true, username: 'test_user' },
+        lastfm: { authenticated: false, username: undefined },
+      };
 
-    mockApi.healthCheck.mockResolvedValue(undefined);
-    mockApi.getAuthStatus.mockResolvedValue(newAuthStatus);
+      mockApi.healthCheck.mockResolvedValue(undefined);
+      mockApi.getAuthStatus.mockResolvedValue(newAuthStatus);
+      mockApi.getDashboard.mockResolvedValue(createMockDashboardData());
 
-    const { authContextValue } = renderHomePageWithProviders(authStatus);
+      const { authContextValue } = renderHomePageWithProviders(authStatus);
 
-    await waitFor(() => {
-      expect(authContextValue.setAuthStatus).toHaveBeenCalledWith(
-        newAuthStatus
-      );
+      await waitFor(() => {
+        expect(authContextValue.setAuthStatus).toHaveBeenCalledWith(
+          newAuthStatus
+        );
+      });
     });
   });
 });

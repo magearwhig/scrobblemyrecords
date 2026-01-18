@@ -1,8 +1,20 @@
 import express, { Request, Response } from 'express';
 
-import { CollectionItem } from '../../shared/types';
+import {
+  CollectionItem,
+  DashboardData,
+  DashboardQuickActions,
+  DashboardQuickStats,
+  DashboardRecentAlbum,
+  DashboardTopAlbum,
+  DashboardTopArtist,
+} from '../../shared/types';
+import { AnalyticsService } from '../services/analyticsService';
 import { AuthService } from '../services/authService';
+import { ScrobbleHistoryStorage } from '../services/scrobbleHistoryStorage';
+import { SellerMonitoringService } from '../services/sellerMonitoringService';
 import { StatsService } from '../services/statsService';
+import { WishlistService } from '../services/wishlistService';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -12,7 +24,11 @@ import { createLogger } from '../utils/logger';
 export default function createStatsRouter(
   fileStorage: FileStorage,
   authService: AuthService,
-  statsService: StatsService
+  statsService: StatsService,
+  historyStorage?: ScrobbleHistoryStorage,
+  wishlistService?: WishlistService,
+  sellerMonitoringService?: SellerMonitoringService,
+  analyticsService?: AnalyticsService
 ) {
   const router = express.Router();
   const logger = createLogger('StatsRoutes');
@@ -38,6 +54,261 @@ export default function createStatsRouter(
 
     return allItems;
   }
+
+  // ============================================
+  // Dashboard (Homepage)
+  // ============================================
+
+  /**
+   * GET /api/v1/stats/dashboard
+   * Get aggregated dashboard data for the homepage.
+   * Each section can fail independently - errors are isolated per section.
+   */
+  router.get('/dashboard', async (req: Request, res: Response) => {
+    const result: DashboardData = {
+      errors: {},
+      quickStats: null,
+      quickActions: null,
+      recentAlbums: null,
+      monthlyTopArtists: null,
+      monthlyTopAlbums: null,
+    };
+
+    try {
+      const settings = await authService.getUserSettings();
+      const username = settings.discogs.username;
+
+      // Fetch all sections in parallel with error isolation
+      const [
+        quickStatsResult,
+        quickActionsResult,
+        recentAlbumsResult,
+        monthlyTopResult,
+      ] = await Promise.allSettled([
+        // Quick stats
+        (async (): Promise<DashboardQuickStats> => {
+          const [streaks, counts, hours, newArtists, milestones, coverage] =
+            await Promise.all([
+              statsService.calculateStreaks(),
+              statsService.getScrobbleCounts(),
+              statsService.getListeningHours(),
+              statsService.getNewArtistsThisMonth(),
+              statsService.getMilestones(),
+              username
+                ? statsService.getCollectionCoverage(
+                    await loadCollection(username)
+                  )
+                : Promise.resolve({
+                    thisMonth: 0,
+                    thisYear: 0,
+                    allTime: 0,
+                    days30: 0,
+                    days90: 0,
+                    days365: 0,
+                    albumsPlayedThisMonth: 0,
+                    albumsPlayedThisYear: 0,
+                    albumsPlayedAllTime: 0,
+                    albumsPlayedDays30: 0,
+                    albumsPlayedDays90: 0,
+                    albumsPlayedDays365: 0,
+                    totalAlbums: 0,
+                  }),
+            ]);
+
+          // Calculate average monthly scrobbles from all-time / months since oldest
+          let avgMonthly = 0;
+          if (historyStorage) {
+            const oldestDate = await historyStorage.getOldestScrobbleDate();
+            if (oldestDate && counts.allTime > 0) {
+              const monthsSince = Math.max(
+                1,
+                (Date.now() - oldestDate.getTime()) / (30 * 24 * 60 * 60 * 1000)
+              );
+              avgMonthly = Math.round(counts.allTime / monthsSince);
+            }
+          }
+
+          return {
+            currentStreak: streaks.currentStreak,
+            longestStreak: streaks.longestStreak,
+            scrobblesThisMonth: counts.thisMonth,
+            averageMonthlyScrobbles: avgMonthly,
+            newArtistsThisMonth: newArtists,
+            collectionCoverageThisMonth: coverage.thisMonth,
+            listeningHoursThisMonth: hours.thisMonth,
+            totalScrobbles: counts.allTime,
+            nextMilestone: milestones.nextMilestone,
+          };
+        })(),
+
+        // Quick actions
+        (async (): Promise<DashboardQuickActions> => {
+          // Get seller matches count
+          let newSellerMatches = 0;
+          if (sellerMonitoringService) {
+            const matches = await sellerMonitoringService.getAllMatches();
+            newSellerMatches = matches.filter(
+              m => m.status === 'active'
+            ).length;
+          }
+
+          // Get missing albums count using analytics service
+          let missingAlbumsCount = 0;
+          if (analyticsService && username) {
+            const collection = await loadCollection(username);
+            // Get a count of missing albums (capped at 100 for performance)
+            const missingAlbums = await analyticsService.getMissingAlbums(
+              collection,
+              100
+            );
+            missingAlbumsCount = missingAlbums.length;
+          }
+
+          // Get want list count (Discogs wantlist + local want list)
+          let wantListCount = 0;
+          if (wishlistService) {
+            const [discogs, local] = await Promise.all([
+              wishlistService.getWishlistItems(),
+              wishlistService.getLocalWantList(),
+            ]);
+            wantListCount = discogs.length + local.length;
+          }
+
+          // Get dusty corners count
+          let dustyCornersCount = 0;
+          if (username) {
+            const collection = await loadCollection(username);
+            const dustyCorners = await statsService.getDustyCorners(
+              collection,
+              100
+            );
+            dustyCornersCount = dustyCorners.length;
+          }
+
+          return {
+            newSellerMatches,
+            missingAlbumsCount,
+            wantListCount,
+            dustyCornersCount,
+          };
+        })(),
+
+        // Recent albums
+        (async (): Promise<DashboardRecentAlbum[]> => {
+          if (!historyStorage) {
+            return [];
+          }
+
+          const recentAlbums = await historyStorage.getRecentlyPlayedAlbums(5);
+
+          // Check which albums are in collection
+          const collection = username ? await loadCollection(username) : [];
+          const collectionMap = new Map<string, CollectionItem>();
+          for (const item of collection) {
+            const key = `${item.release.artist.toLowerCase()}|${item.release.title.toLowerCase()}`;
+            collectionMap.set(key, item);
+          }
+
+          return recentAlbums.map(album => {
+            const key = `${album.artist.toLowerCase()}|${album.album.toLowerCase()}`;
+            const collectionItem = collectionMap.get(key);
+
+            return {
+              artist: album.artist,
+              album: album.album,
+              coverUrl: collectionItem?.release.cover_image || null,
+              lastPlayed: album.lastPlayed,
+              releaseId: collectionItem?.release.id,
+              inCollection: !!collectionItem,
+            };
+          });
+        })(),
+
+        // Monthly top lists
+        (async (): Promise<{
+          artists: DashboardTopArtist[];
+          albums: DashboardTopAlbum[];
+        }> => {
+          const [topArtists, topAlbums] = await Promise.all([
+            statsService.getTopArtists('month', 5),
+            statsService.getTopAlbums('month', 5),
+          ]);
+
+          // Get cover images for top albums from collection
+          const collection = username ? await loadCollection(username) : [];
+          const collectionMap = new Map<string, CollectionItem>();
+          for (const item of collection) {
+            const key = `${item.release.artist.toLowerCase()}|${item.release.title.toLowerCase()}`;
+            collectionMap.set(key, item);
+          }
+
+          return {
+            artists: topArtists.map(a => ({
+              name: a.artist,
+              playCount: a.playCount,
+              imageUrl: null, // Artist images would require Last.fm API call
+            })),
+            albums: topAlbums.map(a => {
+              const key = `${a.artist.toLowerCase()}|${a.album.toLowerCase()}`;
+              const collectionItem = collectionMap.get(key);
+              return {
+                artist: a.artist,
+                album: a.album,
+                playCount: a.playCount,
+                coverUrl: collectionItem?.release.cover_image || null,
+              };
+            }),
+          };
+        })(),
+      ]);
+
+      // Map results with error handling
+      if (quickStatsResult.status === 'fulfilled') {
+        result.quickStats = quickStatsResult.value;
+      } else {
+        result.errors.quickStats =
+          quickStatsResult.reason?.message || 'Failed to load stats';
+        logger.error('Dashboard quickStats error', quickStatsResult.reason);
+      }
+
+      if (quickActionsResult.status === 'fulfilled') {
+        result.quickActions = quickActionsResult.value;
+      } else {
+        result.errors.quickActions =
+          quickActionsResult.reason?.message || 'Failed to load actions';
+        logger.error('Dashboard quickActions error', quickActionsResult.reason);
+      }
+
+      if (recentAlbumsResult.status === 'fulfilled') {
+        result.recentAlbums = recentAlbumsResult.value;
+      } else {
+        result.errors.recentAlbums =
+          recentAlbumsResult.reason?.message || 'Failed to load recent albums';
+        logger.error('Dashboard recentAlbums error', recentAlbumsResult.reason);
+      }
+
+      if (monthlyTopResult.status === 'fulfilled') {
+        result.monthlyTopArtists = monthlyTopResult.value.artists;
+        result.monthlyTopAlbums = monthlyTopResult.value.albums;
+      } else {
+        result.errors.monthlyTop =
+          monthlyTopResult.reason?.message ||
+          'Failed to load monthly highlights';
+        logger.error('Dashboard monthlyTop error', monthlyTopResult.reason);
+      }
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      logger.error('Error getting dashboard data', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
 
   // ============================================
   // Stats Overview

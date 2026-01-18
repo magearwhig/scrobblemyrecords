@@ -17,3 +17,9 @@
 - use `writeJSONWithBackup()` for critical data files (creates `.bak` before overwriting)
 - add new store types to `src/shared/types.ts` extending `VersionedStore` interface
 - cache files should have defined retention periods and be added to `cleanupService.ts` if they need automated cleanup
+
+## UI Navigation Guidelines
+Before adding any new page or navigation item:
+1. Ask: "Which area does this belong to?" (Dashboard, Library, Listen, Discover, Marketplace, Settings)
+2. Ask: "Can this be a tab/section inside an existing area?"
+3. Only add a new top-level area if it represents a genuinely new mental model for users

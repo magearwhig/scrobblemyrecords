@@ -1,40 +1,67 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
+import { DashboardData, MilestoneInfo } from '../../shared/types';
+import {
+  ConnectionStatus,
+  DashboardStatCard,
+  MonthlyHighlights,
+  QuickActionsGrid,
+  RecentAlbums,
+} from '../components/dashboard';
+import { CalendarHeatmap } from '../components/stats/CalendarHeatmap';
+import { MilestoneProgress } from '../components/stats/MilestoneProgress';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
-import { formatLocalTimeClean, getTimezoneOffset } from '../utils/dateUtils';
+import { getTimezoneOffset } from '../utils/dateUtils';
 
 const HomePage: React.FC = () => {
   const { authStatus, setAuthStatus } = useAuth();
   const { state } = useApp();
+
+  // Navigation helper using hash-based routing
+  const navigate = useCallback((path: string) => {
+    window.location.hash = path.startsWith('/') ? path.slice(1) : path;
+  }, []);
+
   const [serverStatus, setServerStatus] = useState<
     'checking' | 'connected' | 'error'
   >('checking');
-  const [serverError, setServerError] = useState<string>('');
-  const [lastfmData, setLastfmData] = useState<{
-    recentScrobbles: any[];
-    topTracks: any[];
-    topArtists: any[];
-  }>({
-    recentScrobbles: [],
-    topTracks: [],
-    topArtists: [],
-  });
-  const [lastfmLoading, setLastfmLoading] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState<
-    '7day' | '1month' | '3month' | '6month' | '12month'
-  >('7day');
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(
+    null
+  );
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [heatmapData, setHeatmapData] = useState<
+    Array<{ date: string; count: number }>
+  >([]);
+  const [milestoneData, setMilestoneData] = useState<MilestoneInfo | null>(
+    null
+  );
+  const [secondaryDataLoaded, setSecondaryDataLoaded] = useState(false);
 
+  // Check server connection and load auth status
   useEffect(() => {
     checkServerAndAuth();
   }, [state.serverUrl]);
 
+  // Load dashboard data when server is connected and we have auth
   useEffect(() => {
-    if (authStatus.lastfm.authenticated) {
-      loadLastfmData();
+    if (serverStatus === 'connected') {
+      loadDashboardData();
     }
-  }, [authStatus.lastfm.authenticated, selectedPeriod]);
+  }, [
+    serverStatus,
+    authStatus.discogs.authenticated,
+    authStatus.lastfm.authenticated,
+  ]);
+
+  // Load secondary data (heatmap, milestones) after dashboard renders - non-blocking
+  useEffect(() => {
+    if (dashboardData && !secondaryDataLoaded) {
+      loadSecondaryData();
+    }
+  }, [dashboardData, secondaryDataLoaded]);
 
   const checkServerAndAuth = async () => {
     try {
@@ -48,456 +75,288 @@ const HomePage: React.FC = () => {
       // Get auth status
       const status = await api.getAuthStatus();
       setAuthStatus(status);
-    } catch (error) {
+    } catch {
       setServerStatus('error');
-      setServerError(error instanceof Error ? error.message : 'Unknown error');
     }
   };
 
-  const loadLastfmData = async () => {
-    if (!authStatus.lastfm.authenticated) return;
-
+  const loadDashboardData = async () => {
     try {
-      setLastfmLoading(true);
+      setDashboardLoading(true);
+      setDashboardError(null);
+      setSecondaryDataLoaded(false);
       const api = getApiService(state.serverUrl);
 
-      const [recentScrobbles, topTracks, topArtists] = await Promise.all([
-        api.getLastfmRecentScrobbles(10),
-        api.getLastfmTopTracks(selectedPeriod, 10),
-        api.getLastfmTopArtists(selectedPeriod, 10),
-      ]);
-
-      setLastfmData({
-        recentScrobbles,
-        topTracks,
-        topArtists,
-      });
+      // Load only critical dashboard data first for fast initial render
+      const dashboard = await api.getDashboard();
+      setDashboardData(dashboard);
     } catch (error) {
-      console.error('Error loading Last.fm data:', error);
+      setDashboardError(
+        error instanceof Error ? error.message : 'Failed to load dashboard'
+      );
     } finally {
-      setLastfmLoading(false);
+      setDashboardLoading(false);
     }
   };
 
-  const getNextSteps = () => {
-    if (serverStatus !== 'connected') {
-      return ['Ensure the backend server is running', 'Check your connection'];
-    }
+  // Load secondary data (heatmap, milestones) non-blocking after dashboard renders
+  const loadSecondaryData = async () => {
+    const api = getApiService(state.serverUrl);
 
-    if (!authStatus.discogs.authenticated && !authStatus.lastfm.authenticated) {
-      return [
-        'Set up your Discogs and Last.fm API credentials',
-        'Go to Setup & Authentication to get started',
-      ];
-    }
+    // Load heatmap and milestones in parallel, but don't block on failures
+    const [heatmap, milestones] = await Promise.all([
+      loadHeatmapData(api),
+      loadMilestoneData(api),
+    ]);
 
-    if (!authStatus.discogs.authenticated) {
-      return [
-        'Complete Discogs authentication',
-        'Add your Discogs Personal Access Token',
-      ];
-    }
-
-    if (!authStatus.lastfm.authenticated) {
-      return [
-        'Complete Last.fm authentication',
-        'Connect your Last.fm account',
-      ];
-    }
-
-    return [
-      'Browse your Discogs collection',
-      'Select albums to scrobble to Last.fm',
-      'View your scrobbling history',
-    ];
+    setHeatmapData(heatmap);
+    setMilestoneData(milestones);
+    setSecondaryDataLoaded(true);
   };
 
-  const nextSteps = getNextSteps();
+  const loadHeatmapData = async (
+    api: ReturnType<typeof getApiService>
+  ): Promise<Array<{ date: string; count: number }>> => {
+    try {
+      // Use correct endpoint path: /stats/heatmap (not /stats/calendar-heatmap)
+      const response = await api['api'].get('/stats/heatmap');
+      return response.data.data || [];
+    } catch {
+      return [];
+    }
+  };
+
+  const loadMilestoneData = async (
+    api: ReturnType<typeof getApiService>
+  ): Promise<MilestoneInfo | null> => {
+    try {
+      const response = await api['api'].get('/stats/milestones');
+      return response.data.data || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const formatNumber = (n: number): string => {
+    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+    if (n >= 1000) return `${(n / 1000).toFixed(0)}K`;
+    return n.toLocaleString();
+  };
+
+  // Determine if user has completed onboarding
+  const isOnboarded =
+    authStatus.discogs.authenticated && authStatus.lastfm.authenticated;
+
+  // If not onboarded, show the onboarding view
+  if (!isOnboarded && serverStatus === 'connected') {
+    return (
+      <div className='dashboard'>
+        <ConnectionStatus
+          authStatus={authStatus}
+          serverConnected={true}
+          isLoading={false}
+        />
+
+        <div className='dashboard-empty'>
+          <div className='dashboard-empty-icon'>🎵</div>
+          <h2>Welcome to RecordScrobbles</h2>
+          <p>
+            Connect your Discogs and Last.fm accounts to start tracking your
+            vinyl listening habits.
+          </p>
+          <button
+            type='button'
+            className='btn'
+            onClick={() => navigate('/settings')}
+          >
+            Connect Accounts
+          </button>
+        </div>
+
+        <div className='dashboard-section'>
+          <h3 className='dashboard-section-header'>How It Works</h3>
+          <div className='dashboard-highlights-grid'>
+            <div className='dashboard-highlights-column'>
+              <h4 className='dashboard-highlights-title'>1. Connect</h4>
+              <p className='dashboard-section-subtitle'>
+                Link your Discogs collection and Last.fm profile.
+              </p>
+            </div>
+            <div className='dashboard-highlights-column'>
+              <h4 className='dashboard-highlights-title'>2. Scrobble</h4>
+              <p className='dashboard-section-subtitle'>
+                Select albums from your collection to log what you&apos;re
+                listening to.
+              </p>
+            </div>
+            <div className='dashboard-highlights-column'>
+              <h4 className='dashboard-highlights-title'>3. Discover</h4>
+              <p className='dashboard-section-subtitle'>
+                Get insights about your listening habits and discover patterns.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state
+  if (dashboardLoading) {
+    return (
+      <div className='dashboard'>
+        <div className='dashboard-loading'>
+          <div className='dashboard-loading-spinner' />
+          <p>Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (dashboardError) {
+    return (
+      <div className='dashboard'>
+        <div className='dashboard-error'>
+          <div className='dashboard-error-icon'>⚠️</div>
+          <h2>Unable to load dashboard</h2>
+          <p>{dashboardError}</p>
+          <button type='button' className='btn' onClick={loadDashboardData}>
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const quickStats = dashboardData?.quickStats;
 
   return (
-    <div>
-      <div className='card'>
-        <h2>Welcome to Discogs to Last.fm Scrobbler</h2>
-        <p>
-          This application allows you to connect your Discogs collection with
-          your Last.fm profile, enabling you to scrobble tracks from your
-          physical music collection.
-        </p>
+    <div className='dashboard'>
+      {/* Connection Status (collapsed when all connected) */}
+      <ConnectionStatus
+        authStatus={authStatus}
+        serverConnected={serverStatus === 'connected'}
+        isLoading={serverStatus === 'checking'}
+      />
 
-        <div style={{ marginTop: '1.5rem' }}>
-          <h3>Server Status</h3>
-          {serverStatus === 'checking' && (
-            <div className='loading'>
-              <div className='spinner'></div>
-              Checking server connection...
-            </div>
-          )}
-
-          {serverStatus === 'connected' && (
-            <div className='success-message'>
-              ✓ Successfully connected to backend server
-            </div>
-          )}
-
-          {serverStatus === 'error' && (
-            <div className='error-message'>
-              ✗ Unable to connect to backend server: {serverError}
-              <button
-                className='btn btn-small'
-                onClick={checkServerAndAuth}
-                style={{ marginLeft: '1rem' }}
-              >
-                Retry
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {serverStatus === 'connected' && (
-        <div className='card'>
-          <h3>Authentication Status</h3>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '1rem',
-              marginBottom: '1rem',
-            }}
-          >
-            <div>
-              <h4>Discogs</h4>
-              <div
-                className={`status ${authStatus.discogs.authenticated ? 'connected' : 'disconnected'}`}
-              >
-                <span className='status-dot'></span>
-                {authStatus.discogs.authenticated
-                  ? 'Connected'
-                  : 'Not connected'}
-              </div>
-              {authStatus.discogs.username && (
-                <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
-                  User: {authStatus.discogs.username}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <h4>Last.fm</h4>
-              <div
-                className={`status ${authStatus.lastfm.authenticated ? 'connected' : 'disconnected'}`}
-              >
-                <span className='status-dot'></span>
-                {authStatus.lastfm.authenticated
-                  ? 'Connected'
-                  : 'Not connected'}
-              </div>
-              {authStatus.lastfm.username && (
-                <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
-                  User: {authStatus.lastfm.username}
-                </div>
-              )}
-            </div>
-          </div>
+      {/* Quick Stats Row */}
+      {quickStats && (
+        <div className='dashboard-stats-row'>
+          <DashboardStatCard
+            icon='🔥'
+            value={quickStats.currentStreak}
+            label='Day Streak'
+            subValue={
+              quickStats.longestStreak > quickStats.currentStreak
+                ? `Best: ${quickStats.longestStreak}`
+                : undefined
+            }
+            onClick={() => navigate('/stats')}
+          />
+          <DashboardStatCard
+            icon='📊'
+            value={formatNumber(quickStats.scrobblesThisMonth)}
+            label='This Month'
+            subValue={`Avg: ${formatNumber(quickStats.averageMonthlyScrobbles)}`}
+          />
+          <DashboardStatCard
+            icon='🎤'
+            value={quickStats.newArtistsThisMonth}
+            label='New Artists'
+            subValue='This month'
+          />
+          <DashboardStatCard
+            icon='📀'
+            value={`${quickStats.collectionCoverageThisMonth}%`}
+            label='Collection Played'
+            subValue='This month'
+          />
+          <DashboardStatCard
+            icon='⏱️'
+            value={`${quickStats.listeningHoursThisMonth}h`}
+            label='Listening Time'
+            subValue='This month'
+          />
+          <DashboardStatCard
+            icon='🎯'
+            value={formatNumber(quickStats.totalScrobbles)}
+            label='All Time'
+            subValue={
+              quickStats.nextMilestone
+                ? `Next: ${formatNumber(quickStats.nextMilestone)}`
+                : undefined
+            }
+            onClick={() => navigate('/stats')}
+          />
         </div>
       )}
 
-      {authStatus.lastfm.authenticated && (
-        <div className='card'>
-          <h3>Your Last.fm Activity</h3>
-
-          {lastfmLoading ? (
-            <div className='loading'>
-              <div className='spinner'></div>
-              Loading Last.fm data...
-            </div>
-          ) : (
-            <>
-              {/* Recent Scrobbles */}
-              <div style={{ marginBottom: '2rem' }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '1rem',
-                  }}
-                >
-                  <h4>Recent Scrobbles</h4>
-                  <span
-                    style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}
-                  >
-                    Times shown in {getTimezoneOffset()}
-                  </span>
-                </div>
-                <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                  {lastfmData.recentScrobbles.map((track, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '0.75rem',
-                        borderBottom:
-                          index < lastfmData.recentScrobbles.length - 1
-                            ? '1px solid var(--border-color)'
-                            : 'none',
-                        backgroundColor: 'var(--bg-secondary)',
-                      }}
-                    >
-                      {track.image?.[2]?.['#text'] && (
-                        <img
-                          src={track.image[2]['#text']}
-                          alt={track.name}
-                          style={{
-                            width: '40px',
-                            height: '40px',
-                            marginRight: '1rem',
-                            borderRadius: '4px',
-                          }}
-                        />
-                      )}
-                      <div style={{ flex: 1 }}>
-                        <div
-                          style={{
-                            fontWeight: '500',
-                            color: 'var(--text-primary)',
-                          }}
-                        >
-                          {track.name}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: '0.9rem',
-                            color: 'var(--text-secondary)',
-                          }}
-                        >
-                          {track.artist['#text']}
-                        </div>
-                        {track.album && (
-                          <div
-                            style={{
-                              fontSize: '0.8rem',
-                              color: 'var(--text-muted)',
-                            }}
-                          >
-                            {track.album['#text']}
-                          </div>
-                        )}
-                      </div>
-                      {track.date && (
-                        <div
-                          style={{
-                            fontSize: '0.8rem',
-                            color: 'var(--text-muted)',
-                          }}
-                        >
-                          {formatLocalTimeClean(new Date(track.date['#text']))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Charts Period Selector */}
-              <div style={{ marginBottom: '1rem' }}>
-                <label
-                  style={{
-                    marginRight: '1rem',
-                    color: 'var(--text-secondary)',
-                  }}
-                >
-                  Time Period:
-                </label>
-                <select
-                  value={selectedPeriod}
-                  onChange={e => setSelectedPeriod(e.target.value as any)}
-                  style={{
-                    padding: '0.5rem',
-                    borderRadius: '4px',
-                    border: '1px solid var(--border-color)',
-                    backgroundColor: 'var(--bg-secondary)',
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  <option value='7day'>Last 7 Days</option>
-                  <option value='1month'>Last Month</option>
-                  <option value='3month'>Last 3 Months</option>
-                  <option value='6month'>Last 6 Months</option>
-                  <option value='12month'>Last Year</option>
-                </select>
-              </div>
-
-              {/* Top Tracks and Artists */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '2rem',
-                }}
-              >
-                <div>
-                  <h4>Top Tracks</h4>
-                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                    {lastfmData.topTracks.map((track, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          padding: '0.5rem',
-                          borderBottom:
-                            index < lastfmData.topTracks.length - 1
-                              ? '1px solid var(--border-color)'
-                              : 'none',
-                          backgroundColor: 'var(--bg-secondary)',
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            backgroundColor: 'var(--accent-color)',
-                            color: 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.8rem',
-                            fontWeight: 'bold',
-                            marginRight: '0.75rem',
-                          }}
-                        >
-                          {index + 1}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div
-                            style={{
-                              fontWeight: '500',
-                              color: 'var(--text-primary)',
-                            }}
-                          >
-                            {track.name}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: '0.9rem',
-                              color: 'var(--text-secondary)',
-                            }}
-                          >
-                            {track.artist.name}
-                          </div>
-                        </div>
-                        <div
-                          style={{
-                            fontSize: '0.8rem',
-                            color: 'var(--text-muted)',
-                          }}
-                        >
-                          {track.playcount} plays
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <h4>Top Artists</h4>
-                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                    {lastfmData.topArtists.map((artist, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          padding: '0.5rem',
-                          borderBottom:
-                            index < lastfmData.topArtists.length - 1
-                              ? '1px solid var(--border-color)'
-                              : 'none',
-                          backgroundColor: 'var(--bg-secondary)',
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            backgroundColor: 'var(--accent-color)',
-                            color: 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.8rem',
-                            fontWeight: 'bold',
-                            marginRight: '0.75rem',
-                          }}
-                        >
-                          {index + 1}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div
-                            style={{
-                              fontWeight: '500',
-                              color: 'var(--text-primary)',
-                            }}
-                          >
-                            {artist.name}
-                          </div>
-                        </div>
-                        <div
-                          style={{
-                            fontSize: '0.8rem',
-                            color: 'var(--text-muted)',
-                          }}
-                        >
-                          {artist.playcount} plays
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+      {/* Quick Actions */}
+      {dashboardData?.quickActions && (
+        <QuickActionsGrid actions={dashboardData.quickActions} />
       )}
 
-      <div className='card'>
-        <h3>Next Steps</h3>
-        <ol style={{ paddingLeft: '1.5rem' }}>
-          {nextSteps.map((step, index) => (
-            <li key={index} style={{ marginBottom: '0.5rem' }}>
-              {step}
-            </li>
-          ))}
-        </ol>
+      {/* Main Content Grid */}
+      <div className='dashboard-grid'>
+        {/* Recent Albums */}
+        {dashboardData?.recentAlbums &&
+          dashboardData.recentAlbums.length > 0 && (
+            <RecentAlbums
+              albums={dashboardData.recentAlbums}
+              timezone={getTimezoneOffset()}
+            />
+          )}
+
+        {/* Monthly Highlights */}
+        {((dashboardData?.monthlyTopArtists &&
+          dashboardData.monthlyTopArtists.length > 0) ||
+          (dashboardData?.monthlyTopAlbums &&
+            dashboardData.monthlyTopAlbums.length > 0)) && (
+          <MonthlyHighlights
+            artists={dashboardData.monthlyTopArtists || []}
+            albums={dashboardData.monthlyTopAlbums || []}
+          />
+        )}
+
+        {/* Calendar Heatmap */}
+        {heatmapData.length > 0 && (
+          <div className='dashboard-section dashboard-grid-full'>
+            <CalendarHeatmap
+              data={heatmapData}
+              year={new Date().getFullYear()}
+            />
+          </div>
+        )}
+
+        {/* Milestone Progress */}
+        {milestoneData && (
+          <div className='dashboard-section dashboard-grid-full'>
+            <MilestoneProgress milestones={milestoneData} />
+          </div>
+        )}
       </div>
 
-      <div className='card'>
-        <h3>How It Works</h3>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: '1rem',
-          }}
-        >
-          <div>
-            <h4>1. Connect Your Accounts</h4>
-            <p>Link your Discogs and Last.fm accounts using API credentials.</p>
+      {/* Empty state if no data */}
+      {!dashboardData?.recentAlbums?.length &&
+        !dashboardData?.monthlyTopArtists?.length &&
+        !heatmapData.length && (
+          <div className='dashboard-empty'>
+            <div className='dashboard-empty-icon'>📻</div>
+            <h2>No listening data yet</h2>
+            <p>
+              Start scrobbling your vinyl collection to see your listening
+              activity here.
+            </p>
+            <button
+              type='button'
+              className='btn'
+              onClick={() => navigate('/collection')}
+            >
+              Browse Collection
+            </button>
           </div>
-          <div>
-            <h4>2. Browse Your Collection</h4>
-            <p>View and search through your Discogs collection.</p>
-          </div>
-          <div>
-            <h4>3. Select & Scrobble</h4>
-            <p>Choose albums or tracks to scrobble to your Last.fm profile.</p>
-          </div>
-        </div>
-      </div>
+        )}
     </div>
   );
 };

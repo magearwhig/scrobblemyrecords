@@ -13,6 +13,7 @@ import {
   BackupPreview,
   BackupSettings,
   CollectionItem,
+  DashboardData,
   DiscogsRelease,
   EnrichedWishlistItem,
   ForgottenTrack,
@@ -700,6 +701,15 @@ class ApiService {
       params: { dormantDays, minPlays, limit },
     });
     return { tracks: response.data.data, meta: response.data.meta };
+  }
+
+  /**
+   * Get aggregated dashboard data for the homepage.
+   * Returns all sections needed for the dashboard in a single call.
+   */
+  async getDashboard(): Promise<DashboardData> {
+    const response = await this.api.get('/stats/dashboard');
+    return response.data.data;
   }
 
   // ============================================

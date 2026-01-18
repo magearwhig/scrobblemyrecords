@@ -241,7 +241,15 @@ app.use(
 app.use('/api/v1/artist-mappings', artistMappingRoutes);
 app.use(
   '/api/v1/stats',
-  createStatsRouter(fileStorage, authService, statsService)
+  createStatsRouter(
+    fileStorage,
+    authService,
+    statsService,
+    historyStorage,
+    wishlistService,
+    sellerMonitoringService,
+    analyticsService
+  )
 );
 app.use(
   '/api/v1/images',

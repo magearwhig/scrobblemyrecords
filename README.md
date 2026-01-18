@@ -107,7 +107,7 @@ npm run start:web
 ## 🎯 Features
 
 ### Core Features
-- **Home Dashboard**: Server status plus Last.fm recent scrobbles/top tracks/top artists
+- **Home Dashboard**: Engaging dashboard with quick stats, quick actions, recent albums, and monthly highlights
 - **Collection Browser**: Search and filter your Discogs collection
 - **Release Details**: Side/disc track selection and per-album scrobble history
 - **Track Selection**: Choose individual tracks or entire albums
@@ -124,6 +124,32 @@ npm run start:web
 - **Artist Name Mapping**: Map Discogs artist names to Last.fm names for consistent scrobbling
 - **Disambiguation Warnings**: Alerts when scrobbling artists with Discogs disambiguation suffixes (e.g., "Ghost (32)")
 - **Possible Mappings**: Automatically suggests artists in your collection that may need name mappings
+
+### 🏠 Home Dashboard
+Your personalized dashboard showing key metrics and insights at a glance:
+
+**Quick Stats:**
+- Current listening streak and monthly scrobble count
+- New artists discovered this month
+- Collection coverage percentage
+- Total listening hours
+
+**Quick Actions:**
+- Seller matches from monitored local record shops
+- Missing albums from your listening history
+- Dusty corners (albums you haven't played recently)
+- One-click navigation to relevant pages
+
+**Recent Activity:**
+- Last 5 albums you played (album-focused view)
+- Monthly top 5 artists and albums
+- Calendar heatmap of listening activity
+- Progress toward scrobble milestones
+
+**Connection Status:**
+- Server and API connection status
+- Discogs and Last.fm authentication
+- Auto-collapses when all services connected
 
 ### 📈 Stats Dashboard
 Comprehensive listening statistics and visualizations:

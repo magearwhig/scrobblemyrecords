@@ -959,4 +959,167 @@ describe('Stats Routes', () => {
       expect(response.body.error).toContain('Forgotten favorites error');
     });
   });
+
+  describe('GET /api/v1/stats/dashboard', () => {
+    it('should return dashboard data with quick stats', async () => {
+      // Arrange - mock collection page
+      mockFileStorage.readJSON
+        .mockResolvedValueOnce({
+          data: [
+            {
+              id: 1,
+              release: {
+                id: 123,
+                artist: 'Test Artist',
+                title: 'Test Album',
+                cover_image: 'https://example.com/cover.jpg',
+              },
+            },
+          ],
+          timestamp: Date.now(),
+        })
+        .mockResolvedValueOnce(null); // No more pages
+
+      mockStatsService.getNewArtistsThisMonth = jest.fn().mockResolvedValue(3);
+
+      // Act
+      const response = await request(app).get('/api/v1/stats/dashboard');
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('quickStats');
+      expect(response.body.data).toHaveProperty('quickActions');
+      expect(response.body.data).toHaveProperty('recentAlbums');
+      expect(response.body.data).toHaveProperty('monthlyTopArtists');
+      expect(response.body.data).toHaveProperty('monthlyTopAlbums');
+    });
+
+    it('should return quick stats with correct values', async () => {
+      // Arrange - mock collection page
+      mockFileStorage.readJSON
+        .mockResolvedValueOnce({
+          data: [
+            {
+              id: 1,
+              release: {
+                id: 123,
+                artist: 'Test Artist',
+                title: 'Test Album',
+                cover_image: 'https://example.com/cover.jpg',
+              },
+            },
+          ],
+          timestamp: Date.now(),
+        })
+        .mockResolvedValueOnce(null); // No more pages
+
+      mockStatsService.getNewArtistsThisMonth = jest.fn().mockResolvedValue(7);
+      mockStatsService.getCollectionCoverage = jest.fn().mockResolvedValue({
+        thisMonth: 30,
+        thisYear: 60,
+        allTime: 80,
+        days30: 35,
+        days90: 50,
+        days365: 70,
+        albumsPlayedThisMonth: 15,
+        albumsPlayedThisYear: 30,
+        albumsPlayedAllTime: 40,
+        albumsPlayedDays30: 18,
+        albumsPlayedDays90: 25,
+        albumsPlayedDays365: 35,
+        totalAlbums: 50,
+      });
+
+      // Act
+      const response = await request(app).get('/api/v1/stats/dashboard');
+
+      // Assert
+      expect(response.status).toBe(200);
+      const quickStats = response.body.data.quickStats;
+      expect(quickStats).toBeDefined();
+      expect(quickStats.currentStreak).toBe(5);
+      expect(quickStats.longestStreak).toBe(10);
+      expect(quickStats.scrobblesThisMonth).toBe(200);
+      expect(quickStats.newArtistsThisMonth).toBe(7);
+      expect(quickStats.collectionCoverageThisMonth).toBe(30);
+    });
+
+    it('should return monthly top artists and albums', async () => {
+      // Arrange - mock collection page
+      mockFileStorage.readJSON
+        .mockResolvedValueOnce({
+          data: [
+            {
+              id: 1,
+              release: {
+                id: 123,
+                artist: 'radiohead',
+                title: 'kid a',
+                cover_image: 'https://example.com/cover.jpg',
+              },
+            },
+          ],
+          timestamp: Date.now(),
+        })
+        .mockResolvedValueOnce(null); // No more pages
+
+      mockStatsService.getNewArtistsThisMonth = jest.fn().mockResolvedValue(2);
+      mockStatsService.getTopArtists = jest.fn().mockResolvedValue([
+        { artist: 'Radiohead', playCount: 100 },
+        { artist: 'Pink Floyd', playCount: 80 },
+      ]);
+      mockStatsService.getTopAlbums = jest.fn().mockResolvedValue([
+        {
+          artist: 'Radiohead',
+          album: 'Kid A',
+          playCount: 50,
+          lastPlayed: Date.now() / 1000,
+        },
+      ]);
+
+      // Act
+      const response = await request(app).get('/api/v1/stats/dashboard');
+
+      // Assert
+      expect(response.status).toBe(200);
+      const { monthlyTopArtists, monthlyTopAlbums } = response.body.data;
+      expect(monthlyTopArtists).toHaveLength(2);
+      expect(monthlyTopArtists[0].name).toBe('Radiohead');
+      expect(monthlyTopArtists[0].playCount).toBe(100);
+      expect(monthlyTopAlbums).toHaveLength(1);
+      expect(monthlyTopAlbums[0].album).toBe('Kid A');
+      expect(monthlyTopAlbums[0].playCount).toBe(50);
+    });
+
+    it('should handle individual section errors gracefully', async () => {
+      // Arrange - make one service fail
+      mockStatsService.calculateStreaks.mockRejectedValue(
+        new Error('Streak error')
+      );
+
+      // Act
+      const response = await request(app).get('/api/v1/stats/dashboard');
+
+      // Assert - should still succeed with error recorded
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.errors.quickStats).toBeDefined();
+      // Other sections should still have data or be null
+    });
+
+    it('should handle complete failure gracefully', async () => {
+      // Arrange - make auth fail
+      mockAuthService.getUserSettings.mockRejectedValue(
+        new Error('Auth error')
+      );
+
+      // Act
+      const response = await request(app).get('/api/v1/stats/dashboard');
+
+      // Assert
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+    });
+  });
 });

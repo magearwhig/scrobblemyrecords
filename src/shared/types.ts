@@ -1198,6 +1198,84 @@ export interface BackupImportOptions {
   password?: string; // Required if backup includes encrypted credentials
 }
 
+// ============================================
+// Dashboard Types (Feature 9)
+// ============================================
+
+/**
+ * Quick stats for the dashboard header row
+ */
+export interface DashboardQuickStats {
+  currentStreak: number;
+  longestStreak: number;
+  scrobblesThisMonth: number;
+  averageMonthlyScrobbles: number;
+  newArtistsThisMonth: number;
+  collectionCoverageThisMonth: number;
+  listeningHoursThisMonth: number;
+  totalScrobbles: number;
+  nextMilestone: number;
+}
+
+/**
+ * Quick action counts for actionable items
+ */
+export interface DashboardQuickActions {
+  newSellerMatches: number;
+  missingAlbumsCount: number;
+  wantListCount: number;
+  dustyCornersCount: number;
+}
+
+/**
+ * Recent album for dashboard display
+ */
+export interface DashboardRecentAlbum {
+  artist: string;
+  album: string;
+  coverUrl: string | null;
+  lastPlayed: number; // Unix timestamp (seconds)
+  releaseId?: number; // Present if album is in collection
+  inCollection: boolean;
+}
+
+/**
+ * Artist entry for monthly highlights
+ */
+export interface DashboardTopArtist {
+  name: string;
+  playCount: number;
+  imageUrl: string | null;
+}
+
+/**
+ * Album entry for monthly highlights
+ */
+export interface DashboardTopAlbum {
+  artist: string;
+  album: string;
+  playCount: number;
+  coverUrl: string | null;
+}
+
+/**
+ * Aggregated dashboard data returned by /api/v1/stats/dashboard
+ * Each section can fail independently - null means the section failed to load
+ */
+export interface DashboardData {
+  errors: {
+    quickStats?: string;
+    quickActions?: string;
+    recentAlbums?: string;
+    monthlyTop?: string;
+  };
+  quickStats: DashboardQuickStats | null;
+  quickActions: DashboardQuickActions | null;
+  recentAlbums: DashboardRecentAlbum[] | null;
+  monthlyTopArtists: DashboardTopArtist[] | null;
+  monthlyTopAlbums: DashboardTopAlbum[] | null;
+}
+
 /**
  * Auto-backup settings.
  * Note: Auto-backups never include credentials since they require interactive
