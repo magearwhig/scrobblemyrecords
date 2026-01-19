@@ -170,13 +170,6 @@ export class MigrationService {
       optional: true,
     });
 
-    this.register('vinyl-watch-list', {
-      path: 'wishlist/vinyl-watch-list.json',
-      currentVersion: 1,
-      migrations: [],
-      optional: true,
-    });
-
     this.register('local-want-list', {
       path: 'wishlist/local-want-list.json',
       currentVersion: 1,
@@ -186,6 +179,21 @@ export class MigrationService {
 
     this.register('versions-cache', {
       path: 'wishlist/versions-cache.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    // Feature 5.5: New Release Tracking Files
+    this.register('wishlist-new-releases', {
+      path: 'wishlist/new-releases.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('new-release-sync-status', {
+      path: 'wishlist/new-release-sync-status.json',
       currentVersion: 1,
       migrations: [],
       optional: true,

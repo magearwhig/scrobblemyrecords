@@ -94,7 +94,6 @@ const SettingsPage: React.FC = () => {
   // Badge counts for tabs
   const [mappingsCount, setMappingsCount] = useState(0);
   const [hiddenCount, setHiddenCount] = useState(0);
-  const [watchListCount, setWatchListCount] = useState(0);
 
   const api = getApiService(state.serverUrl);
 
@@ -136,12 +135,6 @@ const SettingsPage: React.FC = () => {
           api.getHiddenArtists(),
         ]);
         setHiddenCount(hiddenAlbums.length + hiddenArtists.length);
-
-        // Load watch list count
-        if (authStatus.discogs.authenticated) {
-          const watchList = await api.getVinylWatchList();
-          setWatchListCount(watchList.length);
-        }
       } catch (error) {
         console.warn('Failed to load settings counts:', error);
       }
@@ -156,8 +149,6 @@ const SettingsPage: React.FC = () => {
         return mappingsCount > 0 ? mappingsCount : null;
       case 'filters':
         return hiddenCount > 0 ? hiddenCount : null;
-      case 'wishlist':
-        return watchListCount > 0 ? watchListCount : null;
       default:
         return null;
     }

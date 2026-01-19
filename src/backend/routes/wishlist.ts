@@ -179,6 +179,7 @@ export default function createWishlistRouter(
         currency,
         autoSyncInterval,
         notifyOnVinylAvailable,
+        newReleaseTracking,
       } = req.body;
 
       const settings = await wishlistService.saveSettings({
@@ -186,6 +187,7 @@ export default function createWishlistRouter(
         currency,
         autoSyncInterval,
         notifyOnVinylAvailable,
+        newReleaseTracking,
       });
 
       res.json({
@@ -201,86 +203,33 @@ export default function createWishlistRouter(
     }
   });
 
-  // ---- Watch List ----
+  // ---- Local Want List Vinyl Check ----
 
   /**
-   * GET /api/v1/wishlist/watch
-   * Get vinyl watch list
+   * POST /api/v1/wishlist/local-want/check-vinyl
+   * Check local want list for newly available vinyl
    */
-  router.get('/watch', async (_req: Request, res: Response) => {
-    try {
-      const items = await wishlistService.getWatchList();
+  router.post(
+    '/local-want/check-vinyl',
+    async (_req: Request, res: Response) => {
+      try {
+        const newlyAvailable =
+          await wishlistService.checkLocalWantListForVinyl();
 
-      res.json({
-        success: true,
-        data: items,
-        total: items.length,
-      });
-    } catch (error) {
-      logger.error('Error getting watch list', error);
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-  });
-
-  /**
-   * POST /api/v1/wishlist/watch
-   * Add item to vinyl watch list
-   */
-  router.post('/watch', async (req: Request, res: Response) => {
-    try {
-      const { masterId, artist, title, coverImage } = req.body;
-
-      if (!masterId || !artist || !title) {
-        return res.status(400).json({
+        res.json({
+          success: true,
+          data: newlyAvailable,
+          newlyAvailableCount: newlyAvailable.length,
+        });
+      } catch (error) {
+        logger.error('Error checking local want list for vinyl', error);
+        res.status(500).json({
           success: false,
-          error: 'masterId, artist, and title are required',
+          error: error instanceof Error ? error.message : 'Unknown error',
         });
       }
-
-      await wishlistService.addToWatchList({
-        masterId,
-        artist,
-        title,
-        coverImage,
-      });
-
-      res.json({
-        success: true,
-        message: 'Added to vinyl watch list',
-      });
-    } catch (error) {
-      logger.error('Error adding to watch list', error);
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
     }
-  });
-
-  /**
-   * POST /api/v1/wishlist/watch/check
-   * Check watch list for newly available vinyl
-   */
-  router.post('/watch/check', async (_req: Request, res: Response) => {
-    try {
-      const newlyAvailable = await wishlistService.checkWatchListForVinyl();
-
-      res.json({
-        success: true,
-        data: newlyAvailable,
-        newlyAvailableCount: newlyAvailable.length,
-      });
-    } catch (error) {
-      logger.error('Error checking watch list', error);
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-  });
+  );
 
   // ---- Discogs Wantlist Management ----
 
@@ -436,43 +385,6 @@ export default function createWishlistRouter(
   // ============================================
 
   /**
-   * DELETE /api/v1/wishlist/watch/:masterId
-   * Remove item from vinyl watch list
-   */
-  router.delete('/watch/:masterId', async (req: Request, res: Response) => {
-    try {
-      const masterId = parseInt(req.params.masterId, 10);
-
-      if (isNaN(masterId)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid master ID',
-        });
-      }
-
-      const removed = await wishlistService.removeFromWatchList(masterId);
-
-      if (!removed) {
-        return res.status(404).json({
-          success: false,
-          error: 'Item not found in watch list',
-        });
-      }
-
-      res.json({
-        success: true,
-        message: 'Removed from vinyl watch list',
-      });
-    } catch (error) {
-      logger.error('Error removing from watch list', error);
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
-  });
-
-  /**
    * DELETE /api/v1/wishlist/remove/:releaseId
    * Remove a release from the user's Discogs wantlist
    */
@@ -525,6 +437,191 @@ export default function createWishlistRouter(
       });
     } catch (error) {
       logger.error('Error removing from local want list', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // ============================================
+  // Feature 5.5: New Release Tracking Routes
+  // ============================================
+
+  /**
+   * GET /api/v1/wishlist/new-releases
+   * Get detected new releases
+   * Query params:
+   *   - source: 'wishlist' | 'local_want' (optional)
+   *   - days: number (filter by detectedAt, e.g., 7, 30, 90)
+   *   - showDismissed: 'true' to include dismissed items
+   */
+  router.get('/new-releases', async (req: Request, res: Response) => {
+    try {
+      const store = await wishlistService.getNewReleases();
+      const { source, days, showDismissed } = req.query;
+
+      let releases = store.releases;
+
+      // Filter out dismissed unless explicitly requested
+      if (showDismissed !== 'true') {
+        releases = releases.filter(r => !r.dismissed);
+      }
+
+      // Filter by source
+      if (source && typeof source === 'string') {
+        releases = releases.filter(r => r.source === source);
+      }
+
+      // Filter by time (detectedAt)
+      if (days && typeof days === 'string') {
+        const cutoff = Date.now() - parseInt(days, 10) * 24 * 60 * 60 * 1000;
+        releases = releases.filter(r => r.detectedAt >= cutoff);
+      }
+
+      // Sort by detectedAt descending (newest first)
+      releases.sort((a, b) => b.detectedAt - a.detectedAt);
+
+      res.json({
+        success: true,
+        data: {
+          lastCheck: store.lastCheck,
+          releases,
+          count: releases.length,
+        },
+      });
+    } catch (error) {
+      logger.error('Error getting new releases', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * GET /api/v1/wishlist/new-releases/status
+   * Get new release check sync status
+   */
+  router.get('/new-releases/status', async (_req: Request, res: Response) => {
+    try {
+      const status = await wishlistService.getNewReleaseSyncStatus();
+      res.json({ success: true, data: status });
+    } catch (error) {
+      logger.error('Error getting new release sync status', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * POST /api/v1/wishlist/new-releases/check
+   * Trigger check for new releases
+   * Returns immediately, check runs in background
+   */
+  router.post('/new-releases/check', async (_req: Request, res: Response) => {
+    try {
+      // Return immediately
+      res.json({ success: true, data: { message: 'Check started' } });
+
+      // Run check asynchronously
+      wishlistService.checkForNewReleases(true).catch(error => {
+        logger.error('Background new release check failed', error);
+      });
+    } catch (error) {
+      logger.error('Error starting new release check', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * PATCH /api/v1/wishlist/new-releases/:id/dismiss
+   * Dismiss a new release alert
+   */
+  router.patch(
+    '/new-releases/:id/dismiss',
+    async (req: Request, res: Response) => {
+      try {
+        await wishlistService.dismissNewRelease(req.params.id);
+        res.json({ success: true });
+      } catch (error) {
+        logger.error('Error dismissing new release', error);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+  );
+
+  /**
+   * POST /api/v1/wishlist/new-releases/dismiss-bulk
+   * Dismiss multiple new release alerts at once
+   * Body: { ids: string[] } - Array of release IDs to dismiss
+   */
+  router.post(
+    '/new-releases/dismiss-bulk',
+    async (req: Request, res: Response) => {
+      try {
+        const { ids } = req.body || {};
+
+        if (!ids || !Array.isArray(ids)) {
+          return res.status(400).json({
+            success: false,
+            error: 'ids array is required',
+          });
+        }
+
+        const dismissed = await wishlistService.dismissNewReleasesBulk(ids);
+        res.json({ success: true, data: { dismissed } });
+      } catch (error) {
+        logger.error('Error bulk dismissing new releases', error);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+  );
+
+  /**
+   * POST /api/v1/wishlist/new-releases/dismiss-all
+   * Dismiss all non-dismissed new releases
+   */
+  router.post(
+    '/new-releases/dismiss-all',
+    async (req: Request, res: Response) => {
+      try {
+        const dismissed = await wishlistService.dismissAllNewReleases();
+        res.json({ success: true, data: { dismissed } });
+      } catch (error) {
+        logger.error('Error dismissing all new releases', error);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+  );
+
+  /**
+   * POST /api/v1/wishlist/new-releases/cleanup
+   * Clean up old dismissed items
+   * Body: { maxAgeDays?: number } - Default 90
+   */
+  router.post('/new-releases/cleanup', async (req: Request, res: Response) => {
+    try {
+      const { maxAgeDays = 90 } = req.body || {};
+      const removed =
+        await wishlistService.cleanupDismissedReleases(maxAgeDays);
+      res.json({ success: true, data: { removed } });
+    } catch (error) {
+      logger.error('Error cleaning up dismissed releases', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

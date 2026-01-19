@@ -269,9 +269,6 @@ const SettingsBackupSection: React.FC<SettingsBackupSectionProps> = ({
               {preview.localWantListCount > 0 && (
                 <li>{preview.localWantListCount} items in local want list</li>
               )}
-              {preview.vinylWatchListCount > 0 && (
-                <li>{preview.vinylWatchListCount} vinyl watch items</li>
-              )}
               {preview.monitoredSellersCount > 0 && (
                 <li>{preview.monitoredSellersCount} monitored sellers</li>
               )}

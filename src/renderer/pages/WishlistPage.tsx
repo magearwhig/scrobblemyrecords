@@ -8,6 +8,7 @@ import {
   WishlistSyncStatus,
   VinylStatus,
 } from '../../shared/types';
+import { NewReleasesTab } from '../components/wishlist/NewReleasesTab';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -16,7 +17,13 @@ import {
 } from '../hooks/useNotifications';
 import { getApiService } from '../services/api';
 
-type TabType = 'all' | 'vinyl' | 'cd_only' | 'affordable' | 'wanted';
+type TabType =
+  | 'all'
+  | 'vinyl'
+  | 'cd_only'
+  | 'affordable'
+  | 'wanted'
+  | 'new_releases';
 type SortOption = 'date' | 'price' | 'artist' | 'album';
 
 interface VersionsModalState {
@@ -43,6 +50,9 @@ const WishlistPage: React.FC = () => {
 
   // Local want list vinyl check state
   const [checkingLocalVinyl, setCheckingLocalVinyl] = useState(false);
+
+  // New releases count (Feature 5.5)
+  const [newReleasesCount, setNewReleasesCount] = useState(0);
 
   // Versions modal state
   const [versionsModal, setVersionsModal] = useState<VersionsModalState>({
@@ -234,21 +244,6 @@ const WishlistPage: React.FC = () => {
       versions: [],
       loading: false,
     });
-  };
-
-  // Add to vinyl watch list
-  const handleAddToWatch = async (item: EnrichedWishlistItem) => {
-    try {
-      await api.addToVinylWatch({
-        masterId: item.masterId,
-        artist: item.artist,
-        title: item.title,
-        coverImage: item.coverImage,
-      });
-      // Could show a success notification here
-    } catch (err) {
-      console.error('Error adding to watch list:', err);
-    }
   };
 
   // Check local want list for vinyl availability
@@ -459,25 +454,40 @@ const WishlistPage: React.FC = () => {
 
       {/* Tabs */}
       <div className='tabs'>
-        {(['all', 'vinyl', 'cd_only', 'affordable', 'wanted'] as TabType[]).map(
-          tab => (
-            <button
-              key={tab}
-              className={`tab ${activeTab === tab ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab === 'all' && `All (${tabCounts.all})`}
-              {tab === 'vinyl' && `Has Vinyl (${tabCounts.vinyl})`}
-              {tab === 'cd_only' && `CD Only (${tabCounts.cd_only})`}
-              {tab === 'affordable' && `Affordable (${tabCounts.affordable})`}
-              {tab === 'wanted' && `Wanted (${tabCounts.wanted})`}
-            </button>
-          )
-        )}
+        {(
+          [
+            'all',
+            'vinyl',
+            'cd_only',
+            'affordable',
+            'wanted',
+            'new_releases',
+          ] as TabType[]
+        ).map(tab => (
+          <button
+            key={tab}
+            className={`tab ${activeTab === tab ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab === 'all' && `All (${tabCounts.all})`}
+            {tab === 'vinyl' && `Has Vinyl (${tabCounts.vinyl})`}
+            {tab === 'cd_only' && `CD Only (${tabCounts.cd_only})`}
+            {tab === 'affordable' && `Affordable (${tabCounts.affordable})`}
+            {tab === 'wanted' && `Wanted (${tabCounts.wanted})`}
+            {tab === 'new_releases' && (
+              <>
+                New Releases
+                {newReleasesCount > 0 && (
+                  <span className='tab-badge'>{newReleasesCount}</span>
+                )}
+              </>
+            )}
+          </button>
+        ))}
       </div>
 
-      {/* Sort Options - hide for Wanted tab */}
-      {activeTab !== 'wanted' && (
+      {/* Sort Options - hide for Wanted and New Releases tabs */}
+      {activeTab !== 'wanted' && activeTab !== 'new_releases' && (
         <div className='wishlist-sort'>
           <label>Sort by:</label>
           <select
@@ -493,8 +503,11 @@ const WishlistPage: React.FC = () => {
         </div>
       )}
 
-      {/* Wanted Tab - Local Want List */}
-      {activeTab === 'wanted' ? (
+      {/* New Releases Tab (Feature 5.5) */}
+      {activeTab === 'new_releases' ? (
+        <NewReleasesTab onCountChange={setNewReleasesCount} />
+      ) : /* Wanted Tab - Local Want List */
+      activeTab === 'wanted' ? (
         <>
           <div className='wanted-actions'>
             <button
@@ -640,15 +653,6 @@ const WishlistPage: React.FC = () => {
                         title='Browse vinyl on Discogs Marketplace'
                       >
                         Shop
-                      </button>
-                    )}
-                    {item.vinylStatus === 'cd_only' && (
-                      <button
-                        className='btn btn-small btn-secondary'
-                        onClick={() => handleAddToWatch(item)}
-                        title='Watch for vinyl availability'
-                      >
-                        Watch
                       </button>
                     )}
                   </div>

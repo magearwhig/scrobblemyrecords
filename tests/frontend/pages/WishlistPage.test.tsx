@@ -20,7 +20,6 @@ const mockGetWishlistSettings = jest.fn();
 const mockGetLocalWantList = jest.fn();
 const mockStartWishlistSync = jest.fn();
 const mockGetMasterVersions = jest.fn();
-const mockAddToVinylWatch = jest.fn();
 const mockCheckLocalWantListForVinyl = jest.fn();
 const mockRemoveFromLocalWantList = jest.fn();
 
@@ -32,7 +31,6 @@ jest.mock('../../../src/renderer/services/api', () => ({
     getLocalWantList: mockGetLocalWantList,
     startWishlistSync: mockStartWishlistSync,
     getMasterVersions: mockGetMasterVersions,
-    addToVinylWatch: mockAddToVinylWatch,
     checkLocalWantListForVinyl: mockCheckLocalWantListForVinyl,
     removeFromLocalWantList: mockRemoveFromLocalWantList,
   }),
@@ -407,16 +405,5 @@ describe('WishlistPage', () => {
 
     // Radiohead has vinyl, so should have Shop button
     expect(screen.getByText('Shop')).toBeInTheDocument();
-  });
-
-  it('shows Watch button for CD-only items', async () => {
-    renderWishlistPage();
-
-    await waitFor(() => {
-      expect(screen.getByText('The Beatles')).toBeInTheDocument();
-    });
-
-    // Beatles is CD-only, so should have Watch button
-    expect(screen.getByText('Watch')).toBeInTheDocument();
   });
 });

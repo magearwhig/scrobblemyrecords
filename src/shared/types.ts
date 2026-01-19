@@ -596,19 +596,7 @@ export interface WishlistSettings {
   currency: string; // Preferred currency
   autoSyncInterval: number; // Days between auto-sync (0 = manual only)
   notifyOnVinylAvailable: boolean;
-}
-
-/**
- * Item being watched for vinyl availability
- */
-export interface VinylWatchItem {
-  masterId: number;
-  artist: string;
-  title: string;
-  coverImage?: string;
-  addedAt: number; // Unix timestamp when added to watch list
-  lastChecked?: number; // Unix timestamp of last availability check
-  notified: boolean; // Whether user was notified of vinyl availability
+  newReleaseTracking?: WishlistNewReleaseSettings; // Feature 5.5: New release tracking
 }
 
 /**
@@ -618,14 +606,6 @@ export interface WishlistStore {
   schemaVersion: 1;
   lastUpdated: number;
   items: EnrichedWishlistItem[];
-}
-
-/**
- * Stored vinyl watch list
- */
-export interface VinylWatchStore {
-  schemaVersion: 1;
-  items: VinylWatchItem[];
 }
 
 /**
@@ -671,6 +651,97 @@ export interface VersionsCacheEntry {
 export interface VersionsCache {
   schemaVersion: 1;
   entries: Record<number, VersionsCacheEntry>; // masterId -> cache entry
+}
+
+// ============================================
+// Wishlist New Release Tracking Types (Feature 5.5)
+// ============================================
+
+/**
+ * Settings for new release tracking
+ */
+export interface WishlistNewReleaseSettings {
+  enabled: boolean; // Enable/disable tracking
+  checkFrequencyDays: number; // How often to check (default: 7)
+  notifyOnNewRelease: boolean; // Create notifications
+  autoCheck: boolean; // Check on app startup
+  trackLocalWantList: boolean; // Include local want list items
+}
+
+/**
+ * A newly detected release for a tracked master
+ */
+export interface WishlistNewRelease {
+  id: string; // Unique ID (masterId-releaseId)
+  masterId: number; // Parent master release
+  releaseId: number; // New release ID detected
+
+  // Release info (from Discogs)
+  title: string; // Release-specific title (may include edition info)
+  artist: string;
+  year: number; // Year pressed (from Discogs)
+  country: string;
+  format: string[]; // e.g., ["LP", "Album", "180g"]
+  label: string;
+  catalogNumber?: string;
+
+  // Pricing (if available)
+  lowestPrice?: number;
+  priceCurrency?: string;
+  numForSale?: number;
+
+  // Tracking
+  source: 'wishlist' | 'local_want'; // Where the master came from
+  sourceItemId: string | number; // ID of the source item
+  detectedAt: number; // When we first saw this release
+  notified: boolean; // Have we notified the user?
+  dismissed: boolean; // User dismissed this alert
+
+  // Links
+  discogsUrl: string; // Direct link to release page
+  coverImage?: string; // Cover art URL
+}
+
+/**
+ * Store for tracking new releases
+ */
+export interface WishlistNewReleasesStore {
+  schemaVersion: 1;
+  lastCheck: number; // Last time we completed a check
+  releases: WishlistNewRelease[];
+}
+
+/**
+ * Sync status for new release checking (parallels ReleaseTrackingSyncStatus)
+ */
+export interface NewReleaseSyncStatus {
+  status: 'idle' | 'syncing' | 'completed' | 'error';
+  lastFullCheck: number | null; // Last completed full cycle
+  mastersProcessed: number; // Current progress
+  totalMasters: number; // Total to process
+  newReleasesFound: number; // Found in current/last run
+  lastCheckedIndex: number; // For resumable batching
+  progress: number; // 0-100 percentage
+  currentMaster?: string; // Artist - Album being checked
+  estimatedTimeRemaining?: number; // Seconds
+  error?: string; // Error message if status is 'error'
+  lastError?: {
+    // Last error details for retry
+    message: string;
+    masterId?: number;
+    timestamp: number;
+    retryCount: number;
+  };
+}
+
+/**
+ * Info about a tracked master's source
+ */
+export interface TrackedMasterInfo {
+  source: 'wishlist' | 'local_want';
+  itemId: string | number;
+  artistAlbum: string;
+  coverImage?: string;
 }
 
 // ============================================
@@ -1087,7 +1158,6 @@ export interface BackupData {
 
   // Wishlist
   localWantList: LocalWantItem[];
-  vinylWatchList: VinylWatchItem[];
 
   // Sellers
   monitoredSellers: MonitoredSeller[];
@@ -1130,7 +1200,6 @@ export interface BackupPreview {
   hiddenAlbumsCount: number;
   hiddenArtistsCount: number;
   localWantListCount: number;
-  vinylWatchListCount: number;
   monitoredSellersCount: number;
   artistMbidMappingsCount: number;
   hiddenReleasesCount: number;
@@ -1162,7 +1231,6 @@ export interface BackupImportPreview {
     hiddenAlbums: ImportCategorySummary;
     hiddenArtists: ImportCategorySummary;
     localWantList: ImportCategorySummary;
-    vinylWatchList: ImportCategorySummary;
     monitoredSellers: ImportCategorySummary;
     artistMbidMappings: ImportCategorySummary;
     hiddenReleases: ImportCategorySummary;

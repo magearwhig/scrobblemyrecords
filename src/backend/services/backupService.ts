@@ -5,7 +5,7 @@
  * - Settings (user, suggestion, AI, wishlist, seller, release, sync)
  * - Mappings (album, artist, history-artist)
  * - Discovery (hidden albums/artists)
- * - Wishlist (local want list, vinyl watch list)
+ * - Wishlist (local want list)
  * - Sellers (monitored sellers)
  * - Releases (MBID mappings, hidden releases, excluded artists)
  *
@@ -52,8 +52,6 @@ import {
   SuggestionSettings,
   SyncSettings,
   UserSettings,
-  VinylWatchItem,
-  VinylWatchStore,
   WishlistSettings,
 } from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
@@ -76,7 +74,6 @@ const FILE_PATHS = {
   hiddenAlbums: 'discovery/hidden-albums.json',
   hiddenArtists: 'discovery/hidden-artists.json',
   localWantList: 'wishlist/local-want-list.json',
-  vinylWatchList: 'wishlist/vinyl-watch-list.json',
   monitoredSellers: 'sellers/monitored-sellers.json',
   artistMbidMappings: 'releases/artist-mbid-map.json',
   hiddenReleases: 'releases/hidden-releases.json',
@@ -318,13 +315,6 @@ export class BackupService {
     return store?.items ?? [];
   }
 
-  private async loadVinylWatchList(): Promise<VinylWatchItem[]> {
-    const store = await this.fileStorage.readJSON<VinylWatchStore>(
-      FILE_PATHS.vinylWatchList
-    );
-    return store?.items ?? [];
-  }
-
   private async loadMonitoredSellers(): Promise<MonitoredSeller[]> {
     const store = await this.fileStorage.readJSON<MonitoredSellersStore>(
       FILE_PATHS.monitoredSellers
@@ -375,7 +365,6 @@ export class BackupService {
       hiddenAlbums,
       hiddenArtists,
       localWantList,
-      vinylWatchList,
       monitoredSellers,
       artistMbidMappings,
       hiddenReleases,
@@ -394,7 +383,6 @@ export class BackupService {
       this.loadHiddenAlbums(),
       this.loadHiddenArtists(),
       this.loadLocalWantList(),
-      this.loadVinylWatchList(),
       this.loadMonitoredSellers(),
       this.loadArtistMbidMappings(),
       this.loadHiddenReleases(),
@@ -415,7 +403,6 @@ export class BackupService {
       hiddenAlbumsCount: hiddenAlbums.length,
       hiddenArtistsCount: hiddenArtists.length,
       localWantListCount: localWantList.length,
-      vinylWatchListCount: vinylWatchList.length,
       monitoredSellersCount: monitoredSellers.length,
       artistMbidMappingsCount: artistMbidMappings.length,
       hiddenReleasesCount: hiddenReleases.length,
@@ -454,7 +441,6 @@ export class BackupService {
       hiddenAlbums,
       hiddenArtists,
       localWantList,
-      vinylWatchList,
       monitoredSellers,
       artistMbidMappings,
       hiddenReleases,
@@ -473,7 +459,6 @@ export class BackupService {
       this.loadHiddenAlbums(),
       this.loadHiddenArtists(),
       this.loadLocalWantList(),
-      this.loadVinylWatchList(),
       this.loadMonitoredSellers(),
       this.loadArtistMbidMappings(),
       this.loadHiddenReleases(),
@@ -495,7 +480,6 @@ export class BackupService {
       hiddenAlbums,
       hiddenArtists,
       localWantList,
-      vinylWatchList,
       monitoredSellers,
       artistMbidMappings,
       hiddenReleases,
@@ -606,7 +590,6 @@ export class BackupService {
       currentHiddenAlbums,
       currentHiddenArtists,
       currentLocalWantList,
-      currentVinylWatchList,
       currentMonitoredSellers,
       currentArtistMbidMappings,
       currentHiddenReleases,
@@ -618,7 +601,6 @@ export class BackupService {
       this.loadHiddenAlbums(),
       this.loadHiddenArtists(),
       this.loadLocalWantList(),
-      this.loadVinylWatchList(),
       this.loadMonitoredSellers(),
       this.loadArtistMbidMappings(),
       this.loadHiddenReleases(),
@@ -656,11 +638,6 @@ export class BackupService {
         backup.data.localWantList,
         currentLocalWantList,
         (w: LocalWantItem) => w.id
-      ),
-      vinylWatchList: this.compareMappings(
-        backup.data.vinylWatchList,
-        currentVinylWatchList,
-        (w: VinylWatchItem) => String(w.masterId)
       ),
       monitoredSellers: this.compareMappings(
         backup.data.monitoredSellers,
@@ -703,7 +680,6 @@ export class BackupService {
       hiddenAlbums: { new: 0, existing: 0 },
       hiddenArtists: { new: 0, existing: 0 },
       localWantList: { new: 0, existing: 0 },
-      vinylWatchList: { new: 0, existing: 0 },
       monitoredSellers: { new: 0, existing: 0 },
       artistMbidMappings: { new: 0, existing: 0 },
       hiddenReleases: { new: 0, existing: 0 },
@@ -1050,22 +1026,6 @@ export class BackupService {
       updated += result.updated;
     } catch (e) {
       errors.push(`Local want list: ${e instanceof Error ? e.message : e}`);
-    }
-
-    // Import vinyl watch list
-    try {
-      const result = await this.mergeAndSave(
-        FILE_PATHS.vinylWatchList,
-        data.vinylWatchList,
-        (w: VinylWatchItem) => String(w.masterId),
-        'items',
-        merge,
-        (a, b) => (a.addedAt > b.addedAt ? a : b)
-      );
-      added += result.added;
-      updated += result.updated;
-    } catch (e) {
-      errors.push(`Vinyl watch list: ${e instanceof Error ? e.message : e}`);
     }
 
     // Import monitored sellers

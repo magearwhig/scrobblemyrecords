@@ -134,29 +134,6 @@ describe('Wishlist Routes', () => {
         notifyOnVinylAvailable: settings.notifyOnVinylAvailable ?? true,
       }));
 
-    mockWishlistService.getWatchList = jest.fn().mockResolvedValue([
-      {
-        masterId: 11111,
-        artist: 'Watched Artist',
-        title: 'Watched Album',
-        addedAt: '2024-01-10',
-        lastChecked: '2024-01-15',
-        notified: false,
-      },
-    ]);
-
-    mockWishlistService.addToWatchList = jest.fn().mockResolvedValue(undefined);
-    mockWishlistService.removeFromWatchList = jest.fn().mockResolvedValue(true);
-    mockWishlistService.checkWatchListForVinyl = jest.fn().mockResolvedValue([
-      {
-        masterId: 22222,
-        artist: 'New Vinyl Artist',
-        title: 'New Vinyl Album',
-        addedAt: '2024-01-05',
-        notified: true,
-      },
-    ]);
-
     // Local want list mocks
     mockWishlistService.getLocalWantList = jest.fn().mockResolvedValue([
       {
@@ -204,6 +181,54 @@ describe('Wishlist Routes', () => {
           notified: false,
         },
       ]);
+
+    // Feature 5.5: New release tracking mocks
+    mockWishlistService.getNewReleases = jest.fn().mockResolvedValue({
+      schemaVersion: 1,
+      lastCheck: Date.now() - 3600000,
+      releases: [
+        {
+          id: '12345-67890',
+          masterId: 12345,
+          releaseId: 67890,
+          title: 'Test Album (2024 Remaster)',
+          artist: 'Test Artist',
+          year: 2024,
+          country: 'Europe',
+          format: ['LP', 'Album', 'Reissue'],
+          label: 'Test Label',
+          lowestPrice: 29.99,
+          priceCurrency: 'USD',
+          numForSale: 5,
+          source: 'wishlist',
+          sourceItemId: 1,
+          detectedAt: Date.now() - 86400000,
+          notified: false,
+          dismissed: false,
+          discogsUrl: 'https://www.discogs.com/release/67890',
+        },
+      ],
+    });
+
+    mockWishlistService.getNewReleaseSyncStatus = jest.fn().mockResolvedValue({
+      status: 'idle',
+      lastFullCheck: Date.now() - 86400000,
+      mastersProcessed: 0,
+      totalMasters: 50,
+      newReleasesFound: 1,
+      lastCheckedIndex: 0,
+      progress: 0,
+    });
+
+    mockWishlistService.checkForNewReleases = jest.fn().mockResolvedValue([]);
+    mockWishlistService.dismissNewRelease = jest
+      .fn()
+      .mockResolvedValue(undefined);
+    mockWishlistService.dismissNewReleasesBulk = jest.fn().mockResolvedValue(3);
+    mockWishlistService.dismissAllNewReleases = jest.fn().mockResolvedValue(5);
+    mockWishlistService.cleanupDismissedReleases = jest
+      .fn()
+      .mockResolvedValue(5);
 
     // Create Express app
     app = express();
@@ -517,192 +542,6 @@ describe('Wishlist Routes', () => {
     });
   });
 
-  describe('GET /api/v1/wishlist/watch', () => {
-    it('should return watch list items', async () => {
-      // Act
-      const response = await request(app).get('/api/v1/wishlist/watch');
-
-      // Assert
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.data).toHaveLength(1);
-      expect(response.body.total).toBe(1);
-      expect(response.body.data[0].artist).toBe('Watched Artist');
-    });
-
-    it('should handle errors gracefully', async () => {
-      // Arrange
-      mockWishlistService.getWatchList.mockRejectedValue(
-        new Error('Watch list error')
-      );
-
-      // Act
-      const response = await request(app).get('/api/v1/wishlist/watch');
-
-      // Assert
-      expect(response.status).toBe(500);
-      expect(response.body.success).toBe(false);
-    });
-  });
-
-  describe('POST /api/v1/wishlist/watch', () => {
-    it('should add item to watch list', async () => {
-      // Act
-      const response = await request(app).post('/api/v1/wishlist/watch').send({
-        masterId: 33333,
-        artist: 'New Artist',
-        title: 'New Album',
-        coverImage: 'https://example.com/new-cover.jpg',
-      });
-
-      // Assert
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.message).toBe('Added to vinyl watch list');
-      expect(mockWishlistService.addToWatchList).toHaveBeenCalledWith({
-        masterId: 33333,
-        artist: 'New Artist',
-        title: 'New Album',
-        coverImage: 'https://example.com/new-cover.jpg',
-      });
-    });
-
-    it('should return 400 when required fields missing', async () => {
-      // Act
-      const response = await request(app).post('/api/v1/wishlist/watch').send({
-        masterId: 33333,
-        // Missing artist and title
-      });
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toBe(
-        'masterId, artist, and title are required'
-      );
-    });
-
-    it('should handle errors gracefully', async () => {
-      // Arrange
-      mockWishlistService.addToWatchList.mockRejectedValue(
-        new Error('Add error')
-      );
-
-      // Act
-      const response = await request(app).post('/api/v1/wishlist/watch').send({
-        masterId: 33333,
-        artist: 'New Artist',
-        title: 'New Album',
-      });
-
-      // Assert
-      expect(response.status).toBe(500);
-      expect(response.body.success).toBe(false);
-    });
-  });
-
-  describe('DELETE /api/v1/wishlist/watch/:masterId', () => {
-    it('should remove item from watch list', async () => {
-      // Act
-      const response = await request(app).delete(
-        '/api/v1/wishlist/watch/11111'
-      );
-
-      // Assert
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.message).toBe('Removed from vinyl watch list');
-      expect(mockWishlistService.removeFromWatchList).toHaveBeenCalledWith(
-        11111
-      );
-    });
-
-    it('should return 400 for invalid master ID', async () => {
-      // Act
-      const response = await request(app).delete(
-        '/api/v1/wishlist/watch/invalid'
-      );
-
-      // Assert
-      expect(response.status).toBe(400);
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toBe('Invalid master ID');
-    });
-
-    it('should return 404 when item not found', async () => {
-      // Arrange
-      mockWishlistService.removeFromWatchList.mockResolvedValue(false);
-
-      // Act
-      const response = await request(app).delete(
-        '/api/v1/wishlist/watch/99999'
-      );
-
-      // Assert
-      expect(response.status).toBe(404);
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toBe('Item not found in watch list');
-    });
-
-    it('should handle errors gracefully', async () => {
-      // Arrange
-      mockWishlistService.removeFromWatchList.mockRejectedValue(
-        new Error('Remove error')
-      );
-
-      // Act
-      const response = await request(app).delete(
-        '/api/v1/wishlist/watch/11111'
-      );
-
-      // Assert
-      expect(response.status).toBe(500);
-      expect(response.body.success).toBe(false);
-    });
-  });
-
-  describe('POST /api/v1/wishlist/watch/check', () => {
-    it('should check watch list for newly available vinyl', async () => {
-      // Act
-      const response = await request(app).post('/api/v1/wishlist/watch/check');
-
-      // Assert
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.data).toHaveLength(1);
-      expect(response.body.newlyAvailableCount).toBe(1);
-      expect(response.body.data[0].artist).toBe('New Vinyl Artist');
-    });
-
-    it('should return empty array when no new vinyl found', async () => {
-      // Arrange
-      mockWishlistService.checkWatchListForVinyl.mockResolvedValue([]);
-
-      // Act
-      const response = await request(app).post('/api/v1/wishlist/watch/check');
-
-      // Assert
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.data).toHaveLength(0);
-      expect(response.body.newlyAvailableCount).toBe(0);
-    });
-
-    it('should handle errors gracefully', async () => {
-      // Arrange
-      mockWishlistService.checkWatchListForVinyl.mockRejectedValue(
-        new Error('Check error')
-      );
-
-      // Act
-      const response = await request(app).post('/api/v1/wishlist/watch/check');
-
-      // Assert
-      expect(response.status).toBe(500);
-      expect(response.body.success).toBe(false);
-    });
-  });
-
   // ============================================
   // Local Want List Routes
   // ============================================
@@ -871,6 +710,364 @@ describe('Wishlist Routes', () => {
 
       // Act
       const response = await request(app).post('/api/v1/wishlist/local/check');
+
+      // Assert
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  // ============================================
+  // Feature 5.5: New Release Tracking Routes
+  // ============================================
+
+  describe('GET /api/v1/wishlist/new-releases', () => {
+    it('should return new releases', async () => {
+      // Act
+      const response = await request(app).get('/api/v1/wishlist/new-releases');
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.releases).toHaveLength(1);
+      expect(response.body.data.releases[0].artist).toBe('Test Artist');
+      expect(response.body.data.count).toBe(1);
+      expect(mockWishlistService.getNewReleases).toHaveBeenCalled();
+    });
+
+    it('should filter by source', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/wishlist/new-releases?source=wishlist'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.releases).toHaveLength(1);
+    });
+
+    it('should filter by days', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/wishlist/new-releases?days=7'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+
+    it('should filter out dismissed by default', async () => {
+      // Arrange
+      mockWishlistService.getNewReleases.mockResolvedValue({
+        schemaVersion: 1,
+        lastCheck: Date.now(),
+        releases: [
+          {
+            id: '12345-67890',
+            masterId: 12345,
+            releaseId: 67890,
+            title: 'Dismissed Album',
+            artist: 'Test Artist',
+            year: 2024,
+            country: 'EU',
+            format: ['LP'],
+            label: 'Label',
+            source: 'wishlist',
+            sourceItemId: 1,
+            detectedAt: Date.now(),
+            notified: false,
+            dismissed: true,
+            discogsUrl: 'https://discogs.com/release/67890',
+          },
+        ],
+      });
+
+      // Act
+      const response = await request(app).get('/api/v1/wishlist/new-releases');
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.data.releases).toHaveLength(0);
+    });
+
+    it('should include dismissed when showDismissed=true', async () => {
+      // Arrange
+      mockWishlistService.getNewReleases.mockResolvedValue({
+        schemaVersion: 1,
+        lastCheck: Date.now(),
+        releases: [
+          {
+            id: '12345-67890',
+            masterId: 12345,
+            releaseId: 67890,
+            title: 'Dismissed Album',
+            artist: 'Test Artist',
+            year: 2024,
+            country: 'EU',
+            format: ['LP'],
+            label: 'Label',
+            source: 'wishlist',
+            sourceItemId: 1,
+            detectedAt: Date.now(),
+            notified: false,
+            dismissed: true,
+            discogsUrl: 'https://discogs.com/release/67890',
+          },
+        ],
+      });
+
+      // Act
+      const response = await request(app).get(
+        '/api/v1/wishlist/new-releases?showDismissed=true'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.data.releases).toHaveLength(1);
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockWishlistService.getNewReleases.mockRejectedValue(
+        new Error('Database error')
+      );
+
+      // Act
+      const response = await request(app).get('/api/v1/wishlist/new-releases');
+
+      // Assert
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('GET /api/v1/wishlist/new-releases/status', () => {
+    it('should return sync status', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/wishlist/new-releases/status'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.status).toBe('idle');
+      expect(response.body.data.totalMasters).toBe(50);
+      expect(mockWishlistService.getNewReleaseSyncStatus).toHaveBeenCalled();
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockWishlistService.getNewReleaseSyncStatus.mockRejectedValue(
+        new Error('Status error')
+      );
+
+      // Act
+      const response = await request(app).get(
+        '/api/v1/wishlist/new-releases/status'
+      );
+
+      // Assert
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('POST /api/v1/wishlist/new-releases/check', () => {
+    it('should start new release check', async () => {
+      // Act
+      const response = await request(app).post(
+        '/api/v1/wishlist/new-releases/check'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.message).toBe('Check started');
+      // Note: checkForNewReleases is called asynchronously
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Note: Even if the background check fails, the route should return 200
+      // because it returns immediately before the check starts
+      mockWishlistService.checkForNewReleases.mockRejectedValue(
+        new Error('Check error')
+      );
+
+      // Act
+      const response = await request(app).post(
+        '/api/v1/wishlist/new-releases/check'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+    });
+  });
+
+  describe('PATCH /api/v1/wishlist/new-releases/:id/dismiss', () => {
+    it('should dismiss a new release', async () => {
+      // Act
+      const response = await request(app).patch(
+        '/api/v1/wishlist/new-releases/12345-67890/dismiss'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(mockWishlistService.dismissNewRelease).toHaveBeenCalledWith(
+        '12345-67890'
+      );
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockWishlistService.dismissNewRelease.mockRejectedValue(
+        new Error('Dismiss error')
+      );
+
+      // Act
+      const response = await request(app).patch(
+        '/api/v1/wishlist/new-releases/12345-67890/dismiss'
+      );
+
+      // Assert
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('POST /api/v1/wishlist/new-releases/dismiss-bulk', () => {
+    it('should dismiss multiple releases', async () => {
+      // Act
+      const response = await request(app)
+        .post('/api/v1/wishlist/new-releases/dismiss-bulk')
+        .send({ ids: ['id1', 'id2', 'id3'] });
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.dismissed).toBe(3);
+      expect(mockWishlistService.dismissNewReleasesBulk).toHaveBeenCalledWith([
+        'id1',
+        'id2',
+        'id3',
+      ]);
+    });
+
+    it('should return 400 when ids is missing', async () => {
+      // Act
+      const response = await request(app)
+        .post('/api/v1/wishlist/new-releases/dismiss-bulk')
+        .send({});
+
+      // Assert
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('ids array is required');
+    });
+
+    it('should return 400 when ids is not an array', async () => {
+      // Act
+      const response = await request(app)
+        .post('/api/v1/wishlist/new-releases/dismiss-bulk')
+        .send({ ids: 'not-an-array' });
+
+      // Assert
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('ids array is required');
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockWishlistService.dismissNewReleasesBulk.mockRejectedValue(
+        new Error('Bulk dismiss error')
+      );
+
+      // Act
+      const response = await request(app)
+        .post('/api/v1/wishlist/new-releases/dismiss-bulk')
+        .send({ ids: ['id1'] });
+
+      // Assert
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('POST /api/v1/wishlist/new-releases/dismiss-all', () => {
+    it('should dismiss all new releases', async () => {
+      // Act
+      const response = await request(app).post(
+        '/api/v1/wishlist/new-releases/dismiss-all'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.dismissed).toBe(5);
+      expect(mockWishlistService.dismissAllNewReleases).toHaveBeenCalled();
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockWishlistService.dismissAllNewReleases.mockRejectedValue(
+        new Error('Dismiss all error')
+      );
+
+      // Act
+      const response = await request(app).post(
+        '/api/v1/wishlist/new-releases/dismiss-all'
+      );
+
+      // Assert
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('POST /api/v1/wishlist/new-releases/cleanup', () => {
+    it('should cleanup old dismissed releases with default age', async () => {
+      // Act
+      const response = await request(app).post(
+        '/api/v1/wishlist/new-releases/cleanup'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.removed).toBe(5);
+      expect(mockWishlistService.cleanupDismissedReleases).toHaveBeenCalledWith(
+        90
+      );
+    });
+
+    it('should cleanup with custom max age', async () => {
+      // Act
+      const response = await request(app)
+        .post('/api/v1/wishlist/new-releases/cleanup')
+        .send({ maxAgeDays: 30 });
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(mockWishlistService.cleanupDismissedReleases).toHaveBeenCalledWith(
+        30
+      );
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockWishlistService.cleanupDismissedReleases.mockRejectedValue(
+        new Error('Cleanup error')
+      );
+
+      // Act
+      const response = await request(app).post(
+        '/api/v1/wishlist/new-releases/cleanup'
+      );
 
       // Assert
       expect(response.status).toBe(500);

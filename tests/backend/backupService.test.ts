@@ -9,7 +9,6 @@ import {
   HiddenAlbum,
   HiddenArtist,
   LocalWantItem,
-  VinylWatchItem,
   MonitoredSeller,
   ArtistMbidMapping,
   HiddenRelease,
@@ -76,18 +75,6 @@ describe('BackupService', () => {
     ...overrides,
   });
 
-  const createVinylWatchItem = (
-    overrides: Partial<VinylWatchItem> = {}
-  ): VinylWatchItem => ({
-    masterId: 12345,
-    artist: 'Watch Artist',
-    title: 'Watch Title',
-    addedAt: Date.now(),
-    lastChecked: Date.now(),
-    notified: false,
-    ...overrides,
-  });
-
   const createMonitoredSeller = (
     overrides: Partial<MonitoredSeller> = {}
   ): MonitoredSeller => ({
@@ -150,7 +137,6 @@ describe('BackupService', () => {
       expect(preview.hiddenAlbumsCount).toBe(0);
       expect(preview.hiddenArtistsCount).toBe(0);
       expect(preview.localWantListCount).toBe(0);
-      expect(preview.vinylWatchListCount).toBe(0);
       expect(preview.monitoredSellersCount).toBe(0);
       expect(preview.hasUserSettings).toBe(false);
     });
@@ -259,10 +245,6 @@ describe('BackupService', () => {
         schemaVersion: 1,
         items: [createLocalWantItem()],
       });
-      await fileStorage.writeJSON('wishlist/vinyl-watch-list.json', {
-        schemaVersion: 1,
-        items: [createVinylWatchItem()],
-      });
       await fileStorage.writeJSON('sellers/monitored-sellers.json', {
         schemaVersion: 1,
         sellers: [createMonitoredSeller()],
@@ -288,7 +270,6 @@ describe('BackupService', () => {
       expect(backup.data.hiddenAlbums).toHaveLength(1);
       expect(backup.data.hiddenArtists).toHaveLength(1);
       expect(backup.data.localWantList).toHaveLength(1);
-      expect(backup.data.vinylWatchList).toHaveLength(1);
       expect(backup.data.monitoredSellers).toHaveLength(1);
       expect(backup.data.artistMbidMappings).toHaveLength(1);
       expect(backup.data.hiddenReleases).toHaveLength(1);
@@ -332,7 +313,6 @@ describe('BackupService', () => {
           hiddenAlbums: [],
           hiddenArtists: [],
           localWantList: [],
-          vinylWatchList: [],
           monitoredSellers: [],
           artistMbidMappings: [],
           hiddenReleases: [],
@@ -433,7 +413,6 @@ describe('BackupService', () => {
           hiddenAlbums: [],
           hiddenArtists: [],
           localWantList: [],
-          vinylWatchList: [],
           monitoredSellers: [],
           artistMbidMappings: [],
           hiddenReleases: [],
@@ -520,7 +499,6 @@ describe('BackupService', () => {
           hiddenAlbums: [],
           hiddenArtists: [],
           localWantList: [],
-          vinylWatchList: [],
           monitoredSellers: [],
           artistMbidMappings: [],
           hiddenReleases: [],

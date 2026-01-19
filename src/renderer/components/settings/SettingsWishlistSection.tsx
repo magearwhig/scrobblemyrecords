@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 import {
   WishlistSettings,
-  VinylWatchItem,
   SellerMonitoringSettings,
 } from '../../../shared/types';
 import { useAuth } from '../../context/AuthContext';
@@ -20,7 +19,6 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
   // Wishlist settings state
   const [wishlistSettings, setWishlistSettings] =
     useState<WishlistSettings | null>(null);
-  const [vinylWatchList, setVinylWatchList] = useState<VinylWatchItem[]>([]);
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [wishlistError, setWishlistError] = useState<string>('');
   const [wishlistSuccess, setWishlistSuccess] = useState<string>('');
@@ -43,12 +41,8 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
   const loadWishlistSettings = useCallback(async () => {
     try {
       setWishlistLoading(true);
-      const [settings, watchList] = await Promise.all([
-        api.getWishlistSettings(),
-        api.getVinylWatchList(),
-      ]);
+      const settings = await api.getWishlistSettings();
       setWishlistSettings(settings);
-      setVinylWatchList(watchList);
     } catch (error) {
       console.warn('Failed to load wishlist settings:', error);
     } finally {
@@ -71,22 +65,6 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
       );
     } finally {
       setWishlistLoading(false);
-    }
-  };
-
-  const handleRemoveFromWatchList = async (masterId: number) => {
-    try {
-      await api.removeFromVinylWatch(masterId);
-      setVinylWatchList(prev =>
-        prev.filter(item => item.masterId !== masterId)
-      );
-      setWishlistSuccess('Removed from vinyl watch list');
-    } catch (error) {
-      setWishlistError(
-        error instanceof Error
-          ? error.message
-          : 'Failed to remove from watch list'
-      );
     }
   };
 
@@ -308,90 +286,6 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
               ) : (
                 <p>Unable to load wishlist settings. Please try again.</p>
               )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Vinyl Watch List */}
-      <div className='settings-section-card'>
-        <div className='settings-section-header'>
-          <span className='settings-section-icon'>👀</span>
-          <div>
-            <h3>Vinyl Watch List</h3>
-            <p className='settings-section-description'>
-              Albums you&apos;re watching for vinyl releases
-            </p>
-          </div>
-          {vinylWatchList.length > 0 && (
-            <span className='settings-section-badge'>
-              {vinylWatchList.length}
-            </span>
-          )}
-        </div>
-
-        <div className='settings-section-content'>
-          {vinylWatchList.length === 0 ? (
-            <div className='settings-empty-state'>
-              <p>No items in your vinyl watch list.</p>
-              <p className='settings-hint-text'>
-                Add items from the Wishlist page by clicking &quot;Watch for
-                Vinyl&quot; on CD-only releases.
-              </p>
-            </div>
-          ) : (
-            <div className='settings-watch-list'>
-              {vinylWatchList.map(item => (
-                <div key={item.masterId} className='settings-watch-item'>
-                  {item.coverImage && (
-                    <img
-                      src={item.coverImage}
-                      alt={`${item.artist} - ${item.title}`}
-                      className='settings-watch-item-cover'
-                    />
-                  )}
-                  <div className='settings-watch-item-info'>
-                    <div className='settings-watch-item-title'>
-                      {item.title}
-                    </div>
-                    <div className='settings-watch-item-artist'>
-                      {item.artist}
-                    </div>
-                    <div className='settings-watch-item-meta'>
-                      Added: {new Date(item.addedAt).toLocaleDateString()}
-                      {item.lastChecked && (
-                        <span>
-                          {' '}
-                          · Last checked:{' '}
-                          {new Date(item.lastChecked).toLocaleDateString()}
-                        </span>
-                      )}
-                      {item.notified && (
-                        <span className='settings-watch-item-notified'>
-                          {' '}
-                          · Vinyl available!
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className='settings-watch-item-actions'>
-                    <a
-                      href={`https://www.discogs.com/master/${item.masterId}`}
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      className='btn btn-small btn-secondary'
-                    >
-                      View on Discogs
-                    </a>
-                    <button
-                      className='btn btn-small btn-danger'
-                      onClick={() => handleRemoveFromWatchList(item.masterId)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
             </div>
           )}
         </div>

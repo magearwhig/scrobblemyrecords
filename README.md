@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-1940%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-2051%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -255,7 +255,7 @@ Sync and manage your Discogs wantlist with vinyl availability tracking:
 - **Refresh All**: Force re-check vinyl status for all items
 
 **Filtering & Sorting:**
-- **Tabs**: All Items, Has Vinyl, CD Only, Affordable, Wanted
+- **Tabs**: All Items, Has Vinyl, CD Only, Affordable, Wanted, New Releases
 - **Sort Options**: Date Added, Price, Artist, Album
 - **Affordable Filter**: Show items under your price threshold
 
@@ -282,6 +282,15 @@ Sync and manage your Discogs wantlist with vinyl availability tracking:
 - Watch CD-only albums for future vinyl releases
 - Automatic notifications when vinyl becomes available
 - Manage watch list from Settings page
+
+**New Releases Tab:**
+- Track new vinyl pressings for albums on your wishlist
+- Automatic detection of new versions (pressings) for master releases
+- Batch processing respects Discogs API rate limits
+- Filter by source: Discogs Wishlist, Local Want List, or Vinyl Watch List
+- Filter by detection timeframe: 7 days, 30 days, or 90 days
+- Dismiss individual releases or bulk dismiss all
+- Quick links to Discogs marketplace listings
 
 ### 🏪 Local Seller Monitoring
 Track Discogs inventories of your favorite local record shops to find wishlist items available nearby:

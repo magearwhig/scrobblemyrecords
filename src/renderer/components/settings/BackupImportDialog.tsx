@@ -85,7 +85,6 @@ const BackupImportDialog: React.FC<BackupImportDialogProps> = ({
     preview.summary.hiddenAlbums.new +
     preview.summary.hiddenArtists.new +
     preview.summary.localWantList.new +
-    preview.summary.vinylWatchList.new +
     preview.summary.monitoredSellers.new +
     preview.summary.artistMbidMappings.new +
     preview.summary.hiddenReleases.new +
@@ -98,7 +97,6 @@ const BackupImportDialog: React.FC<BackupImportDialogProps> = ({
     preview.summary.hiddenAlbums.existing +
     preview.summary.hiddenArtists.existing +
     preview.summary.localWantList.existing +
-    preview.summary.vinylWatchList.existing +
     preview.summary.monitoredSellers.existing +
     preview.summary.artistMbidMappings.existing +
     preview.summary.hiddenReleases.existing +
@@ -207,15 +205,6 @@ const BackupImportDialog: React.FC<BackupImportDialogProps> = ({
                     {formatSummaryLine(
                       'Local want list',
                       preview.summary.localWantList
-                    )}
-                  </li>
-                ) : null}
-                {preview.summary.vinylWatchList.new > 0 ||
-                preview.summary.vinylWatchList.existing > 0 ? (
-                  <li>
-                    {formatSummaryLine(
-                      'Vinyl watch list',
-                      preview.summary.vinylWatchList
                     )}
                   </li>
                 ) : null}

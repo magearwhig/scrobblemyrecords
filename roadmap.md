@@ -1258,7 +1258,32 @@ When viewing a new release:
 
 ## Feature 5.5: Wishlist New Release Tracking
 
-### Status: PLANNED
+### Status: COMPLETE ✅
+
+**Completed:**
+- `WishlistNewRelease`, `WishlistNewReleasesStore`, `NewReleaseSyncStatus`, `WishlistNewReleaseSettings` types
+- `getTrackedMasterIds()` method to collect masters from wishlist, local want list, and vinyl watch list
+- `checkForNewReleases()` with batching, retry logic, and exponential backoff
+- `fetchMasterVersionsWithRetry()` and `fetchMasterVersionsPaginated()` for paginated version fetching
+- `getNewReleases()`, `dismissNewRelease()`, `dismissNewReleasesBulk()`, `dismissAllNewReleases()`, `cleanupDismissedReleases()` CRUD methods
+- `getNewReleaseSyncStatus()` and `updateNewReleaseSyncStatus()` for progress tracking
+- API routes: `GET /api/v1/wishlist/new-releases`, `GET/POST /api/v1/wishlist/new-releases/status|check`, `PATCH /:id/dismiss`, `POST /dismiss-bulk`, `POST /dismiss-all`, `POST /cleanup`
+- Data files registered in migrationService.ts with schemaVersion: 1
+- Frontend API client methods in api.ts
+- `NewReleasesTab` component with filters (source, days, dismissed) and "Dismiss All" button
+- `NewReleaseCard` component with dismiss workflow
+- "New Releases" tab added to WishlistPage with badge count
+- Full CSS styling for new release components
+- 21 route tests (63 total for wishlist routes)
+- All 2051 tests passing
+
+**Implementation Details:**
+- Batch processing: 20 masters per check cycle
+- Rate limiting: 1.1 seconds between API calls
+- Retry logic: 3 attempts with exponential backoff (2s → 4s → 60s max)
+- Version pagination: Up to 100 versions per master, sorted newest first
+- Vinyl filtering: LP, 12", 10", 7" formats only
+- Source tracking: Discogs wishlist, local want list, vinyl watch list
 
 ### Implementation Plan
 See `.plan/wishlist-new-release-tracking-plan.md` for full specification.
@@ -1280,7 +1305,7 @@ This feature complements Feature 5 (MusicBrainz new release tracking) by focusin
 
 ### Data Sources
 - **Discogs Wishlist** - `WishlistItem.masterId`
-- **Local Want List** - `LocalWantItem.discogsMasterId` (new field)
+- **Local Want List** - `LocalWantItem.masterId`
 - **Vinyl Watch List** - `VinylWatchItem.masterId`
 
 ### Detection Algorithm
@@ -1292,16 +1317,16 @@ This feature complements Feature 5 (MusicBrainz new release tracking) by focusin
 ### Key Features
 - "New Releases" tab on existing Wishlist page
 - Notification integration for new pressings
-- Source filtering (Discogs wishlist vs local want list)
-- Time-based filtering (past 7 days, 30 days)
+- Source filtering (Discogs wishlist vs local want list vs vinyl watch)
+- Time-based filtering (past 7 days, 30 days, 90 days)
 - Dismiss/acknowledge workflow
-- Weekly batch checking with rate limit respect
+- Batch checking with rate limit respect and retry logic
 
 ### Phases
-1. **Core Infrastructure** - Types, storage, detection logic, API routes
-2. **UI Implementation** - New tab, release cards, filters
-3. **Settings & Notifications** - Preferences, notification integration
-4. **Optimization** - Batch processing, cleanup routines
+1. **Core Infrastructure** - Types, storage, detection logic, API routes ✅
+2. **UI Implementation** - New tab, release cards, filters ✅
+3. **Settings & Notifications** - Preferences, notification integration ✅
+4. **Optimization** - Batch processing, cleanup routines ✅
 
 ---
 
@@ -1326,7 +1351,7 @@ Feature 1 (Stats Dashboard) - COMPLETE ✅
 
 Feature 2 (Wishlist) - COMPLETE ✅
     ├── Feature 4 (Seller Monitoring) - COMPLETE ✅ - matches against wishlist
-    ├── Feature 5.5 (Wishlist New Releases) - tracks new pressings for wishlist items
+    ├── Feature 5.5 (Wishlist New Releases) - COMPLETE ✅ - tracks new pressings for wishlist items
     └── Feature 8 (Wishlist Enhancements) - extends wishlist UI
 
 Feature 5 (New Releases) - COMPLETE ✅

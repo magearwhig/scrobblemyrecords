@@ -8,11 +8,14 @@ import {
   LocalWantItem,
   LocalWantStore,
   MarketplaceStats,
+  NewReleaseSyncStatus,
   ReleaseVersion,
+  TrackedMasterInfo,
   VersionsCache,
-  VinylWatchItem,
-  VinylWatchStore,
   WishlistItem,
+  WishlistNewRelease,
+  WishlistNewReleasesStore,
+  WishlistNewReleaseSettings,
   WishlistSettings,
   WishlistStore,
   WishlistSyncStatus,
@@ -56,8 +59,19 @@ export class WishlistService {
   private readonly VERSIONS_CACHE = 'wishlist/versions-cache.json';
   private readonly SETTINGS_FILE = 'wishlist/settings.json';
   private readonly SYNC_STATUS_FILE = 'wishlist/sync-status.json';
-  private readonly WATCH_LIST_FILE = 'wishlist/vinyl-watch-list.json';
   private readonly LOCAL_WANT_LIST_FILE = 'wishlist/local-want-list.json';
+  // Feature 5.5: New release tracking
+  private readonly NEW_RELEASES_FILE = 'wishlist/new-releases.json';
+  private readonly NEW_RELEASE_SYNC_STATUS_FILE =
+    'wishlist/new-release-sync-status.json';
+
+  // New release checking constants
+  private readonly MASTERS_PER_BATCH = 20;
+  private readonly NEW_RELEASE_MAX_VERSIONS = 100; // For new release checking
+  private readonly CHECK_INTERVAL_MS = 1100; // 1.1 sec between API calls
+  private readonly MAX_RETRIES = 3;
+  private readonly INITIAL_BACKOFF_MS = 2000;
+  private readonly MAX_BACKOFF_MS = 60000;
 
   // Track sync state
   private syncInProgress = false;
@@ -152,26 +166,59 @@ export class WishlistService {
    * Get wishlist settings with defaults
    */
   async getSettings(): Promise<WishlistSettings> {
+    const defaultNewReleaseTracking: WishlistNewReleaseSettings = {
+      enabled: true,
+      checkFrequencyDays: 7,
+      notifyOnNewRelease: true,
+      autoCheck: false,
+      trackLocalWantList: true,
+    };
+
+    const defaults: WishlistSettings = {
+      schemaVersion: 1,
+      priceThreshold: 40,
+      currency: 'USD',
+      autoSyncInterval: 24, // Daily
+      notifyOnVinylAvailable: true,
+      newReleaseTracking: defaultNewReleaseTracking,
+    };
+
     try {
       const settings = await this.fileStorage.readJSON<WishlistSettings>(
         this.SETTINGS_FILE
       );
 
       if (settings && settings.schemaVersion === 1) {
-        return settings;
+        // Merge with defaults to ensure newReleaseTracking has all fields
+        const mergedNewReleaseTracking: WishlistNewReleaseSettings = {
+          enabled:
+            settings.newReleaseTracking?.enabled ??
+            defaultNewReleaseTracking.enabled,
+          checkFrequencyDays:
+            settings.newReleaseTracking?.checkFrequencyDays ??
+            defaultNewReleaseTracking.checkFrequencyDays,
+          notifyOnNewRelease:
+            settings.newReleaseTracking?.notifyOnNewRelease ??
+            defaultNewReleaseTracking.notifyOnNewRelease,
+          autoCheck:
+            settings.newReleaseTracking?.autoCheck ??
+            defaultNewReleaseTracking.autoCheck,
+          trackLocalWantList:
+            settings.newReleaseTracking?.trackLocalWantList ??
+            defaultNewReleaseTracking.trackLocalWantList,
+        };
+
+        return {
+          ...defaults,
+          ...settings,
+          newReleaseTracking: mergedNewReleaseTracking,
+        };
       }
     } catch {
       this.logger.debug('No settings file found, using defaults');
     }
 
-    // Return defaults
-    return {
-      schemaVersion: 1,
-      priceThreshold: 40,
-      currency: 'USD',
-      autoSyncInterval: 24, // Daily
-      notifyOnVinylAvailable: true,
-    };
+    return defaults;
   }
 
   /**
@@ -685,126 +732,6 @@ export class WishlistService {
   }
 
   // ============================================
-  // Watch List Management
-  // ============================================
-
-  /**
-   * Get vinyl watch list
-   */
-  async getWatchList(): Promise<VinylWatchItem[]> {
-    try {
-      const store = await this.fileStorage.readJSON<VinylWatchStore>(
-        this.WATCH_LIST_FILE
-      );
-
-      if (store && store.schemaVersion === 1) {
-        return store.items;
-      }
-    } catch {
-      // No watch list exists
-    }
-
-    return [];
-  }
-
-  /**
-   * Add item to vinyl watch list
-   */
-  async addToWatchList(
-    item: Omit<VinylWatchItem, 'addedAt' | 'notified'>
-  ): Promise<void> {
-    const watchList = await this.getWatchList();
-
-    // Check if already watching
-    if (watchList.some(w => w.masterId === item.masterId)) {
-      this.logger.debug(`Already watching master ${item.masterId}`);
-      return;
-    }
-
-    const watchItem: VinylWatchItem = {
-      ...item,
-      addedAt: Date.now(),
-      notified: false,
-    };
-
-    watchList.push(watchItem);
-
-    const store: VinylWatchStore = {
-      schemaVersion: 1,
-      items: watchList,
-    };
-
-    await this.fileStorage.writeJSON(this.WATCH_LIST_FILE, store);
-    this.logger.info(
-      `Added ${item.artist} - ${item.title} to vinyl watch list`
-    );
-  }
-
-  /**
-   * Remove item from vinyl watch list
-   */
-  async removeFromWatchList(masterId: number): Promise<boolean> {
-    const watchList = await this.getWatchList();
-    const index = watchList.findIndex(w => w.masterId === masterId);
-
-    if (index === -1) {
-      return false;
-    }
-
-    watchList.splice(index, 1);
-
-    const store: VinylWatchStore = {
-      schemaVersion: 1,
-      items: watchList,
-    };
-
-    await this.fileStorage.writeJSON(this.WATCH_LIST_FILE, store);
-    this.logger.info(`Removed master ${masterId} from vinyl watch list`);
-    return true;
-  }
-
-  /**
-   * Check watch list for newly available vinyl
-   * Returns items that now have vinyl available
-   */
-  async checkWatchListForVinyl(): Promise<VinylWatchItem[]> {
-    const watchList = await this.getWatchList();
-    const newlyAvailable: VinylWatchItem[] = [];
-
-    for (const item of watchList) {
-      if (item.notified) continue; // Already notified
-
-      try {
-        const versions = await this.getMasterVersions(item.masterId);
-        const hasVinyl = versions.some(v => v.hasVinyl);
-
-        if (hasVinyl) {
-          newlyAvailable.push(item);
-
-          // Mark as notified
-          item.notified = true;
-          item.lastChecked = Date.now();
-        }
-      } catch {
-        this.logger.warn(
-          `Failed to check vinyl for watch item ${item.masterId}`
-        );
-      }
-    }
-
-    // Save updated watch list
-    if (newlyAvailable.length > 0) {
-      const store: VinylWatchStore = {
-        schemaVersion: 1,
-        items: watchList,
-      };
-      await this.fileStorage.writeJSON(this.WATCH_LIST_FILE, store);
-    }
-
-    return newlyAvailable;
-  }
-
-  // ============================================
   // Discogs Wantlist API (Add/Remove)
   // ============================================
 
@@ -1159,6 +1086,534 @@ export class WishlistService {
         items: wantList,
       };
       await this.fileStorage.writeJSON(this.LOCAL_WANT_LIST_FILE, store);
+    }
+  }
+
+  // ============================================
+  // Feature 5.5: New Release Tracking
+  // ============================================
+
+  /**
+   * Get all tracked master IDs from wishlist and local want list
+   */
+  async getTrackedMasterIds(): Promise<Map<number, TrackedMasterInfo>> {
+    const masterMap = new Map<number, TrackedMasterInfo>();
+    const itemsWithoutMasterId: string[] = [];
+
+    // 1. Discogs wishlist items
+    const wishlist = await this.getWishlistItems();
+    for (const item of wishlist) {
+      if (item.masterId) {
+        masterMap.set(item.masterId, {
+          source: 'wishlist',
+          itemId: item.id,
+          artistAlbum: `${item.artist} - ${item.title}`,
+          coverImage: item.coverImage,
+        });
+      } else {
+        itemsWithoutMasterId.push(
+          `${item.artist} - ${item.title} (release ${item.releaseId})`
+        );
+      }
+    }
+
+    // 2. Local want list items (if they have master IDs)
+    const localWant = await this.getLocalWantList();
+    for (const item of localWant) {
+      if (item.masterId && !masterMap.has(item.masterId)) {
+        masterMap.set(item.masterId, {
+          source: 'local_want',
+          itemId: item.id,
+          artistAlbum: `${item.artist} - ${item.album}`,
+          coverImage: item.coverImage,
+        });
+      }
+    }
+
+    if (itemsWithoutMasterId.length > 0) {
+      this.logger.info(
+        `${itemsWithoutMasterId.length} wishlist items have no master ID and won't be tracked for new releases`
+      );
+      this.logger.debug('Items without master ID:', itemsWithoutMasterId);
+    }
+
+    return masterMap;
+  }
+
+  /**
+   * Get the versions cache (for new release detection comparison)
+   */
+  async getVersionsCache(): Promise<VersionsCache> {
+    try {
+      const cache = await this.fileStorage.readJSON<VersionsCache>(
+        this.VERSIONS_CACHE
+      );
+      if (cache && cache.schemaVersion === 1) {
+        return cache;
+      }
+    } catch {
+      // Cache doesn't exist
+    }
+    return { schemaVersion: 1, entries: {} };
+  }
+
+  /**
+   * Update versions cache for a master
+   */
+  async updateVersionsCache(
+    masterId: number,
+    versions: ReleaseVersion[]
+  ): Promise<void> {
+    await this.cacheVersions(masterId, versions);
+  }
+
+  /**
+   * Determine if an error is retryable (rate limits, service unavailable, network issues)
+   */
+  private isRetryableError(error: unknown): boolean {
+    if (axios.isAxiosError(error)) {
+      // HTTP errors that are retryable
+      if (error.response?.status === 429 || error.response?.status === 503) {
+        return true;
+      }
+      // Network errors (no response received)
+      if (!error.response && error.code) {
+        const retryableCodes = [
+          'ETIMEDOUT',
+          'ECONNRESET',
+          'ECONNREFUSED',
+          'ENOTFOUND',
+          'EAI_AGAIN',
+        ];
+        return retryableCodes.includes(error.code);
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Fetch master versions with exponential backoff retry
+   */
+  private async fetchMasterVersionsWithRetry(
+    masterId: number
+  ): Promise<ReleaseVersion[]> {
+    let delay = this.INITIAL_BACKOFF_MS;
+
+    for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
+      try {
+        return await this.fetchMasterVersionsPaginated(masterId);
+      } catch (error) {
+        const isRetryable = this.isRetryableError(error);
+
+        if (!isRetryable || attempt === this.MAX_RETRIES) {
+          throw error;
+        }
+
+        this.logger.warn(
+          `Retryable error fetching master ${masterId}, retry ${attempt}/${this.MAX_RETRIES} in ${delay}ms`,
+          error
+        );
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay = Math.min(delay * 2, this.MAX_BACKOFF_MS);
+      }
+    }
+
+    throw new Error('Max retries exceeded');
+  }
+
+  /**
+   * Fetch master versions with pagination for new release checking
+   * Sorted by newest first, limited to NEW_RELEASE_MAX_VERSIONS
+   */
+  private async fetchMasterVersionsPaginated(
+    masterId: number
+  ): Promise<ReleaseVersion[]> {
+    const allVersions: ReleaseVersion[] = [];
+    let page = 1;
+    const perPage = 50; // Discogs max per page
+
+    while (allVersions.length < this.NEW_RELEASE_MAX_VERSIONS) {
+      const headers = await this.getAuthHeaders();
+      const response = await this.axios.get(`/masters/${masterId}/versions`, {
+        headers,
+        params: {
+          page,
+          per_page: perPage,
+          sort: 'released',
+          sort_order: 'desc',
+        },
+      });
+
+      const versions = response.data.versions || [];
+      if (versions.length === 0) break;
+
+      for (const v of versions) {
+        const format = v.format?.split(', ') || [];
+        allVersions.push({
+          releaseId: v.id,
+          title: v.title,
+          format,
+          label: v.label || '',
+          country: v.country || '',
+          year: v.released ? parseInt(v.released.substring(0, 4), 10) : 0,
+          hasVinyl: this.isVinylFormat(format),
+          lastFetched: Date.now(),
+        });
+
+        if (allVersions.length >= this.NEW_RELEASE_MAX_VERSIONS) break;
+      }
+
+      // Check if there are more pages
+      const pagination = response.data.pagination;
+      if (!pagination || page >= pagination.pages) break;
+
+      page++;
+      await new Promise(r => setTimeout(r, this.CHECK_INTERVAL_MS));
+    }
+
+    return allVersions;
+  }
+
+  /**
+   * Get new release sync status
+   */
+  async getNewReleaseSyncStatus(): Promise<NewReleaseSyncStatus> {
+    try {
+      const status = await this.fileStorage.readJSON<NewReleaseSyncStatus>(
+        this.NEW_RELEASE_SYNC_STATUS_FILE
+      );
+
+      if (status) {
+        return status;
+      }
+    } catch {
+      // Status file doesn't exist
+    }
+
+    return {
+      status: 'idle',
+      lastFullCheck: null,
+      mastersProcessed: 0,
+      totalMasters: 0,
+      newReleasesFound: 0,
+      lastCheckedIndex: 0,
+      progress: 0,
+    };
+  }
+
+  /**
+   * Update new release sync status (partial update)
+   */
+  async updateNewReleaseSyncStatus(
+    updates: Partial<NewReleaseSyncStatus>
+  ): Promise<void> {
+    const current = await this.getNewReleaseSyncStatus();
+    const updated = { ...current, ...updates };
+    await this.fileStorage.writeJSON(
+      this.NEW_RELEASE_SYNC_STATUS_FILE,
+      updated
+    );
+  }
+
+  /**
+   * Get stored new releases
+   */
+  async getNewReleases(): Promise<WishlistNewReleasesStore> {
+    try {
+      const store = await this.fileStorage.readJSON<WishlistNewReleasesStore>(
+        this.NEW_RELEASES_FILE
+      );
+
+      if (store && store.schemaVersion === 1) {
+        return store;
+      }
+    } catch {
+      // File doesn't exist
+    }
+
+    return {
+      schemaVersion: 1,
+      lastCheck: 0,
+      releases: [],
+    };
+  }
+
+  /**
+   * Save new releases to store and update lastCheck timestamp
+   * Always updates lastCheck even if no new releases found
+   */
+  private async saveNewReleasesAndUpdateLastCheck(
+    newReleases: WishlistNewRelease[]
+  ): Promise<void> {
+    const store = await this.getNewReleases();
+    if (newReleases.length > 0) {
+      store.releases.push(...newReleases);
+    }
+    store.lastCheck = Date.now();
+    await this.fileStorage.writeJSON(this.NEW_RELEASES_FILE, store);
+  }
+
+  /**
+   * Dismiss a new release alert
+   */
+  async dismissNewRelease(releaseId: string): Promise<void> {
+    const store = await this.getNewReleases();
+    const release = store.releases.find(r => r.id === releaseId);
+    if (release) {
+      release.dismissed = true;
+      await this.fileStorage.writeJSON(this.NEW_RELEASES_FILE, store);
+    }
+  }
+
+  /**
+   * Dismiss multiple new release alerts at once
+   */
+  async dismissNewReleasesBulk(releaseIds: string[]): Promise<number> {
+    const store = await this.getNewReleases();
+    let dismissedCount = 0;
+
+    for (const id of releaseIds) {
+      const release = store.releases.find(r => r.id === id);
+      if (release && !release.dismissed) {
+        release.dismissed = true;
+        dismissedCount++;
+      }
+    }
+
+    if (dismissedCount > 0) {
+      await this.fileStorage.writeJSON(this.NEW_RELEASES_FILE, store);
+    }
+
+    return dismissedCount;
+  }
+
+  /**
+   * Dismiss all non-dismissed new releases
+   */
+  async dismissAllNewReleases(): Promise<number> {
+    const store = await this.getNewReleases();
+    let dismissedCount = 0;
+
+    for (const release of store.releases) {
+      if (!release.dismissed) {
+        release.dismissed = true;
+        dismissedCount++;
+      }
+    }
+
+    if (dismissedCount > 0) {
+      await this.fileStorage.writeJSON(this.NEW_RELEASES_FILE, store);
+    }
+
+    return dismissedCount;
+  }
+
+  /**
+   * Remove old dismissed releases (cleanup)
+   */
+  async cleanupDismissedReleases(maxAgeDays = 90): Promise<number> {
+    const store = await this.getNewReleases();
+    const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+    const originalCount = store.releases.length;
+
+    store.releases = store.releases.filter(
+      r => !r.dismissed || r.detectedAt > cutoff
+    );
+
+    await this.fileStorage.writeJSON(this.NEW_RELEASES_FILE, store);
+    return originalCount - store.releases.length;
+  }
+
+  /**
+   * Check for new releases with batching, retry logic, and progress tracking
+   */
+  async checkForNewReleases(force = false): Promise<WishlistNewRelease[]> {
+    const settings = await this.getSettings();
+    if (!settings.newReleaseTracking?.enabled && !force) {
+      return [];
+    }
+
+    const syncStatus = await this.getNewReleaseSyncStatus();
+
+    // Don't start new check if one is in progress
+    if (syncStatus.status === 'syncing') {
+      this.logger.warn('New release check already in progress');
+      return [];
+    }
+
+    const trackedMasters = await this.getTrackedMasterIds();
+    const allMasterIds = Array.from(trackedMasters.keys());
+
+    if (allMasterIds.length === 0) {
+      this.logger.info('No masters to check for new releases');
+      return [];
+    }
+
+    // Initialize sync status
+    await this.updateNewReleaseSyncStatus({
+      status: 'syncing',
+      totalMasters: allMasterIds.length,
+      mastersProcessed: 0,
+      newReleasesFound: 0,
+      lastCheckedIndex: syncStatus.lastCheckedIndex || 0,
+      progress: 0,
+      error: undefined,
+    });
+
+    const newReleases: WishlistNewRelease[] = [];
+    const versionsCache = await this.getVersionsCache();
+    const existingNew = await this.getNewReleases();
+    const existingNewIds = new Set(existingNew.releases.map(r => r.id));
+
+    const startIndex = syncStatus.lastCheckedIndex || 0;
+    const endIndex = Math.min(
+      startIndex + this.MASTERS_PER_BATCH,
+      allMasterIds.length
+    );
+
+    try {
+      for (let i = startIndex; i < endIndex; i++) {
+        const masterId = allMasterIds[i];
+        const sourceInfo = trackedMasters.get(masterId);
+
+        if (!sourceInfo) continue;
+
+        // Skip if source settings disable this type
+        if (
+          sourceInfo.source === 'local_want' &&
+          !settings.newReleaseTracking?.trackLocalWantList
+        ) {
+          continue;
+        }
+
+        // Update progress
+        await this.updateNewReleaseSyncStatus({
+          mastersProcessed: i - startIndex + 1,
+          progress: Math.round(
+            ((i - startIndex + 1) / (endIndex - startIndex)) * 100
+          ),
+          currentMaster: sourceInfo.artistAlbum,
+        });
+
+        // Fetch with retry logic
+        let freshVersions: ReleaseVersion[];
+        try {
+          freshVersions = await this.fetchMasterVersionsWithRetry(masterId);
+        } catch (error) {
+          this.logger.warn(
+            `Failed to fetch versions for master ${masterId}, skipping`,
+            error
+          );
+          continue;
+        }
+
+        // Get cached versions (what we knew about before)
+        const cachedEntry = versionsCache.entries[masterId];
+        const cachedReleaseIds = new Set(
+          cachedEntry?.versions.map(v => v.releaseId) || []
+        );
+
+        // Find new vinyl releases
+        for (const version of freshVersions) {
+          if (!cachedReleaseIds.has(version.releaseId) && version.hasVinyl) {
+            const releaseId = `${masterId}-${version.releaseId}`;
+
+            // Skip if already tracked
+            if (existingNewIds.has(releaseId)) {
+              continue;
+            }
+
+            const newRelease: WishlistNewRelease = {
+              id: releaseId,
+              masterId,
+              releaseId: version.releaseId,
+              title: version.title,
+              artist: sourceInfo.artistAlbum.split(' - ')[0],
+              year: version.year,
+              country: version.country,
+              format: version.format,
+              label: version.label,
+              catalogNumber: undefined,
+              lowestPrice: version.marketplaceStats?.lowestPrice,
+              priceCurrency: version.marketplaceStats?.currency,
+              numForSale: version.marketplaceStats?.numForSale,
+              source: sourceInfo.source,
+              sourceItemId: sourceInfo.itemId,
+              detectedAt: Date.now(),
+              notified: false,
+              dismissed: false,
+              discogsUrl: `https://www.discogs.com/release/${version.releaseId}`,
+              coverImage: sourceInfo.coverImage,
+            };
+
+            newReleases.push(newRelease);
+            existingNewIds.add(releaseId);
+          }
+        }
+
+        // Update versions cache with fresh data
+        await this.updateVersionsCache(masterId, freshVersions);
+
+        // Rate limiting between masters
+        await new Promise(r => setTimeout(r, this.CHECK_INTERVAL_MS));
+      }
+
+      // Determine if we completed a full cycle
+      const completedFullCycle = endIndex >= allMasterIds.length;
+
+      // Save new releases and always update lastCheck timestamp
+      await this.saveNewReleasesAndUpdateLastCheck(newReleases);
+
+      // Update sync status
+      await this.updateNewReleaseSyncStatus({
+        status: 'completed',
+        lastCheckedIndex: completedFullCycle ? 0 : endIndex,
+        lastFullCheck: completedFullCycle
+          ? Date.now()
+          : syncStatus.lastFullCheck,
+        newReleasesFound: newReleases.length,
+        progress: 100,
+        currentMaster: undefined,
+      });
+
+      this.logger.info(
+        `New release check completed: ${newReleases.length} new releases found, ` +
+          `${endIndex - startIndex} masters checked`
+      );
+
+      return newReleases;
+    } catch (error) {
+      this.logger.error('New release check failed', error);
+      await this.updateNewReleaseSyncStatus({
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        lastError: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: Date.now(),
+          retryCount: (syncStatus.lastError?.retryCount || 0) + 1,
+        },
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Mark new releases as notified
+   */
+  async markNewReleasesAsNotified(releaseIds: string[]): Promise<void> {
+    const store = await this.getNewReleases();
+    let modified = false;
+
+    for (const id of releaseIds) {
+      const release = store.releases.find(r => r.id === id);
+      if (release && !release.notified) {
+        release.notified = true;
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      await this.fileStorage.writeJSON(this.NEW_RELEASES_FILE, store);
     }
   }
 }

@@ -24,6 +24,7 @@ import {
   MissingAlbum,
   MissingArtist,
   MonitoredSeller,
+  NewReleaseSyncStatus,
   ReleaseTrackingSyncStatus,
   ReleaseVersion,
   ScrobbleTrack,
@@ -35,7 +36,7 @@ import {
   SuggestionSettings,
   SyncSettings,
   SyncStatus,
-  VinylWatchItem,
+  WishlistNewRelease,
   WishlistSettings,
   WishlistSyncStatus,
 } from '../../shared/types';
@@ -947,29 +948,6 @@ class ApiService {
     return response.data.data;
   }
 
-  async getVinylWatchList(): Promise<VinylWatchItem[]> {
-    const response = await this.api.get('/wishlist/watch');
-    return response.data.data;
-  }
-
-  async addToVinylWatch(item: {
-    masterId: number;
-    artist: string;
-    title: string;
-    coverImage?: string;
-  }): Promise<void> {
-    await this.api.post('/wishlist/watch', item);
-  }
-
-  async removeFromVinylWatch(masterId: number): Promise<void> {
-    await this.api.delete(`/wishlist/watch/${masterId}`);
-  }
-
-  async checkVinylWatch(): Promise<VinylWatchItem[]> {
-    const response = await this.api.post('/wishlist/watch/check');
-    return response.data.data;
-  }
-
   // Search Discogs for releases to add to wantlist
   async searchDiscogsForWishlist(
     artist: string,
@@ -1028,6 +1006,86 @@ class ApiService {
   async checkLocalWantListForVinyl(): Promise<LocalWantItem[]> {
     const response = await this.api.post('/wishlist/local/check');
     return response.data.data;
+  }
+
+  // ============================================
+  // Feature 5.5: New Release Tracking methods
+  // ============================================
+
+  /**
+   * Get detected new releases
+   */
+  async getWishlistNewReleases(options?: {
+    source?: 'wishlist' | 'local_want';
+    days?: number;
+    showDismissed?: boolean;
+  }): Promise<{
+    lastCheck: number;
+    releases: WishlistNewRelease[];
+    count: number;
+  }> {
+    const params = new URLSearchParams();
+    if (options?.source) params.set('source', options.source);
+    if (options?.days) params.set('days', options.days.toString());
+    if (options?.showDismissed) params.set('showDismissed', 'true');
+
+    const response = await this.api.get(
+      `/wishlist/new-releases?${params.toString()}`
+    );
+    return response.data.data;
+  }
+
+  /**
+   * Get new release check sync status
+   */
+  async getNewReleaseSyncStatus(): Promise<NewReleaseSyncStatus> {
+    const response = await this.api.get('/wishlist/new-releases/status');
+    return response.data.data;
+  }
+
+  /**
+   * Trigger check for new releases
+   */
+  async checkForNewReleases(): Promise<void> {
+    await this.api.post('/wishlist/new-releases/check');
+  }
+
+  /**
+   * Dismiss a new release alert
+   */
+  async dismissNewRelease(id: string): Promise<void> {
+    await this.api.patch(`/wishlist/new-releases/${id}/dismiss`);
+  }
+
+  /**
+   * Dismiss multiple new release alerts at once
+   */
+  async dismissNewReleasesBulk(ids: string[]): Promise<number> {
+    const response = await this.api.post(
+      '/wishlist/new-releases/dismiss-bulk',
+      {
+        ids,
+      }
+    );
+    return response.data.data.dismissed;
+  }
+
+  /**
+   * Dismiss all non-dismissed new releases
+   */
+  async dismissAllNewReleases(): Promise<number> {
+    const response = await this.api.post('/wishlist/new-releases/dismiss-all');
+    return response.data.data.dismissed;
+  }
+
+  /**
+   * Clean up old dismissed releases
+   */
+  async cleanupDismissedReleases(maxAgeDays = 90): Promise<number> {
+    const response = await this.api.post('/wishlist/new-releases/cleanup', {
+      maxAgeDays,
+    });
+    return response.data.data.removed;
   }
 
   // ============================================
