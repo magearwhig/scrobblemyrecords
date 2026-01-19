@@ -152,7 +152,18 @@ body {
   font-size: 0.95rem;
   font-family: inherit;
   text-align: left;
-  transition: background-color 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+
+/* Ensure dark mode colors apply to buttons */
+.dark-mode .nav-link {
+  color: var(--text-primary);
+}
+
+.dark-mode .nav-link.active {
+  color: white;
 }
 
 .nav-link:hover {
