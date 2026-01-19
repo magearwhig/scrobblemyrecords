@@ -9,6 +9,7 @@ import {
   LocalWantStore,
   MarketplaceStats,
   NewReleaseSyncStatus,
+  PriceSuggestions,
   ReleaseVersion,
   TrackedMasterInfo,
   VersionsCache,
@@ -701,6 +702,8 @@ export class WishlistService {
 
   /**
    * Get marketplace stats for a release
+   * Note: Discogs API only returns lowest_price in /marketplace/stats
+   * We also fetch /marketplace/price_suggestions for price ranges by condition
    */
   async getMarketplaceStats(
     releaseId: number
@@ -708,23 +711,107 @@ export class WishlistService {
     try {
       const headers = await this.getAuthHeaders();
 
-      const response = await this.axios.get(`/marketplace/stats/${releaseId}`, {
-        headers,
-      });
+      // Fetch both stats and price suggestions in parallel
+      const [statsResponse, priceSuggestions] = await Promise.all([
+        this.axios.get(`/marketplace/stats/${releaseId}`, { headers }),
+        this.getPriceSuggestions(releaseId),
+      ]);
 
-      const data = response.data;
+      const data = statsResponse.data;
+
+      // Calculate estimated price range from price suggestions
+      let estimatedLow: number | undefined;
+      let estimatedHigh: number | undefined;
+
+      this.logger.debug(
+        `Price suggestions received for release ${releaseId}:`,
+        priceSuggestions ? 'yes' : 'no'
+      );
+
+      if (priceSuggestions) {
+        const prices = [
+          priceSuggestions.poor?.value,
+          priceSuggestions.fair?.value,
+          priceSuggestions.good?.value,
+          priceSuggestions.goodPlus?.value,
+          priceSuggestions.veryGood?.value,
+          priceSuggestions.veryGoodPlus?.value,
+          priceSuggestions.nearMint?.value,
+          priceSuggestions.mint?.value,
+        ].filter((p): p is number => p !== undefined && p > 0);
+
+        this.logger.debug(`Filtered prices for release ${releaseId}:`, prices);
+
+        if (prices.length > 0) {
+          estimatedLow = Math.min(...prices);
+          estimatedHigh = Math.max(...prices);
+          this.logger.debug(
+            `Price range for release ${releaseId}: ${estimatedLow} - ${estimatedHigh}`
+          );
+        }
+      }
 
       return {
         lowestPrice: data.lowest_price?.value,
-        medianPrice: data.median_price?.value,
-        highestPrice: data.highest_price?.value,
+        // Use price suggestions to estimate median and high
+        medianPrice:
+          priceSuggestions?.veryGoodPlus?.value ||
+          priceSuggestions?.veryGood?.value,
+        highestPrice: estimatedHigh,
         numForSale: data.num_for_sale || 0,
-        currency: data.lowest_price?.currency || 'USD',
+        currency:
+          data.lowest_price?.currency ||
+          priceSuggestions?.veryGood?.currency ||
+          'USD',
         lastFetched: Date.now(),
+        priceSuggestions: priceSuggestions ?? undefined,
       };
     } catch (error) {
       this.logger.warn(
         `Failed to get marketplace stats for release ${releaseId}`,
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Get price suggestions by condition for a release
+   * Requires authentication
+   */
+  async getPriceSuggestions(
+    releaseId: number
+  ): Promise<PriceSuggestions | null> {
+    try {
+      const headers = await this.getAuthHeaders();
+
+      const response = await this.axios.get(
+        `/marketplace/price_suggestions/${releaseId}`,
+        { headers }
+      );
+
+      const data = response.data;
+      this.logger.debug(
+        `Price suggestions for release ${releaseId}:`,
+        JSON.stringify(data)
+      );
+
+      const result = {
+        mint: data['Mint (M)'],
+        nearMint: data['Near Mint (NM or M-)'],
+        veryGoodPlus: data['Very Good Plus (VG+)'],
+        veryGood: data['Very Good (VG)'],
+        goodPlus: data['Good Plus (G+)'],
+        good: data['Good (G)'],
+        fair: data['Fair (F)'],
+        poor: data['Poor (P)'],
+      };
+
+      this.logger.debug(`Parsed price suggestions:`, JSON.stringify(result));
+      return result;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to get price suggestions for release ${releaseId}`,
         error
       );
       return null;

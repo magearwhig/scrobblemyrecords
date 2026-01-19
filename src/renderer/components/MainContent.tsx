@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 import CollectionPage from '../pages/CollectionPage';
+import DiscardPilePage from '../pages/DiscardPilePage';
 import DiscoveryPage from '../pages/DiscoveryPage';
 import HistoryPage from '../pages/HistoryPage';
 import HomePage from '../pages/HomePage';
@@ -59,6 +60,8 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
         return <SellersPage />;
       case 'seller-matches':
         return <SellerMatchesPage />;
+      case 'discard-pile':
+        return <DiscardPilePage />;
       default:
         return <HomePage />;
     }

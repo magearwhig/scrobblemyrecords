@@ -543,6 +543,28 @@ export interface MarketplaceStats {
   numForSale: number;
   currency: string; // e.g., "USD"
   lastFetched: number; // Unix timestamp
+  // Price suggestions by condition (from /marketplace/price_suggestions)
+  priceSuggestions?: PriceSuggestions;
+}
+
+/**
+ * Price suggestions by vinyl condition from Discogs
+ * Returned by /marketplace/price_suggestions/{release_id}
+ */
+export interface PriceSuggestions {
+  mint?: PriceSuggestion;
+  nearMint?: PriceSuggestion;
+  veryGoodPlus?: PriceSuggestion;
+  veryGood?: PriceSuggestion;
+  goodPlus?: PriceSuggestion;
+  good?: PriceSuggestion;
+  fair?: PriceSuggestion;
+  poor?: PriceSuggestion;
+}
+
+export interface PriceSuggestion {
+  value: number;
+  currency: string;
 }
 
 /**
@@ -1372,4 +1394,112 @@ export interface AutoBackupInfo {
 export interface BackupSettingsStore extends VersionedStore {
   schemaVersion: 1;
   settings: BackupSettings;
+}
+
+// ============================================
+// Discard Pile Types (Feature 7)
+// ============================================
+
+/**
+ * Reasons for discarding a record
+ */
+export type DiscardReason =
+  | 'selling' // Planning to sell
+  | 'duplicate' // Have multiple copies
+  | 'damaged' // Physical damage
+  | 'upgrade' // Replacing with better pressing
+  | 'not_listening' // No longer interested
+  | 'gift' // Giving away
+  | 'other'; // Custom reason
+
+/**
+ * Status of a discard pile item
+ */
+export type DiscardStatus =
+  | 'marked' // Just added to discard pile
+  | 'listed' // Listed for sale somewhere
+  | 'sold' // Successfully sold
+  | 'gifted' // Given away
+  | 'removed'; // Actually removed from collection
+
+/**
+ * Item marked for discard/sale tracking
+ */
+export interface DiscardPileItem {
+  id: string; // Generated hash of collectionItemId
+  collectionItemId: number; // Discogs collection instance ID (CollectionItem.id)
+  releaseId: number; // Discogs release ID (for lookups)
+  masterId?: number; // Discogs master ID (for grouping pressings)
+  artist: string;
+  title: string;
+  coverImage?: string;
+  format?: string[]; // ["Vinyl", "LP", "Album"]
+  year?: number;
+  reason: DiscardReason;
+  reasonNote?: string; // Custom note for 'other' reason
+  rating?: number; // Original rating from collection
+  addedAt: number; // When added to discard pile (timestamp)
+  status: DiscardStatus;
+  statusChangedAt: number; // When status last changed (initialize to addedAt)
+  estimatedValue?: number; // User's estimate
+  actualSalePrice?: number; // What it actually sold for
+  currency: string; // ISO currency code (e.g., 'USD', 'EUR', 'GBP')
+  marketplaceUrl?: string; // Link if listed for sale (Discogs, eBay, etc.)
+  notes?: string; // General notes
+  orphaned: boolean; // True if no longer in collection (sold/removed externally)
+}
+
+/**
+ * Versioned store for discard pile items
+ */
+export interface DiscardPileStore extends VersionedStore {
+  schemaVersion: 1;
+  items: DiscardPileItem[];
+  lastUpdated: number;
+}
+
+/**
+ * Aggregated statistics for discard pile
+ */
+export interface DiscardPileStats {
+  totalItems: number;
+  byStatus: Record<DiscardStatus, number>;
+  byReason: Record<DiscardReason, number>;
+  totalEstimatedValue: number;
+  totalActualSales: number;
+  currency: string; // Primary currency for totals
+}
+
+/**
+ * Request DTO for adding item to discard pile
+ */
+export interface AddDiscardPileItemRequest {
+  collectionItemId: number; // Required: Discogs collection instance ID
+  releaseId: number; // Required: Discogs release ID
+  masterId?: number;
+  artist: string;
+  title: string;
+  coverImage?: string;
+  format?: string[];
+  year?: number;
+  reason: DiscardReason;
+  reasonNote?: string;
+  rating?: number;
+  estimatedValue?: number;
+  currency?: string; // Defaults to 'USD' if not provided
+  notes?: string;
+}
+
+/**
+ * Request DTO for updating discard pile item
+ */
+export interface UpdateDiscardPileItemRequest {
+  reason?: DiscardReason;
+  reasonNote?: string;
+  status?: DiscardStatus;
+  estimatedValue?: number;
+  actualSalePrice?: number;
+  currency?: string;
+  marketplaceUrl?: string;
+  notes?: string;
 }

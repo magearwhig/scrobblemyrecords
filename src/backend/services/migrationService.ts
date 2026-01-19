@@ -277,6 +277,16 @@ export class MigrationService {
       migrations: [],
       optional: true,
     });
+
+    // ============================================
+    // Discard Pile Files (Feature 7)
+    // ============================================
+    this.register('discard-pile', {
+      path: 'collections/discard-pile.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
   }
 
   private register(key: string, meta: DataFileMeta): void {

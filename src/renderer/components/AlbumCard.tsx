@@ -7,6 +7,8 @@ interface AlbumCardProps {
   selected: boolean;
   onSelect: () => void;
   onViewDetails: (release: DiscogsRelease) => void;
+  isInDiscardPile?: boolean;
+  onAddToDiscardPile?: (item: CollectionItem) => void;
 }
 
 const AlbumCard: React.FC<AlbumCardProps> = ({
@@ -14,6 +16,8 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
   selected,
   onSelect,
   onViewDetails,
+  isInDiscardPile = false,
+  onAddToDiscardPile,
 }) => {
   const { release } = item;
 
@@ -29,7 +33,9 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
   };
 
   return (
-    <div className={`album-card ${selected ? 'selected' : ''}`}>
+    <div
+      className={`album-card ${selected ? 'selected' : ''} ${isInDiscardPile ? 'in-discard-pile' : ''}`}
+    >
       <div
         className='album-cover'
         onClick={() => onViewDetails(release)}
@@ -41,6 +47,11 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
         title='Click to view details'
       >
         {!getImageUrl(release.cover_image) && '🎵'}
+        {isInDiscardPile && (
+          <span className='discard-pile-badge' title='In Discard Pile'>
+            📦
+          </span>
+        )}
       </div>
 
       <div style={{ flex: 1 }}>
@@ -100,6 +111,35 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
         >
           View Details
         </button>
+
+        {onAddToDiscardPile && !isInDiscardPile && (
+          <button
+            type='button'
+            className='btn btn-small btn-outline-warning'
+            onClick={e => {
+              e.preventDefault();
+              e.stopPropagation();
+              onAddToDiscardPile(item);
+            }}
+            style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}
+            title='Add to discard pile'
+          >
+            📦 Discard
+          </button>
+        )}
+
+        {isInDiscardPile && (
+          <span
+            className='discard-pile-indicator'
+            style={{
+              fontSize: '0.7rem',
+              color: 'var(--accent-warning, #f59e0b)',
+              textAlign: 'center',
+            }}
+          >
+            In Discard Pile
+          </span>
+        )}
       </div>
     </div>
   );

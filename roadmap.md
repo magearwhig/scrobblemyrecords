@@ -1479,7 +1479,28 @@ See `.plan/forgotten-favorites-plan.md` for full specification including:
 
 ## Feature 7: Discard Pile
 
-### Status: PLANNED
+### Status: COMPLETE ✅
+
+**Completed:**
+- `DiscardPileService` (`src/backend/services/discardPileService.ts`) with CRUD, bulk, and orphan operations
+- `/api/v1/discard-pile/*` routes (list, add, update, delete, bulk add/remove, stats, ids, mark sold/listed)
+- `DiscardPilePage.tsx` with tabs (All, Pending, Listed, Completed, Orphaned), filters, and stats summary
+- Edit modal with Discogs marketplace price suggestions (price range and condition-based suggestions)
+- Mark as Sold and Mark as Listed quick actions with modals
+- Collection view integration with "In Discard Pile" badge on `AlbumCard`
+- Release details page "Add to Discard Pile" button
+- Sidebar navigation and MainContent routing
+- All discard pile types defined in `shared/types.ts`
+- 79 tests (41 service tests, 38 route tests)
+- Uses `writeJSONWithBackup()` for data safety
+
+**Implementation Details:**
+- Keys by `collectionItemId` (not releaseId) to track duplicate copies separately
+- Status lifecycle: marked → listed → sold/gifted/removed
+- Reason types: selling, duplicate, damaged, upgrade, not_listening, gift, other
+- Stats: estimated value, actual sales, by-status/reason breakdown
+- Orphan detection (items removed from Discogs collection externally)
+- Marketplace price integration in edit modal via `/api/v1/releases/:releaseId/marketplace-stats`
 
 ### Overview
 Track records from your Discogs collection that you want to get rid of during collection cleanup. Supports tracking duplicates, damaged records, and items to sell/gift.

@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 
 import {
+  AddDiscardPileItemRequest,
   AlbumMapping,
   ApiResponse,
   ArtistMapping,
@@ -14,6 +15,8 @@ import {
   BackupSettings,
   CollectionItem,
   DashboardData,
+  DiscardPileItem,
+  DiscardPileStats,
   DiscogsRelease,
   EnrichedWishlistItem,
   ForgottenTrack,
@@ -36,6 +39,7 @@ import {
   SuggestionSettings,
   SyncSettings,
   SyncStatus,
+  UpdateDiscardPileItemRequest,
   WishlistNewRelease,
   WishlistSettings,
   WishlistSyncStatus,
@@ -1448,6 +1452,112 @@ class ApiService {
    */
   async runAutoBackup(): Promise<void> {
     await this.api.post('/backup/auto-backup/run');
+  }
+
+  // ============================================
+  // Discard Pile methods (Feature 7)
+  // ============================================
+
+  /**
+   * Get all discard pile items.
+   */
+  async getDiscardPile(): Promise<DiscardPileItem[]> {
+    const response = await this.api.get('/discard-pile');
+    return response.data.data;
+  }
+
+  /**
+   * Get discard pile statistics.
+   */
+  async getDiscardPileStats(): Promise<DiscardPileStats> {
+    const response = await this.api.get('/discard-pile/stats');
+    return response.data.data;
+  }
+
+  /**
+   * Get collection IDs in discard pile (for badges in collection view).
+   */
+  async getDiscardPileCollectionIds(): Promise<number[]> {
+    const response = await this.api.get('/discard-pile/ids');
+    return response.data.data;
+  }
+
+  /**
+   * Add an item to the discard pile.
+   */
+  async addToDiscardPile(
+    item: AddDiscardPileItemRequest
+  ): Promise<DiscardPileItem> {
+    const response = await this.api.post('/discard-pile', item);
+    return response.data.data;
+  }
+
+  /**
+   * Bulk add multiple items to the discard pile.
+   */
+  async bulkAddToDiscardPile(
+    items: AddDiscardPileItemRequest[]
+  ): Promise<{ items: DiscardPileItem[]; total: number; skipped: number }> {
+    const response = await this.api.post('/discard-pile/bulk', { items });
+    return {
+      items: response.data.data,
+      total: response.data.total,
+      skipped: response.data.skipped,
+    };
+  }
+
+  /**
+   * Update a discard pile item.
+   */
+  async updateDiscardPileItem(
+    id: string,
+    updates: UpdateDiscardPileItemRequest
+  ): Promise<DiscardPileItem> {
+    const response = await this.api.put(`/discard-pile/${id}`, updates);
+    return response.data.data;
+  }
+
+  /**
+   * Remove an item from the discard pile.
+   */
+  async removeFromDiscardPile(id: string): Promise<void> {
+    await this.api.delete(`/discard-pile/${id}`);
+  }
+
+  /**
+   * Bulk remove multiple items from the discard pile.
+   */
+  async bulkRemoveFromDiscardPile(ids: string[]): Promise<number> {
+    const response = await this.api.delete('/discard-pile/bulk', {
+      data: { ids },
+    });
+    return response.data.removed;
+  }
+
+  /**
+   * Mark a discard pile item as sold.
+   */
+  async markDiscardItemSold(
+    id: string,
+    salePrice?: number
+  ): Promise<DiscardPileItem> {
+    const response = await this.api.post(`/discard-pile/${id}/sold`, {
+      salePrice,
+    });
+    return response.data.data;
+  }
+
+  /**
+   * Mark a discard pile item as listed for sale.
+   */
+  async markDiscardItemListed(
+    id: string,
+    marketplaceUrl: string
+  ): Promise<DiscardPileItem> {
+    const response = await this.api.post(`/discard-pile/${id}/listed`, {
+      marketplaceUrl,
+    });
+    return response.data.data;
   }
 
   // Update base URL (for when server URL changes)

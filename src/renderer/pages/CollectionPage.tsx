@@ -1,10 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
-import { CollectionItem } from '../../shared/types';
+import {
+  CollectionItem,
+  DiscardReason,
+  AddDiscardPileItemRequest,
+  MarketplaceStats,
+} from '../../shared/types';
 import AlbumCard from '../components/AlbumCard';
 import SearchBar from '../components/SearchBar';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
 import { getApiService } from '../services/api';
 
 const CollectionPage: React.FC = () => {
@@ -19,8 +25,7 @@ const CollectionPage: React.FC = () => {
   const [filteredCollection, setFilteredCollection] = useState<
     CollectionItem[]
   >([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  // Pagination for search mode only
   const [searchPage, setSearchPage] = useState(1);
   const [searchTotalPages, setSearchTotalPages] = useState(1);
   const [searchTotal, setSearchTotal] = useState(0);
@@ -55,8 +60,42 @@ const CollectionPage: React.FC = () => {
   const [updatingWithNewItems, setUpdatingWithNewItems] =
     useState<boolean>(false);
 
+  // Discard pile integration state
+  const [discardPileIds, setDiscardPileIds] = useState<Set<number>>(new Set());
+  const [discardModalItem, setDiscardModalItem] =
+    useState<CollectionItem | null>(null);
+  const [discardReason, setDiscardReason] = useState<DiscardReason>('selling');
+  const [discardReasonNote, setDiscardReasonNote] = useState<string>('');
+  const [discardEstimatedValue, setDiscardEstimatedValue] =
+    useState<string>('');
+  const [discardNotes, setDiscardNotes] = useState<string>('');
+  const [addingToDiscard, setAddingToDiscard] = useState<boolean>(false);
+  const [bulkDiscardModalOpen, setBulkDiscardModalOpen] =
+    useState<boolean>(false);
+  const [bulkAddingToDiscard, setBulkAddingToDiscard] =
+    useState<boolean>(false);
+  const [marketplaceStats, setMarketplaceStats] =
+    useState<MarketplaceStats | null>(null);
+  const [loadingMarketplaceStats, setLoadingMarketplaceStats] =
+    useState<boolean>(false);
+
   const api = getApiService(state.serverUrl);
   const itemsPerPage = 50;
+  const scrollBatchSize = 100; // Load more items per scroll for smoother experience
+
+  // Infinite scroll for browse mode (not search mode)
+  const {
+    sentinelRef,
+    hasMore,
+    visibleCount,
+    reset: resetInfiniteScroll,
+  } = useInfiniteScroll({
+    enabled: !isSearchMode && !loading,
+    totalItems: entireCollection.length,
+    loadedItems: filteredCollection.length,
+    itemsPerPage: scrollBatchSize,
+    threshold: 600, // Trigger loading earlier for smoother experience
+  });
 
   // Compute available filter options from collection data
   const filterOptions = useMemo(() => {
@@ -248,22 +287,15 @@ const CollectionPage: React.FC = () => {
       );
       setFilteredCollection(sorted);
 
-      // Update total pages based on filtered results when filters are active
-      const hasFilters =
-        filterFormat || filterYearFrom || filterYearTo || filterDateAdded;
-      if (hasFilters) {
-        setTotalPages(Math.ceil(sorted.length / itemsPerPage));
-        // Reset to page 1 if current page would be out of bounds
-        if (currentPage > Math.ceil(sorted.length / itemsPerPage)) {
-          setCurrentPage(1);
-        }
-      } else {
-        setTotalPages(Math.ceil(entireCollection.length / itemsPerPage));
-      }
+      // Reset infinite scroll when filters or sort changes
+      resetInfiniteScroll();
     } else if (!isSearchMode && entireCollection.length === 0) {
       console.log('📭 Collection is empty, clearing filtered collection');
       setFilteredCollection([]);
     }
+    // Note: resetInfiniteScroll is excluded from deps as it's a stable callback
+    // and we only want to reset when data/sort/filter actually changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     entireCollection.length,
     isSearchMode,
@@ -320,16 +352,14 @@ const CollectionPage: React.FC = () => {
             }))
           );
           setEntireCollection(response.data);
-          // Calculate total pages based on items per page
-          const totalPages = Math.ceil(response.data.length / itemsPerPage);
-          setTotalPages(totalPages);
+          // Reset infinite scroll for new collection
+          resetInfiniteScroll();
           console.log(
-            `📄 Total pages: ${totalPages} (${response.data.length} items, ${itemsPerPage} per page)`
+            `📄 Loaded ${response.data.length} items (${itemsPerPage} per scroll batch)`
           );
         } else {
           // Empty collection or expired cache
           setEntireCollection([]);
-          setTotalPages(1);
         }
 
         // Check if we used cache based on response time (cache should be much faster)
@@ -623,6 +653,192 @@ const CollectionPage: React.FC = () => {
     }
   };
 
+  // Load discard pile collection IDs for badges
+  const loadDiscardPileIds = useCallback(async () => {
+    try {
+      const ids = await api.getDiscardPileCollectionIds();
+      setDiscardPileIds(new Set(ids));
+    } catch (error) {
+      console.error('Failed to load discard pile IDs:', error);
+    }
+  }, [api]);
+
+  // Load discard pile IDs when component mounts and auth is ready
+  useEffect(() => {
+    if (authStatus.discogs.authenticated) {
+      loadDiscardPileIds();
+    }
+  }, [authStatus.discogs.authenticated, loadDiscardPileIds]);
+
+  // Handle opening the discard modal
+  const handleOpenDiscardModal = async (item: CollectionItem) => {
+    setDiscardModalItem(item);
+    setDiscardReason('selling');
+    setDiscardReasonNote('');
+    setDiscardEstimatedValue('');
+    setDiscardNotes('');
+    setMarketplaceStats(null);
+
+    // Fetch marketplace stats in background
+    setLoadingMarketplaceStats(true);
+    try {
+      const stats = await api.getMarketplaceStats(item.release.id);
+      setMarketplaceStats(stats);
+    } catch (error) {
+      console.error('Failed to fetch marketplace stats:', error);
+    } finally {
+      setLoadingMarketplaceStats(false);
+    }
+  };
+
+  // Handle closing the discard modal
+  const handleCloseDiscardModal = () => {
+    setDiscardModalItem(null);
+    setMarketplaceStats(null);
+  };
+
+  // Handle adding to discard pile
+  const handleAddToDiscardPile = async () => {
+    if (!discardModalItem) return;
+
+    setAddingToDiscard(true);
+    try {
+      const request: AddDiscardPileItemRequest = {
+        collectionItemId: discardModalItem.id,
+        releaseId: discardModalItem.release.id,
+        masterId: discardModalItem.release.master_id,
+        artist: discardModalItem.release.artist,
+        title: discardModalItem.release.title,
+        coverImage: discardModalItem.release.cover_image,
+        format: discardModalItem.release.format,
+        year: discardModalItem.release.year,
+        reason: discardReason,
+        reasonNote: discardReasonNote || undefined,
+        rating: discardModalItem.rating,
+        estimatedValue: discardEstimatedValue
+          ? parseFloat(discardEstimatedValue)
+          : undefined,
+        notes: discardNotes || undefined,
+      };
+
+      await api.addToDiscardPile(request);
+      // Update local state to show badge
+      setDiscardPileIds(prev => new Set([...prev, discardModalItem.id]));
+      handleCloseDiscardModal();
+      setInfoMessage(
+        `Added "${discardModalItem.release.artist} - ${discardModalItem.release.title}" to discard pile`
+      );
+      setTimeout(() => setInfoMessage(''), 5000);
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : 'Failed to add to discard pile'
+      );
+    } finally {
+      setAddingToDiscard(false);
+    }
+  };
+
+  // Handle opening the bulk discard modal
+  const handleOpenBulkDiscardModal = () => {
+    setBulkDiscardModalOpen(true);
+    setDiscardReason('selling');
+    setDiscardReasonNote('');
+    setDiscardEstimatedValue('');
+    setDiscardNotes('');
+  };
+
+  // Handle closing the bulk discard modal
+  const handleCloseBulkDiscardModal = () => {
+    setBulkDiscardModalOpen(false);
+  };
+
+  // Handle bulk adding to discard pile
+  const handleBulkAddToDiscardPile = async () => {
+    if (selectedAlbums.size === 0) return;
+
+    // Get the selected items that are not already in discard pile
+    const selectedItems = filteredCollection.filter(
+      item =>
+        selectedAlbums.has(item.release.id) && !discardPileIds.has(item.id)
+    );
+
+    if (selectedItems.length === 0) {
+      setInfoMessage('All selected items are already in the discard pile');
+      setTimeout(() => setInfoMessage(''), 5000);
+      handleCloseBulkDiscardModal();
+      return;
+    }
+
+    setBulkAddingToDiscard(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      for (const item of selectedItems) {
+        try {
+          const request: AddDiscardPileItemRequest = {
+            collectionItemId: item.id,
+            releaseId: item.release.id,
+            masterId: item.release.master_id,
+            artist: item.release.artist,
+            title: item.release.title,
+            coverImage: item.release.cover_image,
+            format: item.release.format,
+            year: item.release.year,
+            reason: discardReason,
+            reasonNote: discardReasonNote || undefined,
+            rating: item.rating,
+            estimatedValue: discardEstimatedValue
+              ? parseFloat(discardEstimatedValue)
+              : undefined,
+            notes: discardNotes || undefined,
+          };
+
+          await api.addToDiscardPile(request);
+          successCount++;
+          // Update local state immediately for this item
+          setDiscardPileIds(prev => new Set([...prev, item.id]));
+        } catch (error) {
+          console.error(
+            `Failed to add ${item.release.title} to discard pile:`,
+            error
+          );
+          failCount++;
+        }
+      }
+
+      handleCloseBulkDiscardModal();
+      setSelectedAlbums(new Set()); // Clear selection after bulk operation
+
+      if (failCount === 0) {
+        setInfoMessage(
+          `Added ${successCount} item${successCount !== 1 ? 's' : ''} to discard pile`
+        );
+      } else {
+        setInfoMessage(
+          `Added ${successCount} item${successCount !== 1 ? 's' : ''} to discard pile. ${failCount} failed.`
+        );
+      }
+      setTimeout(() => setInfoMessage(''), 5000);
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to bulk add to discard pile'
+      );
+    } finally {
+      setBulkAddingToDiscard(false);
+    }
+  };
+
+  // Get count of selected items not already in discard pile
+  const selectedNotInDiscardCount = useMemo(() => {
+    return filteredCollection.filter(
+      item =>
+        selectedAlbums.has(item.release.id) && !discardPileIds.has(item.id)
+    ).length;
+  }, [filteredCollection, selectedAlbums, discardPileIds]);
+
   const sortCollection = (items: CollectionItem[]): CollectionItem[] => {
     console.log(`🔀 Sorting ${items.length} items by ${sortBy} (${sortOrder})`);
     const sorted = [...items].sort((a, b) => {
@@ -664,15 +880,15 @@ const CollectionPage: React.FC = () => {
     return sorted;
   };
 
-  // Get current page of items from the sorted collection
-  const getCurrentPageItems = (): CollectionItem[] => {
+  // Get visible items - uses infinite scroll for browse mode, pagination for search mode
+  const getVisibleItems = (): CollectionItem[] => {
     if (isSearchMode) {
+      // Search mode still uses pagination
       return filteredCollection;
     }
 
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredCollection.slice(startIndex, endIndex);
+    // Browse mode uses infinite scroll - show items up to visibleCount
+    return filteredCollection.slice(0, visibleCount);
   };
 
   if (!authStatus.discogs.authenticated) {
@@ -1240,6 +1456,7 @@ const CollectionPage: React.FC = () => {
 
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             {isSearchMode ? (
+              // Search mode: keep pagination
               <>
                 <button
                   className='btn btn-small'
@@ -1248,7 +1465,9 @@ const CollectionPage: React.FC = () => {
                 >
                   Previous
                 </button>
-                <span style={{ fontSize: '0.9rem', color: '#666' }}>
+                <span
+                  style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}
+                >
                   Page {searchPage} of {searchTotalPages} ({searchTotal}{' '}
                   results)
                 </span>
@@ -1263,27 +1482,13 @@ const CollectionPage: React.FC = () => {
                 </button>
               </>
             ) : (
-              <>
-                <button
-                  className='btn btn-small'
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage <= 1 || loading}
-                >
-                  Previous
-                </button>
-                <span style={{ fontSize: '0.9rem', color: '#666' }}>
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  className='btn btn-small'
-                  onClick={() =>
-                    setCurrentPage(Math.min(totalPages, currentPage + 1))
-                  }
-                  disabled={currentPage >= totalPages || loading}
-                >
-                  Next
-                </button>
-              </>
+              // Browse mode: show count with infinite scroll
+              <span
+                style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}
+              >
+                Showing {Math.min(visibleCount, filteredCollection.length)} of{' '}
+                {filteredCollection.length}
+              </span>
             )}
           </div>
         </div>
@@ -1321,22 +1526,63 @@ const CollectionPage: React.FC = () => {
 
       {!loading && filteredCollection.length > 0 && (
         <div className='collection-grid'>
-          {getCurrentPageItems().map((item, index) => (
+          {getVisibleItems().map((item, index) => (
             <AlbumCard
               key={`${item.id}-${item.date_added || index}`}
               item={item}
               selected={selectedAlbums.has(item.release.id)}
               onSelect={() => handleAlbumSelect(item.release.id)}
               onViewDetails={release => {
-                // Store release for details view
+                // Store release and collection item ID for details view
                 localStorage.setItem(
                   'selectedRelease',
                   JSON.stringify(release)
                 );
+                localStorage.setItem(
+                  'selectedCollectionItemId',
+                  item.id.toString()
+                );
                 window.location.hash = '#release-details';
               }}
+              isInDiscardPile={discardPileIds.has(item.id)}
+              onAddToDiscardPile={handleOpenDiscardModal}
             />
           ))}
+
+          {/* Infinite scroll sentinel - invisible trigger zone */}
+          {!isSearchMode && hasMore && (
+            <div
+              ref={sentinelRef}
+              className='infinite-scroll-sentinel'
+              style={{
+                gridColumn: '1 / -1',
+                height: '1px',
+                visibility: 'hidden',
+              }}
+              aria-hidden='true'
+            />
+          )}
+
+          {/* End of collection indicator */}
+          {!isSearchMode &&
+            !hasMore &&
+            filteredCollection.length > scrollBatchSize && (
+              <div
+                style={{
+                  gridColumn: '1 / -1',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  padding: '1.5rem',
+                }}
+              >
+                <span
+                  style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}
+                >
+                  End of collection
+                </span>
+              </div>
+            )}
         </div>
       )}
 
@@ -1357,6 +1603,15 @@ const CollectionPage: React.FC = () => {
               >
                 Clear Selection
               </button>
+              {selectedNotInDiscardCount > 0 && (
+                <button
+                  className='btn btn-small btn-outline-warning'
+                  onClick={handleOpenBulkDiscardModal}
+                  title={`Add ${selectedNotInDiscardCount} item${selectedNotInDiscardCount !== 1 ? 's' : ''} to discard pile`}
+                >
+                  Discard ({selectedNotInDiscardCount})
+                </button>
+              )}
               <button
                 className='btn btn-small'
                 onClick={() => {
@@ -1373,6 +1628,340 @@ const CollectionPage: React.FC = () => {
                 }}
               >
                 Scrobble
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add to Discard Pile Modal */}
+      {discardModalItem && (
+        <div className='modal-overlay' onClick={handleCloseDiscardModal}>
+          <div className='modal' onClick={e => e.stopPropagation()}>
+            <div className='modal-header'>
+              <h3>Add to Discard Pile</h3>
+              <button
+                className='modal-close'
+                onClick={handleCloseDiscardModal}
+                aria-label='Close'
+              >
+                ×
+              </button>
+            </div>
+            <div className='modal-body'>
+              <div className='discard-modal-item-info'>
+                <strong>{discardModalItem.release.artist}</strong>
+                <span> - </span>
+                <span>{discardModalItem.release.title}</span>
+                {discardModalItem.release.year && (
+                  <span className='text-muted'>
+                    {' '}
+                    ({discardModalItem.release.year})
+                  </span>
+                )}
+              </div>
+
+              {/* Marketplace Price Stats */}
+              <div className='marketplace-stats-info'>
+                {loadingMarketplaceStats ? (
+                  <div className='marketplace-stats-loading'>
+                    Loading marketplace prices...
+                  </div>
+                ) : marketplaceStats ? (
+                  <div className='marketplace-stats-content'>
+                    <div className='marketplace-stats-prices'>
+                      <span className='marketplace-stats-label'>
+                        Discogs Marketplace:
+                      </span>
+                      {marketplaceStats.lowestPrice !== undefined ? (
+                        <>
+                          <span className='marketplace-stats-range'>
+                            {marketplaceStats.highestPrice !== undefined &&
+                            marketplaceStats.highestPrice !==
+                              marketplaceStats.lowestPrice ? (
+                              // We have a price range from price suggestions
+                              <>
+                                {new Intl.NumberFormat('en-US', {
+                                  style: 'currency',
+                                  currency: marketplaceStats.currency || 'USD',
+                                }).format(marketplaceStats.lowestPrice)}
+                                {' - '}
+                                {new Intl.NumberFormat('en-US', {
+                                  style: 'currency',
+                                  currency: marketplaceStats.currency || 'USD',
+                                }).format(marketplaceStats.highestPrice)}
+                              </>
+                            ) : (
+                              // Only lowest price available (no price suggestions)
+                              <>
+                                from{' '}
+                                {new Intl.NumberFormat('en-US', {
+                                  style: 'currency',
+                                  currency: marketplaceStats.currency || 'USD',
+                                }).format(marketplaceStats.lowestPrice)}
+                              </>
+                            )}
+                          </span>
+                          <span className='marketplace-stats-count'>
+                            ({marketplaceStats.numForSale} for sale)
+                          </span>
+                        </>
+                      ) : (
+                        <span className='marketplace-stats-none'>
+                          No listings
+                        </span>
+                      )}
+                    </div>
+                    {marketplaceStats.priceSuggestions ? (
+                      <div className='marketplace-stats-suggestions'>
+                        <span className='marketplace-stats-suggestion-label'>
+                          Suggested prices by condition:
+                        </span>
+                        <div className='marketplace-stats-condition-list'>
+                          {marketplaceStats.priceSuggestions.nearMint && (
+                            <span className='condition-price'>
+                              NM:{' '}
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency:
+                                  marketplaceStats.priceSuggestions.nearMint
+                                    .currency || 'USD',
+                              }).format(
+                                marketplaceStats.priceSuggestions.nearMint.value
+                              )}
+                            </span>
+                          )}
+                          {marketplaceStats.priceSuggestions.veryGoodPlus && (
+                            <span className='condition-price'>
+                              VG+:{' '}
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency:
+                                  marketplaceStats.priceSuggestions.veryGoodPlus
+                                    .currency || 'USD',
+                              }).format(
+                                marketplaceStats.priceSuggestions.veryGoodPlus
+                                  .value
+                              )}
+                            </span>
+                          )}
+                          {marketplaceStats.priceSuggestions.veryGood && (
+                            <span className='condition-price'>
+                              VG:{' '}
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency:
+                                  marketplaceStats.priceSuggestions.veryGood
+                                    .currency || 'USD',
+                              }).format(
+                                marketplaceStats.priceSuggestions.veryGood.value
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      marketplaceStats.lowestPrice !== undefined && (
+                        <div className='marketplace-stats-suggestions'>
+                          <span className='marketplace-stats-no-suggestions'>
+                            Seller profile required for price suggestions
+                          </span>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ) : (
+                  <div className='marketplace-stats-unavailable'>
+                    Marketplace data unavailable
+                  </div>
+                )}
+              </div>
+
+              <div className='form-group'>
+                <label htmlFor='discard-reason'>Reason for discarding</label>
+                <select
+                  id='discard-reason'
+                  className='form-select'
+                  value={discardReason}
+                  onChange={e =>
+                    setDiscardReason(e.target.value as DiscardReason)
+                  }
+                >
+                  <option value='selling'>Selling</option>
+                  <option value='duplicate'>Duplicate</option>
+                  <option value='damaged'>Damaged</option>
+                  <option value='upgrade'>Upgrading to better pressing</option>
+                  <option value='not_listening'>Not listening anymore</option>
+                  <option value='gift'>Gifting to someone</option>
+                  <option value='other'>Other</option>
+                </select>
+              </div>
+
+              {discardReason === 'other' && (
+                <div className='form-group'>
+                  <label htmlFor='discard-reason-note'>Specify reason</label>
+                  <input
+                    type='text'
+                    id='discard-reason-note'
+                    className='form-input'
+                    value={discardReasonNote}
+                    onChange={e => setDiscardReasonNote(e.target.value)}
+                    placeholder='Enter your reason...'
+                  />
+                </div>
+              )}
+
+              <div className='form-group'>
+                <label htmlFor='discard-value'>Estimated value (USD)</label>
+                <input
+                  type='number'
+                  id='discard-value'
+                  className='form-input'
+                  value={discardEstimatedValue}
+                  onChange={e => setDiscardEstimatedValue(e.target.value)}
+                  placeholder='0.00'
+                  min='0'
+                  step='0.01'
+                />
+              </div>
+
+              <div className='form-group'>
+                <label htmlFor='discard-notes'>Notes (optional)</label>
+                <textarea
+                  id='discard-notes'
+                  className='form-textarea'
+                  value={discardNotes}
+                  onChange={e => setDiscardNotes(e.target.value)}
+                  placeholder='Condition, pressing details, etc.'
+                  rows={3}
+                />
+              </div>
+            </div>
+            <div className='modal-footer'>
+              <button
+                className='btn btn-secondary'
+                onClick={handleCloseDiscardModal}
+                disabled={addingToDiscard}
+              >
+                Cancel
+              </button>
+              <button
+                className='btn btn-primary'
+                onClick={handleAddToDiscardPile}
+                disabled={addingToDiscard}
+              >
+                {addingToDiscard ? 'Adding...' : 'Add to Discard Pile'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Add to Discard Pile Modal */}
+      {bulkDiscardModalOpen && (
+        <div className='modal-overlay' onClick={handleCloseBulkDiscardModal}>
+          <div className='modal' onClick={e => e.stopPropagation()}>
+            <div className='modal-header'>
+              <h3>Add to Discard Pile</h3>
+              <button
+                className='modal-close'
+                onClick={handleCloseBulkDiscardModal}
+                aria-label='Close'
+              >
+                ×
+              </button>
+            </div>
+            <div className='modal-body'>
+              <div className='discard-modal-item-info'>
+                <strong>
+                  {selectedNotInDiscardCount} item
+                  {selectedNotInDiscardCount !== 1 ? 's' : ''}
+                </strong>
+                <span> will be added to the discard pile</span>
+              </div>
+
+              <div className='form-group'>
+                <label htmlFor='bulk-discard-reason'>
+                  Reason for discarding
+                </label>
+                <select
+                  id='bulk-discard-reason'
+                  className='form-select'
+                  value={discardReason}
+                  onChange={e =>
+                    setDiscardReason(e.target.value as DiscardReason)
+                  }
+                >
+                  <option value='selling'>Selling</option>
+                  <option value='duplicate'>Duplicate</option>
+                  <option value='damaged'>Damaged</option>
+                  <option value='upgrade'>Upgrading to better pressing</option>
+                  <option value='not_listening'>Not listening anymore</option>
+                  <option value='gift'>Gifting to someone</option>
+                  <option value='other'>Other</option>
+                </select>
+              </div>
+
+              {discardReason === 'other' && (
+                <div className='form-group'>
+                  <label htmlFor='bulk-discard-reason-note'>
+                    Specify reason
+                  </label>
+                  <input
+                    type='text'
+                    id='bulk-discard-reason-note'
+                    className='form-input'
+                    value={discardReasonNote}
+                    onChange={e => setDiscardReasonNote(e.target.value)}
+                    placeholder='Enter your reason...'
+                  />
+                </div>
+              )}
+
+              <div className='form-group'>
+                <label htmlFor='bulk-discard-value'>
+                  Estimated value per item (USD)
+                </label>
+                <input
+                  type='number'
+                  id='bulk-discard-value'
+                  className='form-input'
+                  value={discardEstimatedValue}
+                  onChange={e => setDiscardEstimatedValue(e.target.value)}
+                  placeholder='0.00'
+                  min='0'
+                  step='0.01'
+                />
+              </div>
+
+              <div className='form-group'>
+                <label htmlFor='bulk-discard-notes'>Notes (optional)</label>
+                <textarea
+                  id='bulk-discard-notes'
+                  className='form-textarea'
+                  value={discardNotes}
+                  onChange={e => setDiscardNotes(e.target.value)}
+                  placeholder='Condition, pressing details, etc.'
+                  rows={3}
+                />
+              </div>
+            </div>
+            <div className='modal-footer'>
+              <button
+                className='btn btn-secondary'
+                onClick={handleCloseBulkDiscardModal}
+                disabled={bulkAddingToDiscard}
+              >
+                Cancel
+              </button>
+              <button
+                className='btn btn-primary'
+                onClick={handleBulkAddToDiscardPile}
+                disabled={bulkAddingToDiscard}
+              >
+                {bulkAddingToDiscard
+                  ? 'Adding...'
+                  : `Add ${selectedNotInDiscardCount} to Discard Pile`}
               </button>
             </div>
           </div>

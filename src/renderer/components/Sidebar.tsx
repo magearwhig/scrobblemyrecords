@@ -49,6 +49,12 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
           icon: '❤️',
           enabled: authStatus.discogs.authenticated,
         },
+        {
+          id: 'discard-pile',
+          label: 'Discard Pile',
+          icon: '📦',
+          enabled: authStatus.discogs.authenticated,
+        },
       ],
     },
     {

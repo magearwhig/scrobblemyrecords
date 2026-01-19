@@ -13,6 +13,7 @@ import artistMappingRoutes from './backend/routes/artistMapping';
 import { createAuthRouter } from './backend/routes/auth';
 import createBackupRouter from './backend/routes/backup';
 import createCollectionRouter from './backend/routes/collection';
+import createDiscardPileRouter from './backend/routes/discardPile';
 import createImagesRouter from './backend/routes/images';
 import createReleasesRouter from './backend/routes/releases';
 import createScrobbleRouter from './backend/routes/scrobble';
@@ -24,6 +25,7 @@ import { AnalyticsService } from './backend/services/analyticsService';
 import { AuthService } from './backend/services/authService';
 import { BackupService } from './backend/services/backupService';
 import { CleanupService } from './backend/services/cleanupService';
+import { DiscardPileService } from './backend/services/discardPileService';
 import { DiscogsService } from './backend/services/discogsService';
 import { HiddenItemService } from './backend/services/hiddenItemService';
 import { HiddenReleasesService } from './backend/services/hiddenReleasesService';
@@ -224,6 +226,7 @@ const releaseTrackingService = new ReleaseTrackingService(
   hiddenReleasesService
 );
 const backupService = new BackupService(fileStorage, 'data');
+const discardPileService = new DiscardPileService(fileStorage);
 
 // API routes
 app.use(
@@ -291,6 +294,7 @@ app.use(
   )
 );
 app.use('/api/v1/backup', createBackupRouter(backupService));
+app.use('/api/v1/discard-pile', createDiscardPileRouter(discardPileService));
 
 // API info endpoint
 app.get('/api/v1', (req, res) => {
@@ -308,6 +312,7 @@ app.get('/api/v1', (req, res) => {
       sellers: '/api/v1/sellers',
       releases: '/api/v1/releases',
       backup: '/api/v1/backup',
+      discardPile: '/api/v1/discard-pile',
     },
   });
 });

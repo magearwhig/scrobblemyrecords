@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
-import { DiscogsRelease } from '../../shared/types';
+import {
+  DiscogsRelease,
+  DiscardReason,
+  AddDiscardPileItemRequest,
+  MarketplaceStats,
+} from '../../shared/types';
 import AlbumScrobbleHistory from '../components/AlbumScrobbleHistory';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -42,6 +47,20 @@ const ReleaseDetailsPage: React.FC = () => {
     []
   );
 
+  // Discard pile state
+  const [discardModalOpen, setDiscardModalOpen] = useState(false);
+  const [discardReason, setDiscardReason] = useState<DiscardReason>('selling');
+  const [discardReasonNote, setDiscardReasonNote] = useState('');
+  const [discardEstimatedValue, setDiscardEstimatedValue] = useState('');
+  const [discardNotes, setDiscardNotes] = useState('');
+  const [addingToDiscard, setAddingToDiscard] = useState(false);
+  const [discardSuccess, setDiscardSuccess] = useState<string | null>(null);
+  const [isInDiscardPile, setIsInDiscardPile] = useState(false);
+  const [marketplaceStats, setMarketplaceStats] =
+    useState<MarketplaceStats | null>(null);
+  const [loadingMarketplaceStats, setLoadingMarketplaceStats] = useState(false);
+  const [collectionItemId, setCollectionItemId] = useState<number | null>(null);
+
   const api = getApiService(state.serverUrl);
 
   // Pattern to detect Discogs disambiguation suffix like (2), (11), etc.
@@ -71,6 +90,9 @@ const ReleaseDetailsPage: React.FC = () => {
 
       // Get release from localStorage (set by AlbumCard)
       const releaseData = localStorage.getItem('selectedRelease');
+      const storedCollectionItemId = localStorage.getItem(
+        'selectedCollectionItemId'
+      );
       console.log('[ReleaseDetailsPage] loadReleaseDetails called');
       console.log(
         '[ReleaseDetailsPage] releaseData from localStorage:',
@@ -92,6 +114,11 @@ const ReleaseDetailsPage: React.FC = () => {
         releaseInfo.artist
       );
 
+      // Store collection item ID if available
+      if (storedCollectionItemId) {
+        setCollectionItemId(parseInt(storedCollectionItemId, 10));
+      }
+
       // Fetch full release details from API
       const fullRelease = await api.getReleaseDetails(releaseInfo.id);
       console.log(
@@ -109,6 +136,18 @@ const ReleaseDetailsPage: React.FC = () => {
           .filter(({ track }) => track.position && track.position.trim() !== '')
           .map(({ index }) => index) || [];
       setSelectedTracks(new Set(actualTrackIndices));
+
+      // Check if this release is in the discard pile
+      try {
+        const discardPileIds = await api.getDiscardPileCollectionIds();
+        if (storedCollectionItemId) {
+          setIsInDiscardPile(
+            discardPileIds.includes(parseInt(storedCollectionItemId, 10))
+          );
+        }
+      } catch (err) {
+        console.warn('Failed to check discard pile status:', err);
+      }
     } catch (error) {
       setError(
         error instanceof Error
@@ -128,6 +167,69 @@ const ReleaseDetailsPage: React.FC = () => {
       // Silently fail for artist mapping lookup
       console.warn('Failed to load artist mapping:', error);
       setArtistMapping(null);
+    }
+  };
+
+  // Discard pile handlers
+  const handleOpenDiscardModal = async () => {
+    if (!release) return;
+    setDiscardModalOpen(true);
+    setDiscardReason('selling');
+    setDiscardReasonNote('');
+    setDiscardEstimatedValue('');
+    setDiscardNotes('');
+    setMarketplaceStats(null);
+
+    // Fetch marketplace stats in background
+    setLoadingMarketplaceStats(true);
+    try {
+      const stats = await api.getMarketplaceStats(release.id);
+      setMarketplaceStats(stats);
+    } catch (err) {
+      console.error('Failed to fetch marketplace stats:', err);
+    } finally {
+      setLoadingMarketplaceStats(false);
+    }
+  };
+
+  const handleCloseDiscardModal = () => {
+    setDiscardModalOpen(false);
+    setMarketplaceStats(null);
+  };
+
+  const handleAddToDiscardPile = async () => {
+    if (!release || !collectionItemId) return;
+
+    setAddingToDiscard(true);
+    try {
+      const request: AddDiscardPileItemRequest = {
+        collectionItemId,
+        releaseId: release.id,
+        masterId: release.master_id,
+        artist: release.artist,
+        title: release.title,
+        coverImage: release.cover_image,
+        format: release.format,
+        year: release.year,
+        reason: discardReason,
+        reasonNote: discardReasonNote || undefined,
+        estimatedValue: discardEstimatedValue
+          ? parseFloat(discardEstimatedValue)
+          : undefined,
+        notes: discardNotes || undefined,
+      };
+
+      await api.addToDiscardPile(request);
+      setIsInDiscardPile(true);
+      setDiscardSuccess('Added to discard pile');
+      setTimeout(() => setDiscardSuccess(null), 5000);
+      handleCloseDiscardModal();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to add to discard pile'
+      );
+    } finally {
+      setAddingToDiscard(false);
     }
   };
 
@@ -762,8 +864,46 @@ const ReleaseDetailsPage: React.FC = () => {
                 Catalog: {release.catalog_number}
               </p>
             )}
+
+            {/* Discard pile button */}
+            {collectionItemId && (
+              <div style={{ marginTop: '1rem' }}>
+                {isInDiscardPile ? (
+                  <span
+                    className='discard-pile-indicator'
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      fontSize: '0.9rem',
+                      color: 'var(--accent-warning, #f59e0b)',
+                      padding: '0.4rem 0.75rem',
+                      backgroundColor: 'var(--bg-tertiary)',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    📦 In Discard Pile
+                  </span>
+                ) : (
+                  <button
+                    className='btn btn-small btn-outline-warning'
+                    onClick={handleOpenDiscardModal}
+                    style={{ fontSize: '0.85rem', padding: '0.4rem 0.75rem' }}
+                  >
+                    📦 Add to Discard Pile
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Discard success message */}
+        {discardSuccess && (
+          <div className='message success' style={{ marginBottom: '1rem' }}>
+            {discardSuccess}
+          </div>
+        )}
 
         {/* Scrobble History Section */}
         <AlbumScrobbleHistory artist={release.artist} album={release.title} />
@@ -1340,6 +1480,224 @@ const ReleaseDetailsPage: React.FC = () => {
           })}
         </div>
       </div>
+
+      {/* Add to Discard Pile Modal */}
+      {discardModalOpen && release && (
+        <div className='modal-overlay' onClick={handleCloseDiscardModal}>
+          <div className='modal' onClick={e => e.stopPropagation()}>
+            <div className='modal-header'>
+              <h3>Add to Discard Pile</h3>
+              <button
+                className='modal-close'
+                onClick={handleCloseDiscardModal}
+                aria-label='Close'
+              >
+                ×
+              </button>
+            </div>
+            <div className='modal-body'>
+              <div className='discard-modal-item-info'>
+                <strong>{release.artist}</strong>
+                <span> - </span>
+                <span>{release.title}</span>
+                {release.year && (
+                  <span className='text-muted'> ({release.year})</span>
+                )}
+              </div>
+
+              {/* Marketplace Price Stats */}
+              <div className='marketplace-stats-info'>
+                {loadingMarketplaceStats ? (
+                  <div className='marketplace-stats-loading'>
+                    Loading marketplace prices...
+                  </div>
+                ) : marketplaceStats ? (
+                  <div className='marketplace-stats-content'>
+                    <div className='marketplace-stats-prices'>
+                      <span className='marketplace-stats-label'>
+                        Discogs Marketplace:
+                      </span>
+                      {marketplaceStats.lowestPrice !== undefined ? (
+                        <>
+                          <span className='marketplace-stats-range'>
+                            {marketplaceStats.highestPrice !== undefined &&
+                            marketplaceStats.highestPrice !==
+                              marketplaceStats.lowestPrice ? (
+                              <>
+                                {new Intl.NumberFormat('en-US', {
+                                  style: 'currency',
+                                  currency: marketplaceStats.currency || 'USD',
+                                }).format(marketplaceStats.lowestPrice)}
+                                {' - '}
+                                {new Intl.NumberFormat('en-US', {
+                                  style: 'currency',
+                                  currency: marketplaceStats.currency || 'USD',
+                                }).format(marketplaceStats.highestPrice)}
+                              </>
+                            ) : (
+                              <>
+                                from{' '}
+                                {new Intl.NumberFormat('en-US', {
+                                  style: 'currency',
+                                  currency: marketplaceStats.currency || 'USD',
+                                }).format(marketplaceStats.lowestPrice)}
+                              </>
+                            )}
+                          </span>
+                          <span className='marketplace-stats-count'>
+                            ({marketplaceStats.numForSale} for sale)
+                          </span>
+                        </>
+                      ) : (
+                        <span className='marketplace-stats-none'>
+                          No listings
+                        </span>
+                      )}
+                    </div>
+                    {marketplaceStats.priceSuggestions ? (
+                      <div className='marketplace-stats-suggestions'>
+                        <span className='marketplace-stats-suggestion-label'>
+                          Suggested prices by condition:
+                        </span>
+                        <div className='marketplace-stats-condition-list'>
+                          {marketplaceStats.priceSuggestions.nearMint && (
+                            <span className='condition-price'>
+                              NM:{' '}
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency:
+                                  marketplaceStats.priceSuggestions.nearMint
+                                    .currency || 'USD',
+                              }).format(
+                                marketplaceStats.priceSuggestions.nearMint.value
+                              )}
+                            </span>
+                          )}
+                          {marketplaceStats.priceSuggestions.veryGoodPlus && (
+                            <span className='condition-price'>
+                              VG+:{' '}
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency:
+                                  marketplaceStats.priceSuggestions.veryGoodPlus
+                                    .currency || 'USD',
+                              }).format(
+                                marketplaceStats.priceSuggestions.veryGoodPlus
+                                  .value
+                              )}
+                            </span>
+                          )}
+                          {marketplaceStats.priceSuggestions.veryGood && (
+                            <span className='condition-price'>
+                              VG:{' '}
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency:
+                                  marketplaceStats.priceSuggestions.veryGood
+                                    .currency || 'USD',
+                              }).format(
+                                marketplaceStats.priceSuggestions.veryGood.value
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      marketplaceStats.lowestPrice !== undefined && (
+                        <div className='marketplace-stats-suggestions'>
+                          <span className='marketplace-stats-no-suggestions'>
+                            Seller profile required for price suggestions
+                          </span>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ) : (
+                  <div className='marketplace-stats-unavailable'>
+                    Marketplace data unavailable
+                  </div>
+                )}
+              </div>
+
+              <div className='form-group'>
+                <label htmlFor='discard-reason'>Reason for discarding</label>
+                <select
+                  id='discard-reason'
+                  className='form-select'
+                  value={discardReason}
+                  onChange={e =>
+                    setDiscardReason(e.target.value as DiscardReason)
+                  }
+                >
+                  <option value='selling'>Selling</option>
+                  <option value='duplicate'>Duplicate</option>
+                  <option value='damaged'>Damaged</option>
+                  <option value='upgrade'>Upgrading to better pressing</option>
+                  <option value='not_listening'>Not listening anymore</option>
+                  <option value='gift'>Gifting to someone</option>
+                  <option value='other'>Other</option>
+                </select>
+              </div>
+
+              {discardReason === 'other' && (
+                <div className='form-group'>
+                  <label htmlFor='discard-reason-note'>Specify reason</label>
+                  <input
+                    type='text'
+                    id='discard-reason-note'
+                    className='form-input'
+                    value={discardReasonNote}
+                    onChange={e => setDiscardReasonNote(e.target.value)}
+                    placeholder='Enter your reason...'
+                  />
+                </div>
+              )}
+
+              <div className='form-group'>
+                <label htmlFor='discard-value'>Estimated value (USD)</label>
+                <input
+                  type='number'
+                  id='discard-value'
+                  className='form-input'
+                  value={discardEstimatedValue}
+                  onChange={e => setDiscardEstimatedValue(e.target.value)}
+                  placeholder='0.00'
+                  min='0'
+                  step='0.01'
+                />
+              </div>
+
+              <div className='form-group'>
+                <label htmlFor='discard-notes'>Notes (optional)</label>
+                <textarea
+                  id='discard-notes'
+                  className='form-textarea'
+                  value={discardNotes}
+                  onChange={e => setDiscardNotes(e.target.value)}
+                  placeholder='Condition, pressing details, etc.'
+                  rows={3}
+                />
+              </div>
+            </div>
+            <div className='modal-footer'>
+              <button
+                className='btn btn-secondary'
+                onClick={handleCloseDiscardModal}
+                disabled={addingToDiscard}
+              >
+                Cancel
+              </button>
+              <button
+                className='btn btn-primary'
+                onClick={handleAddToDiscardPile}
+                disabled={addingToDiscard}
+              >
+                {addingToDiscard ? 'Adding...' : 'Add to Discard Pile'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
