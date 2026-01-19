@@ -99,12 +99,22 @@ body {
 }
 
 .header-theme-toggle {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
   min-width: auto;
   padding: 0.5rem;
-  font-size: 1.2rem;
+  font-size: 1.25rem;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.15s;
+}
+
+.header-theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .main-content {

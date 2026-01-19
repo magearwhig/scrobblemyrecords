@@ -198,21 +198,11 @@ describe('Header', () => {
     // Test light mode
     renderHeaderWithProviders(authStatus, false);
     let themeButton = screen.getByTitle('Switch to dark mode');
-    expect(themeButton).toHaveClass(
-      'btn',
-      'btn-small',
-      'btn-secondary',
-      'header-theme-toggle'
-    );
+    expect(themeButton).toHaveClass('header-theme-toggle');
 
     // Test dark mode
     renderHeaderWithProviders(authStatus, true);
     themeButton = screen.getByTitle('Switch to light mode');
-    expect(themeButton).toHaveClass(
-      'btn',
-      'btn-small',
-      'btn-secondary',
-      'header-theme-toggle'
-    );
+    expect(themeButton).toHaveClass('header-theme-toggle');
   });
 });

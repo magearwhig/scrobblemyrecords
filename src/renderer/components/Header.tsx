@@ -55,7 +55,7 @@ const Header: React.FC = () => {
           onClick={() => {
             toggleDarkMode();
           }}
-          className='btn btn-small btn-secondary header-theme-toggle'
+          className='header-theme-toggle'
           title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
         >
           {isDarkMode ? '☀️' : '🌙'}
