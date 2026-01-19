@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 
-import { useApp } from '../context/AppContext';
-import { useAuth } from '../context/AuthContext';
-import { getApiService } from '../services/api';
-import { createLogger } from '../utils/logger';
+import { useAuth } from '../../context/AuthContext';
+import ApiService from '../../services/api';
+import { createLogger } from '../../utils/logger';
 
-const log = createLogger('SetupPage');
+const log = createLogger('SettingsConnectionsSection');
 
-const SetupPage: React.FC = () => {
+interface SettingsConnectionsSectionProps {
+  api: ApiService;
+}
+
+const SettingsConnectionsSection: React.FC<SettingsConnectionsSectionProps> = ({
+  api,
+}) => {
   const { authStatus, setAuthStatus } = useAuth();
-  const { state } = useApp();
   const [loading, setLoading] = useState<string>('');
   const [message, setMessage] = useState<{
     type: 'success' | 'error';
@@ -20,8 +24,6 @@ const SetupPage: React.FC = () => {
   const [discogsToken, setDiscogsToken] = useState('');
   const [discogsUsername, setDiscogsUsername] = useState('');
   const [lastfmToken, setLastfmToken] = useState('');
-
-  const api = getApiService(state.serverUrl);
 
   const handleDiscogsAuth = async () => {
     setLoading('discogs');
@@ -352,12 +354,12 @@ const SetupPage: React.FC = () => {
 
   return (
     <div>
+      {/* Introduction */}
       <div className='card'>
-        <h2>Setup & Authentication</h2>
+        <h3>Account Connections</h3>
         <p>
-          To use this application, you need to set up API access for both
-          Discogs and Last.fm. Follow the instructions below to get your API
-          credentials.
+          Connect your Discogs and Last.fm accounts to enable scrobbling and
+          collection management.
         </p>
 
         {message && (
@@ -373,7 +375,7 @@ const SetupPage: React.FC = () => {
 
       {/* Discogs Setup */}
       <div className='card'>
-        <h3>1. Discogs Setup</h3>
+        <h3>Discogs</h3>
         <div style={{ marginBottom: '1rem' }}>
           <div
             className={`status ${authStatus.discogs.authenticated ? 'connected' : 'disconnected'}`}
@@ -389,20 +391,6 @@ const SetupPage: React.FC = () => {
           Connect to your Discogs account using OAuth. Your API credentials are
           already configured.
         </p>
-        <p>
-          <strong>Instructions:</strong>
-        </p>
-        <ol>
-          <li>
-            Click "Connect to Discogs" to get the authorization URL (or it will
-            open in a popup)
-          </li>
-          <li>Visit the URL and authorize the application</li>
-          <li>
-            If automatic flow doesn't work, copy the tokens from the URL and use
-            manual entry below
-          </li>
-        </ol>
 
         <button
           className='btn'
@@ -508,7 +496,7 @@ const SetupPage: React.FC = () => {
 
       {/* Last.fm Setup */}
       <div className='card'>
-        <h3>2. Last.fm Setup</h3>
+        <h3>Last.fm</h3>
         <div style={{ marginBottom: '1rem' }}>
           <div
             className={`status ${authStatus.lastfm.authenticated ? 'connected' : 'disconnected'}`}
@@ -524,20 +512,6 @@ const SetupPage: React.FC = () => {
           Connect to your Last.fm account. Your API credentials are already
           configured.
         </p>
-        <p>
-          <strong>Instructions:</strong>
-        </p>
-        <ol>
-          <li>
-            Click "Connect to Last.fm" to get the authorization URL (or it will
-            open in a popup)
-          </li>
-          <li>Visit the URL and authorize the application</li>
-          <li>
-            If automatic flow doesn't work, copy the token from the URL and use
-            manual entry below
-          </li>
-        </ol>
 
         <button
           className='btn'
@@ -608,4 +582,4 @@ const SetupPage: React.FC = () => {
   );
 };
 
-export default SetupPage;
+export default SettingsConnectionsSection;

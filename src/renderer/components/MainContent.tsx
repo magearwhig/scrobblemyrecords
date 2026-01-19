@@ -10,7 +10,6 @@ import ScrobblePage from '../pages/ScrobblePage';
 import SellerMatchesPage from '../pages/SellerMatchesPage';
 import SellersPage from '../pages/SellersPage';
 import SettingsPage from '../pages/SettingsPage';
-import SetupPage from '../pages/SetupPage';
 import StatsPage from '../pages/StatsPage';
 import SuggestionsPage from '../pages/SuggestionsPage';
 import WishlistPage from '../pages/WishlistPage';
@@ -35,8 +34,6 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
     switch (currentPage) {
       case 'home':
         return <HomePage />;
-      case 'setup':
-        return <SetupPage />;
       case 'collection':
         return <CollectionPage />;
       case 'scrobble':

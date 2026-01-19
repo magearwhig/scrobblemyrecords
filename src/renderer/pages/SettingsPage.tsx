@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 import {
+  SettingsConnectionsSection,
   SettingsIntegrationsSection,
   SettingsMappingsSection,
   SettingsFiltersSection,
@@ -12,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
 
 type SettingsTab =
+  | 'connections'
   | 'integrations'
   | 'mappings'
   | 'filters'
@@ -26,6 +28,12 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
+  {
+    id: 'connections',
+    label: 'Connections',
+    icon: '🔗',
+    description: 'Discogs & Last.fm accounts',
+  },
   {
     id: 'integrations',
     label: 'Integrations',
@@ -58,10 +66,30 @@ const TABS: TabConfig[] = [
   },
 ];
 
+// Helper to parse tab from URL hash query params
+const getTabFromUrl = (): SettingsTab | null => {
+  const hash = window.location.hash;
+  const queryIndex = hash.indexOf('?');
+  if (queryIndex === -1) return null;
+
+  const queryString = hash.slice(queryIndex + 1);
+  const params = new URLSearchParams(queryString);
+  const tab = params.get('tab');
+
+  if (tab && TABS.some(t => t.id === tab)) {
+    return tab as SettingsTab;
+  }
+  return null;
+};
+
 const SettingsPage: React.FC = () => {
   const { state } = useApp();
   const { authStatus } = useAuth();
-  const [activeTab, setActiveTab] = useState<SettingsTab>('integrations');
+
+  // Initialize with URL tab param or default to 'connections'
+  const [activeTab, setActiveTab] = useState<SettingsTab>(() => {
+    return getTabFromUrl() || 'connections';
+  });
 
   // Badge counts for tabs
   const [mappingsCount, setMappingsCount] = useState(0);
@@ -69,6 +97,19 @@ const SettingsPage: React.FC = () => {
   const [watchListCount, setWatchListCount] = useState(0);
 
   const api = getApiService(state.serverUrl);
+
+  // Listen for hash changes to handle tab parameter
+  useEffect(() => {
+    const handleHashChange = () => {
+      const tabFromUrl = getTabFromUrl();
+      if (tabFromUrl) {
+        setActiveTab(tabFromUrl);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Load badge counts
   useEffect(() => {
@@ -124,6 +165,8 @@ const SettingsPage: React.FC = () => {
 
   const renderTabContent = () => {
     switch (activeTab) {
+      case 'connections':
+        return <SettingsConnectionsSection api={api} />;
       case 'integrations':
         return <SettingsIntegrationsSection api={api} />;
       case 'mappings':
@@ -145,7 +188,7 @@ const SettingsPage: React.FC = () => {
       <div className='settings-header-card'>
         <h1>Settings</h1>
         <p className='settings-page-description'>
-          Configure your integrations, mappings, and preferences
+          Configure your connections, integrations, mappings, and preferences
         </p>
       </div>
 

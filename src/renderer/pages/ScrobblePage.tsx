@@ -260,8 +260,8 @@ const ScrobblePage: React.FC = () => {
           Please authenticate with both Discogs and Last.fm to scrobble tracks.
         </p>
         <div style={{ marginTop: '1rem' }}>
-          <a href='#setup' className='btn'>
-            Go to Setup
+          <a href='#settings?tab=connections' className='btn'>
+            Connect Accounts
           </a>
         </div>
       </div>

@@ -108,7 +108,7 @@ describe('HistoryPage', () => {
           'Please authenticate with Last.fm first to view your scrobbling history.'
         )
       ).toBeInTheDocument();
-      expect(screen.getByText('Go to Setup')).toBeInTheDocument();
+      expect(screen.getByText('Connect Last.fm')).toBeInTheDocument();
     });
 
     it('loads history when Last.fm is authenticated', async () => {

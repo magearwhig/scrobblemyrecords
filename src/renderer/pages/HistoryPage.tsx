@@ -194,8 +194,8 @@ const HistoryPage: React.FC = () => {
           history.
         </p>
         <div style={{ marginTop: '1rem' }}>
-          <a href='#setup' className='btn'>
-            Go to Setup
+          <a href='#settings?tab=connections' className='btn'>
+            Connect Last.fm
           </a>
         </div>
       </div>

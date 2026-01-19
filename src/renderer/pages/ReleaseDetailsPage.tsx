@@ -1199,10 +1199,12 @@ const ReleaseDetailsPage: React.FC = () => {
               Please authenticate with Last.fm to scrobble tracks.
               <button
                 className='btn btn-small'
-                onClick={() => (window.location.hash = '#setup')}
+                onClick={() =>
+                  (window.location.hash = '#settings?tab=connections')
+                }
                 style={{ marginLeft: '1rem' }}
               >
-                Go to Setup
+                Connect Last.fm
               </button>
             </div>
           )}

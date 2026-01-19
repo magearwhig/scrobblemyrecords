@@ -681,12 +681,8 @@ const CollectionPage: React.FC = () => {
         <h2>Browse Collection</h2>
         <p>Please authenticate with Discogs first to browse your collection.</p>
         <div style={{ marginTop: '1rem' }}>
-          <a
-            href='#'
-            onClick={() => (window.location.hash = '#setup')}
-            className='btn'
-          >
-            Go to Setup
+          <a href='#settings?tab=connections' className='btn'>
+            Connect Discogs
           </a>
         </div>
       </div>
@@ -1233,25 +1229,12 @@ const CollectionPage: React.FC = () => {
                 ? 'Deselect All'
                 : 'Select All'}
             </button>
-
             {selectedAlbums.size > 0 && (
-              <button
-                className='btn btn-small'
-                onClick={() => {
-                  // Navigate to scrobble page with selected albums
-                  const selectedItems = filteredCollection.filter(item =>
-                    selectedAlbums.has(item.release.id)
-                  );
-                  // Store selected items in localStorage for now
-                  localStorage.setItem(
-                    'selectedAlbums',
-                    JSON.stringify(selectedItems)
-                  );
-                  window.location.hash = '#scrobble';
-                }}
+              <span
+                style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}
               >
-                Scrobble Selected ({selectedAlbums.size})
-              </button>
+                {selectedAlbums.size} selected
+              </span>
             )}
           </div>
 
@@ -1354,6 +1337,45 @@ const CollectionPage: React.FC = () => {
               }}
             />
           ))}
+        </div>
+      )}
+
+      {/* Floating Action Bar - appears when albums are selected */}
+      {selectedAlbums.size > 0 && (
+        <div className='floating-action-bar'>
+          <div className='floating-action-bar-content'>
+            <div className='floating-action-bar-info'>
+              <span className='floating-action-bar-count'>
+                {selectedAlbums.size} album
+                {selectedAlbums.size !== 1 ? 's' : ''} selected
+              </span>
+            </div>
+            <div className='floating-action-bar-actions'>
+              <button
+                className='btn btn-secondary btn-small'
+                onClick={() => setSelectedAlbums(new Set())}
+              >
+                Clear Selection
+              </button>
+              <button
+                className='btn btn-small'
+                onClick={() => {
+                  // Navigate to scrobble page with selected albums
+                  const selectedItems = filteredCollection.filter(item =>
+                    selectedAlbums.has(item.release.id)
+                  );
+                  // Store selected items in localStorage
+                  localStorage.setItem(
+                    'selectedAlbums',
+                    JSON.stringify(selectedItems)
+                  );
+                  window.location.hash = '#scrobble';
+                }}
+              >
+                Scrobble
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

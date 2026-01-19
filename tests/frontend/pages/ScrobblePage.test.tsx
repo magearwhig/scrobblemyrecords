@@ -159,7 +159,7 @@ describe('ScrobblePage', () => {
           'Please authenticate with both Discogs and Last.fm to scrobble tracks.'
         )
       ).toBeInTheDocument();
-      expect(screen.getByText('Go to Setup')).toBeInTheDocument();
+      expect(screen.getByText('Connect Accounts')).toBeInTheDocument();
     });
 
     it('shows authentication required when Discogs is not authenticated', () => {

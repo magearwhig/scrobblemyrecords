@@ -422,7 +422,7 @@ describe('CollectionPage', () => {
       expect(deselectButtons).toHaveLength(3);
     });
 
-    it('shows scrobble button when albums are selected', async () => {
+    it('shows floating action bar when albums are selected', async () => {
       renderWithProviders(<CollectionPage />);
 
       await waitFor(() => {
@@ -432,7 +432,10 @@ describe('CollectionPage', () => {
       const selectButtons = screen.getAllByText('Select');
       await userEvent.click(selectButtons[0]);
 
-      expect(screen.getByText('Scrobble Selected (1)')).toBeInTheDocument();
+      // Floating action bar should appear with selection count and buttons
+      expect(screen.getByText('1 album selected')).toBeInTheDocument();
+      expect(screen.getByText('Scrobble')).toBeInTheDocument();
+      expect(screen.getByText('Clear Selection')).toBeInTheDocument();
     });
 
     it('navigates to scrobble page when scrobble button is clicked', async () => {
@@ -445,10 +448,32 @@ describe('CollectionPage', () => {
       const selectButtons = screen.getAllByText('Select');
       await userEvent.click(selectButtons[0]);
 
-      const scrobbleButton = screen.getByText('Scrobble Selected (1)');
+      const scrobbleButton = screen.getByText('Scrobble');
       await userEvent.click(scrobbleButton);
 
       expect(window.location.hash).toBe('#scrobble');
+    });
+
+    it('clears selection when Clear Selection is clicked', async () => {
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      const selectButtons = screen.getAllByText('Select');
+      await userEvent.click(selectButtons[0]);
+
+      // Floating action bar should be visible
+      expect(screen.getByText('1 album selected')).toBeInTheDocument();
+
+      // Click Clear Selection
+      const clearButton = screen.getByText('Clear Selection');
+      await userEvent.click(clearButton);
+
+      // Floating action bar should disappear
+      expect(screen.queryByText('1 album selected')).not.toBeInTheDocument();
+      expect(screen.queryByText('Clear Selection')).not.toBeInTheDocument();
     });
   });
 

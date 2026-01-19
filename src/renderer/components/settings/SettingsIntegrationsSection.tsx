@@ -422,10 +422,10 @@ const SettingsIntegrationsSection: React.FC<
             <button
               className='btn'
               onClick={() => {
-                window.location.hash = 'setup';
+                window.location.hash = 'settings?tab=connections';
               }}
             >
-              Go to Setup
+              Connect Last.fm
             </button>
           </div>
         )}

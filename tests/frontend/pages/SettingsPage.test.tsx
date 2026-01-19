@@ -35,17 +35,21 @@ describe('SettingsPage', () => {
     renderWithProviders(<SettingsPage />);
 
     expect(
-      screen.getByText('Configure your integrations, mappings, and preferences')
+      screen.getByText(
+        'Configure your connections, integrations, mappings, and preferences'
+      )
     ).toBeInTheDocument();
   });
 
-  it('renders the four tabs', () => {
+  it('renders all six tabs', () => {
     renderWithProviders(<SettingsPage />);
 
+    expect(screen.getByText('Connections')).toBeInTheDocument();
     expect(screen.getByText('Integrations')).toBeInTheDocument();
     expect(screen.getByText('Mappings')).toBeInTheDocument();
     expect(screen.getByText('Filters')).toBeInTheDocument();
     expect(screen.getByText('Wishlist')).toBeInTheDocument();
+    expect(screen.getByText('Backup')).toBeInTheDocument();
   });
 
   it('renders within a header card container', () => {
@@ -70,16 +74,28 @@ describe('SettingsPage', () => {
     expect(headerCard).toHaveClass('settings-header-card');
   });
 
-  it('starts on Integrations tab by default', () => {
+  it('starts on Connections tab by default', () => {
     renderWithProviders(<SettingsPage />);
 
-    // Integrations tab should be active
+    // Connections tab should be active
+    const connectionsTab = screen.getByRole('button', {
+      name: /Connections/i,
+    });
+    expect(connectionsTab).toHaveClass('active');
+
+    // Should show connection-related content
+    expect(screen.getByText('Account Connections')).toBeInTheDocument();
+  });
+
+  it('can switch to Integrations tab', () => {
+    renderWithProviders(<SettingsPage />);
+
     const integrationsTab = screen.getByRole('button', {
       name: /Integrations/i,
     });
-    expect(integrationsTab).toHaveClass('active');
+    fireEvent.click(integrationsTab);
 
-    // Should show integration-related content
+    expect(integrationsTab).toHaveClass('active');
     expect(screen.getByText('Last.fm Sync')).toBeInTheDocument();
   });
 

@@ -35,8 +35,8 @@ describe('Sidebar', () => {
     jest.clearAllMocks();
   });
 
-  describe('Navigation Items', () => {
-    it('renders all navigation items', () => {
+  describe('Category Headers', () => {
+    it('renders category headers for navigation groups', () => {
       const authStatus: AuthStatus = {
         discogs: { authenticated: true, username: 'discogs_user' },
         lastfm: { authenticated: true, username: 'lastfm_user' },
@@ -44,12 +44,56 @@ describe('Sidebar', () => {
 
       renderSidebarWithAuth(authStatus);
 
+      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      expect(screen.getByText('Library')).toBeInTheDocument();
+      expect(screen.getByText('Listening')).toBeInTheDocument();
+      expect(screen.getByText('Explore')).toBeInTheDocument();
+      expect(screen.getByText('System')).toBeInTheDocument();
+    });
+  });
+
+  describe('Navigation Items', () => {
+    it('renders all navigation items in correct groups', () => {
+      const authStatus: AuthStatus = {
+        discogs: { authenticated: true, username: 'discogs_user' },
+        lastfm: { authenticated: true, username: 'lastfm_user' },
+      };
+
+      renderSidebarWithAuth(authStatus);
+
+      // Dashboard group
       expect(screen.getByText('Home')).toBeInTheDocument();
-      expect(screen.getByText('Setup & Authentication')).toBeInTheDocument();
+
+      // Library group
       expect(screen.getByText('Browse Collection')).toBeInTheDocument();
-      expect(screen.getByText('Scrobble Tracks')).toBeInTheDocument();
+      expect(screen.getByText('Wishlist')).toBeInTheDocument();
+
+      // Listening group
+      expect(screen.getByText('Play Suggestions')).toBeInTheDocument();
       expect(screen.getByText('Scrobble History')).toBeInTheDocument();
+      expect(screen.getByText('Stats Dashboard')).toBeInTheDocument();
+
+      // Explore group
+      expect(screen.getByText('Discovery')).toBeInTheDocument();
+      expect(screen.getByText('New Releases')).toBeInTheDocument();
+      expect(screen.getByText('Local Sellers')).toBeInTheDocument();
+
+      // System group
       expect(screen.getByText('Settings')).toBeInTheDocument();
+    });
+
+    it('does not render removed navigation items (Setup, Scrobble Tracks)', () => {
+      const authStatus: AuthStatus = {
+        discogs: { authenticated: true, username: 'discogs_user' },
+        lastfm: { authenticated: true, username: 'lastfm_user' },
+      };
+
+      renderSidebarWithAuth(authStatus);
+
+      expect(
+        screen.queryByText('Setup & Authentication')
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText('Scrobble Tracks')).not.toBeInTheDocument();
     });
 
     it('shows correct icons for each navigation item', () => {
@@ -61,10 +105,14 @@ describe('Sidebar', () => {
       renderSidebarWithAuth(authStatus);
 
       expect(screen.getByText('🏠')).toBeInTheDocument(); // Home
-      expect(screen.getByText('🔑')).toBeInTheDocument(); // Setup
       expect(screen.getByText('💿')).toBeInTheDocument(); // Collection
-      expect(screen.getByText('🎵')).toBeInTheDocument(); // Scrobble
+      expect(screen.getByText('❤️')).toBeInTheDocument(); // Wishlist
+      expect(screen.getByText('🎲')).toBeInTheDocument(); // Suggestions
       expect(screen.getByText('📝')).toBeInTheDocument(); // History
+      expect(screen.getByText('📊')).toBeInTheDocument(); // Stats
+      expect(screen.getByText('🔍')).toBeInTheDocument(); // Discovery
+      expect(screen.getByText('📢')).toBeInTheDocument(); // New Releases
+      expect(screen.getByText('🏪')).toBeInTheDocument(); // Local Sellers
       expect(screen.getByText('⚙️')).toBeInTheDocument(); // Settings
     });
 
@@ -87,7 +135,7 @@ describe('Sidebar', () => {
   });
 
   describe('Authentication-based Enablement', () => {
-    it('enables Home and Setup regardless of authentication status', () => {
+    it('enables Home and Settings regardless of authentication status', () => {
       const authStatus: AuthStatus = {
         discogs: { authenticated: false, username: undefined },
         lastfm: { authenticated: false, username: undefined },
@@ -96,17 +144,13 @@ describe('Sidebar', () => {
       renderSidebarWithAuth(authStatus);
 
       const homeButton = screen.getByText('Home').closest('button');
-      const setupButton = screen
-        .getByText('Setup & Authentication')
-        .closest('button');
       const settingsButton = screen.getByText('Settings').closest('button');
 
       expect(homeButton).toBeEnabled();
-      expect(setupButton).toBeEnabled();
       expect(settingsButton).toBeEnabled();
     });
 
-    it('disables Collection when Discogs is not authenticated', () => {
+    it('disables Collection and Wishlist when Discogs is not authenticated', () => {
       const authStatus: AuthStatus = {
         discogs: { authenticated: false, username: undefined },
         lastfm: { authenticated: true, username: 'lastfm_user' },
@@ -117,11 +161,15 @@ describe('Sidebar', () => {
       const collectionButton = screen
         .getByText('Browse Collection')
         .closest('button');
+      const wishlistButton = screen.getByText('Wishlist').closest('button');
+
       expect(collectionButton).toBeDisabled();
       expect(collectionButton).toHaveClass('disabled');
+      expect(wishlistButton).toBeDisabled();
+      expect(wishlistButton).toHaveClass('disabled');
     });
 
-    it('enables Collection when Discogs is authenticated', () => {
+    it('enables Collection and Wishlist when Discogs is authenticated', () => {
       const authStatus: AuthStatus = {
         discogs: { authenticated: true, username: 'discogs_user' },
         lastfm: { authenticated: false, username: undefined },
@@ -132,11 +180,15 @@ describe('Sidebar', () => {
       const collectionButton = screen
         .getByText('Browse Collection')
         .closest('button');
+      const wishlistButton = screen.getByText('Wishlist').closest('button');
+
       expect(collectionButton).toBeEnabled();
       expect(collectionButton).not.toHaveClass('disabled');
+      expect(wishlistButton).toBeEnabled();
+      expect(wishlistButton).not.toHaveClass('disabled');
     });
 
-    it('disables Scrobble when either service is not authenticated', () => {
+    it('disables Play Suggestions when either service is not authenticated', () => {
       const authStatusPartial: AuthStatus = {
         discogs: { authenticated: true, username: 'discogs_user' },
         lastfm: { authenticated: false, username: undefined },
@@ -144,14 +196,14 @@ describe('Sidebar', () => {
 
       renderSidebarWithAuth(authStatusPartial);
 
-      const scrobbleButton = screen
-        .getByText('Scrobble Tracks')
+      const suggestionsButton = screen
+        .getByText('Play Suggestions')
         .closest('button');
-      expect(scrobbleButton).toBeDisabled();
-      expect(scrobbleButton).toHaveClass('disabled');
+      expect(suggestionsButton).toBeDisabled();
+      expect(suggestionsButton).toHaveClass('disabled');
     });
 
-    it('enables Scrobble when both services are authenticated', () => {
+    it('enables Play Suggestions when both services are authenticated', () => {
       const authStatus: AuthStatus = {
         discogs: { authenticated: true, username: 'discogs_user' },
         lastfm: { authenticated: true, username: 'lastfm_user' },
@@ -159,14 +211,14 @@ describe('Sidebar', () => {
 
       renderSidebarWithAuth(authStatus);
 
-      const scrobbleButton = screen
-        .getByText('Scrobble Tracks')
+      const suggestionsButton = screen
+        .getByText('Play Suggestions')
         .closest('button');
-      expect(scrobbleButton).toBeEnabled();
-      expect(scrobbleButton).not.toHaveClass('disabled');
+      expect(suggestionsButton).toBeEnabled();
+      expect(suggestionsButton).not.toHaveClass('disabled');
     });
 
-    it('disables History when Last.fm is not authenticated', () => {
+    it('disables History, Discovery, and Stats when Last.fm is not authenticated', () => {
       const authStatus: AuthStatus = {
         discogs: { authenticated: true, username: 'discogs_user' },
         lastfm: { authenticated: false, username: undefined },
@@ -177,11 +229,18 @@ describe('Sidebar', () => {
       const historyButton = screen
         .getByText('Scrobble History')
         .closest('button');
+      const discoveryButton = screen.getByText('Discovery').closest('button');
+      const statsButton = screen.getByText('Stats Dashboard').closest('button');
+
       expect(historyButton).toBeDisabled();
       expect(historyButton).toHaveClass('disabled');
+      expect(discoveryButton).toBeDisabled();
+      expect(discoveryButton).toHaveClass('disabled');
+      expect(statsButton).toBeDisabled();
+      expect(statsButton).toHaveClass('disabled');
     });
 
-    it('enables History when Last.fm is authenticated', () => {
+    it('enables History, Discovery, and Stats when Last.fm is authenticated', () => {
       const authStatus: AuthStatus = {
         discogs: { authenticated: false, username: undefined },
         lastfm: { authenticated: true, username: 'lastfm_user' },
@@ -192,8 +251,32 @@ describe('Sidebar', () => {
       const historyButton = screen
         .getByText('Scrobble History')
         .closest('button');
+      const discoveryButton = screen.getByText('Discovery').closest('button');
+      const statsButton = screen.getByText('Stats Dashboard').closest('button');
+
       expect(historyButton).toBeEnabled();
       expect(historyButton).not.toHaveClass('disabled');
+      expect(discoveryButton).toBeEnabled();
+      expect(discoveryButton).not.toHaveClass('disabled');
+      expect(statsButton).toBeEnabled();
+      expect(statsButton).not.toHaveClass('disabled');
+    });
+
+    it('disables New Releases and Local Sellers when Discogs is not authenticated', () => {
+      const authStatus: AuthStatus = {
+        discogs: { authenticated: false, username: undefined },
+        lastfm: { authenticated: true, username: 'lastfm_user' },
+      };
+
+      renderSidebarWithAuth(authStatus);
+
+      const releasesButton = screen.getByText('New Releases').closest('button');
+      const sellersButton = screen.getByText('Local Sellers').closest('button');
+
+      expect(releasesButton).toBeDisabled();
+      expect(releasesButton).toHaveClass('disabled');
+      expect(sellersButton).toBeDisabled();
+      expect(sellersButton).toHaveClass('disabled');
     });
   });
 
@@ -269,7 +352,7 @@ describe('Sidebar', () => {
       expect(screen.getByText('Last.fm: ✗ Not connected')).toBeInTheDocument();
     });
 
-    it('applies correct colors to status text', () => {
+    it('applies correct CSS classes to status items', () => {
       const authStatus: AuthStatus = {
         discogs: { authenticated: true, username: 'discogs_user' },
         lastfm: { authenticated: false, username: undefined },
@@ -280,44 +363,8 @@ describe('Sidebar', () => {
       const discogsStatus = screen.getByText('Discogs: ✓ Connected');
       const lastfmStatus = screen.getByText('Last.fm: ✗ Not connected');
 
-      expect(discogsStatus).toHaveStyle('color: #28a745'); // Green for connected
-      expect(lastfmStatus).toHaveStyle('color: #dc3545'); // Red for not connected
-    });
-  });
-
-  describe('Visual Styling', () => {
-    it('applies correct cursor styles for enabled and disabled buttons', () => {
-      const authStatus: AuthStatus = {
-        discogs: { authenticated: false, username: undefined },
-        lastfm: { authenticated: false, username: undefined },
-      };
-
-      renderSidebarWithAuth(authStatus);
-
-      const homeButton = screen.getByText('Home').closest('button');
-      const collectionButton = screen
-        .getByText('Browse Collection')
-        .closest('button');
-
-      expect(homeButton).toHaveStyle('cursor: pointer');
-      expect(collectionButton).toHaveStyle('cursor: not-allowed');
-    });
-
-    it('applies correct opacity for enabled and disabled buttons', () => {
-      const authStatus: AuthStatus = {
-        discogs: { authenticated: false, username: undefined },
-        lastfm: { authenticated: false, username: undefined },
-      };
-
-      renderSidebarWithAuth(authStatus);
-
-      const homeButton = screen.getByText('Home').closest('button');
-      const collectionButton = screen
-        .getByText('Browse Collection')
-        .closest('button');
-
-      expect(homeButton).toHaveStyle('opacity: 1');
-      expect(collectionButton).toHaveStyle('opacity: 0.5');
+      expect(discogsStatus).toHaveClass('sidebar-status-connected');
+      expect(lastfmStatus).toHaveClass('sidebar-status-disconnected');
     });
   });
 });

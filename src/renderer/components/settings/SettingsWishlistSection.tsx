@@ -299,10 +299,10 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
                   <button
                     className='btn'
                     onClick={() => {
-                      window.location.hash = 'setup';
+                      window.location.hash = 'settings?tab=connections';
                     }}
                   >
-                    Go to Setup
+                    Connect Discogs
                   </button>
                 </>
               ) : (
@@ -553,10 +553,10 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
                   <button
                     className='btn'
                     onClick={() => {
-                      window.location.hash = 'setup';
+                      window.location.hash = 'settings?tab=connections';
                     }}
                   >
-                    Go to Setup
+                    Connect Discogs
                   </button>
                 </>
               ) : (

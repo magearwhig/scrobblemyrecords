@@ -907,7 +907,7 @@ describe('ReleaseDetailsPage Last.fm Connection Testing', () => {
     expect(
       screen.getByText('Please authenticate with Last.fm to scrobble tracks.')
     ).toBeInTheDocument();
-    expect(screen.getByText('Go to Setup')).toBeInTheDocument();
+    expect(screen.getByText('Connect Last.fm')).toBeInTheDocument();
 
     // Should not show Last.fm connection buttons
     expect(

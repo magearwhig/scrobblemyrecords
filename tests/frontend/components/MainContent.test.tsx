@@ -11,12 +11,6 @@ jest.mock('../../../src/renderer/pages/HomePage', () => {
   };
 });
 
-jest.mock('../../../src/renderer/pages/SetupPage', () => {
-  return function MockSetupPage() {
-    return <div data-testid='setup-page'>Setup Page</div>;
-  };
-});
-
 jest.mock('../../../src/renderer/pages/CollectionPage', () => {
   return function MockCollectionPage() {
     return <div data-testid='collection-page'>Collection Page</div>;
@@ -53,13 +47,6 @@ describe('MainContent', () => {
 
     expect(screen.getByTestId('home-page')).toBeInTheDocument();
     expect(screen.getByText('Home Page')).toBeInTheDocument();
-  });
-
-  it('renders SetupPage when currentPage is "setup"', () => {
-    render(<MainContent currentPage='setup' />);
-
-    expect(screen.getByTestId('setup-page')).toBeInTheDocument();
-    expect(screen.getByText('Setup Page')).toBeInTheDocument();
   });
 
   it('renders CollectionPage when currentPage is "collection"', () => {
@@ -118,19 +105,25 @@ describe('MainContent', () => {
     expect(screen.getByText('Home Page')).toBeInTheDocument();
   });
 
+  it('renders HomePage when currentPage is "setup" (removed page)', () => {
+    // Setup page was removed - should fall through to default (HomePage)
+    render(<MainContent currentPage='setup' />);
+
+    expect(screen.getByTestId('home-page')).toBeInTheDocument();
+    expect(screen.getByText('Home Page')).toBeInTheDocument();
+  });
+
   it('only renders one page at a time', () => {
     const { rerender } = render(<MainContent currentPage='home' />);
 
     expect(screen.getByTestId('home-page')).toBeInTheDocument();
-    expect(screen.queryByTestId('setup-page')).not.toBeInTheDocument();
     expect(screen.queryByTestId('collection-page')).not.toBeInTheDocument();
 
     // Change page and verify only new page is rendered
-    rerender(<MainContent currentPage='setup' />);
+    rerender(<MainContent currentPage='collection' />);
 
     expect(screen.queryByTestId('home-page')).not.toBeInTheDocument();
-    expect(screen.getByTestId('setup-page')).toBeInTheDocument();
-    expect(screen.queryByTestId('collection-page')).not.toBeInTheDocument();
+    expect(screen.getByTestId('collection-page')).toBeInTheDocument();
   });
 
   it('handles page switching correctly', () => {
