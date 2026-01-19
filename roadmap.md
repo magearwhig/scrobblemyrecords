@@ -1526,26 +1526,47 @@ See `.plan/discard-pile-plan.md` for full specification including:
 
 ---
 
-## Feature 8: Wishlist Enhancements
+## Feature 8: Wishlist & Collection Enhancements
 
-### Status: PLANNED
+### Status: COMPLETE ✅
+
+**Completed:**
+- `POST /api/v1/stats/album-play-counts` batch endpoint with fuzzy matching via `getAlbumHistoryFuzzy()`
+- `AlbumIdentifier`, `AlbumPlayCountRequest`, `AlbumPlayCountResult`, `AlbumPlayCountResponse` types
+- WishlistPage: "Scrobbles (Most Played)" sort option with client-side caching
+- CollectionPage: "Scrobbles (Most Played)" sort option with lazy-loaded play counts
+- "Include monitored" toggle to merge local want items with Discogs wishlist
+- Deduplication logic with "Monitored" badge for items in both sources
+- Naming convention updates: "Wanted" → "Monitoring", "Want" → "Monitor", "In Wantlist" → "In Wishlist"
+- 11 new tests for album-play-counts endpoint
+- Updated WishlistPage and DiscoveryPage tests for naming changes
+
+**Implementation Details:**
+- Play counts fetched via batch endpoint, cached client-side for session
+- Fuzzy matching handles naming differences between Discogs and Last.fm
+- Zero play count labels hidden for cleaner UI
+- Local items use negative IDs to avoid React key collisions with Discogs items
 
 ### Overview
-Three enhancements for the Wishlist page:
-1. **Sort by scrobble count** - Order items by how often you've listened to that album
-2. **Include monitored albums toggle** - Show local want items alongside Discogs wishlist
-3. **Better naming conventions** - Clarify Discogs wishlist vs local monitoring
+Four enhancements across Wishlist and Collection pages:
+1. **Sort Wishlist by scrobble count** - Order wishlist items by how often you've listened to that album
+2. **Sort Collection by scrobble count** - Order collection items by play count (reuses same batch endpoint)
+3. **Include monitored albums toggle** - Show local want items alongside Discogs wishlist
+4. **Better naming conventions** - Clarify Discogs wishlist vs local monitoring
 
 ### Key Features
-- Batch endpoint for album play count lookup using fuzzy matching
+- Batch endpoint for album play count lookup using fuzzy matching (`POST /api/v1/stats/album-play-counts`)
+- Add "Scrobbles" sort option to both WishlistPage and CollectionPage
 - Merge/dedupe logic for items in both Discogs wishlist and local monitoring
 - Consistent terminology: "Wishlist" (Discogs) vs "Monitoring" (local)
 
 ### Implementation Details
 See `.plan/wishlist-enhancements-plan.md` for full specification including:
-- `POST /api/v1/stats/album-play-counts` batch endpoint
+- `POST /api/v1/stats/album-play-counts` batch endpoint (shared by Wishlist and Collection)
+- WishlistPage: Enrich items with play counts, add "Scrobbles" sort option
+- CollectionPage: Lazy-load play counts when "Scrobbles" sort selected (single request)
 - `includeTracked` toggle with deduplication
-- UI naming changes across WishlistPage and DiscoveryPage
+- UI naming changes: "Wanted" → "Monitoring", "Want" → "Monitor", etc.
 
 ---
 

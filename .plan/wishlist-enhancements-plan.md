@@ -1,15 +1,18 @@
-# Wishlist Page Enhancements - Implementation Plan
+# Wishlist & Collection Enhancements - Implementation Plan
 
 ## Overview
 
-Three enhancements for the Wishlist page:
-1. **Sort by scrobble count** - Order wishlist items by how many times you've listened to that album
-2. **Include local wantlist toggle** - Show local want items alongside Discogs wishlist items  
-3. **Better naming conventions** - Clarify the difference between Discogs wishlist and local wantlist
+Four enhancements across Wishlist and Collection pages:
+1. **Sort by scrobble count (Wishlist)** - Order wishlist items by how many times you've listened to that album
+2. **Sort by scrobble count (Collection)** - Order collection items by play count (reuses same batch endpoint)
+3. **Include local wantlist toggle** - Show local want items alongside Discogs wishlist items
+4. **Better naming conventions** - Clarify the difference between Discogs wishlist and local wantlist
+
+> **Note:** Enhancements 1 and 2 share the same backend logic (batch album play counts endpoint).
 
 ---
 
-## Current State
+## Current State (January 2026)
 
 ### Two Data Sources
 | Source | Type | Tab Location | Origin |
@@ -80,6 +83,66 @@ Cross-reference wishlist items with Last.fm scrobble history using existing `get
 - **Scrobble counts are all-time** (not configurable period for v1)
 - **Show "0 plays" or hide?** Hide the label when count is 0 (cleaner UI)
 - **Stable sort:** When counts are equal, secondary sort by date added
+
+---
+
+## Enhancement 1B: Sort Collection by Scrobble Count
+
+### Current Collection Sort Options
+The Collection page (`CollectionPage.tsx`) currently supports:
+- `'artist'` - Sort by artist name
+- `'title'` - Sort by album title
+- `'year'` - Sort by release year
+- `'date_added'` - Sort by date added to collection
+
+### Challenge
+Collection items come from Discogs and don't have scrobble data.
+
+### Solution
+Reuse the same batch endpoint (`POST /api/v1/stats/album-play-counts`) created for Wishlist.
+
+### Implementation Steps
+
+1. **Update CollectionPage.tsx sort options:**
+   ```typescript
+   const [sortBy, setSortBy] = useState<
+     'artist' | 'title' | 'year' | 'date_added' | 'scrobbles'
+   >('artist');
+   ```
+
+2. **Add state for scrobble counts:**
+   ```typescript
+   const [albumScrobbleCounts, setAlbumScrobbleCounts] = useState<Map<string, number>>(new Map());
+   const [loadingScrobbleCounts, setLoadingScrobbleCounts] = useState(false);
+   ```
+
+3. **Fetch play counts when collection loads:**
+   - Call batch endpoint with collection artist/album pairs
+   - Store in Map keyed by `${artist}|${album}` for O(1) lookup
+   - Fetch lazily (only when user selects "scrobbles" sort, or prefetch in background)
+
+4. **Add sort case:**
+   ```typescript
+   case 'scrobbles':
+     const aCount = albumScrobbleCounts.get(`${a.release.artist}|${a.release.title}`) || 0;
+     const bCount = albumScrobbleCounts.get(`${b.release.artist}|${b.release.title}`) || 0;
+     return bCount - aCount; // High to low
+   ```
+
+5. **Add sort option to UI:**
+   - Add "Scrobbles" option to sort dropdown
+   - Show loading indicator while fetching counts
+   - Optionally display count on AlbumCard when sorted by scrobbles
+
+### Performance Considerations
+- Collection can be large (1000+ items), but payload is small (~50KB for 1000 albums)
+- Single request is fine - no batching needed
+- Cache results client-side for the session
+
+### UI Considerations
+- Show "Loading play counts..." when switching to scrobbles sort
+- Display scrobble count overlay on cards when sorted by scrobbles (like DiscardPile badge)
+- Gray out "0 plays" albums or show at bottom
 
 ---
 
@@ -253,6 +316,17 @@ describe('Include Monitored Toggle', () => {
 });
 ```
 
+#### CollectionPage.test.tsx
+```typescript
+describe('Sort by Scrobbles', () => {
+  it('fetches play counts when scrobbles sort selected');
+  it('sorts by scrobble count descending');
+  it('shows loading state while fetching counts');
+  it('displays play count overlay on cards when sorted by scrobbles');
+  it('caches play counts for session');
+});
+```
+
 #### DiscoveryPage.test.tsx
 ```typescript
 describe('Naming Updates', () => {
@@ -267,12 +341,18 @@ describe('Naming Updates', () => {
 
 ## Files to Modify
 
-### Phase 1: Sort by Scrobbles
-- `src/shared/types.ts` - Add scrobbleCount field
-- `src/backend/routes/stats.ts` - Add batch endpoint
-- `src/renderer/services/api.ts` - Add client method
+### Phase 1A: Sort Wishlist by Scrobbles
+- `src/shared/types.ts` - Add scrobbleCount field, AlbumPlayCountRequest/Response types
+- `src/backend/routes/stats.ts` - Add batch endpoint `POST /api/v1/stats/album-play-counts`
+- `src/renderer/services/api.ts` - Add `getAlbumPlayCounts()` client method
 - `src/renderer/pages/WishlistPage.tsx` - Enrich, sort, display
 - `tests/backend/stats.test.ts` - Endpoint tests
+
+### Phase 1B: Sort Collection by Scrobbles
+- `src/renderer/pages/CollectionPage.tsx` - Add 'scrobbles' sort option, fetch counts, display
+- `src/renderer/components/AlbumCard.tsx` - Optional: Add scrobble count prop for display
+- `src/renderer/styles.css` - Scrobble count badge styling
+- `tests/frontend/pages/CollectionPage.test.tsx` - Collection sort tests
 
 ### Phase 2: Include Toggle
 - `src/renderer/pages/WishlistPage.tsx` - Toggle, merge, dedupe, filter logic
@@ -282,6 +362,7 @@ describe('Naming Updates', () => {
 ### Phase 3: Naming (ALL locations)
 - `src/renderer/pages/WishlistPage.tsx` - Tab label, empty states, toggle label
 - `src/renderer/pages/DiscoveryPage.tsx` - Badges, button, toggle text
+- `src/renderer/components/discovery/MissingAlbumsTab.tsx` - Badge text, button text, toggle label
 - `src/renderer/styles.css` - CSS class names (optional)
 - `tests/frontend/pages/DiscoveryPage.test.tsx` - Naming tests
 
@@ -292,10 +373,12 @@ describe('Naming Updates', () => {
 | Question | Decision |
 |----------|----------|
 | Scrobble counts: all-time or configurable? | **All-time** for v1 |
-| Show 0 plays or hide? | **Hide** when 0 |
+| Show 0 plays or hide? | **Hide** when 0 (show when sorted by scrobbles) |
 | Dedupe when in both sources? | **Show Discogs item with "Monitored" badge** |
 | Monitored items in Affordable filter? | **Excluded** (no price data) |
 | Naming collision with "Watch"? | **Use "Monitor/Monitoring"** instead of "Track" |
+| Collection: eager or lazy load counts? | **Lazy** - fetch when user selects scrobbles sort |
+| Collection: batch size for large collections? | **None** - single request handles 1000+ albums fine (~50KB) |
 
 ---
 
@@ -307,10 +390,18 @@ Use existing `getAlbumHistoryFuzzy()` which handles:
 - Punctuation differences
 - Common Last.fm vs Discogs naming quirks
 
-### Performance  
+### Performance
+**Wishlist:**
 - Batch endpoint: O(n) where n = wishlist items
 - Each album lookup: O(1) from index (already loaded in memory)
 - Total: Fast for typical wishlist sizes (<500 items)
+
+**Collection:**
+- Larger dataset (1000+ items typical)
+- Lazy loading: Only fetch when user selects "scrobbles" sort
+- Single request: ~50KB payload for 1000 albums, no batching needed
+- Client-side caching: Store counts in state for session duration
+- Show loading spinner while fetching counts
 
 ### Deduplication Key
 ```typescript

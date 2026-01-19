@@ -81,6 +81,15 @@ jest.mock('../../../src/renderer/components/SearchBar', () => {
   };
 });
 
+// Mock IntersectionObserver for useInfiniteScroll hook
+const mockIntersectionObserver = jest.fn();
+mockIntersectionObserver.mockReturnValue({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+});
+window.IntersectionObserver = mockIntersectionObserver;
+
 // Mock AppContext
 const mockUseApp = {
   state: { serverUrl: 'http://localhost:3001' },
@@ -563,8 +572,8 @@ describe('CollectionPage', () => {
     });
   });
 
-  describe('Pagination', () => {
-    it('shows pagination controls for large collections', async () => {
+  describe('Infinite Scroll', () => {
+    it('shows album count for large collections in browse mode', async () => {
       const largeCollection = Array.from({ length: 50 }, (_, i) => ({
         id: i + 1,
         release: {
@@ -586,13 +595,13 @@ describe('CollectionPage', () => {
 
       renderWithProviders(<CollectionPage />);
 
+      // Browse mode uses infinite scroll, should show "Showing X of Y" format
       await waitFor(() => {
-        expect(screen.getByText('Previous')).toBeInTheDocument();
-        expect(screen.getByText('Next')).toBeInTheDocument();
+        expect(screen.getByText(/Showing.*of.*50/)).toBeInTheDocument();
       });
     });
 
-    it('allows navigating to next page', async () => {
+    it('loads large collections with infinite scroll', async () => {
       const largeCollection = Array.from({ length: 150 }, (_, i) => ({
         id: i + 1,
         release: {
@@ -614,14 +623,10 @@ describe('CollectionPage', () => {
 
       renderWithProviders(<CollectionPage />);
 
+      // Should show "Showing X of 150" format in browse mode
       await waitFor(() => {
-        expect(screen.getByText('Next')).toBeInTheDocument();
+        expect(screen.getByText(/of 150/)).toBeInTheDocument();
       });
-
-      const nextButton = screen.getByText('Next');
-      await userEvent.click(nextButton);
-
-      expect(screen.getByText('Page 2 of 3')).toBeInTheDocument();
     });
   });
 

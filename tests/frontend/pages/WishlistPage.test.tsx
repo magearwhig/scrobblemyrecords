@@ -209,7 +209,7 @@ describe('WishlistPage', () => {
     expect(screen.getByText(/Has Vinyl \(/)).toBeInTheDocument();
     expect(screen.getByText(/CD Only \(/)).toBeInTheDocument();
     expect(screen.getByText(/Affordable \(/)).toBeInTheDocument();
-    expect(screen.getByText(/Wanted \(/)).toBeInTheDocument();
+    expect(screen.getByText(/Monitoring \(/)).toBeInTheDocument();
   });
 
   it('filters items by vinyl status when clicking Has Vinyl tab', async () => {
@@ -246,16 +246,16 @@ describe('WishlistPage', () => {
     });
   });
 
-  it('shows local want list when clicking Wanted tab', async () => {
+  it('shows local want list when clicking Monitoring tab', async () => {
     renderWishlistPage();
 
     await waitFor(() => {
       expect(screen.getByText('Radiohead')).toBeInTheDocument();
     });
 
-    // Click the "Wanted" tab
-    const wantedTab = screen.getByText(/Wanted \(/);
-    fireEvent.click(wantedTab);
+    // Click the "Monitoring" tab
+    const monitoringTab = screen.getByText(/Monitoring \(/);
+    fireEvent.click(monitoringTab);
 
     // Should show local want list item
     await waitFor(() => {
@@ -350,15 +350,15 @@ describe('WishlistPage', () => {
     expect(screen.getByDisplayValue('Artist')).toBeInTheDocument();
   });
 
-  it('shows Check for Vinyl button in Wanted tab', async () => {
+  it('shows Check for Vinyl button in Monitoring tab', async () => {
     renderWishlistPage();
 
     await waitFor(() => {
       expect(screen.getByText('Radiohead')).toBeInTheDocument();
     });
 
-    const wantedTab = screen.getByText(/Wanted \(/);
-    fireEvent.click(wantedTab);
+    const monitoringTab = screen.getByText(/Monitoring \(/);
+    fireEvent.click(monitoringTab);
 
     await waitFor(() => {
       expect(screen.getByText('Check for Vinyl')).toBeInTheDocument();
@@ -372,8 +372,8 @@ describe('WishlistPage', () => {
       expect(screen.getByText('Radiohead')).toBeInTheDocument();
     });
 
-    const wantedTab = screen.getByText(/Wanted \(/);
-    fireEvent.click(wantedTab);
+    const monitoringTab = screen.getByText(/Monitoring \(/);
+    fireEvent.click(monitoringTab);
 
     await waitFor(() => {
       expect(screen.getByText('Check for Vinyl')).toBeInTheDocument();

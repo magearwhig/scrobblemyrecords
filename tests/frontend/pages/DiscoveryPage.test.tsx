@@ -264,19 +264,19 @@ describe('DiscoveryPage', () => {
     });
   });
 
-  it('shows Want button for albums not in want list', async () => {
+  it('shows Monitor button for albums not being monitored', async () => {
     renderDiscoveryPage();
 
     await waitFor(() => {
       expect(screen.getByText('Radiohead')).toBeInTheDocument();
     });
 
-    // Find all Want buttons - should have 3 (one for each album)
-    const wantButtons = screen.getAllByText('Want');
-    expect(wantButtons.length).toBe(3);
+    // Find all Monitor buttons - should have 3 (one for each album)
+    const monitorButtons = screen.getAllByText('Monitor');
+    expect(monitorButtons.length).toBe(3);
   });
 
-  it('shows Wanted button for albums already in want list', async () => {
+  it('shows Monitoring button for albums already being monitored', async () => {
     // Mock local want list with Clem Snide album
     mockGetLocalWantList.mockResolvedValue(mockLocalWantList);
 
@@ -286,16 +286,18 @@ describe('DiscoveryPage', () => {
       expect(screen.getByText('Clem Snide')).toBeInTheDocument();
     });
 
-    // Should have 2 Want buttons and 1 Wanted button
-    const wantButtons = screen.getAllByText('Want');
-    expect(wantButtons.length).toBe(2);
+    // Should have 2 Monitor buttons and 1 Monitoring button
+    const monitorButtons = screen.getAllByText('Monitor');
+    expect(monitorButtons.length).toBe(2);
 
-    // Should show Wanted button (disabled state)
-    const wantedButtons = screen.getAllByRole('button', { name: /Wanted/i });
-    expect(wantedButtons.length).toBe(1);
+    // Should show Monitoring button (disabled state)
+    const monitoringButtons = screen.getAllByRole('button', {
+      name: /Monitoring/i,
+    });
+    expect(monitoringButtons.length).toBe(1);
   });
 
-  it('shows Wanted badge for albums in local want list', async () => {
+  it('shows Monitoring badge for albums being monitored', async () => {
     // Mock local want list with Clem Snide album
     mockGetLocalWantList.mockResolvedValue(mockLocalWantList);
 
@@ -305,23 +307,25 @@ describe('DiscoveryPage', () => {
       expect(screen.getByText('Clem Snide')).toBeInTheDocument();
     });
 
-    // Should show "Wanted" badge for items in local want list
-    const wantedBadge = screen.getByTitle('In your local want list');
-    expect(wantedBadge).toBeInTheDocument();
-    expect(wantedBadge).toHaveTextContent('Wanted');
-    expect(wantedBadge).toHaveClass('discovery-badge-wanted');
+    // Should show "Monitoring" badge for items in local want list
+    const monitoringBadge = screen.getByTitle(
+      'Monitoring for vinyl availability'
+    );
+    expect(monitoringBadge).toBeInTheDocument();
+    expect(monitoringBadge).toHaveTextContent('Monitoring');
+    expect(monitoringBadge).toHaveClass('discovery-badge-monitoring');
   });
 
-  it('adds album to want list when clicking Want button', async () => {
+  it('adds album to monitoring when clicking Monitor button', async () => {
     renderDiscoveryPage();
 
     await waitFor(() => {
       expect(screen.getByText('Radiohead')).toBeInTheDocument();
     });
 
-    // Find the Want button for the first album (Radiohead)
-    const wantButtons = screen.getAllByText('Want');
-    fireEvent.click(wantButtons[0]);
+    // Find the Monitor button for the first album (Radiohead)
+    const monitorButtons = screen.getAllByText('Monitor');
+    fireEvent.click(monitorButtons[0]);
 
     await waitFor(() => {
       expect(mockAddToLocalWantList).toHaveBeenCalledWith({
@@ -333,21 +337,23 @@ describe('DiscoveryPage', () => {
     });
   });
 
-  it('disables Want button after clicking and shows Wanted', async () => {
+  it('disables Monitor button after clicking and shows Monitoring', async () => {
     renderDiscoveryPage();
 
     await waitFor(() => {
       expect(screen.getByText('Radiohead')).toBeInTheDocument();
     });
 
-    const wantButtons = screen.getAllByRole('button', { name: 'Want' });
-    fireEvent.click(wantButtons[0]);
+    const monitorButtons = screen.getAllByRole('button', { name: 'Monitor' });
+    fireEvent.click(monitorButtons[0]);
 
     await waitFor(() => {
-      // After clicking, button should show "Wanted" and be disabled
-      const wantedButton = screen.getAllByRole('button', { name: 'Wanted' })[0];
-      expect(wantedButton).toBeInTheDocument();
-      expect(wantedButton).toBeDisabled();
+      // After clicking, button should show "Monitoring" and be disabled
+      const monitoringButton = screen.getAllByRole('button', {
+        name: 'Monitoring',
+      })[0];
+      expect(monitoringButton).toBeInTheDocument();
+      expect(monitoringButton).toBeDisabled();
     });
   });
 
@@ -575,7 +581,7 @@ describe('DiscoveryPage', () => {
     });
   });
 
-  it('shows "In Wantlist" badge for albums in Discogs wishlist', async () => {
+  it('shows "In Wishlist" badge for albums in Discogs wishlist', async () => {
     // Mock Discogs wishlist with Radiohead - OK Computer
     mockGetWishlist.mockResolvedValue(mockDiscogsWishlist);
 
@@ -585,11 +591,11 @@ describe('DiscoveryPage', () => {
       expect(screen.getByText('Radiohead')).toBeInTheDocument();
     });
 
-    // Should show "In Wantlist" badge for OK Computer
-    expect(screen.getByText('In Wantlist')).toBeInTheDocument();
+    // Should show "In Wishlist" badge for OK Computer
+    expect(screen.getByText('In Wishlist')).toBeInTheDocument();
   });
 
-  it('does not show "In Wantlist" badge for albums not in Discogs wishlist', async () => {
+  it('does not show "In Wishlist" badge for albums not in Discogs wishlist', async () => {
     // Empty wishlist
     mockGetWishlist.mockResolvedValue([]);
 
@@ -599,8 +605,8 @@ describe('DiscoveryPage', () => {
       expect(screen.getByText('Radiohead')).toBeInTheDocument();
     });
 
-    // Should not show any "In Wantlist" badges
-    expect(screen.queryByText('In Wantlist')).not.toBeInTheDocument();
+    // Should not show any "In Wishlist" badges
+    expect(screen.queryByText('In Wishlist')).not.toBeInTheDocument();
   });
 
   it('matches Discogs wishlist case-insensitively', async () => {
@@ -620,7 +626,7 @@ describe('DiscoveryPage', () => {
     });
 
     // Should still match and show the badge
-    expect(screen.getByText('In Wantlist')).toBeInTheDocument();
+    expect(screen.getByText('In Wishlist')).toBeInTheDocument();
   });
 
   it('matches Discogs wishlist with quoted album names', async () => {
@@ -657,7 +663,7 @@ describe('DiscoveryPage', () => {
     });
 
     // Should match despite quote differences
-    expect(screen.getByText('In Wantlist')).toBeInTheDocument();
+    expect(screen.getByText('In Wishlist')).toBeInTheDocument();
   });
 
   it('matches Discogs wishlist with [Explicit] suffix', async () => {
@@ -694,7 +700,7 @@ describe('DiscoveryPage', () => {
     });
 
     // Should match despite [Explicit] suffix
-    expect(screen.getByText('In Wantlist')).toBeInTheDocument();
+    expect(screen.getByText('In Wishlist')).toBeInTheDocument();
   });
 
   it('matches Discogs wishlist with (Deluxe) suffix', async () => {
@@ -731,7 +737,7 @@ describe('DiscoveryPage', () => {
     });
 
     // Should match despite (Deluxe) suffix
-    expect(screen.getByText('In Wantlist')).toBeInTheDocument();
+    expect(screen.getByText('In Wishlist')).toBeInTheDocument();
   });
 
   it('matches Discogs wishlist when Last.fm includes album in artist name', async () => {
@@ -772,7 +778,7 @@ describe('DiscoveryPage', () => {
     });
 
     // Should match despite Last.fm's quirky formatting
-    expect(screen.getByText('In Wantlist')).toBeInTheDocument();
+    expect(screen.getByText('In Wishlist')).toBeInTheDocument();
   });
 
   it('handles Discogs wishlist API failure gracefully', async () => {
@@ -787,20 +793,22 @@ describe('DiscoveryPage', () => {
     });
 
     // No badges shown (failed to load wishlist)
-    expect(screen.queryByText('In Wantlist')).not.toBeInTheDocument();
+    expect(screen.queryByText('In Wishlist')).not.toBeInTheDocument();
   });
 
-  it('shows Hide wanted toggle checkbox', async () => {
+  it('shows Hide wishlisted & monitored toggle checkbox', async () => {
     renderDiscoveryPage();
 
     await waitFor(() => {
       expect(screen.getByText('Radiohead')).toBeInTheDocument();
     });
 
-    expect(screen.getByLabelText('Hide wanted')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Hide wishlisted & monitored')
+    ).toBeInTheDocument();
   });
 
-  it('hides albums in local want list when Hide wanted is checked', async () => {
+  it('hides albums in local want list when Hide wishlisted & monitored is checked', async () => {
     // Setup local want list with Clem Snide album
     mockGetLocalWantList.mockResolvedValue(mockLocalWantList);
 
@@ -814,8 +822,8 @@ describe('DiscoveryPage', () => {
     expect(screen.getByText('Clem Snide')).toBeInTheDocument();
     expect(screen.getByText('End of Love')).toBeInTheDocument();
 
-    // Check the Hide wanted toggle
-    const toggle = screen.getByLabelText('Hide wanted');
+    // Check the Hide wishlisted & monitored toggle
+    const toggle = screen.getByLabelText('Hide wishlisted & monitored');
     fireEvent.click(toggle);
 
     // Clem Snide should now be hidden
@@ -827,7 +835,7 @@ describe('DiscoveryPage', () => {
     expect(screen.getByText('The Beatles')).toBeInTheDocument();
   });
 
-  it('hides albums in Discogs wantlist when Hide wanted is checked', async () => {
+  it('hides albums in Discogs wishlist when Hide wishlisted & monitored is checked', async () => {
     mockGetWishlist.mockResolvedValue([
       {
         id: 1,
@@ -849,11 +857,11 @@ describe('DiscoveryPage', () => {
       expect(screen.getByText('Radiohead')).toBeInTheDocument();
     });
 
-    // Should show In Wantlist badge
-    expect(screen.getByText('In Wantlist')).toBeInTheDocument();
+    // Should show In Wishlist badge
+    expect(screen.getByText('In Wishlist')).toBeInTheDocument();
 
-    // Check the Hide wanted toggle
-    const toggle = screen.getByLabelText('Hide wanted');
+    // Check the Hide wishlisted & monitored toggle
+    const toggle = screen.getByLabelText('Hide wishlisted & monitored');
     fireEvent.click(toggle);
 
     // Radiohead should now be hidden
@@ -864,7 +872,7 @@ describe('DiscoveryPage', () => {
     expect(screen.getByText('The Beatles')).toBeInTheDocument();
   });
 
-  it('updates tab count when Hide wanted is checked', async () => {
+  it('updates tab count when Hide wishlisted & monitored is checked', async () => {
     // Setup local want list with Clem Snide album
     mockGetLocalWantList.mockResolvedValue(mockLocalWantList);
 
@@ -877,8 +885,8 @@ describe('DiscoveryPage', () => {
     // Should show "3" albums initially
     expect(screen.getByText(/Missing Albums.*3.*/)).toBeInTheDocument();
 
-    // Check the Hide wanted toggle
-    const toggle = screen.getByLabelText('Hide wanted');
+    // Check the Hide wishlisted & monitored toggle
+    const toggle = screen.getByLabelText('Hide wishlisted & monitored');
     fireEvent.click(toggle);
 
     // Should show "2/3" format (2 visible out of 3 total)
@@ -904,13 +912,13 @@ describe('DiscoveryPage', () => {
       expect(screen.getByText('Clem Snide')).toBeInTheDocument();
     });
 
-    // Check the Hide wanted toggle
-    const toggle = screen.getByLabelText('Hide wanted');
+    // Check the Hide wishlisted & monitored toggle
+    const toggle = screen.getByLabelText('Hide wishlisted & monitored');
     fireEvent.click(toggle);
 
-    // Should show special message about all albums being in wantlist
+    // Should show special message about all albums being in wishlist or monitored
     expect(
-      screen.getByText(/All albums are in your wantlist/)
+      screen.getByText(/All albums are in your wishlist or being monitored/)
     ).toBeInTheDocument();
   });
 });

@@ -81,7 +81,7 @@ const MissingAlbumsTab: React.FC<MissingAlbumsTabProps> = ({
               checked={hideWantedItems}
               onChange={e => setHideWantedItems(e.target.checked)}
             />
-            <span>Hide wanted</span>
+            <span>Hide wishlisted & monitored</span>
           </label>
           <div className='discovery-sort'>
             <label htmlFor='album-sort'>Sort by:</label>
@@ -101,7 +101,7 @@ const MissingAlbumsTab: React.FC<MissingAlbumsTabProps> = ({
       {sortedAlbums.length === 0 ? (
         <p className='empty-state'>
           {hideWantedItems && missingAlbums.length > 0
-            ? 'All albums are in your wantlist. Turn off "Hide wanted" to see them.'
+            ? 'All albums are in your wishlist or being monitored. Turn off "Hide wishlisted & monitored" to see them.'
             : 'No missing albums found. Either you own everything you listen to, or you need to sync your history first!'}
         </p>
       ) : (
@@ -117,17 +117,17 @@ const MissingAlbumsTab: React.FC<MissingAlbumsTabProps> = ({
                   {isInDiscogsWishlist(album.artist, album.album) && (
                     <span
                       className='discovery-badge discovery-badge-wishlist'
-                      title='In your Discogs wantlist'
+                      title='In your Discogs wishlist'
                     >
-                      In Wantlist
+                      In Wishlist
                     </span>
                   )}
                   {addedToWantList.has(`${album.artist}:${album.album}`) && (
                     <span
-                      className='discovery-badge discovery-badge-wanted'
-                      title='In your local want list'
+                      className='discovery-badge discovery-badge-monitoring'
+                      title='Monitoring for vinyl availability'
                     >
-                      Wanted
+                      Monitoring
                     </span>
                   )}
                 </div>
@@ -176,13 +176,13 @@ const MissingAlbumsTab: React.FC<MissingAlbumsTabProps> = ({
                     addingToWantList.has(`${album.artist}:${album.album}`) ||
                     addedToWantList.has(`${album.artist}:${album.album}`)
                   }
-                  title='Add to want list - tracks vinyl availability'
+                  title='Monitor for vinyl availability'
                 >
                   {addingToWantList.has(`${album.artist}:${album.album}`)
                     ? 'Adding...'
                     : addedToWantList.has(`${album.artist}:${album.album}`)
-                      ? 'Wanted'
-                      : 'Want'}
+                      ? 'Monitoring'
+                      : 'Monitor'}
                 </button>
                 <button
                   className='btn btn-small btn-link'

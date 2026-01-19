@@ -2,7 +2,9 @@ import axios, { AxiosInstance } from 'axios';
 
 import {
   AddDiscardPileItemRequest,
+  AlbumIdentifier,
   AlbumMapping,
+  AlbumPlayCountResponse,
   ApiResponse,
   ArtistMapping,
   AuthStatus,
@@ -714,6 +716,21 @@ class ApiService {
    */
   async getDashboard(): Promise<DashboardData> {
     const response = await this.api.get('/stats/dashboard');
+    return response.data.data;
+  }
+
+  /**
+   * Get play counts for multiple albums in a batch.
+   * Uses fuzzy matching to find albums in scrobble history.
+   * @param albums - Array of album identifiers (artist + title)
+   * @returns Play count results with match type for each album
+   */
+  async getAlbumPlayCounts(
+    albums: AlbumIdentifier[]
+  ): Promise<AlbumPlayCountResponse> {
+    const response = await this.api.post('/stats/album-play-counts', {
+      albums,
+    });
     return response.data.data;
   }
 

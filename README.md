@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-2051%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-2145%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -255,8 +255,9 @@ Sync and manage your Discogs wantlist with vinyl availability tracking:
 - **Refresh All**: Force re-check vinyl status for all items
 
 **Filtering & Sorting:**
-- **Tabs**: All Items, Has Vinyl, CD Only, Affordable, Wanted, New Releases
-- **Sort Options**: Date Added, Price, Artist, Album
+- **Tabs**: All Items, Has Vinyl, CD Only, Affordable, Monitoring, New Releases
+- **Sort Options**: Date Added, Price, Artist, Album, Scrobbles (Most Played)
+- **Include Monitored Toggle**: Merge locally monitored albums into main wishlist view
 - **Affordable Filter**: Show items under your price threshold
 
 **Version Browser:**
@@ -266,11 +267,11 @@ Sync and manage your Discogs wantlist with vinyl availability tracking:
 - Marketplace pricing (lowest, median, highest)
 - Direct links to Discogs marketplace
 
-**Local Wanted List:**
-- Add albums from Discovery page to track
+**Local Monitored List:**
+- Add albums from Discovery page to monitor for vinyl availability
 - Check for vinyl availability on demand
 - Notifications when vinyl becomes available
-- Independent from Discogs wantlist (track anything)
+- Independent from Discogs wantlist (monitor anything)
 
 **Settings (Settings → Wishlist):**
 - **Price Threshold**: Filter by maximum price
@@ -536,7 +537,7 @@ npm run dev          # Backend only with hot reload
 npm run dev:web      # Frontend only with hot reload
 npm run build        # Build for production
 npm run test         # Run test suite
-npm run test:coverage # Run tests with coverage (90% target)
+npm run test:coverage # Run tests with coverage
 ```
 
 ### Project Structure
@@ -632,7 +633,7 @@ npm run test:coverage # Run with coverage report
 npm run test:watch    # Run in watch mode
 ```
 
-**Coverage Target**: 90% minimum
+**Coverage Thresholds**: Enforced in jest.config.js (incrementally raised as coverage improves)
 
 ## 🤝 Contributing
 

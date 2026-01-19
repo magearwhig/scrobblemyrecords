@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 import {
+  AlbumIdentifier,
+  AlbumPlayCountResult,
   CollectionItem,
   DiscardReason,
   AddDiscardPileItemRequest,
@@ -34,7 +36,7 @@ const CollectionPage: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [cacheProgress, setCacheProgress] = useState<any>(null);
   const [sortBy, setSortBy] = useState<
-    'artist' | 'title' | 'year' | 'date_added'
+    'artist' | 'title' | 'year' | 'date_added' | 'scrobbles'
   >('artist');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -78,6 +80,12 @@ const CollectionPage: React.FC = () => {
     useState<MarketplaceStats | null>(null);
   const [loadingMarketplaceStats, setLoadingMarketplaceStats] =
     useState<boolean>(false);
+
+  // Play counts state for scrobbles sorting (Feature 8)
+  const [playCounts, setPlayCounts] = useState<
+    Map<string, AlbumPlayCountResult>
+  >(new Map());
+  const [loadingPlayCounts, setLoadingPlayCounts] = useState(false);
 
   const api = getApiService(state.serverUrl);
   const itemsPerPage = 50;
@@ -295,6 +303,7 @@ const CollectionPage: React.FC = () => {
     }
     // Note: resetInfiniteScroll is excluded from deps as it's a stable callback
     // and we only want to reset when data/sort/filter actually changes
+    // playCounts is included so the collection re-sorts when play counts load
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     entireCollection.length,
@@ -305,6 +314,7 @@ const CollectionPage: React.FC = () => {
     filterYearFrom,
     filterYearTo,
     filterDateAdded,
+    playCounts,
   ]);
 
   const loadCollection = async (forceReload: boolean = false) => {
@@ -670,6 +680,58 @@ const CollectionPage: React.FC = () => {
     }
   }, [authStatus.discogs.authenticated, loadDiscardPileIds]);
 
+  // Helper to create a cache key for play counts
+  const getPlayCountKey = useCallback(
+    (artist: string, title: string): string => {
+      return `${artist.toLowerCase()}|${title.toLowerCase()}`;
+    },
+    []
+  );
+
+  // Fetch play counts when scrobbles sort is selected
+  const fetchPlayCounts = useCallback(
+    async (albums: AlbumIdentifier[]) => {
+      if (albums.length === 0) return;
+
+      // Filter out albums we already have cached
+      const uncachedAlbums = albums.filter(
+        album => !playCounts.has(getPlayCountKey(album.artist, album.title))
+      );
+
+      if (uncachedAlbums.length === 0) return;
+
+      try {
+        setLoadingPlayCounts(true);
+        const response = await api.getAlbumPlayCounts(uncachedAlbums);
+
+        // Update the cache with new results
+        setPlayCounts(prev => {
+          const newMap = new Map(prev);
+          for (const result of response.results) {
+            newMap.set(getPlayCountKey(result.artist, result.title), result);
+          }
+          return newMap;
+        });
+      } catch (err) {
+        console.error('Error fetching play counts:', err);
+      } finally {
+        setLoadingPlayCounts(false);
+      }
+    },
+    [api, playCounts, getPlayCountKey]
+  );
+
+  // Fetch play counts when sorting by scrobbles
+  useEffect(() => {
+    if (sortBy === 'scrobbles' && entireCollection.length > 0) {
+      const albums: AlbumIdentifier[] = entireCollection.map(item => ({
+        artist: item.release.artist,
+        title: item.release.title,
+      }));
+      fetchPlayCounts(albums);
+    }
+  }, [sortBy, entireCollection, fetchPlayCounts]);
+
   // Handle opening the discard modal
   const handleOpenDiscardModal = async (item: CollectionItem) => {
     setDiscardModalItem(item);
@@ -842,17 +904,38 @@ const CollectionPage: React.FC = () => {
   const sortCollection = (items: CollectionItem[]): CollectionItem[] => {
     console.log(`🔀 Sorting ${items.length} items by ${sortBy} (${sortOrder})`);
     const sorted = [...items].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
+      // Handle scrobbles sort separately (it has different sort logic)
+      if (sortBy === 'scrobbles') {
+        // Sort by play count, with secondary sort by date added for stability
+        const keyA = getPlayCountKey(a.release.artist, a.release.title);
+        const keyB = getPlayCountKey(b.release.artist, b.release.title);
+        const countA = playCounts.get(keyA)?.playCount ?? 0;
+        const countB = playCounts.get(keyB)?.playCount ?? 0;
+
+        // Primary: by play count (desc for 'asc' since highest is "best")
+        if (countA !== countB) {
+          // Note: When sortOrder is 'asc', we want highest plays first (descending)
+          // When sortOrder is 'desc', we want lowest plays first
+          return sortOrder === 'asc' ? countB - countA : countA - countB;
+        }
+        // Secondary: by date added (newer first as tiebreaker)
+        const dateA = new Date(a.date_added || '').getTime();
+        const dateB = new Date(b.date_added || '').getTime();
+        return dateB - dateA;
+      }
+
+      // Handle other sort options
+      let aValue: string | number;
+      let bValue: string | number;
 
       switch (sortBy) {
         case 'artist':
-          aValue = a.release.artist || '';
-          bValue = b.release.artist || '';
+          aValue = (a.release.artist || '').toLowerCase();
+          bValue = (b.release.artist || '').toLowerCase();
           break;
         case 'title':
-          aValue = a.release.title || '';
-          bValue = b.release.title || '';
+          aValue = (a.release.title || '').toLowerCase();
+          bValue = (b.release.title || '').toLowerCase();
           break;
         case 'year':
           aValue = a.release.year || 0;
@@ -863,13 +946,8 @@ const CollectionPage: React.FC = () => {
           bValue = new Date(b.date_added || '').getTime();
           break;
         default:
-          aValue = a.release.artist || '';
-          bValue = b.release.artist || '';
-      }
-
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        aValue = aValue.toLowerCase();
-        bValue = bValue.toLowerCase();
+          aValue = (a.release.artist || '').toLowerCase();
+          bValue = (b.release.artist || '').toLowerCase();
       }
 
       if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
@@ -1408,7 +1486,19 @@ const CollectionPage: React.FC = () => {
               <option value='title'>Title</option>
               <option value='year'>Year</option>
               <option value='date_added'>Date Added</option>
+              <option value='scrobbles'>Scrobbles (Most Played)</option>
             </select>
+            {sortBy === 'scrobbles' && loadingPlayCounts && (
+              <span
+                style={{
+                  fontSize: '0.8rem',
+                  color: 'var(--text-secondary)',
+                  marginLeft: '0.5rem',
+                }}
+              >
+                Loading play counts...
+              </span>
+            )}
             <button
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
               style={{

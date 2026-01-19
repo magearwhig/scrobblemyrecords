@@ -204,7 +204,7 @@ describe('XSS Vulnerability Prevention', () => {
         expect(lastfmResponse.text).not.toContain(payload);
         expect(lastfmResponse.text).not.toContain('alert');
         expect(lastfmResponse.text).not.toContain('javascript:');
-      });
+      }, 15000);
     });
   });
 

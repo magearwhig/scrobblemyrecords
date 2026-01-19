@@ -1,6 +1,9 @@
 import express, { Request, Response } from 'express';
 
 import {
+  AlbumPlayCountRequest,
+  AlbumPlayCountResponse,
+  AlbumPlayCountResult,
   CollectionItem,
   DashboardData,
   DashboardQuickActions,
@@ -964,6 +967,88 @@ export default function createStatsRouter(
       });
     } catch (error) {
       logger.error('Error getting timeline data', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // ============================================
+  // Album Play Counts (Batch)
+  // ============================================
+
+  /**
+   * POST /api/v1/stats/album-play-counts
+   * Get play counts for multiple albums in a single request.
+   * Uses fuzzy matching to handle naming differences between Discogs and Last.fm.
+   *
+   * Request body:
+   *   albums: Array<{ artist: string, title: string }>
+   *
+   * Response:
+   *   results: Array<{ artist, title, playCount, lastPlayed, matchType }>
+   */
+  router.post('/album-play-counts', async (req: Request, res: Response) => {
+    try {
+      const body = req.body as AlbumPlayCountRequest;
+
+      // Validate request body
+      if (!body || !Array.isArray(body.albums)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Request body must contain an albums array',
+        });
+      }
+
+      // Validate each album has artist and title
+      for (const album of body.albums) {
+        if (
+          typeof album.artist !== 'string' ||
+          typeof album.title !== 'string'
+        ) {
+          return res.status(400).json({
+            success: false,
+            error: 'Each album must have artist and title strings',
+          });
+        }
+      }
+
+      // Check if history storage is available
+      if (!historyStorage) {
+        return res.status(503).json({
+          success: false,
+          error:
+            'Scrobble history not available. Please sync your history first.',
+        });
+      }
+
+      // Process each album using fuzzy matching
+      const results: AlbumPlayCountResult[] = await Promise.all(
+        body.albums.map(async album => {
+          const historyResult = await historyStorage.getAlbumHistoryFuzzy(
+            album.artist,
+            album.title
+          );
+
+          return {
+            artist: album.artist,
+            title: album.title,
+            playCount: historyResult.entry?.playCount || 0,
+            lastPlayed: historyResult.entry?.lastPlayed || null,
+            matchType: historyResult.matchType,
+          };
+        })
+      );
+
+      const response: AlbumPlayCountResponse = { results };
+
+      res.json({
+        success: true,
+        data: response,
+      });
+    } catch (error) {
+      logger.error('Error getting album play counts', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

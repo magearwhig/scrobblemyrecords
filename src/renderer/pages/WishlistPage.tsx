@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 
 import {
+  AlbumIdentifier,
+  AlbumPlayCountResult,
   EnrichedWishlistItem,
   LocalWantItem,
   ReleaseVersion,
@@ -22,9 +24,9 @@ type TabType =
   | 'vinyl'
   | 'cd_only'
   | 'affordable'
-  | 'wanted'
+  | 'monitoring'
   | 'new_releases';
-type SortOption = 'date' | 'price' | 'artist' | 'album';
+type SortOption = 'date' | 'price' | 'artist' | 'album' | 'scrobbles';
 
 interface VersionsModalState {
   isOpen: boolean;
@@ -48,6 +50,9 @@ const WishlistPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [sortBy, setSortBy] = useState<SortOption>('date');
 
+  // Include monitored albums toggle (Phase 2)
+  const [includeMonitored, setIncludeMonitored] = useState(false);
+
   // Local want list vinyl check state
   const [checkingLocalVinyl, setCheckingLocalVinyl] = useState(false);
 
@@ -64,6 +69,12 @@ const WishlistPage: React.FC = () => {
 
   // Polling for sync status
   const [isPolling, setIsPolling] = useState(false);
+
+  // Play counts state for scrobbles sorting (Feature 8)
+  const [playCounts, setPlayCounts] = useState<
+    Map<string, AlbumPlayCountResult>
+  >(new Map());
+  const [loadingPlayCounts, setLoadingPlayCounts] = useState(false);
 
   const api = getApiService(state.serverUrl);
 
@@ -96,6 +107,71 @@ const WishlistPage: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Helper to create a cache key for play counts
+  const getPlayCountKey = useCallback(
+    (artist: string, title: string): string => {
+      return `${artist.toLowerCase()}|${title.toLowerCase()}`;
+    },
+    []
+  );
+
+  // Fetch play counts when scrobbles sort is selected
+  const fetchPlayCounts = useCallback(
+    async (albums: AlbumIdentifier[]) => {
+      if (albums.length === 0) return;
+
+      // Filter out albums we already have cached
+      const uncachedAlbums = albums.filter(
+        album => !playCounts.has(getPlayCountKey(album.artist, album.title))
+      );
+
+      if (uncachedAlbums.length === 0) return;
+
+      try {
+        setLoadingPlayCounts(true);
+        const response = await api.getAlbumPlayCounts(uncachedAlbums);
+
+        // Update the cache with new results
+        setPlayCounts(prev => {
+          const newMap = new Map(prev);
+          for (const result of response.results) {
+            newMap.set(getPlayCountKey(result.artist, result.title), result);
+          }
+          return newMap;
+        });
+      } catch (err) {
+        console.error('Error fetching play counts:', err);
+      } finally {
+        setLoadingPlayCounts(false);
+      }
+    },
+    [api, playCounts, getPlayCountKey]
+  );
+
+  // Fetch play counts when sorting by scrobbles
+  // Include both Discogs items and local monitored items when toggle is on
+  useEffect(() => {
+    if (sortBy === 'scrobbles') {
+      const albums: AlbumIdentifier[] = [];
+
+      // Add Discogs wishlist items
+      for (const item of items) {
+        albums.push({ artist: item.artist, title: item.title });
+      }
+
+      // Add local monitored items if toggle is on
+      if (includeMonitored) {
+        for (const item of localWantItems) {
+          albums.push({ artist: item.artist, title: item.album });
+        }
+      }
+
+      if (albums.length > 0) {
+        fetchPlayCounts(albums);
+      }
+    }
+  }, [sortBy, items, localWantItems, includeMonitored, fetchPlayCounts]);
 
   // Poll for sync status when syncing
   useEffect(() => {
@@ -139,9 +215,73 @@ const WishlistPage: React.FC = () => {
     }
   };
 
+  // Helper to normalize artist/album for deduplication
+  const normalizeForComparison = useCallback((str: string): string => {
+    return str.toLowerCase().trim();
+  }, []);
+
+  // Create set of monitored album keys for deduplication and badge display
+  const monitoredAlbumKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const item of localWantItems) {
+      keys.add(
+        `${normalizeForComparison(item.artist)}|${normalizeForComparison(item.album)}`
+      );
+    }
+    return keys;
+  }, [localWantItems, normalizeForComparison]);
+
+  // Check if an item is also being monitored locally
+  const isItemMonitored = useCallback(
+    (artist: string, title: string): boolean => {
+      return monitoredAlbumKeys.has(
+        `${normalizeForComparison(artist)}|${normalizeForComparison(title)}`
+      );
+    },
+    [monitoredAlbumKeys, normalizeForComparison]
+  );
+
   // Filter items based on active tab
   const filteredItems = useMemo(() => {
+    // Start with Discogs wishlist items
     let filtered = [...items];
+
+    // If includeMonitored is ON, merge in local want items that aren't already in Discogs
+    if (includeMonitored && activeTab !== 'monitoring') {
+      // Create set of existing Discogs items for deduplication
+      const discogsKeys = new Set<string>();
+      for (const item of items) {
+        discogsKeys.add(
+          `${normalizeForComparison(item.artist)}|${normalizeForComparison(item.title)}`
+        );
+      }
+
+      // Convert local want items to wishlist-compatible format
+      for (const localItem of localWantItems) {
+        const key = `${normalizeForComparison(localItem.artist)}|${normalizeForComparison(localItem.album)}`;
+
+        // Skip if already in Discogs (Discogs item will show with "Monitored" badge)
+        if (discogsKeys.has(key)) continue;
+
+        // Convert to EnrichedWishlistItem format
+        // Use negative ID to ensure uniqueness from Discogs items (which have positive IDs)
+        const uniqueId = -(localWantItems.indexOf(localItem) + 1);
+        const converted: EnrichedWishlistItem = {
+          id: uniqueId,
+          masterId: localItem.masterId || 0,
+          releaseId: 0,
+          artist: localItem.artist,
+          title: localItem.album,
+          coverImage: localItem.coverImage,
+          dateAdded: new Date(localItem.addedAt).toISOString(),
+          vinylStatus: localItem.vinylStatus,
+          vinylVersions: [],
+          notes: '',
+          rating: 0,
+        };
+        filtered.push(converted);
+      }
+    }
 
     switch (activeTab) {
       case 'vinyl':
@@ -152,6 +292,7 @@ const WishlistPage: React.FC = () => {
         break;
       case 'affordable':
         if (settings) {
+          // Only include items with price data (excludes most monitored items)
           filtered = filtered.filter(
             item =>
               item.vinylStatus === 'has_vinyl' &&
@@ -184,10 +325,38 @@ const WishlistPage: React.FC = () => {
       case 'album':
         filtered.sort((a, b) => a.title.localeCompare(b.title));
         break;
+      case 'scrobbles':
+        // Sort by play count (descending), with secondary sort by date added
+        filtered.sort((a, b) => {
+          const keyA = getPlayCountKey(a.artist, a.title);
+          const keyB = getPlayCountKey(b.artist, b.title);
+          const countA = playCounts.get(keyA)?.playCount ?? 0;
+          const countB = playCounts.get(keyB)?.playCount ?? 0;
+
+          // Primary: descending by play count
+          if (countB !== countA) {
+            return countB - countA;
+          }
+          // Secondary: descending by date added (stable sort)
+          return (
+            new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime()
+          );
+        });
+        break;
     }
 
     return filtered;
-  }, [items, activeTab, sortBy, settings]);
+  }, [
+    items,
+    localWantItems,
+    activeTab,
+    sortBy,
+    settings,
+    playCounts,
+    getPlayCountKey,
+    includeMonitored,
+    normalizeForComparison,
+  ]);
 
   // Tab counts
   const tabCounts = useMemo(() => {
@@ -208,7 +377,7 @@ const WishlistPage: React.FC = () => {
       vinyl: vinylCount,
       cd_only: cdCount,
       affordable: affordableCount,
-      wanted: localWantItems.length,
+      monitoring: localWantItems.length,
     };
   }, [items, settings, localWantItems]);
 
@@ -460,7 +629,7 @@ const WishlistPage: React.FC = () => {
             'vinyl',
             'cd_only',
             'affordable',
-            'wanted',
+            'monitoring',
             'new_releases',
           ] as TabType[]
         ).map(tab => (
@@ -473,7 +642,7 @@ const WishlistPage: React.FC = () => {
             {tab === 'vinyl' && `Has Vinyl (${tabCounts.vinyl})`}
             {tab === 'cd_only' && `CD Only (${tabCounts.cd_only})`}
             {tab === 'affordable' && `Affordable (${tabCounts.affordable})`}
-            {tab === 'wanted' && `Wanted (${tabCounts.wanted})`}
+            {tab === 'monitoring' && `Monitoring (${tabCounts.monitoring})`}
             {tab === 'new_releases' && (
               <>
                 New Releases
@@ -486,8 +655,8 @@ const WishlistPage: React.FC = () => {
         ))}
       </div>
 
-      {/* Sort Options - hide for Wanted and New Releases tabs */}
-      {activeTab !== 'wanted' && activeTab !== 'new_releases' && (
+      {/* Sort Options - hide for Monitoring and New Releases tabs */}
+      {activeTab !== 'monitoring' && activeTab !== 'new_releases' && (
         <div className='wishlist-sort'>
           <label>Sort by:</label>
           <select
@@ -496,20 +665,38 @@ const WishlistPage: React.FC = () => {
             className='form-select'
           >
             <option value='date'>Date Added</option>
+            <option value='scrobbles'>Scrobbles (Most Played)</option>
             <option value='price'>Price (Low to High)</option>
             <option value='artist'>Artist</option>
             <option value='album'>Album</option>
           </select>
+          {sortBy === 'scrobbles' && loadingPlayCounts && (
+            <span className='wishlist-sort-loading'>
+              Loading play counts...
+            </span>
+          )}
+
+          {/* Include Monitored toggle (Phase 2) */}
+          {localWantItems.length > 0 && (
+            <label className='wishlist-toggle'>
+              <input
+                type='checkbox'
+                checked={includeMonitored}
+                onChange={e => setIncludeMonitored(e.target.checked)}
+              />
+              <span>Include monitored ({localWantItems.length})</span>
+            </label>
+          )}
         </div>
       )}
 
       {/* New Releases Tab (Feature 5.5) */}
       {activeTab === 'new_releases' ? (
         <NewReleasesTab onCountChange={setNewReleasesCount} />
-      ) : /* Wanted Tab - Local Want List */
-      activeTab === 'wanted' ? (
+      ) : /* Monitoring Tab - Monitored Albums */
+      activeTab === 'monitoring' ? (
         <>
-          <div className='wanted-actions'>
+          <div className='monitoring-actions'>
             <button
               className='btn btn-primary'
               onClick={handleCheckLocalVinyl}
@@ -517,18 +704,18 @@ const WishlistPage: React.FC = () => {
             >
               {checkingLocalVinyl ? 'Checking...' : 'Check for Vinyl'}
             </button>
-            <span className='wanted-info'>
+            <span className='monitoring-info'>
               Albums added from Discovery page. Click "Check for Vinyl" to see
               if any are now available on vinyl.
             </span>
           </div>
           {loading ? (
-            <div className='loading-spinner'>Loading wanted list...</div>
+            <div className='loading-spinner'>Loading monitored albums...</div>
           ) : localWantItems.length === 0 ? (
             <div className='empty-state'>
               <p>
-                Your wanted list is empty. Add albums from the Discovery page to
-                track them for vinyl availability.
+                No albums being monitored. Use Discovery to find albums to
+                monitor for vinyl availability.
               </p>
             </div>
           ) : (
@@ -582,7 +769,7 @@ const WishlistPage: React.FC = () => {
                     <button
                       className='btn btn-small btn-danger'
                       onClick={() => handleRemoveFromLocalWant(item.id)}
-                      title='Remove from wanted list'
+                      title='Stop monitoring this album'
                     >
                       Remove
                     </button>
@@ -616,6 +803,11 @@ const WishlistPage: React.FC = () => {
                       <div className='wishlist-card-placeholder'>No Image</div>
                     )}
                     {getStatusBadge(item.vinylStatus)}
+                    {isItemMonitored(item.artist, item.title) && (
+                      <span className='wishlist-badge wishlist-badge-monitored'>
+                        Monitored
+                      </span>
+                    )}
                   </div>
                   <div className='wishlist-card-content'>
                     <h4 className='wishlist-card-title'>{item.title}</h4>
@@ -636,6 +828,19 @@ const WishlistPage: React.FC = () => {
                           )}
                         </span>
                       )}
+                      {sortBy === 'scrobbles' &&
+                        (playCounts.get(
+                          getPlayCountKey(item.artist, item.title)
+                        )?.playCount ?? 0) > 0 && (
+                          <span className='wishlist-card-plays'>
+                            {
+                              playCounts.get(
+                                getPlayCountKey(item.artist, item.title)
+                              )?.playCount
+                            }{' '}
+                            plays
+                          </span>
+                        )}
                     </div>
                   </div>
                   <div className='wishlist-card-actions'>

@@ -1503,3 +1503,40 @@ export interface UpdateDiscardPileItemRequest {
   marketplaceUrl?: string;
   notes?: string;
 }
+
+// ============================================
+// Album Play Count Batch Types (Feature 8)
+// ============================================
+
+/**
+ * Single album identifier for batch play count lookup
+ */
+export interface AlbumIdentifier {
+  artist: string;
+  title: string;
+}
+
+/**
+ * Request body for batch album play count endpoint
+ */
+export interface AlbumPlayCountRequest {
+  albums: AlbumIdentifier[];
+}
+
+/**
+ * Play count result for a single album
+ */
+export interface AlbumPlayCountResult {
+  artist: string;
+  title: string;
+  playCount: number;
+  lastPlayed: number | null; // Unix timestamp (seconds) or null if never played
+  matchType: 'exact' | 'fuzzy' | 'none';
+}
+
+/**
+ * Response from batch album play count endpoint
+ */
+export interface AlbumPlayCountResponse {
+  results: AlbumPlayCountResult[];
+}

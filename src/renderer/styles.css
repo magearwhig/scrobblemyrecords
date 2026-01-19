@@ -1527,7 +1527,8 @@ body {
   color: white;
 }
 
-.discovery-badge-wanted {
+.discovery-badge-wanted,
+.discovery-badge-monitoring {
   background: var(--success-color);
   color: white;
 }
@@ -4501,6 +4502,26 @@ body {
   color: white;
 }
 
+.wishlist-badge-monitored {
+  background: var(--accent-primary, #3b82f6);
+  color: white;
+  top: 2.2rem;
+}
+
+.wishlist-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.wishlist-toggle input {
+  cursor: pointer;
+}
+
 .wishlist-card-content {
   padding: 1rem;
   flex: 1;
@@ -4735,7 +4756,8 @@ body {
   flex-shrink: 0;
 }
 
-/* Wanted Tab Styles */
+/* Monitoring Tab Styles (formerly "Wanted") */
+.monitoring-actions,
 .wanted-actions {
   display: flex;
   align-items: center;
@@ -4746,6 +4768,7 @@ body {
   margin-bottom: 1rem;
 }
 
+.monitoring-info,
 .wanted-info {
   font-size: 0.85rem;
   color: var(--text-secondary);
