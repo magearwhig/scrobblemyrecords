@@ -199,7 +199,7 @@ export default function createStatsRouter(
             return [];
           }
 
-          const recentAlbums = await historyStorage.getRecentlyPlayedAlbums(5);
+          const recentAlbums = await historyStorage.getRecentlyPlayedAlbums(10);
 
           // Check which albums are in collection
           const collection = username ? await loadCollection(username) : [];
