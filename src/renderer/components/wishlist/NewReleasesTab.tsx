@@ -97,12 +97,20 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
     fetchSyncStatus();
   }, [fetchNewReleases, fetchSyncStatus]);
 
-  // Poll sync status while syncing
+  // Poll sync status while syncing or auto-continuing
   useEffect(() => {
-    if (syncStatus?.status !== 'syncing') return;
+    // Keep polling if syncing OR if auto-continue is enabled (to catch completion and trigger next batch)
+    const shouldPoll = syncStatus?.status === 'syncing' || autoContinue;
+    if (!shouldPoll) return;
 
     const interval = setInterval(async () => {
       const status = await fetchSyncStatus();
+
+      if (status?.status === 'syncing') {
+        // Still syncing, just update status (already done by fetchSyncStatus)
+        return;
+      }
+
       if (status?.status === 'completed' || status?.status === 'error') {
         // Refresh releases after sync completes
         await fetchNewReleases();
@@ -124,6 +132,7 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
                 err instanceof Error ? err.message : 'Auto-continue failed'
               );
               setAutoContinue(false);
+              autoContinueRef.current = false;
             }
           }, 500);
         } else if (
@@ -133,12 +142,23 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
         ) {
           // Full cycle completed, turn off auto-continue
           setAutoContinue(false);
+          autoContinueRef.current = false;
+        } else if (status?.status === 'error') {
+          // Error occurred, turn off auto-continue
+          setAutoContinue(false);
+          autoContinueRef.current = false;
         }
       }
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [syncStatus?.status, fetchSyncStatus, fetchNewReleases, api]);
+  }, [
+    syncStatus?.status,
+    autoContinue,
+    fetchSyncStatus,
+    fetchNewReleases,
+    api,
+  ]);
 
   const handleCheckNow = async (withAutoContinue = false) => {
     try {
@@ -173,6 +193,7 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
 
   const handleStopAutoContinue = () => {
     setAutoContinue(false);
+    autoContinueRef.current = false;
   };
 
   const handleDismiss = async (id: string) => {
