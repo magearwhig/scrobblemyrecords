@@ -85,6 +85,11 @@ const NewReleasesPage: React.FC = () => {
       setDisambiguations(disambiguationsData.disambiguations);
       setSyncStatus(statusData);
       setHiddenReleases(new Set(hiddenData.map((h: HiddenRelease) => h.mbid)));
+
+      // If a sync is already in progress, start polling
+      if (statusData.status === 'syncing') {
+        setIsPolling(true);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load release data');
     } finally {

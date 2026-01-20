@@ -18,6 +18,7 @@ import {
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
+import { artistMappingService } from './artistMappingService';
 import { DiscogsService } from './discogsService';
 import { HiddenReleasesService } from './hiddenReleasesService';
 import { MusicBrainzService } from './musicbrainzService';
@@ -803,9 +804,18 @@ export class ReleaseTrackingService {
           let mapping = mappingsByNormalized.get(artist.normalizedName);
 
           if (!mapping) {
+            // Use Last.fm name mapping if available (cleaner names without Discogs disambiguation)
+            // e.g., "Tool (2)" -> "Tool", "Discovery (7)" -> "Discovery"
+            const searchName = artistMappingService.getLastfmName(artist.name);
+            if (searchName !== artist.name) {
+              this.logger.debug(
+                `Using Last.fm name for search: "${artist.name}" -> "${searchName}"`
+              );
+            }
+
             // Search MusicBrainz for this artist
             const candidates = await this.musicBrainzService.searchArtist(
-              artist.name,
+              searchName,
               5
             );
 
@@ -1424,8 +1434,16 @@ export class ReleaseTrackingService {
 
   /**
    * Search for an artist's MusicBrainz matches
+   * Uses Last.fm name mapping if available for better search results
    */
   async searchArtist(name: string): Promise<MusicBrainzArtistMatch[]> {
-    return this.musicBrainzService.searchArtist(name);
+    // Use Last.fm name mapping if available (cleaner names without Discogs disambiguation)
+    const searchName = artistMappingService.getLastfmName(name);
+    if (searchName !== name) {
+      this.logger.debug(
+        `Using Last.fm name for search: "${name}" -> "${searchName}"`
+      );
+    }
+    return this.musicBrainzService.searchArtist(searchName);
   }
 }

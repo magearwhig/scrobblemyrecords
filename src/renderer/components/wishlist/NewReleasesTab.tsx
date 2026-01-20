@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 
 import {
   NewReleaseSyncStatus,
@@ -32,10 +32,19 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
   const [error, setError] = useState<string | null>(null);
   const [checkStarting, setCheckStarting] = useState(false);
 
+  // Auto-continue mode state
+  const [autoContinue, setAutoContinue] = useState(false);
+  const autoContinueRef = useRef(false);
+
   // Filter state
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('');
   const [daysFilter, setDaysFilter] = useState<DaysFilter>('');
   const [showDismissed, setShowDismissed] = useState(false);
+
+  // Keep ref in sync with state for use in callbacks
+  useEffect(() => {
+    autoContinueRef.current = autoContinue;
+  }, [autoContinue]);
 
   const fetchNewReleases = useCallback(async () => {
     try {
@@ -97,24 +106,71 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
       if (status?.status === 'completed' || status?.status === 'error') {
         // Refresh releases after sync completes
         await fetchNewReleases();
+
+        // Auto-continue: if there are more masters to check and auto-continue is enabled
+        if (
+          status?.status === 'completed' &&
+          autoContinueRef.current &&
+          status.lastCheckedIndex > 0 &&
+          status.lastCheckedIndex < status.totalMasters
+        ) {
+          // Trigger next batch after a short delay
+          setTimeout(async () => {
+            try {
+              await api.checkForNewReleases();
+              await fetchSyncStatus();
+            } catch (err) {
+              setError(
+                err instanceof Error ? err.message : 'Auto-continue failed'
+              );
+              setAutoContinue(false);
+            }
+          }, 500);
+        } else if (
+          status?.status === 'completed' &&
+          autoContinueRef.current &&
+          status.lastCheckedIndex === 0
+        ) {
+          // Full cycle completed, turn off auto-continue
+          setAutoContinue(false);
+        }
       }
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [syncStatus?.status, fetchSyncStatus, fetchNewReleases]);
+  }, [syncStatus?.status, fetchSyncStatus, fetchNewReleases, api]);
 
-  const handleCheckNow = async () => {
+  const handleCheckNow = async (withAutoContinue = false) => {
     try {
       setCheckStarting(true);
       setError(null);
+      if (withAutoContinue) {
+        setAutoContinue(true);
+      }
       await api.checkForNewReleases();
-      // Start polling for status
-      await fetchSyncStatus();
+
+      // Poll until status becomes 'syncing' (backend may take a moment to start)
+      // This ensures the UI shows the progress bar immediately
+      let attempts = 0;
+      const maxAttempts = 5;
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const status = await fetchSyncStatus();
+        if (status?.status === 'syncing') {
+          break;
+        }
+        attempts++;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Check failed');
+      setAutoContinue(false);
     } finally {
       setCheckStarting(false);
     }
+  };
+
+  const handleStopAutoContinue = () => {
+    setAutoContinue(false);
   };
 
   const handleDismiss = async (id: string) => {
@@ -162,12 +218,35 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
 
   const isSyncing = checkStarting || syncStatus?.status === 'syncing';
 
+  // Calculate overall progress for display
+  const totalMasters = syncStatus?.totalMasters || 0;
+  const lastCheckedIndex = syncStatus?.lastCheckedIndex || 0;
+  const currentBatchProcessed = syncStatus?.mastersProcessed || 0;
+  const overallChecked = lastCheckedIndex + currentBatchProcessed;
+  const overallProgress =
+    totalMasters > 0 ? Math.round((overallChecked / totalMasters) * 100) : 0;
+
+  // Check if there are more batches to process
+  const hasMoreBatches =
+    syncStatus?.status === 'completed' &&
+    lastCheckedIndex > 0 &&
+    lastCheckedIndex < totalMasters;
+
   return (
     <div className='new-releases-tab'>
       {/* Header with sync status */}
       <div className='new-releases-header'>
         <div className='new-releases-last-check'>
           Last checked: {formatRelativeTime(lastCheck)}
+          {totalMasters > 0 && !isSyncing && (
+            <span className='new-releases-progress-summary'>
+              {' '}
+              •{' '}
+              {lastCheckedIndex === 0
+                ? 'Full scan complete'
+                : `${lastCheckedIndex} of ${totalMasters} masters checked`}
+            </span>
+          )}
         </div>
 
         {isSyncing ? (
@@ -177,18 +256,56 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
                 ? `Checking: ${syncStatus.currentMaster}`
                 : 'Checking for new releases...'}
             </span>
+            <div className='sync-progress-info'>
+              <span className='sync-masters-count'>
+                {overallChecked} of {totalMasters} masters
+              </span>
+              {autoContinue && (
+                <span className='sync-auto-continue-badge'>Auto-continue</span>
+              )}
+            </div>
             <div className='sync-progress-bar-container'>
               <div
                 className='sync-progress-bar'
-                style={{ width: `${syncStatus?.progress || 0}%` }}
+                style={{ width: `${overallProgress}%` }}
               />
             </div>
-            <span className='sync-percent'>{syncStatus?.progress || 0}%</span>
+            <div className='sync-progress-actions'>
+              <span className='sync-percent'>{overallProgress}%</span>
+              {autoContinue && (
+                <button
+                  className='btn btn-sm btn-ghost'
+                  onClick={handleStopAutoContinue}
+                >
+                  Stop
+                </button>
+              )}
+            </div>
+          </div>
+        ) : hasMoreBatches ? (
+          <div className='new-releases-continue-actions'>
+            <span className='continue-hint'>
+              {totalMasters - lastCheckedIndex} masters remaining
+            </span>
+            <button
+              className='btn btn-secondary'
+              onClick={() => handleCheckNow(false)}
+              disabled={isSyncing}
+            >
+              Check Next Batch
+            </button>
+            <button
+              className='btn btn-primary'
+              onClick={() => handleCheckNow(true)}
+              disabled={isSyncing}
+            >
+              Check All Remaining
+            </button>
           </div>
         ) : (
           <button
             className='btn btn-primary'
-            onClick={handleCheckNow}
+            onClick={() => handleCheckNow(false)}
             disabled={isSyncing}
           >
             Check Now
@@ -200,7 +317,10 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
       {(error || syncStatus?.status === 'error') && (
         <div className='new-releases-error'>
           <span>{error || syncStatus?.error}</span>
-          <button className='btn btn-sm btn-ghost' onClick={handleCheckNow}>
+          <button
+            className='btn btn-sm btn-ghost'
+            onClick={() => handleCheckNow()}
+          >
             Retry
           </button>
         </div>

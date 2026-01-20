@@ -12,7 +12,7 @@ export class FileStorage {
   private readonly SAFE_FILENAME_PATTERN =
     /^[a-zA-Z0-9_-]+\.(json|txt|md|bak)$/;
   // Maximum number of backup files to keep per original file
-  private readonly MAX_BACKUPS = 3;
+  private readonly MAX_BACKUPS = 10;
 
   constructor(dataDir: string = './data') {
     this.dataDir = path.resolve(dataDir);

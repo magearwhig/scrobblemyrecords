@@ -4934,6 +4934,53 @@ body {
   min-width: 35px;
 }
 
+/* Enhanced sync progress display */
+.new-releases-sync-progress .sync-progress-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.new-releases-sync-progress .sync-masters-count {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.new-releases-sync-progress .sync-auto-continue-badge {
+  padding: 0.125rem 0.4rem;
+  background: var(--accent-primary);
+  color: white;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.new-releases-sync-progress .sync-progress-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Progress summary in header */
+.new-releases-progress-summary {
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+}
+
+/* Continue actions when batch is complete but more remain */
+.new-releases-continue-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.new-releases-continue-actions .continue-hint {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
 .new-releases-error {
   display: flex;
   justify-content: space-between;

@@ -96,6 +96,11 @@ const WishlistPage: React.FC = () => {
       setSyncStatus(status);
       setSettings(wishlistSettings);
       setLocalWantItems(localItems);
+
+      // If a sync is already in progress, start polling
+      if (status.status === 'syncing' || status.status === 'checking_vinyl') {
+        setIsPolling(true);
+      }
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to load wishlist data'
