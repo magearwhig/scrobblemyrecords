@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
 import { MonitoredSeller, SellerScanStatus } from '../../shared/types';
+import { Modal, ModalFooter } from '../components/ui';
 import { useApp } from '../context/AppContext';
 import {
   useNotifications,
@@ -587,69 +588,59 @@ const SellersPage: React.FC = () => {
       )}
 
       {/* Add seller modal */}
-      {addDialogOpen && (
-        <div className='modal-overlay' onClick={() => setAddDialogOpen(false)}>
-          <div className='modal' onClick={e => e.stopPropagation()}>
-            <div className='modal-header'>
-              <h2>Add Local Seller</h2>
-              <button
-                className='modal-close'
-                onClick={() => setAddDialogOpen(false)}
-              >
-                &times;
-              </button>
-            </div>
-            <div className='modal-body'>
-              <div className='form-group'>
-                <label className='form-label'>Discogs Username *</label>
-                <input
-                  type='text'
-                  className='form-input'
-                  placeholder='localvinylshop'
-                  value={newSellerUsername}
-                  onChange={e => setNewSellerUsername(e.target.value)}
-                  disabled={addingInProgress}
-                  autoFocus
-                />
-                <span className='form-hint'>
-                  The seller's username on Discogs Marketplace
-                </span>
-              </div>
-              <div className='form-group'>
-                <label className='form-label'>Display Name (optional)</label>
-                <input
-                  type='text'
-                  className='form-input'
-                  placeholder='Local Vinyl Shop'
-                  value={newSellerDisplayName}
-                  onChange={e => setNewSellerDisplayName(e.target.value)}
-                  disabled={addingInProgress}
-                />
-                <span className='form-hint'>
-                  A friendly name to display in the app
-                </span>
-              </div>
-              {addError && <div className='form-error'>{addError}</div>}
-            </div>
-            <div className='modal-footer'>
-              <button
-                className='btn btn-secondary'
-                onClick={() => setAddDialogOpen(false)}
-                disabled={addingInProgress}
-              >
-                Cancel
-              </button>
-              <button
-                className='btn'
-                onClick={handleAddSeller}
-                disabled={addingInProgress || !newSellerUsername.trim()}
-              >
-                {addingInProgress ? 'Adding...' : 'Add Seller'}
-              </button>
-            </div>
-          </div>
+      <Modal
+        isOpen={addDialogOpen}
+        onClose={() => setAddDialogOpen(false)}
+        title='Add Local Seller'
+        size='small'
+      >
+        <div className='form-group'>
+          <label className='form-label'>Discogs Username *</label>
+          <input
+            type='text'
+            className='form-input'
+            placeholder='localvinylshop'
+            value={newSellerUsername}
+            onChange={e => setNewSellerUsername(e.target.value)}
+            disabled={addingInProgress}
+            autoFocus
+          />
+          <span className='form-hint'>
+            The seller's username on Discogs Marketplace
+          </span>
         </div>
-      )}
+        <div className='form-group'>
+          <label className='form-label'>Display Name (optional)</label>
+          <input
+            type='text'
+            className='form-input'
+            placeholder='Local Vinyl Shop'
+            value={newSellerDisplayName}
+            onChange={e => setNewSellerDisplayName(e.target.value)}
+            disabled={addingInProgress}
+          />
+          <span className='form-hint'>
+            A friendly name to display in the app
+          </span>
+        </div>
+        {addError && <div className='form-error'>{addError}</div>}
+        <ModalFooter>
+          <button
+            className='btn btn-secondary'
+            onClick={() => setAddDialogOpen(false)}
+            disabled={addingInProgress}
+          >
+            Cancel
+          </button>
+          <button
+            className='btn'
+            onClick={handleAddSeller}
+            disabled={addingInProgress || !newSellerUsername.trim()}
+          >
+            {addingInProgress ? 'Adding...' : 'Add Seller'}
+          </button>
+        </ModalFooter>
+      </Modal>
 
       {/* View all matches link */}
       {sellers.some(s => (s.matchCount || 0) > 0) && (

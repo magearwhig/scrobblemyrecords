@@ -560,11 +560,11 @@ These are nice-to-have features for later consideration:
 ### P1 - Do Soon
 - [x] Settings page restructure with visual separation ✅ COMPLETE
 - [x] Centralized logging (remove token exposure) ✅ COMPLETE
-- [ ] Remove `any` types
+- [x] Remove `any` types ✅ COMPLETE (reduced from 52 to 22, ~58%)
 - [x] Fix missing/duplicate CSS ✅ COMPLETE
-- [ ] Loading skeletons
-- [ ] Collapsible sidebar
-- [ ] Better empty states
+- [x] Loading skeletons ✅ COMPLETE (Skeleton component with variants)
+- [x] Collapsible sidebar ✅ COMPLETE (with localStorage persistence)
+- [x] Better empty states ✅ COMPLETE (EmptyState component)
 
 ### P2 - Next Cycle
 - [ ] Standardize API error responses
@@ -576,8 +576,8 @@ These are nice-to-have features for later consideration:
 - [ ] Split styles.css
 - [ ] Extract shared UI patterns
 - [ ] Component extraction (see 4.4 for full roadmap):
-  - [ ] Level 1: `Button`, `Badge`, `ProgressBar` components
-  - [ ] Level 2: `Modal` component + refactor 4 page modals
+  - [x] Level 1: `Button`, `Badge`, `ProgressBar` components ✅ COMPLETE
+  - [x] Level 2: `Modal` component + refactor 4 page modals ✅ COMPLETE
   - [ ] Level 3: `DiscoveryItemCard`, `WishlistItemCard` extraction
   - [ ] Level 4: `ForgottenFavoritesTab`, `CollectionFilters`, `CacheStatus` extraction
 

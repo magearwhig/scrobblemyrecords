@@ -1,0 +1,190 @@
+/* Base Skeleton Styles */
+.skeleton {
+  background-color: var(--bg-secondary);
+  display: block;
+}
+
+/* Variants */
+.skeleton--rectangular {
+  border-radius: 4px;
+}
+
+.skeleton--text {
+  border-radius: 4px;
+  transform: scale(1, 0.8);
+}
+
+.skeleton--circular {
+  border-radius: 50%;
+}
+
+/* Animations */
+.skeleton--pulse {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton--wave {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton--wave::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  animation: skeleton-wave 1.5s ease-in-out infinite;
+}
+
+.skeleton--none {
+  animation: none;
+}
+
+@keyframes skeleton-pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes skeleton-wave {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Album Card Skeleton */
+.skeleton-album-card {
+  background: var(--bg-card);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.skeleton-album-cover {
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.skeleton-album-info {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Stat Card Skeleton */
+.skeleton-stat-card {
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 1.25rem;
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* List Item Skeleton */
+.skeleton-list-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.skeleton-list-item:last-child {
+  border-bottom: none;
+}
+
+.skeleton-avatar {
+  flex-shrink: 0;
+}
+
+.skeleton-list-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Table Row Skeleton */
+.skeleton-table-row td {
+  padding: 0.75rem;
+}
+
+/* Session Card Skeleton */
+.skeleton-session-card {
+  padding: 1rem;
+}
+
+.skeleton-session-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.skeleton-session-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.skeleton-session-info {
+  margin-bottom: 0.75rem;
+}
+
+.skeleton-session-covers {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.skeleton-session-covers .skeleton {
+  border-radius: 4px;
+}
+
+/* Dark mode adjustments */
+.dark-mode .skeleton {
+  background-color: var(--bg-secondary);
+}
+
+.dark-mode .skeleton--wave::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.05),
+    transparent
+  );
+}
+
+/* Chart Skeleton */
+.skeleton-chart-card {
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 1.25rem;
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.skeleton-chart {
+  border-radius: 8px;
+}

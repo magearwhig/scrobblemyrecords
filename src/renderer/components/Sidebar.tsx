@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 import { useAuth } from '../context/AuthContext';
 
 interface SidebarProps {
   currentPage: string;
   onPageChange: (page: string) => void;
+  collapsed: boolean;
+  onCollapsedChange: (collapsed: boolean) => void;
 }
 
 interface NavItem {
@@ -19,8 +21,29 @@ interface NavCategory {
   items: NavItem[];
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
+const Sidebar: React.FC<SidebarProps> = ({
+  currentPage,
+  onPageChange,
+  collapsed,
+  onCollapsedChange,
+}) => {
   const { authStatus } = useAuth();
+
+  const handleToggleCollapse = () => {
+    onCollapsedChange(!collapsed);
+  };
+
+  // Auto-collapse on narrow viewports
+  useEffect(() => {
+    const checkViewport = () => {
+      if (window.innerWidth < 768 && !collapsed) {
+        onCollapsedChange(true);
+      }
+    };
+    checkViewport();
+    // Only run on initial mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const navCategories: NavCategory[] = [
     {
@@ -118,11 +141,22 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
   ];
 
   return (
-    <nav className='sidebar'>
+    <nav className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
+      <button
+        className='sidebar-toggle'
+        onClick={handleToggleCollapse}
+        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        <span className='sidebar-toggle-icon'>{collapsed ? '→' : '←'}</span>
+      </button>
+
       <ul className='nav-menu'>
         {navCategories.map(category => (
           <React.Fragment key={category.label}>
-            <li className='nav-category-header'>{category.label}</li>
+            {!collapsed && (
+              <li className='nav-category-header'>{category.label}</li>
+            )}
             {category.items.map(item => (
               <li key={item.id} className='nav-item'>
                 <button
@@ -134,9 +168,12 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
                     }
                   }}
                   disabled={!item.enabled}
+                  title={collapsed ? item.label : undefined}
                 >
                   <span className='nav-link-icon'>{item.icon}</span>
-                  {item.label}
+                  {!collapsed && (
+                    <span className='nav-link-label'>{item.label}</span>
+                  )}
                 </button>
               </li>
             ))}
@@ -145,18 +182,48 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, onPageChange }) => {
       </ul>
 
       <div className='sidebar-status'>
-        <div className='sidebar-status-label'>Status:</div>
+        {!collapsed && <div className='sidebar-status-label'>Status:</div>}
         <div
           className={`sidebar-status-item ${authStatus.discogs.authenticated ? 'sidebar-status-connected' : 'sidebar-status-disconnected'}`}
+          title={
+            collapsed
+              ? `Discogs: ${authStatus.discogs.authenticated ? 'Connected' : 'Not connected'}`
+              : undefined
+          }
         >
-          Discogs:{' '}
-          {authStatus.discogs.authenticated ? '✓ Connected' : '✗ Not connected'}
+          {collapsed ? (
+            <span className='sidebar-status-icon'>
+              {authStatus.discogs.authenticated ? '✓' : '✗'}
+            </span>
+          ) : (
+            <>
+              Discogs:{' '}
+              {authStatus.discogs.authenticated
+                ? '✓ Connected'
+                : '✗ Not connected'}
+            </>
+          )}
         </div>
         <div
           className={`sidebar-status-item ${authStatus.lastfm.authenticated ? 'sidebar-status-connected' : 'sidebar-status-disconnected'}`}
+          title={
+            collapsed
+              ? `Last.fm: ${authStatus.lastfm.authenticated ? 'Connected' : 'Not connected'}`
+              : undefined
+          }
         >
-          Last.fm:{' '}
-          {authStatus.lastfm.authenticated ? '✓ Connected' : '✗ Not connected'}
+          {collapsed ? (
+            <span className='sidebar-status-icon'>
+              {authStatus.lastfm.authenticated ? '✓' : '✗'}
+            </span>
+          ) : (
+            <>
+              Last.fm:{' '}
+              {authStatus.lastfm.authenticated
+                ? '✓ Connected'
+                : '✗ Not connected'}
+            </>
+          )}
         </div>
       </div>
     </nav>

@@ -15,18 +15,26 @@ const createMockAuthContext = (authStatus: AuthStatus) => ({
 const renderSidebarWithAuth = (
   authStatus: AuthStatus,
   currentPage: string = 'home',
-  onPageChange: jest.Mock = jest.fn()
+  onPageChange: jest.Mock = jest.fn(),
+  collapsed: boolean = false,
+  onCollapsedChange: jest.Mock = jest.fn()
 ) => {
   const authContextValue = createMockAuthContext(authStatus);
 
   return {
     ...render(
       <AuthProvider value={authContextValue}>
-        <Sidebar currentPage={currentPage} onPageChange={onPageChange} />
+        <Sidebar
+          currentPage={currentPage}
+          onPageChange={onPageChange}
+          collapsed={collapsed}
+          onCollapsedChange={onCollapsedChange}
+        />
       </AuthProvider>
     ),
     authContextValue,
     onPageChange,
+    onCollapsedChange,
   };
 };
 

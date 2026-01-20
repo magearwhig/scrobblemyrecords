@@ -7,6 +7,7 @@ import {
   DiscardStatus,
   MarketplaceStats,
 } from '../../shared/types';
+import { Modal, ModalFooter } from '../components/ui';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -588,369 +589,326 @@ const DiscardPilePage: React.FC = () => {
       )}
 
       {/* Edit Modal */}
-      {editModal.isOpen && editModal.item && (
-        <div className='modal-overlay' onClick={closeEditModal}>
-          <div className='modal' onClick={e => e.stopPropagation()}>
-            <div className='modal-header'>
-              <h2>Edit Item</h2>
-              <button className='modal-close' onClick={closeEditModal}>
-                &times;
-              </button>
-            </div>
-            <div className='modal-body'>
-              {/* Marketplace Price Stats */}
-              <div className='marketplace-stats-info'>
-                {loadingEditMarketplaceStats ? (
-                  <div className='marketplace-stats-loading'>
-                    Loading marketplace prices...
-                  </div>
-                ) : editMarketplaceStats ? (
-                  <div className='marketplace-stats-content'>
-                    <div className='marketplace-stats-prices'>
-                      <span className='marketplace-stats-label'>
-                        Discogs Marketplace:
+      {editModal.item && (
+        <Modal
+          isOpen={editModal.isOpen}
+          onClose={closeEditModal}
+          title='Edit Item'
+          size='medium'
+        >
+          {/* Marketplace Price Stats */}
+          <div className='marketplace-stats-info'>
+            {loadingEditMarketplaceStats ? (
+              <div className='marketplace-stats-loading'>
+                Loading marketplace prices...
+              </div>
+            ) : editMarketplaceStats ? (
+              <div className='marketplace-stats-content'>
+                <div className='marketplace-stats-prices'>
+                  <span className='marketplace-stats-label'>
+                    Discogs Marketplace:
+                  </span>
+                  {editMarketplaceStats.lowestPrice !== undefined ? (
+                    <>
+                      <span className='marketplace-stats-range'>
+                        {editMarketplaceStats.highestPrice !== undefined &&
+                        editMarketplaceStats.highestPrice !==
+                          editMarketplaceStats.lowestPrice ? (
+                          <>
+                            {new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: editMarketplaceStats.currency || 'USD',
+                            }).format(editMarketplaceStats.lowestPrice)}
+                            {' - '}
+                            {new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: editMarketplaceStats.currency || 'USD',
+                            }).format(editMarketplaceStats.highestPrice)}
+                          </>
+                        ) : (
+                          <>
+                            from{' '}
+                            {new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: editMarketplaceStats.currency || 'USD',
+                            }).format(editMarketplaceStats.lowestPrice)}
+                          </>
+                        )}
                       </span>
-                      {editMarketplaceStats.lowestPrice !== undefined ? (
-                        <>
-                          <span className='marketplace-stats-range'>
-                            {editMarketplaceStats.highestPrice !== undefined &&
-                            editMarketplaceStats.highestPrice !==
-                              editMarketplaceStats.lowestPrice ? (
-                              <>
-                                {new Intl.NumberFormat('en-US', {
-                                  style: 'currency',
-                                  currency:
-                                    editMarketplaceStats.currency || 'USD',
-                                }).format(editMarketplaceStats.lowestPrice)}
-                                {' - '}
-                                {new Intl.NumberFormat('en-US', {
-                                  style: 'currency',
-                                  currency:
-                                    editMarketplaceStats.currency || 'USD',
-                                }).format(editMarketplaceStats.highestPrice)}
-                              </>
-                            ) : (
-                              <>
-                                from{' '}
-                                {new Intl.NumberFormat('en-US', {
-                                  style: 'currency',
-                                  currency:
-                                    editMarketplaceStats.currency || 'USD',
-                                }).format(editMarketplaceStats.lowestPrice)}
-                              </>
-                            )}
-                          </span>
-                          <span className='marketplace-stats-count'>
-                            ({editMarketplaceStats.numForSale} for sale)
-                          </span>
-                        </>
-                      ) : (
-                        <span className='marketplace-stats-none'>
-                          No listings
+                      <span className='marketplace-stats-count'>
+                        ({editMarketplaceStats.numForSale} for sale)
+                      </span>
+                    </>
+                  ) : (
+                    <span className='marketplace-stats-none'>No listings</span>
+                  )}
+                </div>
+                {editMarketplaceStats.priceSuggestions ? (
+                  <div className='marketplace-stats-suggestions'>
+                    <span className='marketplace-stats-suggestion-label'>
+                      Suggested prices by condition:
+                    </span>
+                    <div className='marketplace-stats-condition-list'>
+                      {editMarketplaceStats.priceSuggestions.nearMint && (
+                        <span className='condition-price'>
+                          NM:{' '}
+                          {new Intl.NumberFormat('en-US', {
+                            style: 'currency',
+                            currency:
+                              editMarketplaceStats.priceSuggestions.nearMint
+                                .currency || 'USD',
+                          }).format(
+                            editMarketplaceStats.priceSuggestions.nearMint.value
+                          )}
+                        </span>
+                      )}
+                      {editMarketplaceStats.priceSuggestions.veryGoodPlus && (
+                        <span className='condition-price'>
+                          VG+:{' '}
+                          {new Intl.NumberFormat('en-US', {
+                            style: 'currency',
+                            currency:
+                              editMarketplaceStats.priceSuggestions.veryGoodPlus
+                                .currency || 'USD',
+                          }).format(
+                            editMarketplaceStats.priceSuggestions.veryGoodPlus
+                              .value
+                          )}
+                        </span>
+                      )}
+                      {editMarketplaceStats.priceSuggestions.veryGood && (
+                        <span className='condition-price'>
+                          VG:{' '}
+                          {new Intl.NumberFormat('en-US', {
+                            style: 'currency',
+                            currency:
+                              editMarketplaceStats.priceSuggestions.veryGood
+                                .currency || 'USD',
+                          }).format(
+                            editMarketplaceStats.priceSuggestions.veryGood.value
+                          )}
                         </span>
                       )}
                     </div>
-                    {editMarketplaceStats.priceSuggestions ? (
-                      <div className='marketplace-stats-suggestions'>
-                        <span className='marketplace-stats-suggestion-label'>
-                          Suggested prices by condition:
-                        </span>
-                        <div className='marketplace-stats-condition-list'>
-                          {editMarketplaceStats.priceSuggestions.nearMint && (
-                            <span className='condition-price'>
-                              NM:{' '}
-                              {new Intl.NumberFormat('en-US', {
-                                style: 'currency',
-                                currency:
-                                  editMarketplaceStats.priceSuggestions.nearMint
-                                    .currency || 'USD',
-                              }).format(
-                                editMarketplaceStats.priceSuggestions.nearMint
-                                  .value
-                              )}
-                            </span>
-                          )}
-                          {editMarketplaceStats.priceSuggestions
-                            .veryGoodPlus && (
-                            <span className='condition-price'>
-                              VG+:{' '}
-                              {new Intl.NumberFormat('en-US', {
-                                style: 'currency',
-                                currency:
-                                  editMarketplaceStats.priceSuggestions
-                                    .veryGoodPlus.currency || 'USD',
-                              }).format(
-                                editMarketplaceStats.priceSuggestions
-                                  .veryGoodPlus.value
-                              )}
-                            </span>
-                          )}
-                          {editMarketplaceStats.priceSuggestions.veryGood && (
-                            <span className='condition-price'>
-                              VG:{' '}
-                              {new Intl.NumberFormat('en-US', {
-                                style: 'currency',
-                                currency:
-                                  editMarketplaceStats.priceSuggestions.veryGood
-                                    .currency || 'USD',
-                              }).format(
-                                editMarketplaceStats.priceSuggestions.veryGood
-                                  .value
-                              )}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      editMarketplaceStats.lowestPrice !== undefined && (
-                        <div className='marketplace-stats-suggestions'>
-                          <span className='marketplace-stats-no-suggestions'>
-                            Seller profile required for price suggestions
-                          </span>
-                        </div>
-                      )
-                    )}
                   </div>
                 ) : (
-                  <div className='marketplace-stats-unavailable'>
-                    Marketplace data unavailable
-                  </div>
+                  editMarketplaceStats.lowestPrice !== undefined && (
+                    <div className='marketplace-stats-suggestions'>
+                      <span className='marketplace-stats-no-suggestions'>
+                        Seller profile required for price suggestions
+                      </span>
+                    </div>
+                  )
                 )}
               </div>
-
-              <div className='form-group'>
-                <label>Reason</label>
-                <select
-                  value={editForm.reason}
-                  onChange={e =>
-                    setEditForm({
-                      ...editForm,
-                      reason: e.target.value as DiscardReason,
-                    })
-                  }
-                >
-                  {Object.entries(REASON_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+            ) : (
+              <div className='marketplace-stats-unavailable'>
+                Marketplace data unavailable
               </div>
-              {editForm.reason === 'other' && (
-                <div className='form-group'>
-                  <label>Reason Note</label>
-                  <input
-                    type='text'
-                    value={editForm.reasonNote}
-                    onChange={e =>
-                      setEditForm({ ...editForm, reasonNote: e.target.value })
-                    }
-                    placeholder='Custom reason...'
-                  />
-                </div>
-              )}
-              <div className='form-group'>
-                <label>Status</label>
-                <select
-                  value={editForm.status}
-                  onChange={e =>
-                    setEditForm({
-                      ...editForm,
-                      status: e.target.value as DiscardStatus,
-                    })
-                  }
-                >
-                  {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='form-group'>
-                <label>Estimated Value ({editModal.item.currency})</label>
-                <input
-                  type='number'
-                  step='0.01'
-                  value={editForm.estimatedValue}
-                  onChange={e =>
-                    setEditForm({ ...editForm, estimatedValue: e.target.value })
-                  }
-                  placeholder='0.00'
-                />
-              </div>
-              <div className='form-group'>
-                <label>Notes</label>
-                <textarea
-                  value={editForm.notes}
-                  onChange={e =>
-                    setEditForm({ ...editForm, notes: e.target.value })
-                  }
-                  placeholder='Additional notes...'
-                  rows={3}
-                />
-              </div>
-              <div className='form-group'>
-                <label>Marketplace URL</label>
-                <input
-                  type='url'
-                  value={editForm.marketplaceUrl}
-                  onChange={e =>
-                    setEditForm({ ...editForm, marketplaceUrl: e.target.value })
-                  }
-                  placeholder='https://www.discogs.com/sell/item/...'
-                />
-              </div>
-              <div className='form-group'>
-                <label>Actual Sale Price ({editModal.item.currency})</label>
-                <input
-                  type='number'
-                  step='0.01'
-                  value={editForm.actualSalePrice}
-                  onChange={e =>
-                    setEditForm({
-                      ...editForm,
-                      actualSalePrice: e.target.value,
-                    })
-                  }
-                  placeholder='0.00'
-                />
-              </div>
-            </div>
-            <div className='modal-footer'>
-              <button className='btn btn-secondary' onClick={closeEditModal}>
-                Cancel
-              </button>
-              <button className='btn btn-primary' onClick={handleSaveEdit}>
-                Save Changes
-              </button>
-            </div>
+            )}
           </div>
-        </div>
+
+          <div className='form-group'>
+            <label>Reason</label>
+            <select
+              value={editForm.reason}
+              onChange={e =>
+                setEditForm({
+                  ...editForm,
+                  reason: e.target.value as DiscardReason,
+                })
+              }
+            >
+              {Object.entries(REASON_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {editForm.reason === 'other' && (
+            <div className='form-group'>
+              <label>Reason Note</label>
+              <input
+                type='text'
+                value={editForm.reasonNote}
+                onChange={e =>
+                  setEditForm({ ...editForm, reasonNote: e.target.value })
+                }
+                placeholder='Custom reason...'
+              />
+            </div>
+          )}
+          <div className='form-group'>
+            <label>Status</label>
+            <select
+              value={editForm.status}
+              onChange={e =>
+                setEditForm({
+                  ...editForm,
+                  status: e.target.value as DiscardStatus,
+                })
+              }
+            >
+              {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className='form-group'>
+            <label>Estimated Value ({editModal.item.currency})</label>
+            <input
+              type='number'
+              step='0.01'
+              value={editForm.estimatedValue}
+              onChange={e =>
+                setEditForm({ ...editForm, estimatedValue: e.target.value })
+              }
+              placeholder='0.00'
+            />
+          </div>
+          <div className='form-group'>
+            <label>Notes</label>
+            <textarea
+              value={editForm.notes}
+              onChange={e =>
+                setEditForm({ ...editForm, notes: e.target.value })
+              }
+              placeholder='Additional notes...'
+              rows={3}
+            />
+          </div>
+          <div className='form-group'>
+            <label>Marketplace URL</label>
+            <input
+              type='url'
+              value={editForm.marketplaceUrl}
+              onChange={e =>
+                setEditForm({ ...editForm, marketplaceUrl: e.target.value })
+              }
+              placeholder='https://www.discogs.com/sell/item/...'
+            />
+          </div>
+          <div className='form-group'>
+            <label>Actual Sale Price ({editModal.item.currency})</label>
+            <input
+              type='number'
+              step='0.01'
+              value={editForm.actualSalePrice}
+              onChange={e =>
+                setEditForm({
+                  ...editForm,
+                  actualSalePrice: e.target.value,
+                })
+              }
+              placeholder='0.00'
+            />
+          </div>
+          <ModalFooter>
+            <button className='btn btn-secondary' onClick={closeEditModal}>
+              Cancel
+            </button>
+            <button className='btn btn-primary' onClick={handleSaveEdit}>
+              Save Changes
+            </button>
+          </ModalFooter>
+        </Modal>
       )}
 
       {/* Mark as Sold Modal */}
-      {soldModal.isOpen && soldModal.item && (
-        <div
-          className='modal-overlay'
-          onClick={() =>
+      {soldModal.item && (
+        <Modal
+          isOpen={soldModal.isOpen}
+          onClose={() =>
             setSoldModal({ isOpen: false, item: null, salePrice: '' })
           }
+          title='Mark as Sold'
+          size='small'
         >
-          <div className='modal' onClick={e => e.stopPropagation()}>
-            <div className='modal-header'>
-              <h2>Mark as Sold</h2>
-              <button
-                className='modal-close'
-                onClick={() =>
-                  setSoldModal({ isOpen: false, item: null, salePrice: '' })
-                }
-              >
-                &times;
-              </button>
-            </div>
-            <div className='modal-body'>
-              <p>
-                Marking <strong>{soldModal.item.artist}</strong> -{' '}
-                <strong>{soldModal.item.title}</strong> as sold.
-              </p>
-              <div className='form-group'>
-                <label>Sale Price ({soldModal.item.currency}, optional)</label>
-                <input
-                  type='number'
-                  step='0.01'
-                  value={soldModal.salePrice}
-                  onChange={e =>
-                    setSoldModal({ ...soldModal, salePrice: e.target.value })
-                  }
-                  placeholder='0.00'
-                />
-              </div>
-            </div>
-            <div className='modal-footer'>
-              <button
-                className='btn btn-secondary'
-                onClick={() =>
-                  setSoldModal({ isOpen: false, item: null, salePrice: '' })
-                }
-              >
-                Cancel
-              </button>
-              <button className='btn btn-success' onClick={handleMarkAsSold}>
-                Mark as Sold
-              </button>
-            </div>
+          <p>
+            Marking <strong>{soldModal.item.artist}</strong> -{' '}
+            <strong>{soldModal.item.title}</strong> as sold.
+          </p>
+          <div className='form-group'>
+            <label>Sale Price ({soldModal.item.currency}, optional)</label>
+            <input
+              type='number'
+              step='0.01'
+              value={soldModal.salePrice}
+              onChange={e =>
+                setSoldModal({ ...soldModal, salePrice: e.target.value })
+              }
+              placeholder='0.00'
+            />
           </div>
-        </div>
+          <ModalFooter>
+            <button
+              className='btn btn-secondary'
+              onClick={() =>
+                setSoldModal({ isOpen: false, item: null, salePrice: '' })
+              }
+            >
+              Cancel
+            </button>
+            <button className='btn btn-success' onClick={handleMarkAsSold}>
+              Mark as Sold
+            </button>
+          </ModalFooter>
+        </Modal>
       )}
 
       {/* Mark as Listed Modal */}
-      {listedModal.isOpen && listedModal.item && (
-        <div
-          className='modal-overlay'
-          onClick={() =>
+      {listedModal.item && (
+        <Modal
+          isOpen={listedModal.isOpen}
+          onClose={() =>
             setListedModal({ isOpen: false, item: null, marketplaceUrl: '' })
           }
+          title='Mark as Listed'
+          size='small'
         >
-          <div className='modal' onClick={e => e.stopPropagation()}>
-            <div className='modal-header'>
-              <h2>Mark as Listed</h2>
-              <button
-                className='modal-close'
-                onClick={() =>
-                  setListedModal({
-                    isOpen: false,
-                    item: null,
-                    marketplaceUrl: '',
-                  })
-                }
-              >
-                &times;
-              </button>
-            </div>
-            <div className='modal-body'>
-              <p>
-                Marking <strong>{listedModal.item.artist}</strong> -{' '}
-                <strong>{listedModal.item.title}</strong> as listed for sale.
-              </p>
-              <div className='form-group'>
-                <label>Marketplace URL</label>
-                <input
-                  type='url'
-                  value={listedModal.marketplaceUrl}
-                  onChange={e =>
-                    setListedModal({
-                      ...listedModal,
-                      marketplaceUrl: e.target.value,
-                    })
-                  }
-                  placeholder='https://discogs.com/sell/item/...'
-                />
-              </div>
-            </div>
-            <div className='modal-footer'>
-              <button
-                className='btn btn-secondary'
-                onClick={() =>
-                  setListedModal({
-                    isOpen: false,
-                    item: null,
-                    marketplaceUrl: '',
-                  })
-                }
-              >
-                Cancel
-              </button>
-              <button
-                className='btn btn-primary'
-                onClick={handleMarkAsListed}
-                disabled={!listedModal.marketplaceUrl}
-              >
-                Mark as Listed
-              </button>
-            </div>
+          <p>
+            Marking <strong>{listedModal.item.artist}</strong> -{' '}
+            <strong>{listedModal.item.title}</strong> as listed for sale.
+          </p>
+          <div className='form-group'>
+            <label>Marketplace URL</label>
+            <input
+              type='url'
+              value={listedModal.marketplaceUrl}
+              onChange={e =>
+                setListedModal({
+                  ...listedModal,
+                  marketplaceUrl: e.target.value,
+                })
+              }
+              placeholder='https://discogs.com/sell/item/...'
+            />
           </div>
-        </div>
+          <ModalFooter>
+            <button
+              className='btn btn-secondary'
+              onClick={() =>
+                setListedModal({
+                  isOpen: false,
+                  item: null,
+                  marketplaceUrl: '',
+                })
+              }
+            >
+              Cancel
+            </button>
+            <button
+              className='btn btn-primary'
+              onClick={handleMarkAsListed}
+              disabled={!listedModal.marketplaceUrl}
+            >
+              Mark as Listed
+            </button>
+          </ModalFooter>
+        </Modal>
       )}
     </div>
   );

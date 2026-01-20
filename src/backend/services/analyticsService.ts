@@ -5,7 +5,7 @@ import {
 } from '../../shared/types';
 import { createLogger } from '../utils/logger';
 
-import { LastFmService } from './lastfmService';
+import { LastFmService, LastFmTopArtist } from './lastfmService';
 import { MappingService } from './mappingService';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 
@@ -62,7 +62,7 @@ export class AnalyticsService {
       const artistMap = new Map<string, number>();
 
       // Weight recent plays more heavily
-      const processArtists = (artists: any[], weight: number) => {
+      const processArtists = (artists: LastFmTopArtist[], weight: number) => {
         for (const artist of artists) {
           const name = artist.name.toLowerCase();
           const playcount = parseInt(artist.playcount || '0', 10) * weight;

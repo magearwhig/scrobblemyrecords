@@ -8,6 +8,36 @@ import { createLogger } from '../utils/logger';
 
 import { AuthService } from './authService';
 
+/**
+ * Last.fm API response types
+ */
+export interface LastFmTopArtist {
+  name: string;
+  playcount: string;
+  url: string;
+  mbid?: string;
+  image?: Array<{ '#text': string; size: string }>;
+}
+
+export interface LastFmUserInfo {
+  name: string;
+  realname?: string;
+  url: string;
+  playcount: string;
+  registered?: { '#text': number; unixtime: string };
+  image?: Array<{ '#text': string; size: string }>;
+}
+
+export interface LastFmRecentTrack {
+  name: string;
+  artist: { '#text': string; mbid?: string };
+  album?: { '#text': string; mbid?: string };
+  url: string;
+  date?: { uts: string; '#text': string };
+  image?: Array<{ '#text': string; size: string }>;
+  '@attr'?: { nowplaying: string };
+}
+
 export class LastFmService {
   private axios: AxiosInstance;
   private fileStorage: FileStorage;
@@ -119,9 +149,9 @@ export class LastFmService {
         sessionKey: session.key,
         username: session.name,
       };
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error('Error getting Last.fm session', error);
-      if (error.response) {
+      if (axios.isAxiosError(error) && error.response) {
         this.logger.error('Last.fm API response error', {
           status: error.response.status,
           data: error.response.data,
@@ -254,9 +284,9 @@ export class LastFmService {
         ignored,
         message,
       };
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error('Error scrobbling track', error);
-      if (error.response) {
+      if (axios.isAxiosError(error) && error.response) {
         this.logger.error('Last.fm API response error', {
           status: error.response.status,
           data: error.response.data,
@@ -454,7 +484,7 @@ export class LastFmService {
   async testConnection(): Promise<{
     success: boolean;
     message: string;
-    userInfo?: any;
+    userInfo?: LastFmUserInfo;
   }> {
     try {
       this.logger.info('Testing Last.fm connection...');
@@ -485,16 +515,19 @@ export class LastFmService {
         message: `Connected successfully to Last.fm as ${userInfo.name}`,
         userInfo,
       };
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error('Last.fm connection test failed', error);
       return {
         success: false,
-        message: error.message || 'Failed to connect to Last.fm',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Failed to connect to Last.fm',
       };
     }
   }
 
-  async getUserInfo(): Promise<any> {
+  async getUserInfo(): Promise<LastFmUserInfo> {
     try {
       const credentials = await this.authService.getLastFmCredentials();
       if (!credentials.apiKey || !credentials.sessionKey) {
@@ -521,7 +554,7 @@ export class LastFmService {
     }
   }
 
-  async getRecentScrobbles(limit: number = 10): Promise<any[]> {
+  async getRecentScrobbles(limit: number = 10): Promise<LastFmRecentTrack[]> {
     try {
       const credentials = await this.authService.getLastFmCredentials();
       if (!credentials.apiKey || !credentials.username) {
@@ -586,7 +619,7 @@ export class LastFmService {
   async getTopArtists(
     period: '7day' | '1month' | '3month' | '6month' | '12month' = '7day',
     limit: number = 10
-  ): Promise<any[]> {
+  ): Promise<LastFmTopArtist[]> {
     try {
       const credentials = await this.authService.getLastFmCredentials();
       if (!credentials.apiKey || !credentials.username) {

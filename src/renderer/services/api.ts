@@ -6,7 +6,9 @@ import {
   AlbumMapping,
   AlbumPlayCountResponse,
   ApiResponse,
+  ArtistDisambiguationStatus,
   ArtistMapping,
+  ArtistMbidMapping,
   AuthStatus,
   AutoBackupInfo,
   BackupExportOptions,
@@ -15,6 +17,7 @@ import {
   BackupImportResult,
   BackupPreview,
   BackupSettings,
+  CollectionArtist,
   CollectionItem,
   DashboardData,
   DiscardPileItem,
@@ -24,14 +27,18 @@ import {
   ForgottenTrack,
   HiddenAlbum,
   HiddenArtist,
+  HiddenRelease,
   LocalWantItem,
   MarketplaceStats,
   MissingAlbum,
   MissingArtist,
   MonitoredSeller,
+  MusicBrainzArtistMatch,
   NewReleaseSyncStatus,
   ReleaseTrackingSyncStatus,
   ReleaseVersion,
+  ScrobbleArtistMapping,
+  ScrobbleArtistMappingStats,
   ScrobbleTrack,
   ScrobbleSession,
   SellerMatch,
@@ -41,6 +48,7 @@ import {
   SuggestionSettings,
   SyncSettings,
   SyncStatus,
+  TrackedRelease,
   UpdateDiscardPileItemRequest,
   WishlistNewRelease,
   WishlistSettings,
@@ -331,7 +339,7 @@ class ApiService {
     startTime?: number
   ): Promise<{
     tracks: ScrobbleTrack[];
-    release: any;
+    release: DiscogsRelease;
     startTime: number;
     totalDuration: number;
   }> {
@@ -375,8 +383,8 @@ class ApiService {
 
   // Artist mapping methods
   async getArtistMappings(): Promise<{
-    mappings: any[];
-    stats: any;
+    mappings: ScrobbleArtistMapping[];
+    stats: ScrobbleArtistMappingStats;
   }> {
     const response = await this.api.get('/artist-mappings');
     return response.data.data;
@@ -436,7 +444,7 @@ class ApiService {
     return response.data.data;
   }
 
-  async importArtistMappings(mappings: any[]): Promise<{
+  async importArtistMappings(mappings: ScrobbleArtistMapping[]): Promise<{
     message: string;
     imported: number;
     skipped: number;
@@ -448,7 +456,11 @@ class ApiService {
     return response.data.data;
   }
 
-  async exportArtistMappings(): Promise<any> {
+  async exportArtistMappings(): Promise<{
+    mappings: ScrobbleArtistMapping[];
+    version: string;
+    lastUpdated: number;
+  }> {
     const response = await this.api.get('/artist-mappings/export');
     return response.data;
   }
@@ -460,7 +472,7 @@ class ApiService {
     return response.data.data;
   }
 
-  async getArtistMappingStats(): Promise<any> {
+  async getArtistMappingStats(): Promise<ScrobbleArtistMappingStats> {
     const response = await this.api.get('/artist-mappings/stats');
     return response.data.data;
   }
@@ -850,7 +862,7 @@ class ApiService {
 
   async getAISuggestion(mood?: string): Promise<{
     suggestions: Array<{
-      album: any; // CollectionItem
+      album: CollectionItem;
       reasoning: string;
       confidence: 'high' | 'medium' | 'low';
     }>;
@@ -1207,7 +1219,7 @@ class ApiService {
     sortOrder?: string;
     limit?: number;
   }): Promise<{
-    releases: any[];
+    releases: TrackedRelease[];
     total: number;
   }> {
     const response = await this.api.get('/releases', { params: options });
@@ -1253,20 +1265,30 @@ class ApiService {
     includeEps?: boolean;
     includeSingles?: boolean;
     includeCompilations?: boolean;
-  }): Promise<any> {
+  }): Promise<{
+    autoCheckOnStartup: boolean;
+    checkFrequencyDays: number;
+    notifyOnNewRelease: boolean;
+    includeEps: boolean;
+    includeSingles: boolean;
+    includeCompilations: boolean;
+  }> {
     const response = await this.api.post('/releases/settings', settings);
     return response.data.data;
   }
 
   async getPendingDisambiguations(): Promise<{
-    disambiguations: any[];
+    disambiguations: ArtistDisambiguationStatus[];
     total: number;
   }> {
     const response = await this.api.get('/releases/disambiguations');
     return { disambiguations: response.data.data, total: response.data.total };
   }
 
-  async resolveDisambiguation(id: string, mbid: string | null): Promise<any> {
+  async resolveDisambiguation(
+    id: string,
+    mbid: string | null
+  ): Promise<ArtistDisambiguationStatus> {
     const response = await this.api.post(
       `/releases/disambiguations/${id}/resolve`,
       { mbid }
@@ -1279,7 +1301,7 @@ class ApiService {
   }
 
   async getArtistMbidMappings(): Promise<{
-    mappings: any[];
+    mappings: ArtistMbidMapping[];
     total: number;
   }> {
     const response = await this.api.get('/releases/mappings');
@@ -1289,7 +1311,7 @@ class ApiService {
   async setArtistMbidMapping(
     artistName: string,
     mbid: string | null
-  ): Promise<any> {
+  ): Promise<ArtistMbidMapping> {
     const response = await this.api.post('/releases/mappings', {
       artistName,
       mbid,
@@ -1303,7 +1325,9 @@ class ApiService {
     );
   }
 
-  async searchMusicBrainzArtist(name: string): Promise<any[]> {
+  async searchMusicBrainzArtist(
+    name: string
+  ): Promise<MusicBrainzArtistMatch[]> {
     const response = await this.api.get('/releases/search/artist', {
       params: { name },
     });
@@ -1315,7 +1339,7 @@ class ApiService {
     return response.data.data;
   }
 
-  async checkSingleReleaseVinyl(mbid: string): Promise<any> {
+  async checkSingleReleaseVinyl(mbid: string): Promise<TrackedRelease> {
     const response = await this.api.post(`/releases/check-vinyl/${mbid}`);
     return response.data.data;
   }
@@ -1330,7 +1354,7 @@ class ApiService {
   }
 
   async getCollectionArtistsForReleases(): Promise<{
-    artists: any[];
+    artists: CollectionArtist[];
     total: number;
   }> {
     const response = await this.api.get('/releases/collection-artists');
@@ -1339,7 +1363,7 @@ class ApiService {
 
   // Hidden releases and excluded artists
 
-  async getHiddenReleases(): Promise<any[]> {
+  async getHiddenReleases(): Promise<HiddenRelease[]> {
     const response = await this.api.get('/releases/hidden');
     return response.data.data;
   }

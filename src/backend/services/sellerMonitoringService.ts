@@ -381,9 +381,11 @@ export class SellerMonitoringService {
   /**
    * Validate that a seller exists on Discogs
    */
-  async validateSellerExists(
-    username: string
-  ): Promise<{ valid: boolean; error?: string; info?: any }> {
+  async validateSellerExists(username: string): Promise<{
+    valid: boolean;
+    error?: string;
+    info?: { username: string; id: number; inventoryCount: number };
+  }> {
     try {
       const headers = await this.getAuthHeaders();
 
@@ -428,7 +430,7 @@ export class SellerMonitoringService {
 
     // Validate seller exists
     const validation = await this.validateSellerExists(username);
-    if (!validation.valid) {
+    if (!validation.valid || !validation.info) {
       throw new Error(validation.error || 'Invalid seller');
     }
 

@@ -14,6 +14,7 @@ import {
   ForgottenFavoritesTab,
 } from '../components/discovery';
 import SyncStatusBar from '../components/SyncStatusBar';
+import { Modal, ModalFooter } from '../components/ui';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
@@ -501,120 +502,107 @@ const DiscoveryPage: React.FC = () => {
       </div>
 
       {/* Mapping Modal */}
-      {mappingModal.isOpen && (
-        <div className='modal-overlay' onClick={closeMappingModal}>
-          <div
-            className='modal mapping-modal'
-            onClick={e => e.stopPropagation()}
-          >
-            <div className='modal-header'>
-              <h2>
-                Map {mappingModal.type === 'album' ? 'Album' : 'Artist'} to
-                Collection
-              </h2>
-              <button className='modal-close' onClick={closeMappingModal}>
-                &times;
-              </button>
-            </div>
-
-            <div className='modal-body'>
-              <div className='mapping-source'>
-                <strong>Last.fm {mappingModal.type}:</strong>
-                <div className='mapping-source-info'>
-                  {mappingModal.type === 'album' ? (
-                    <>
-                      <span className='mapping-album'>
-                        {mappingModal.historyAlbum}
-                      </span>
-                      <span className='mapping-artist'>
-                        by {mappingModal.historyArtist}
-                      </span>
-                    </>
-                  ) : (
-                    <span className='mapping-artist'>
-                      {mappingModal.historyArtist}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className='mapping-search'>
-                <label>Search your collection:</label>
-                <div className='mapping-search-row'>
-                  <input
-                    type='text'
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                    placeholder='Search by artist or album...'
-                    className='mapping-search-input'
-                  />
-                  <button
-                    className='btn'
-                    onClick={handleSearch}
-                    disabled={searchLoading || !searchQuery.trim()}
-                  >
-                    {searchLoading ? 'Searching...' : 'Search'}
-                  </button>
-                </div>
-              </div>
-
-              <div className='mapping-results'>
-                {searchLoading ? (
-                  <div className='mapping-results-loading'>
-                    <div className='loading-spinner' />
-                  </div>
-                ) : searchResults.length === 0 ? (
-                  <p className='mapping-results-empty'>
-                    {searchQuery
-                      ? 'No results found. Try a different search.'
-                      : 'Enter a search term to find matching collection items.'}
-                  </p>
-                ) : (
-                  <div className='mapping-results-list'>
-                    {searchResults.map(item => (
-                      <div
-                        key={item.id}
-                        className='mapping-result-item'
-                        onClick={() =>
-                          !mappingInProgress && handleSelectMapping(item)
-                        }
-                      >
-                        {item.release.cover_image && (
-                          <img
-                            src={item.release.cover_image}
-                            alt=''
-                            className='mapping-result-cover'
-                          />
-                        )}
-                        <div className='mapping-result-info'>
-                          <div className='mapping-result-title'>
-                            {item.release.title}
-                          </div>
-                          <div className='mapping-result-artist'>
-                            {item.release.artist}
-                          </div>
-                          {item.release.year && (
-                            <div className='mapping-result-year'>
-                              {item.release.year}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className='modal-footer'>
-              <button className='btn btn-secondary' onClick={closeMappingModal}>
-                Cancel
-              </button>
-            </div>
+      <Modal
+        isOpen={mappingModal.isOpen}
+        onClose={closeMappingModal}
+        title={`Map ${mappingModal.type === 'album' ? 'Album' : 'Artist'} to Collection`}
+        size='medium'
+        className='mapping-modal'
+      >
+        <div className='mapping-source'>
+          <strong>Last.fm {mappingModal.type}:</strong>
+          <div className='mapping-source-info'>
+            {mappingModal.type === 'album' ? (
+              <>
+                <span className='mapping-album'>
+                  {mappingModal.historyAlbum}
+                </span>
+                <span className='mapping-artist'>
+                  by {mappingModal.historyArtist}
+                </span>
+              </>
+            ) : (
+              <span className='mapping-artist'>
+                {mappingModal.historyArtist}
+              </span>
+            )}
           </div>
         </div>
-      )}
+
+        <div className='mapping-search'>
+          <label>Search your collection:</label>
+          <div className='mapping-search-row'>
+            <input
+              type='text'
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSearch()}
+              placeholder='Search by artist or album...'
+              className='mapping-search-input'
+            />
+            <button
+              className='btn'
+              onClick={handleSearch}
+              disabled={searchLoading || !searchQuery.trim()}
+            >
+              {searchLoading ? 'Searching...' : 'Search'}
+            </button>
+          </div>
+        </div>
+
+        <div className='mapping-results'>
+          {searchLoading ? (
+            <div className='mapping-results-loading'>
+              <div className='loading-spinner' />
+            </div>
+          ) : searchResults.length === 0 ? (
+            <p className='mapping-results-empty'>
+              {searchQuery
+                ? 'No results found. Try a different search.'
+                : 'Enter a search term to find matching collection items.'}
+            </p>
+          ) : (
+            <div className='mapping-results-list'>
+              {searchResults.map(item => (
+                <div
+                  key={item.id}
+                  className='mapping-result-item'
+                  onClick={() =>
+                    !mappingInProgress && handleSelectMapping(item)
+                  }
+                >
+                  {item.release.cover_image && (
+                    <img
+                      src={item.release.cover_image}
+                      alt=''
+                      className='mapping-result-cover'
+                    />
+                  )}
+                  <div className='mapping-result-info'>
+                    <div className='mapping-result-title'>
+                      {item.release.title}
+                    </div>
+                    <div className='mapping-result-artist'>
+                      {item.release.artist}
+                    </div>
+                    {item.release.year && (
+                      <div className='mapping-result-year'>
+                        {item.release.year}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <ModalFooter>
+          <button className='btn btn-secondary' onClick={closeMappingModal}>
+            Cancel
+          </button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 };

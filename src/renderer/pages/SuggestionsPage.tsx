@@ -10,6 +10,7 @@ import AISuggestionCard from '../components/AISuggestionCard';
 import SuggestionCard from '../components/SuggestionCard';
 import SuggestionWeightControls from '../components/SuggestionWeightControls';
 import SyncStatusBar from '../components/SyncStatusBar';
+import { EmptyState } from '../components/ui/EmptyState';
 import { useApp } from '../context/AppContext';
 import { getApiService } from '../services/api';
 
@@ -277,16 +278,25 @@ const SuggestionsPage: React.FC = () => {
               <p>Analyzing your collection and listening history...</p>
             </div>
           ) : suggestions.length === 0 ? (
-            <div className='empty-state'>
-              <h2>No suggestions available</h2>
-              <p>
-                Make sure you have a collection loaded and your scrobble history
-                is synced.
-              </p>
-              <button className='btn' onClick={loadSuggestions}>
-                Try Again
-              </button>
-            </div>
+            <EmptyState
+              icon='🎲'
+              title='No Suggestions Available'
+              description='We need more data to generate personalized suggestions for you.'
+              suggestion='Make sure your collection is loaded and your scrobble history is synced.'
+              actions={[
+                {
+                  label: 'Try Again',
+                  onClick: loadSuggestions,
+                },
+                {
+                  label: 'Sync History',
+                  onClick: () => {
+                    window.location.hash = 'stats';
+                  },
+                  variant: 'secondary',
+                },
+              ]}
+            />
           ) : (
             <div className='suggestions-list'>
               {suggestions.map((suggestion, index) => (

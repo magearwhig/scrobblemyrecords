@@ -64,7 +64,7 @@ class SecureLogger {
   /**
    * Redacts sensitive information from a string
    */
-  private redactSensitiveData(data: any): string {
+  private redactSensitiveData(data: unknown): string {
     if (!this.config.redactionEnabled) {
       return this.stringifyData(data);
     }
@@ -86,7 +86,7 @@ class SecureLogger {
   /**
    * Converts data to string for logging
    */
-  private stringifyData(data: any): string {
+  private stringifyData(data: unknown): string {
     if (typeof data === 'string') return data;
     if (data instanceof Error) return `${data.name}: ${data.message}`;
 
@@ -121,7 +121,7 @@ class SecureLogger {
   private log(
     level: LogLevel,
     message: string,
-    data?: any,
+    data?: unknown,
     context?: string
   ): void {
     if (level < this.config.level) return;
@@ -152,19 +152,19 @@ class SecureLogger {
     }
   }
 
-  debug(message: string, data?: any, context?: string): void {
+  debug(message: string, data?: unknown, context?: string): void {
     this.log(LogLevel.DEBUG, message, data, context);
   }
 
-  info(message: string, data?: any, context?: string): void {
+  info(message: string, data?: unknown, context?: string): void {
     this.log(LogLevel.INFO, message, data, context);
   }
 
-  warn(message: string, data?: any, context?: string): void {
+  warn(message: string, data?: unknown, context?: string): void {
     this.log(LogLevel.WARN, message, data, context);
   }
 
-  error(message: string, data?: any, context?: string): void {
+  error(message: string, data?: unknown, context?: string): void {
     this.log(LogLevel.ERROR, message, data, context);
   }
 
@@ -185,19 +185,19 @@ class ContextLogger {
     private context: string
   ) {}
 
-  debug(message: string, data?: any): void {
+  debug(message: string, data?: unknown): void {
     this.parent.debug(message, data, this.context);
   }
 
-  info(message: string, data?: any): void {
+  info(message: string, data?: unknown): void {
     this.parent.info(message, data, this.context);
   }
 
-  warn(message: string, data?: any): void {
+  warn(message: string, data?: unknown): void {
     this.parent.warn(message, data, this.context);
   }
 
-  error(message: string, data?: any): void {
+  error(message: string, data?: unknown): void {
     this.parent.error(message, data, this.context);
   }
 }

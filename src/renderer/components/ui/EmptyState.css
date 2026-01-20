@@ -1,0 +1,108 @@
+/* Empty State Component Styles */
+
+.empty-state-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 2rem;
+}
+
+/* Size variants */
+.empty-state-container--small {
+  padding: 1.5rem 1rem;
+}
+
+.empty-state-container--small .empty-state-icon {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.empty-state-container--small .empty-state-title {
+  font-size: 1rem;
+}
+
+.empty-state-container--medium {
+  padding: 2.5rem 2rem;
+}
+
+.empty-state-container--large {
+  padding: 4rem 2rem;
+}
+
+.empty-state-container--large .empty-state-icon {
+  font-size: 4rem;
+  margin-bottom: 1.5rem;
+}
+
+.empty-state-container--large .empty-state-title {
+  font-size: 1.5rem;
+}
+
+/* Icon */
+.empty-state-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.8;
+  line-height: 1;
+}
+
+/* Title */
+.empty-state-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+/* Description */
+.empty-state-description {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.75rem 0;
+  max-width: 400px;
+  line-height: 1.5;
+}
+
+/* Suggestion */
+.empty-state-suggestion {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0 0 1.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-tertiary);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+}
+
+.empty-state-suggestion-icon {
+  font-size: 1rem;
+}
+
+/* Actions */
+.empty-state-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Ensure existing empty-state class also gets some styling improvement */
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+}
+
+.empty-state h2,
+.empty-state h3 {
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+  margin-bottom: 1rem;
+}

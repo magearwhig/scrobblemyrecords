@@ -25,6 +25,7 @@ import { SourcePieChart } from '../components/stats/SourcePieChart';
 import { StatCard } from '../components/stats/StatCard';
 import { StreakCard } from '../components/stats/StreakCard';
 import { TopList } from '../components/stats/TopList';
+import { StatsPageSkeleton } from '../components/ui/Skeleton';
 import { imagesApi, statsApi } from '../services/statsApi';
 
 type Period =
@@ -331,14 +332,7 @@ export const StatsPage: React.FC = () => {
   );
 
   if (loading) {
-    return (
-      <div className='stats-page'>
-        <div className='stats-loading'>
-          <div className='stats-loading-spinner' />
-          <p>Loading your stats...</p>
-        </div>
-      </div>
-    );
+    return <StatsPageSkeleton />;
   }
 
   if (error) {

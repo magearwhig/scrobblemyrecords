@@ -172,9 +172,9 @@ describe('HistoryPage', () => {
       renderHistoryPageWithProviders(authStatus);
 
       await waitFor(() => {
-        expect(
-          screen.getByText('Loading scrobble history...')
-        ).toBeInTheDocument();
+        // Loading state now shows skeleton cards instead of text
+        const skeletons = document.querySelectorAll('.skeleton-session-card');
+        expect(skeletons.length).toBeGreaterThan(0);
       });
     });
 
@@ -185,9 +185,7 @@ describe('HistoryPage', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(
-            'No scrobbling sessions found. Start scrobbling some tracks to see them here!'
-          )
+          screen.getByText('No Scrobble Sessions Yet')
         ).toBeInTheDocument();
         expect(screen.getByText('Browse Collection')).toBeInTheDocument();
       });

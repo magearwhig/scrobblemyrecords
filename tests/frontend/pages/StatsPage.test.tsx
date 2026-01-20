@@ -200,7 +200,11 @@ describe('StatsPage', () => {
 
   it('should show loading state initially', () => {
     render(<StatsPage />);
-    expect(screen.getByText(/loading your stats/i)).toBeInTheDocument();
+    // Loading state now shows skeleton components instead of text
+    const skeletons = document.querySelectorAll(
+      '.skeleton-stat-card, .skeleton-chart-card'
+    );
+    expect(skeletons.length).toBeGreaterThan(0);
   });
 
   it('should render stats dashboard after loading', async () => {

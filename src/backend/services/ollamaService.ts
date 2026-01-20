@@ -48,6 +48,14 @@ export interface OllamaResponse {
   evalCount?: number;
 }
 
+// Internal interface for Ollama API model list response
+interface OllamaApiModel {
+  name: string;
+  size?: number;
+  modified_at?: string;
+  modifiedAt?: string;
+}
+
 export const DEFAULT_OLLAMA_SETTINGS: OllamaSettings = {
   enabled: false,
   baseUrl: 'http://localhost:11434',
@@ -132,7 +140,7 @@ export class OllamaService {
       }
 
       const data = await response.json();
-      return (data.models || []).map((model: any) => ({
+      return (data.models || []).map((model: OllamaApiModel) => ({
         name: model.name,
         size: model.size || 0,
         modifiedAt: model.modified_at || model.modifiedAt || '',

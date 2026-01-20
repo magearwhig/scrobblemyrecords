@@ -98,9 +98,27 @@ describe('AnalyticsService', () => {
     it('should combine artists from multiple time periods', async () => {
       // Arrange
       mockLastFmService.getTopArtists
-        .mockResolvedValueOnce([{ name: 'Radiohead', playcount: '10' }]) // 7day
-        .mockResolvedValueOnce([{ name: 'Radiohead', playcount: '20' }]) // 1month
-        .mockResolvedValueOnce([{ name: 'Radiohead', playcount: '100' }]); // 12month
+        .mockResolvedValueOnce([
+          {
+            name: 'Radiohead',
+            playcount: '10',
+            url: 'https://last.fm/music/Radiohead',
+          },
+        ]) // 7day
+        .mockResolvedValueOnce([
+          {
+            name: 'Radiohead',
+            playcount: '20',
+            url: 'https://last.fm/music/Radiohead',
+          },
+        ]) // 1month
+        .mockResolvedValueOnce([
+          {
+            name: 'Radiohead',
+            playcount: '100',
+            url: 'https://last.fm/music/Radiohead',
+          },
+        ]); // 12month
 
       // Act
       const artists = await analyticsService.getTopArtistsMap();
@@ -113,7 +131,11 @@ describe('AnalyticsService', () => {
     it('should cache results', async () => {
       // Arrange
       mockLastFmService.getTopArtists.mockResolvedValue([
-        { name: 'Artist', playcount: '10' },
+        {
+          name: 'Artist',
+          playcount: '10',
+          url: 'https://last.fm/music/Artist',
+        },
       ]);
 
       // Act
@@ -140,7 +162,11 @@ describe('AnalyticsService', () => {
     it('should return 0 for unknown artist', async () => {
       // Arrange
       mockLastFmService.getTopArtists.mockResolvedValue([
-        { name: 'Radiohead', playcount: '100' },
+        {
+          name: 'Radiohead',
+          playcount: '100',
+          url: 'https://last.fm/music/Radiohead',
+        },
       ]);
 
       // Act
@@ -154,7 +180,11 @@ describe('AnalyticsService', () => {
     it('should return 1 for top artist', async () => {
       // Arrange - set all periods to same artist so they combine
       mockLastFmService.getTopArtists.mockResolvedValue([
-        { name: 'Radiohead', playcount: '100' },
+        {
+          name: 'Radiohead',
+          playcount: '100',
+          url: 'https://last.fm/music/Radiohead',
+        },
       ]);
 
       // Act
@@ -167,8 +197,16 @@ describe('AnalyticsService', () => {
     it('should return proportional score for other artists', async () => {
       // Arrange
       mockLastFmService.getTopArtists.mockResolvedValue([
-        { name: 'Radiohead', playcount: '100' },
-        { name: 'Pink Floyd', playcount: '50' },
+        {
+          name: 'Radiohead',
+          playcount: '100',
+          url: 'https://last.fm/music/Radiohead',
+        },
+        {
+          name: 'Pink Floyd',
+          playcount: '50',
+          url: 'https://last.fm/music/Pink+Floyd',
+        },
       ]);
 
       // Act
@@ -567,7 +605,11 @@ describe('AnalyticsService', () => {
         ])
       );
       mockLastFmService.getTopArtists.mockResolvedValue([
-        { name: 'Radiohead', playcount: '200' },
+        {
+          name: 'Radiohead',
+          playcount: '200',
+          url: 'https://last.fm/music/Radiohead',
+        },
       ]);
 
       // Act

@@ -1,0 +1,191 @@
+/* Button Component Styles */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+/* Size variants */
+.button--small {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: 6px;
+}
+
+.button--medium {
+  padding: 0.625rem 1.25rem;
+  font-size: 0.9rem;
+}
+
+.button--large {
+  padding: 0.875rem 1.75rem;
+  font-size: 1rem;
+  border-radius: 10px;
+}
+
+/* Primary variant */
+.button--primary {
+  background: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+}
+
+.button--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+/* Secondary variant */
+.button--secondary {
+  background: var(--text-secondary);
+  color: white;
+  border-color: var(--text-secondary);
+}
+
+.button--secondary:hover:not(:disabled) {
+  background: var(--text-muted);
+  border-color: var(--text-muted);
+}
+
+/* Danger variant */
+.button--danger {
+  background: var(--error-color);
+  color: white;
+  border-color: var(--error-color);
+}
+
+.button--danger:hover:not(:disabled) {
+  background: #c82333;
+  border-color: #c82333;
+}
+
+/* Success variant */
+.button--success {
+  background: var(--success-color);
+  color: white;
+  border-color: var(--success-color);
+}
+
+.button--success:hover:not(:disabled) {
+  background: #218838;
+  border-color: #218838;
+}
+
+/* Outline variant */
+.button--outline {
+  background: transparent;
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.button--outline:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  border-color: var(--text-secondary);
+}
+
+/* Ghost variant (no border) */
+.button--ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: transparent;
+}
+
+.button--ghost:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Disabled state */
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Full width */
+.button--full-width {
+  width: 100%;
+}
+
+/* Loading state */
+.button--loading {
+  position: relative;
+  color: transparent;
+}
+
+.button--loading .button-label,
+.button--loading .button-icon {
+  visibility: hidden;
+}
+
+.button-spinner {
+  position: absolute;
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: button-spin 0.6s linear infinite;
+}
+
+.button--primary .button-spinner,
+.button--secondary .button-spinner,
+.button--danger .button-spinner,
+.button--success .button-spinner {
+  border-color: white;
+  border-right-color: transparent;
+}
+
+@keyframes button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Icon button */
+.button--icon-only {
+  padding: 0.5rem;
+}
+
+.button--icon-only.button--small {
+  padding: 0.35rem;
+}
+
+.button--icon-only.button--large {
+  padding: 0.75rem;
+}
+
+/* Button icons */
+.button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1em;
+}
+
+.button-label {
+  line-height: 1.2;
+}
+
+/* Dark mode adjustments */
+.dark-mode .button--outline:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.dark-mode .button--ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+}

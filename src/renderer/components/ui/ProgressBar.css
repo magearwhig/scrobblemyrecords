@@ -1,0 +1,211 @@
+/* Progress Bar Component Styles */
+
+.progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.progress-bar-track {
+  flex: 1;
+  background: var(--bg-tertiary);
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* Size variants */
+.progress-bar--small .progress-bar-track {
+  height: 4px;
+}
+
+.progress-bar--medium .progress-bar-track {
+  height: 8px;
+}
+
+.progress-bar--large .progress-bar-track {
+  height: 12px;
+}
+
+/* Color variants */
+.progress-bar--primary .progress-bar-fill {
+  background: var(--accent-color);
+}
+
+.progress-bar--success .progress-bar-fill {
+  background: var(--success-color);
+}
+
+.progress-bar--warning .progress-bar-fill {
+  background: var(--warning-color);
+}
+
+.progress-bar--danger .progress-bar-fill {
+  background: var(--error-color);
+}
+
+/* Multi-segment progress bar */
+.progress-bar--multi .progress-bar-fill {
+  border-radius: 0;
+}
+
+.progress-bar--multi .progress-bar-fill:first-child {
+  border-top-left-radius: 999px;
+  border-bottom-left-radius: 999px;
+}
+
+.progress-bar--multi .progress-bar-fill:last-child {
+  border-top-right-radius: 999px;
+  border-bottom-right-radius: 999px;
+}
+
+.progress-bar-fill--primary {
+  background: var(--accent-color);
+}
+
+.progress-bar-fill--success {
+  background: var(--success-color);
+}
+
+.progress-bar-fill--warning {
+  background: var(--warning-color);
+}
+
+.progress-bar-fill--danger {
+  background: var(--error-color);
+}
+
+/* Label */
+.progress-bar-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  min-width: 3em;
+  text-align: right;
+}
+
+/* Striped pattern */
+.progress-bar--striped .progress-bar-fill {
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.15) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.15) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 1rem 1rem;
+}
+
+/* Animated striped */
+.progress-bar--animated .progress-bar-fill {
+  animation: progress-bar-stripes 1s linear infinite;
+}
+
+@keyframes progress-bar-stripes {
+  from {
+    background-position: 1rem 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+/* Indeterminate state */
+.progress-bar--indeterminate .progress-bar-fill {
+  width: 30% !important;
+  animation: progress-bar-indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes progress-bar-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+/* ============================================ */
+/* Circular Progress                            */
+/* ============================================ */
+
+.circular-progress {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.circular-progress svg {
+  transform: rotate(-90deg);
+}
+
+.circular-progress-track {
+  fill: none;
+  stroke: var(--bg-tertiary);
+}
+
+.circular-progress-fill {
+  fill: none;
+  stroke: var(--accent-color);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+/* Color variants */
+.circular-progress--primary .circular-progress-fill {
+  stroke: var(--accent-color);
+}
+
+.circular-progress--success .circular-progress-fill {
+  stroke: var(--success-color);
+}
+
+.circular-progress--warning .circular-progress-fill {
+  stroke: var(--warning-color);
+}
+
+.circular-progress--danger .circular-progress-fill {
+  stroke: var(--error-color);
+}
+
+/* Label */
+.circular-progress-label {
+  position: absolute;
+  font-size: 0.65em;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Indeterminate spinning */
+.circular-progress--indeterminate svg {
+  animation: circular-progress-spin 1s linear infinite;
+}
+
+@keyframes circular-progress-spin {
+  from {
+    transform: rotate(-90deg);
+  }
+  to {
+    transform: rotate(270deg);
+  }
+}
+
+/* Dark mode adjustments */
+.dark-mode .progress-bar-track {
+  background: var(--bg-hover);
+}
+
+.dark-mode .circular-progress-track {
+  stroke: var(--bg-hover);
+}

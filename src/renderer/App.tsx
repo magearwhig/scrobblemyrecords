@@ -9,12 +9,23 @@ import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 
+const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
+
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<string>('home');
   const [authStatus, setAuthStatus] = useState<AuthStatus>({
     discogs: { authenticated: false },
     lastfm: { authenticated: false },
   });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    return saved === 'true';
+  });
+
+  const handleSidebarCollapsedChange = (collapsed: boolean) => {
+    setSidebarCollapsed(collapsed);
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
+  };
 
   useEffect(() => {
     // Handle hash-based routing
@@ -42,10 +53,14 @@ const App: React.FC = () => {
         <AuthProvider value={{ authStatus, setAuthStatus }}>
           <div className='app'>
             <Header />
-            <div className='main-content'>
+            <div
+              className={`main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+            >
               <Sidebar
                 currentPage={currentPage}
                 onPageChange={setCurrentPage}
+                collapsed={sidebarCollapsed}
+                onCollapsedChange={handleSidebarCollapsedChange}
               />
               <div className='content'>
                 <MainContent currentPage={currentPage} />

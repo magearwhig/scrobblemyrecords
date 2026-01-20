@@ -10,6 +10,7 @@ import {
   WishlistSyncStatus,
   VinylStatus,
 } from '../../shared/types';
+import { Modal } from '../components/ui';
 import { NewReleasesTab } from '../components/wishlist/NewReleasesTab';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -869,83 +870,77 @@ const WishlistPage: React.FC = () => {
       )}
 
       {/* Versions Modal */}
-      {versionsModal.isOpen && versionsModal.item && (
-        <div className='modal-overlay' onClick={closeVersionsModal}>
-          <div className='modal modal-large' onClick={e => e.stopPropagation()}>
-            <div className='modal-header'>
-              <h3>
-                {versionsModal.item.artist} - {versionsModal.item.title}
-              </h3>
-              <button className='modal-close' onClick={closeVersionsModal}>
-                ×
-              </button>
-            </div>
-            <div className='modal-content'>
-              {versionsModal.loading ? (
-                <div className='loading-spinner'>Loading versions...</div>
-              ) : versionsModal.versions.length === 0 ? (
-                <p className='text-secondary'>No versions found.</p>
-              ) : (
-                <div className='versions-table-wrapper'>
-                  <table className='versions-table'>
-                    <thead>
-                      <tr>
-                        <th>Format</th>
-                        <th>Label</th>
-                        <th>Country</th>
-                        <th>Year</th>
-                        <th>Vinyl</th>
-                        <th>Price</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {versionsModal.versions.map(version => (
-                        <tr
-                          key={version.releaseId}
-                          className={version.hasVinyl ? 'version-vinyl' : ''}
+      {versionsModal.item && (
+        <Modal
+          isOpen={versionsModal.isOpen}
+          onClose={closeVersionsModal}
+          title={`${versionsModal.item.artist} - ${versionsModal.item.title}`}
+          size='large'
+          loading={versionsModal.loading}
+        >
+          {versionsModal.loading ? (
+            <div className='loading-spinner'>Loading versions...</div>
+          ) : versionsModal.versions.length === 0 ? (
+            <p className='text-secondary'>No versions found.</p>
+          ) : (
+            <div className='versions-table-wrapper'>
+              <table className='versions-table'>
+                <thead>
+                  <tr>
+                    <th>Format</th>
+                    <th>Label</th>
+                    <th>Country</th>
+                    <th>Year</th>
+                    <th>Vinyl</th>
+                    <th>Price</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {versionsModal.versions.map(version => (
+                    <tr
+                      key={version.releaseId}
+                      className={version.hasVinyl ? 'version-vinyl' : ''}
+                    >
+                      <td>{version.format.join(', ')}</td>
+                      <td>{version.label}</td>
+                      <td>{version.country}</td>
+                      <td>{version.year || 'N/A'}</td>
+                      <td>
+                        {version.hasVinyl ? (
+                          <span className='version-vinyl-yes'>Yes</span>
+                        ) : (
+                          <span className='version-vinyl-no'>No</span>
+                        )}
+                      </td>
+                      <td>
+                        {version.marketplaceStats?.lowestPrice
+                          ? formatPrice(
+                              version.marketplaceStats.lowestPrice,
+                              version.marketplaceStats.currency
+                            )
+                          : 'N/A'}
+                      </td>
+                      <td>
+                        <button
+                          className='btn btn-small btn-secondary'
+                          onClick={() =>
+                            window.open(
+                              `https://www.discogs.com/release/${version.releaseId}`,
+                              '_blank'
+                            )
+                          }
                         >
-                          <td>{version.format.join(', ')}</td>
-                          <td>{version.label}</td>
-                          <td>{version.country}</td>
-                          <td>{version.year || 'N/A'}</td>
-                          <td>
-                            {version.hasVinyl ? (
-                              <span className='version-vinyl-yes'>Yes</span>
-                            ) : (
-                              <span className='version-vinyl-no'>No</span>
-                            )}
-                          </td>
-                          <td>
-                            {version.marketplaceStats?.lowestPrice
-                              ? formatPrice(
-                                  version.marketplaceStats.lowestPrice,
-                                  version.marketplaceStats.currency
-                                )
-                              : 'N/A'}
-                          </td>
-                          <td>
-                            <button
-                              className='btn btn-small btn-secondary'
-                              onClick={() =>
-                                window.open(
-                                  `https://www.discogs.com/release/${version.releaseId}`,
-                                  '_blank'
-                                )
-                              }
-                            >
-                              View
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-        </div>
+          )}
+        </Modal>
       )}
     </div>
   );

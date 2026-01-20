@@ -8,10 +8,11 @@ import React, {
 
 import { AppState } from '../../shared/types';
 
-interface AppAction {
-  type: 'SET_LOADING' | 'SET_ERROR' | 'SET_SERVER_URL' | 'CLEAR_ERROR';
-  payload?: any;
-}
+type AppAction =
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'SET_SERVER_URL'; payload: string }
+  | { type: 'CLEAR_ERROR' };
 
 const initialState: AppState = {
   loading: false,

@@ -62,7 +62,7 @@ export function sanitizePathComponent(input: string): string | null {
 /**
  * Validates that a numeric ID is a positive integer
  */
-export function validateNumericId(id: any): boolean {
+export function validateNumericId(id: unknown): boolean {
   const numId = Number(id);
   return !isNaN(numId) && numId > 0 && Number.isInteger(numId);
 }

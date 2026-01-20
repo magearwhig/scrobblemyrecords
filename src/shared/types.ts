@@ -297,6 +297,39 @@ export interface HistoryArtistMappingsStore {
 }
 
 // ============================================
+// Scrobble Artist Mappings (Discogs -> Last.fm)
+// ============================================
+
+/**
+ * Artist mapping for scrobbling (Discogs name -> Last.fm name)
+ * Used when Discogs artist names need to be corrected for Last.fm
+ */
+export interface ScrobbleArtistMapping {
+  discogsName: string;
+  lastfmName: string;
+  dateAdded: number;
+  lastUsed?: number;
+}
+
+/**
+ * Statistics for scrobble artist mappings
+ */
+export interface ScrobbleArtistMappingStats {
+  totalMappings: number;
+  filePath: string;
+  lastUpdated?: number;
+}
+
+/**
+ * Suggestion for artist mapping (disambiguation artists)
+ */
+export interface ScrobbleArtistMappingSuggestion {
+  artist: string;
+  localScrobbles: number;
+  suggestedMapping: string;
+}
+
+// ============================================
 // Hidden Discovery Items
 // ============================================
 

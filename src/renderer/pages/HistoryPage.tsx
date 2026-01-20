@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 
-import { ScrobbleSession } from '../../shared/types';
+import { ScrobbleSession, ScrobbleTrack } from '../../shared/types';
 import LastFmHistoryTab from '../components/LastFmHistoryTab';
+import { EmptyState } from '../components/ui/EmptyState';
+import { SessionCardSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
@@ -171,7 +173,7 @@ const HistoryPage: React.FC = () => {
     }
   };
 
-  const getUniqueAlbumCovers = (tracks: any[]) => {
+  const getUniqueAlbumCovers = (tracks: ScrobbleTrack[]) => {
     const uniqueAlbums = new Map();
     tracks.forEach(track => {
       if (track.album && track.albumCover && !uniqueAlbums.has(track.album)) {
@@ -280,27 +282,27 @@ const HistoryPage: React.FC = () => {
           </div>
 
           {loading && !sessions.length && (
-            <div className='card'>
-              <div className='loading'>
-                <div className='spinner'></div>
-                Loading scrobble history...
-              </div>
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              <SessionCardSkeleton count={3} />
             </div>
           )}
 
           {!loading && sessions.length === 0 && !error && (
             <div className='card'>
-              <div
-                style={{ textAlign: 'center', padding: '2rem', color: '#666' }}
-              >
-                No scrobbling sessions found. Start scrobbling some tracks to
-                see them here!
-              </div>
-              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-                <a href='#collection' className='btn'>
-                  Browse Collection
-                </a>
-              </div>
+              <EmptyState
+                icon='📝'
+                title='No Scrobble Sessions Yet'
+                description='Start scrobbling tracks from your collection to see your listening history here.'
+                suggestion='Select an album from your collection and click "Scrobble" to begin.'
+                actions={[
+                  {
+                    label: 'Browse Collection',
+                    onClick: () => {
+                      window.location.hash = 'collection';
+                    },
+                  },
+                ]}
+              />
             </div>
           )}
 

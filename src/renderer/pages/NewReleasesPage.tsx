@@ -7,6 +7,7 @@ import {
   ReleaseTrackingSyncStatus,
   HiddenRelease,
 } from '../../shared/types';
+import { Modal, ModalFooter } from '../components/ui';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -792,116 +793,95 @@ const NewReleasesPage: React.FC = () => {
       )}
 
       {/* Disambiguation Modal */}
-      {disambiguationModal.isOpen && (
-        <div
-          className='modal-overlay'
-          onClick={() =>
-            setDisambiguationModal(prev => ({ ...prev, isOpen: false }))
-          }
-        >
-          <div className='modal' onClick={e => e.stopPropagation()}>
-            <div className='modal-header'>
-              <h2>
-                Select Artist: {disambiguationModal.disambiguation?.artistName}
-              </h2>
-              <button
-                className='modal-close'
-                onClick={() =>
-                  setDisambiguationModal(prev => ({ ...prev, isOpen: false }))
-                }
-              >
-                ×
-              </button>
-            </div>
-
-            <div className='modal-body'>
-              <div className='search-box'>
-                <input
-                  type='text'
-                  value={disambiguationModal.searchQuery}
-                  onChange={e =>
-                    setDisambiguationModal(prev => ({
-                      ...prev,
-                      searchQuery: e.target.value,
-                    }))
-                  }
-                  placeholder='Search for artist...'
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      handleArtistSearch(disambiguationModal.searchQuery);
-                    }
-                  }}
-                />
-                <button
-                  onClick={() =>
-                    handleArtistSearch(disambiguationModal.searchQuery)
-                  }
-                  disabled={disambiguationModal.loading}
-                >
-                  Search
-                </button>
-              </div>
-
-              {disambiguationModal.loading ? (
-                <div className='loading-state'>
-                  <div className='spinner' />
-                  <p>Searching...</p>
-                </div>
-              ) : (
-                <div className='artist-results'>
-                  {disambiguationModal.searchResults.map(artist => (
-                    <div
-                      key={artist.mbid}
-                      className='artist-result'
-                      onClick={() => handleResolveDisambiguation(artist.mbid)}
-                    >
-                      <div className='artist-info'>
-                        <span className='artist-name'>{artist.name}</span>
-                        {artist.disambiguation && (
-                          <span className='disambiguation-text'>
-                            ({artist.disambiguation})
-                          </span>
-                        )}
-                        <span className='artist-details'>
-                          {artist.country && <span>{artist.country}</span>}
-                          {artist.beginYear && (
-                            <span>
-                              {artist.beginYear}
-                              {artist.endYear
-                                ? ` - ${artist.endYear}`
-                                : ' - present'}
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                      <span className='match-score'>{artist.score}%</span>
-                    </div>
-                  ))}
-
-                  {disambiguationModal.searchResults.length === 0 && (
-                    <p className='no-results'>No artists found</p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className='modal-footer'>
-              <button
-                className='btn btn-secondary'
-                onClick={handleSkipDisambiguation}
-              >
-                Skip for Now
-              </button>
-              <button
-                className='btn btn-warning'
-                onClick={() => handleResolveDisambiguation(null)}
-              >
-                None of These
-              </button>
-            </div>
-          </div>
+      <Modal
+        isOpen={disambiguationModal.isOpen}
+        onClose={() =>
+          setDisambiguationModal(prev => ({ ...prev, isOpen: false }))
+        }
+        title={`Select Artist: ${disambiguationModal.disambiguation?.artistName || ''}`}
+        size='medium'
+        loading={disambiguationModal.loading}
+      >
+        <div className='search-box'>
+          <input
+            type='text'
+            value={disambiguationModal.searchQuery}
+            onChange={e =>
+              setDisambiguationModal(prev => ({
+                ...prev,
+                searchQuery: e.target.value,
+              }))
+            }
+            placeholder='Search for artist...'
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                handleArtistSearch(disambiguationModal.searchQuery);
+              }
+            }}
+          />
+          <button
+            onClick={() => handleArtistSearch(disambiguationModal.searchQuery)}
+            disabled={disambiguationModal.loading}
+          >
+            Search
+          </button>
         </div>
-      )}
+
+        {disambiguationModal.loading ? (
+          <div className='loading-state'>
+            <div className='spinner' />
+            <p>Searching...</p>
+          </div>
+        ) : (
+          <div className='artist-results'>
+            {disambiguationModal.searchResults.map(artist => (
+              <div
+                key={artist.mbid}
+                className='artist-result'
+                onClick={() => handleResolveDisambiguation(artist.mbid)}
+              >
+                <div className='artist-info'>
+                  <span className='artist-name'>{artist.name}</span>
+                  {artist.disambiguation && (
+                    <span className='disambiguation-text'>
+                      ({artist.disambiguation})
+                    </span>
+                  )}
+                  <span className='artist-details'>
+                    {artist.country && <span>{artist.country}</span>}
+                    {artist.beginYear && (
+                      <span>
+                        {artist.beginYear}
+                        {artist.endYear ? ` - ${artist.endYear}` : ' - present'}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <span className='match-score'>{artist.score}%</span>
+              </div>
+            ))}
+
+            {disambiguationModal.searchResults.length === 0 && (
+              <p className='no-results'>No artists found</p>
+            )}
+          </div>
+        )}
+
+        <ModalFooter>
+          <button
+            className='btn btn-secondary'
+            onClick={handleSkipDisambiguation}
+          >
+            Skip for Now
+          </button>
+          <button
+            className='btn btn-warning'
+            onClick={() => handleResolveDisambiguation(null)}
+          >
+            None of These
+          </button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 };

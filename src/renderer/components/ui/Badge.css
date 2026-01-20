@@ -1,0 +1,163 @@
+/* Badge Component Styles */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* Size variants */
+.badge--small {
+  padding: 0.125rem 0.375rem;
+  font-size: 0.65rem;
+  border-radius: 4px;
+}
+
+.badge--medium {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 4px;
+}
+
+.badge--large {
+  padding: 0.25rem 0.625rem;
+  font-size: 0.85rem;
+  border-radius: 5px;
+}
+
+/* Pill shape */
+.badge--pill {
+  border-radius: 999px;
+}
+
+.badge--pill.badge--small {
+  padding: 0.125rem 0.5rem;
+}
+
+.badge--pill.badge--medium {
+  padding: 0.2rem 0.625rem;
+}
+
+.badge--pill.badge--large {
+  padding: 0.25rem 0.75rem;
+}
+
+/* Default variant */
+.badge--default {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+/* Primary variant */
+.badge--primary {
+  background: var(--accent-color);
+  color: white;
+}
+
+/* Secondary variant */
+.badge--secondary {
+  background: var(--text-secondary);
+  color: white;
+}
+
+/* Success variant */
+.badge--success {
+  background: var(--success-color);
+  color: white;
+}
+
+/* Warning variant */
+.badge--warning {
+  background: var(--warning-color);
+  color: #1a1a1a;
+}
+
+/* Danger variant */
+.badge--danger {
+  background: var(--error-color);
+  color: white;
+}
+
+/* Info variant */
+.badge--info {
+  background: #3b82f6;
+  color: white;
+}
+
+/* Outline variants */
+.badge--outline {
+  background: transparent;
+  border: 1px solid currentColor;
+}
+
+.badge--outline.badge--default {
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+
+.badge--outline.badge--primary {
+  color: var(--accent-color);
+}
+
+.badge--outline.badge--secondary {
+  color: var(--text-secondary);
+}
+
+.badge--outline.badge--success {
+  color: var(--success-color);
+}
+
+.badge--outline.badge--warning {
+  color: var(--warning-color);
+}
+
+.badge--outline.badge--danger {
+  color: var(--error-color);
+}
+
+.badge--outline.badge--info {
+  color: #3b82f6;
+}
+
+/* Badge icon */
+.badge-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9em;
+}
+
+/* Count badge specific styles */
+.badge--count {
+  min-width: 1.25em;
+  text-align: center;
+  padding-left: 0.4em;
+  padding-right: 0.4em;
+}
+
+/* Status badge specific styles */
+.badge--status {
+  text-transform: none;
+  font-weight: 500;
+}
+
+.badge-status-dot {
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* Dark mode adjustments */
+.dark-mode .badge--default {
+  background: var(--bg-hover);
+}
+
+.dark-mode .badge--warning {
+  color: #1a1a1a;
+}
