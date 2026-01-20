@@ -146,6 +146,8 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
       setError(null);
       if (withAutoContinue) {
         setAutoContinue(true);
+        // Update ref immediately so polling loop sees it
+        autoContinueRef.current = true;
       }
       await api.checkForNewReleases();
 

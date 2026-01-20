@@ -1217,6 +1217,27 @@ export class WishlistService {
       }
     }
 
+    // Count local want items that overlap with wishlist
+    let localOnlyCount = 0;
+    let localOverlapCount = 0;
+    for (const item of localWant) {
+      if (item.masterId) {
+        if (masterMap.has(item.masterId)) {
+          // Check if it was added by wishlist or local_want
+          const existing = masterMap.get(item.masterId);
+          if (existing?.source === 'wishlist') {
+            localOverlapCount++;
+          }
+        } else {
+          localOnlyCount++;
+        }
+      }
+    }
+
+    this.logger.info(
+      `Tracked masters: ${masterMap.size} total (${wishlist.length - itemsWithoutMasterId.length} from wishlist, ${localOnlyCount} from local want, ${localOverlapCount} overlap/deduped)`
+    );
+
     if (itemsWithoutMasterId.length > 0) {
       this.logger.info(
         `${itemsWithoutMasterId.length} wishlist items have no master ID and won't be tracked for new releases`
