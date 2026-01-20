@@ -1,4 +1,4 @@
-/* global navigator, Blob */
+/* global navigator */
 import React, { useState } from 'react';
 
 import { ForgottenTrack } from '../../../shared/types';
