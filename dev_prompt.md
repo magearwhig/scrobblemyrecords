@@ -11,6 +11,7 @@
 - reference TEST_STYLE_GUIDE.md when writing tests
 - NEVER USE AMEND ON A COMMIT UNLESS EXPLICITLY TOLD TO DO SO
 - BEFORE COMITTING YOU MUST MAKE SURE TESTS PASS AND MEET COVERAGE THRESHOLDS WHEN RUN THE SAME WAY AS THE CI PIPELINE
+- RUN ALL CHECKS THAT ARE RUH IN THE CI PIPELINE BEFORE COMMITTING
 - all data files must include `schemaVersion: 1` as a top-level field
 - register new data files in `migrationService.ts` with path, currentVersion, and optional flag
 - files that store raw arrays must use `arrayWrapperKey` in registration to wrap as `{schemaVersion: 1, [key]: [...]}` (e.g., `items` or `mappings`)

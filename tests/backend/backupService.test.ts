@@ -706,16 +706,33 @@ describe('BackupService', () => {
       const backupDir = path.join(testDataDir, 'backups');
       await fs.mkdir(backupDir, { recursive: true });
 
-      // Create test backup files
+      // Create test backup files with different mtimes
+      // Create older file first
       await fs.writeFile(
         path.join(backupDir, 'auto-backup-2024-01-01T10-00-00.json'),
         '{}',
         'utf8'
       );
+      // Set mtime to an older date
+      const olderDate = new Date('2024-01-01T10:00:00Z');
+      await fs.utimes(
+        path.join(backupDir, 'auto-backup-2024-01-01T10-00-00.json'),
+        olderDate,
+        olderDate
+      );
+
+      // Create newer file
       await fs.writeFile(
         path.join(backupDir, 'auto-backup-2024-01-02T10-00-00.json'),
         '{}',
         'utf8'
+      );
+      // Set mtime to a newer date
+      const newerDate = new Date('2024-01-02T10:00:00Z');
+      await fs.utimes(
+        path.join(backupDir, 'auto-backup-2024-01-02T10-00-00.json'),
+        newerDate,
+        newerDate
       );
 
       const backups = await service.listAutoBackups();
