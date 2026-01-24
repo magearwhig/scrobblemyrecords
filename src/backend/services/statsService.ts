@@ -17,6 +17,7 @@ import {
   TimelineDataPoint,
   TrackPlayCount,
 } from '../../shared/types';
+import { createNormalizedTrackKey } from '../../shared/utils/trackNormalization';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -523,7 +524,7 @@ export class StatsService {
           play.timestamp <= endTimestamp &&
           play.track
         ) {
-          const trackKey = `${artist}|${album}|${play.track.toLowerCase()}`;
+          const trackKey = createNormalizedTrackKey(artist, album, play.track);
           const existing = trackCounts.get(trackKey);
           if (existing) {
             existing.count++;
@@ -1208,7 +1209,7 @@ export class StatsService {
         // Skip plays without track info
         if (!play.track) continue;
 
-        const trackKey = `${artist}|${album}|${play.track.toLowerCase()}`;
+        const trackKey = createNormalizedTrackKey(artist, album, play.track);
         const existing = trackStats.get(trackKey);
 
         if (existing) {

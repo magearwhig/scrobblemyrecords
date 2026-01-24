@@ -160,6 +160,18 @@ describe('ScrobbleHistoryStorage', () => {
       // Assert
       expect(key).toBe('thebeatles|sgtpepperslonelyheartsclubband');
     });
+
+    it('should remove "at XX" anniversary suffix', () => {
+      // Arrange - "Gentlemen at 21" is the 21st anniversary edition
+      const artist = 'The Afghan Whigs';
+      const album = 'Gentlemen at 21';
+
+      // Act
+      const key = storage.fuzzyNormalizeKey(artist, album);
+
+      // Assert - should match "Gentlemen"
+      expect(key).toBe('theafghanwhigs|gentlemen');
+    });
   });
 
   describe('getIndex', () => {

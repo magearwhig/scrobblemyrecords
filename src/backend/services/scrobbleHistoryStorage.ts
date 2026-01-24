@@ -60,6 +60,9 @@ export class ScrobbleHistoryStorage {
         ''
       );
 
+      // Remove "at XX" anniversary suffixes (e.g., "Gentlemen at 21")
+      normalized = normalized.replace(/\s+at\s+\d+\s*$/gi, '');
+
       // Remove trailing " - EP", " - Single", " EP", " Single"
       normalized = normalized.replace(/\s*-?\s*(ep|single)\s*$/gi, '');
 
