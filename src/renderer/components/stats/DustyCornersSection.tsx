@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { DustyCornerAlbum } from '../../../shared/types';
+import { playAlbumOnSpotify } from '../../utils/spotifyUtils';
 
 interface DustyCornersSectionProps {
   albums: DustyCornerAlbum[];
@@ -144,6 +145,16 @@ export const DustyCornersSection: React.FC<DustyCornersSectionProps> = ({
               <div className='dusty-corners-last-played'>
                 {formatLastPlayed(album)}
               </div>
+              <button
+                className='btn btn-small btn-icon dusty-corners-play-btn'
+                onClick={e => {
+                  e.stopPropagation();
+                  playAlbumOnSpotify(album.artist, album.album);
+                }}
+                title='Play on Spotify'
+              >
+                ▶️
+              </button>
             </div>
           </div>
         ))}

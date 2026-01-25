@@ -6,6 +6,10 @@ import {
   DateRange,
   TrackPlayCount,
 } from '../../../shared/types';
+import {
+  playTrackOnSpotify,
+  playAlbumOnSpotify,
+} from '../../utils/spotifyUtils';
 
 import DateRangePicker from './DateRangePicker';
 
@@ -265,6 +269,19 @@ export const TopList: React.FC<TopListProps> = ({
                     <div className='top-list-name'>{item.artist}</div>
                   )}
                 </div>
+                <button
+                  className='btn btn-small btn-icon top-list-play-btn'
+                  onClick={() => {
+                    if (isTrackData(item)) {
+                      playTrackOnSpotify(item.artist, item.track, item.album);
+                    } else if (isAlbumData(item)) {
+                      playAlbumOnSpotify(item.artist, item.album);
+                    }
+                  }}
+                  title='Play on Spotify'
+                >
+                  ▶️
+                </button>
                 <div className='top-list-count'>
                   {item.playCount.toLocaleString()}
                 </div>

@@ -1,7 +1,10 @@
 /* global navigator */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-import { ForgottenTrack } from '../../../shared/types';
+import { ForgottenTrack, TrackMapping } from '../../../shared/types';
+import ApiService from '../../services/api';
+import { playTrackOnSpotify } from '../../utils/spotifyUtils';
+import { Modal, ModalSection } from '../ui/Modal';
 
 type ForgottenSortOption = 'plays' | 'artist' | 'track' | 'dormant';
 
@@ -19,6 +22,7 @@ interface ForgottenFavoritesTabProps {
   loadForgottenFavorites: () => void;
   formatDate: (timestamp: number) => string;
   openLink: (url: string) => void;
+  api: ApiService;
 }
 
 const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
@@ -35,8 +39,53 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
   loadForgottenFavorites,
   formatDate,
   openLink,
+  api,
 }) => {
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [mappingModalOpen, setMappingModalOpen] = useState(false);
+  const [selectedTrack, setSelectedTrack] = useState<ForgottenTrack | null>(
+    null
+  );
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<
+    Array<{
+      artist: string;
+      album: string;
+      track: string;
+      playCount: number;
+    }>
+  >([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [mappingSuccess, setMappingSuccess] = useState<string | null>(null);
+  const [mappingError, setMappingError] = useState<string | null>(null);
+  const [existingMappings, setExistingMappings] = useState<TrackMapping[]>([]);
+
+  // Load existing track mappings on mount
+  useEffect(() => {
+    const loadExistingMappings = async () => {
+      try {
+        const mappings = await api.getTrackMappings();
+        setExistingMappings(mappings);
+      } catch (error) {
+        console.warn('Failed to load existing track mappings:', error);
+      }
+    };
+    loadExistingMappings();
+  }, [api]);
+
+  // Check if a track is already mapped
+  const isTrackAlreadyMapped = (
+    artist: string,
+    album: string,
+    track: string
+  ): boolean => {
+    return existingMappings.some(
+      m =>
+        m.cacheArtist.toLowerCase() === artist.toLowerCase() &&
+        m.cacheAlbum.toLowerCase() === album.toLowerCase() &&
+        m.cacheTrack.toLowerCase() === track.toLowerCase()
+    );
+  };
 
   // Sort forgotten tracks based on selected option
   const sortedForgottenTracks = [...forgottenTracks].sort((a, b) => {
@@ -84,6 +133,97 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
       setCopySuccess(`Copied ${sortedForgottenTracks.length} tracks`);
       setTimeout(() => setCopySuccess(null), 2000);
     });
+  };
+
+  // Open track mapping modal
+  const openTrackMappingModal = (track: ForgottenTrack) => {
+    setSelectedTrack(track);
+    setSearchQuery(track.track); // Pre-fill with just the track title
+    setMappingModalOpen(true);
+    setMappingSuccess(null);
+    setMappingError(null);
+    // Trigger initial search
+    searchLocalTracks(track.track);
+  };
+
+  // Search for tracks in local cache
+  const searchLocalTracks = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      setSearchLoading(true);
+      const result = await api.getTrackHistoryPaginated(
+        1,
+        20, // Fetch more to account for filtered results
+        'playCount',
+        'desc',
+        query
+      );
+
+      // Filter out tracks that are already mapped
+      const filteredResults = result.items.filter(
+        item => !isTrackAlreadyMapped(item.artist, item.album, item.track)
+      );
+
+      setSearchResults(filteredResults.slice(0, 10)); // Limit to 10 after filtering
+    } catch (error) {
+      console.error('Failed to search tracks:', error);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  // Create track mapping
+  const createTrackMapping = async (cacheTrack: {
+    artist: string;
+    album: string;
+    track: string;
+  }) => {
+    if (!selectedTrack) return;
+
+    try {
+      await api.createTrackMapping({
+        historyArtist: selectedTrack.artist,
+        historyAlbum: selectedTrack.album,
+        historyTrack: selectedTrack.track,
+        cacheArtist: cacheTrack.artist,
+        cacheAlbum: cacheTrack.album,
+        cacheTrack: cacheTrack.track,
+      });
+
+      // Reload mappings to update the filter
+      const mappings = await api.getTrackMappings();
+      setExistingMappings(mappings);
+
+      // Reload forgotten favorites to reflect the new mapping
+      loadForgottenFavorites();
+
+      setMappingSuccess(
+        `Mapped "${selectedTrack.track}" to "${cacheTrack.track}"`
+      );
+      setTimeout(() => {
+        setMappingModalOpen(false);
+        setMappingSuccess(null);
+        setSelectedTrack(null);
+      }, 1500);
+    } catch (error) {
+      setMappingError(
+        error instanceof Error ? error.message : 'Failed to create mapping'
+      );
+    }
+  };
+
+  // Close mapping modal
+  const closeMappingModal = () => {
+    setMappingModalOpen(false);
+    setSelectedTrack(null);
+    setSearchQuery('');
+    setSearchResults([]);
+    setMappingError(null);
   };
 
   // Export tracks to CSV
@@ -247,6 +387,15 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
                   <button
                     className='btn btn-small btn-icon'
                     onClick={() =>
+                      playTrackOnSpotify(track.artist, track.track, track.album)
+                    }
+                    title='Play on Spotify'
+                  >
+                    ▶️
+                  </button>
+                  <button
+                    className='btn btn-small btn-icon'
+                    onClick={() =>
                       openLink(
                         `https://www.last.fm/music/${encodeURIComponent(track.artist)}/_/${encodeURIComponent(track.track)}`
                       )
@@ -262,12 +411,111 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
                   >
                     Copy
                   </button>
+                  <button
+                    className='btn btn-small btn-secondary'
+                    onClick={() => openTrackMappingModal(track)}
+                    title='Map this track to local cache'
+                  >
+                    Map
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         </>
       )}
+
+      {/* Track Mapping Modal */}
+      <Modal
+        isOpen={mappingModalOpen && selectedTrack !== null}
+        onClose={closeMappingModal}
+        title='Map Track to Local Cache'
+        size='medium'
+      >
+        {selectedTrack && (
+          <>
+            <ModalSection>
+              <div className='mapping-modal-source'>
+                <h4>Forgotten Favorite Track:</h4>
+                <div className='mapping-modal-track-info'>
+                  <div className='mapping-modal-track-title'>
+                    {selectedTrack.track}
+                  </div>
+                  <div className='mapping-modal-track-artist'>
+                    {selectedTrack.artist} — {selectedTrack.album || '(Single)'}
+                  </div>
+                  <div className='mapping-modal-track-plays'>
+                    {selectedTrack.allTimePlayCount} plays
+                  </div>
+                </div>
+              </div>
+
+              <div className='mapping-modal-arrow'>↓</div>
+
+              <div className='mapping-modal-search'>
+                <h4>Search Local Cache:</h4>
+                <input
+                  type='text'
+                  className='form-input'
+                  value={searchQuery}
+                  onChange={e => {
+                    setSearchQuery(e.target.value);
+                    searchLocalTracks(e.target.value);
+                  }}
+                  placeholder='Search for matching track...'
+                  autoFocus
+                />
+
+                {mappingError && (
+                  <div className='message error'>{mappingError}</div>
+                )}
+
+                {mappingSuccess && (
+                  <div className='message success'>{mappingSuccess}</div>
+                )}
+
+                {searchLoading ? (
+                  <div className='mapping-modal-loading'>
+                    <div className='spinner'></div>
+                    Searching...
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <div className='mapping-modal-empty'>
+                    No tracks found. Try a different search.
+                  </div>
+                ) : (
+                  <div className='mapping-modal-results'>
+                    {searchResults.map((result, index) => (
+                      <div
+                        key={`${result.artist}-${result.album}-${result.track}-${index}`}
+                        className='mapping-modal-result-item'
+                      >
+                        <div className='mapping-modal-result-info'>
+                          <div className='mapping-modal-result-title'>
+                            {result.track}
+                          </div>
+                          <div className='mapping-modal-result-artist'>
+                            {result.artist} — {result.album}
+                          </div>
+                          <div className='mapping-modal-result-plays'>
+                            {result.playCount} plays
+                          </div>
+                        </div>
+                        <button
+                          className='btn btn-small'
+                          onClick={() => createTrackMapping(result)}
+                        >
+                          Map to This
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </ModalSection>
+          </>
+        )}
+      </Modal>
     </div>
   );
 };

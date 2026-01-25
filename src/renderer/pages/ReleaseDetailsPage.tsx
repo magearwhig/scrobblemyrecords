@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 import {
   DiscogsRelease,
@@ -6,11 +6,27 @@ import {
   AddDiscardPileItemRequest,
   MarketplaceStats,
 } from '../../shared/types';
+import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import AlbumScrobbleHistory from '../components/AlbumScrobbleHistory';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
-import { formatLocalTimeClean } from '../utils/dateUtils';
+import { formatLocalTimeClean, formatRelativeTime } from '../utils/dateUtils';
+import { playAlbumOnSpotify, playTrackOnSpotify } from '../utils/spotifyUtils';
+
+interface TrackScrobbleStats {
+  count: number;
+  lastPlayed: number | null;
+}
+
+interface AlbumHistoryData {
+  found: boolean;
+  artist: string;
+  album: string;
+  lastPlayed: number | null;
+  playCount: number;
+  plays: Array<{ timestamp: number; track?: string }>;
+}
 
 const ReleaseDetailsPage: React.FC = () => {
   const { authStatus } = useAuth();
@@ -61,6 +77,11 @@ const ReleaseDetailsPage: React.FC = () => {
   const [loadingMarketplaceStats, setLoadingMarketplaceStats] = useState(false);
   const [collectionItemId, setCollectionItemId] = useState<number | null>(null);
 
+  // Track scrobble stats state
+  const [albumHistory, setAlbumHistory] = useState<AlbumHistoryData | null>(
+    null
+  );
+
   const api = getApiService(state.serverUrl);
 
   // Pattern to detect Discogs disambiguation suffix like (2), (11), etc.
@@ -82,6 +103,65 @@ const ReleaseDetailsPage: React.FC = () => {
       loadArtistMapping(release.artist);
     }
   }, [release?.artist]);
+
+  // Load album history function (must be defined before useEffect that uses it)
+  const loadAlbumHistory = useCallback(
+    async (artist: string, album: string) => {
+      try {
+        const data = await api.getAlbumHistory(artist, album);
+        setAlbumHistory(data);
+      } catch (err) {
+        // Silently fail - album history is optional enhancement
+        console.warn('Failed to load album history for track stats:', err);
+        setAlbumHistory(null);
+      }
+    },
+    [api]
+  );
+
+  // Fetch album history when release is loaded
+  useEffect(() => {
+    if (release?.artist && release?.title) {
+      loadAlbumHistory(release.artist, release.title);
+    }
+  }, [release?.artist, release?.title, loadAlbumHistory]);
+
+  // Calculate per-track scrobble stats from album history
+  const trackScrobbleStats = useMemo((): Map<string, TrackScrobbleStats> => {
+    const stats = new Map<string, TrackScrobbleStats>();
+
+    if (!albumHistory?.plays) {
+      return stats;
+    }
+
+    for (const play of albumHistory.plays) {
+      if (!play.track) continue;
+
+      const normalizedTrack = normalizeForMatching(play.track);
+      const existing = stats.get(normalizedTrack);
+
+      if (existing) {
+        existing.count++;
+        // Keep the most recent play timestamp
+        if (play.timestamp > (existing.lastPlayed || 0)) {
+          existing.lastPlayed = play.timestamp;
+        }
+      } else {
+        stats.set(normalizedTrack, {
+          count: 1,
+          lastPlayed: play.timestamp,
+        });
+      }
+    }
+
+    return stats;
+  }, [albumHistory?.plays]);
+
+  // Helper to get scrobble stats for a track
+  const getTrackStats = (trackTitle: string): TrackScrobbleStats | null => {
+    const normalizedTitle = normalizeForMatching(trackTitle);
+    return trackScrobbleStats.get(normalizedTitle) || null;
+  };
 
   const loadReleaseDetails = async () => {
     try {
@@ -865,6 +945,20 @@ const ReleaseDetailsPage: React.FC = () => {
               </p>
             )}
 
+            {/* Play on Spotify button */}
+            <div style={{ marginTop: '1rem' }}>
+              <button
+                className='btn btn-small btn-icon'
+                onClick={() =>
+                  playAlbumOnSpotify(release.artist, release.title)
+                }
+                title='Play on Spotify'
+                style={{ marginRight: '0.5rem' }}
+              >
+                ▶️ Play on Spotify
+              </button>
+            </div>
+
             {/* Discard pile button */}
             {collectionItemId && (
               <div style={{ marginTop: '1rem' }}>
@@ -1426,6 +1520,8 @@ const ReleaseDetailsPage: React.FC = () => {
             }
 
             // Render actual track as selectable item
+            const trackStats = getTrackStats(track.title);
+
             return (
               <div
                 key={index}
@@ -1475,6 +1571,61 @@ const ReleaseDetailsPage: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Spotify play button */}
+                <button
+                  className='btn btn-small btn-icon'
+                  onClick={e => {
+                    e.stopPropagation();
+                    playTrackOnSpotify(
+                      track.artist || release.artist,
+                      track.title,
+                      release.title
+                    );
+                  }}
+                  title='Play on Spotify'
+                  style={{ marginLeft: '0.5rem' }}
+                >
+                  ▶️
+                </button>
+
+                {/* Track scrobble stats */}
+                {trackStats && trackStats.count > 0 && (
+                  <div
+                    className='track-scrobble-stats'
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-end',
+                      marginLeft: '1rem',
+                      minWidth: '80px',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: '0.85rem',
+                        fontWeight: '500',
+                        color: 'var(--accent-color)',
+                      }}
+                    >
+                      {trackStats.count}{' '}
+                      {trackStats.count === 1 ? 'play' : 'plays'}
+                    </span>
+                    {trackStats.lastPlayed && (
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          color: 'var(--text-muted)',
+                        }}
+                        title={formatLocalTimeClean(
+                          trackStats.lastPlayed * 1000
+                        )}
+                      >
+                        {formatRelativeTime(trackStats.lastPlayed)}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

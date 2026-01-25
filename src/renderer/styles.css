@@ -1790,6 +1790,27 @@ body {
   gap: 0.5rem;
 }
 
+/* Modal content wrapper with sizing */
+.modal-content {
+  background: var(--bg-primary);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-medium {
+  width: 90%;
+  max-width: 600px;
+}
+
+.modal-large {
+  width: 90%;
+  max-width: 900px;
+}
+
 /* Mapping Modal Styles */
 .mapping-modal {
   width: 90%;
@@ -1923,6 +1944,139 @@ body {
 }
 
 .mapping-result-year {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Forgotten Favorites Track Mapping Modal Styles */
+.mapping-modal-source {
+  background: var(--bg-tertiary);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-color);
+}
+
+.mapping-modal-source h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mapping-modal-track-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mapping-modal-track-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mapping-modal-track-artist {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.mapping-modal-track-plays {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.mapping-modal-arrow {
+  text-align: center;
+  font-size: 2rem;
+  color: var(--text-muted);
+  margin: 1rem 0;
+}
+
+.mapping-modal-search {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mapping-modal-search h4 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mapping-modal-loading,
+.mapping-modal-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  color: var(--text-muted);
+  text-align: center;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  margin-top: 1rem;
+}
+
+.mapping-modal-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  margin-top: 1rem;
+}
+
+.mapping-modal-result-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s;
+}
+
+.mapping-modal-result-item:hover {
+  background: var(--bg-secondary);
+  border-color: var(--accent-color);
+}
+
+.mapping-modal-result-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mapping-modal-result-title {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.25rem;
+}
+
+.mapping-modal-result-artist {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.25rem;
+}
+
+.mapping-modal-result-plays {
   font-size: 0.75rem;
   color: var(--text-muted);
 }
@@ -2780,6 +2934,13 @@ body {
   color: var(--text-secondary);
 }
 
+.lastfm-history-col-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .lastfm-history-loading-overlay {
   position: absolute;
   top: 0;
@@ -2805,6 +2966,66 @@ body {
   font-size: 0.9rem;
   color: var(--text-secondary);
   padding: 0 1rem;
+}
+
+/* View mode toggle */
+.lastfm-history-view-toggle {
+  display: flex;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.lastfm-history-view-btn {
+  padding: 0.5rem 1rem;
+  background: var(--bg-secondary);
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lastfm-history-view-btn:not(:last-child) {
+  border-right: 1px solid var(--border-color);
+}
+
+.lastfm-history-view-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.lastfm-history-view-btn.active {
+  background: var(--accent-color);
+  color: white;
+}
+
+/* Track view styles */
+.lastfm-history-track-header {
+  grid-template-columns: 2fr 1.5fr 1.5fr 70px 100px;
+}
+
+.lastfm-history-track-item {
+  grid-template-columns: 2fr 1.5fr 1.5fr 70px 100px;
+}
+
+.lastfm-history-col-track {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.lastfm-history-col-artist-sm,
+.lastfm-history-col-album-sm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
 }
 
 /* Settings Section Boxes */
@@ -4120,6 +4341,13 @@ body {
   font-size: 0.7rem;
   color: var(--text-muted);
   margin-top: 0.25rem;
+}
+
+.dusty-corners-play-btn {
+  margin-top: 0.5rem;
+  width: 100%;
+  padding: 0.5rem;
+  font-size: 1rem;
 }
 
 .dusty-corners-more {
