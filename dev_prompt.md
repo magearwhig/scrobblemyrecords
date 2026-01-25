@@ -18,6 +18,7 @@
 - use `writeJSONWithBackup()` for critical data files (creates `.bak` before overwriting)
 - add new store types to `src/shared/types.ts` extending `VersionedStore` interface
 - cache files should have defined retention periods and be added to `cleanupService.ts` if they need automated cleanup
+- ALWAYS CHECK IF UI COMPONENTS ALREADY EXIST BEFORE MAKING NEW ONES, (LIKE MODAL AND BUTTONS)
 
 ## UI Navigation Guidelines
 Before adding any new page or navigation item:

@@ -160,10 +160,10 @@ Comprehensive listening statistics and visualizations:
 - **New Artists**: Count of new artists discovered this month
 - **Collection Coverage**: Percentage of your vinyl collection played over various time periods
 - **Calendar Heatmap**: GitHub-style visualization of daily listening activity by year
-- **Top Artists & Albums**: Leaderboards with period selection (week/month/year/all-time/custom)
+- **Top Artists & Albums**: Leaderboards with period selection (week/month/year/all-time/custom) with Spotify play buttons
 - **Custom Date Range**: Pick specific months or custom date ranges for all stats
 - **Milestone Progress**: Track progress toward scrobble milestones (1K, 5K, 10K, etc.)
-- **Dusty Corners**: Albums in your collection you haven't played in 6+ months
+- **Dusty Corners**: Albums in your collection you haven't played in 6+ months, with Spotify play buttons
 - **Source Breakdown**: See which sources your scrobbles come from
 - **Listening Timeline**: Visualize listening trends over time
 
@@ -219,6 +219,7 @@ Two-tab view of your listening activity:
 - Sort by play count, last played, artist, or album
 - Paginated view for large libraries
 - Play count and last played date for each album
+- **Spotify Integration**: Play button for each track to instantly search and play on Spotify
 - Sync controls to update the history index
 
 ### 🔍 Discovery Page
@@ -243,6 +244,8 @@ Find albums you listen to but don't own, and rediscover forgotten favorites:
 - **Copy to Clipboard**: Copy single track or all tracks for playlist creation
 - **CSV Export**: Export your forgotten favorites for external use
 - **Last.fm Links**: Quick access to track pages on Last.fm
+- **Spotify Integration**: Play button for each track to instantly search and play on Spotify
+- **Track Mapping Support**: Manual track mappings ensure accurate matching when automatic normalization fails
 
 ### ❤️ Wishlist Page
 Sync and manage your Discogs wantlist with vinyl availability tracking:
@@ -487,12 +490,36 @@ ollama pull mistral
 - Works alongside algorithm-based suggestions
 - **Cost: $0** - Runs 100% locally, no API fees, works offline
 
+### 🎧 Spotify Integration
+Instantly play tracks and albums on Spotify with one-click play buttons throughout the app:
+
+**How It Works:**
+- Click any play button (▶️) to search for and play the track/album on Spotify
+- Automatically tries desktop app first via `spotify:` URI scheme
+- Falls back to web player if desktop app isn't installed
+- No Spotify API authentication required - uses simple deep linking
+
+**Where You'll Find Play Buttons:**
+- **Forgotten Favorites**: Play individual forgotten tracks
+- **Last.fm History**: Play any track from your listening history
+- **Top Tracks & Albums**: Play trending tracks and albums from Stats page
+- **Release Details**: Play entire albums or individual tracks
+- **Dusty Corners**: Rediscover albums you haven't played recently
+- **All Track Listings**: Play buttons wherever tracks appear
+
+**Requirements:**
+- Spotify free or premium account
+- Spotify desktop app (recommended) or web browser access
+- No additional configuration needed
+
 ### 📀 Album Scrobble History
 View detailed listening history for any album:
 
 - **Last Played**: When you last scrobbled the album
 - **Total Plays**: Track-level scrobble count
 - **Play Timeline**: Chronological list of listening sessions
+- **Spotify Integration**: Play buttons for album and individual tracks
+- **Track Mapping Support**: Manual mappings ensure accurate history matching across naming variants
 - Visible on the Release Details page
 
 ### 💾 Backup & Restore
