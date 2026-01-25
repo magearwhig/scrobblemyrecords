@@ -168,12 +168,10 @@ const DiscoveryPage: React.FC = () => {
     }
   }, [api, dormantDays, minPlays]);
 
-  // Load forgotten favorites when tab becomes active or params change
+  // Load forgotten favorites on mount and when params change
   useEffect(() => {
-    if (activeTab === 'forgotten') {
-      loadForgottenFavorites();
-    }
-  }, [activeTab, dormantDays, minPlays, loadForgottenFavorites]);
+    loadForgottenFavorites();
+  }, [loadForgottenFavorites]);
 
   const formatDate = (timestamp: number): string => {
     const date = new Date(timestamp * 1000);
@@ -488,6 +486,7 @@ const DiscoveryPage: React.FC = () => {
               loadForgottenFavorites={loadForgottenFavorites}
               formatDate={formatDate}
               openLink={openLink}
+              api={api}
             />
           )}
         </div>

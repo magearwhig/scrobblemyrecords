@@ -5,6 +5,7 @@ import {
   AlbumMapping,
   ArtistMapping as DiscoveryArtistMapping,
   ArtistMbidMapping,
+  TrackMapping,
 } from '../../../shared/types';
 import { useAuth } from '../../context/AuthContext';
 import ApiService from '../../services/api';
@@ -60,9 +61,14 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
   const [mbidMappings, setMbidMappings] = useState<ArtistMbidMapping[]>([]);
   const [mbidMappingsLoading, setMbidMappingsLoading] = useState(false);
 
+  // Track mapping state (for Forgotten Favorites)
+  const [trackMappings, setTrackMappings] = useState<TrackMapping[]>([]);
+  const [trackMappingsLoading, setTrackMappingsLoading] = useState(false);
+
   useEffect(() => {
     loadMappings();
     loadDiscoveryMappings();
+    loadTrackMappings();
     loadMbidMappings();
     if (authStatus.discogs.authenticated && authStatus.discogs.username) {
       loadArtists();
@@ -127,6 +133,18 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
     }
   };
 
+  const loadTrackMappings = async () => {
+    try {
+      setTrackMappingsLoading(true);
+      const mappings = await api.getTrackMappings();
+      setTrackMappings(mappings);
+    } catch (error) {
+      console.warn('Failed to load track mappings:', error);
+    } finally {
+      setTrackMappingsLoading(false);
+    }
+  };
+
   const loadMbidMappings = async () => {
     try {
       setMbidMappingsLoading(true);
@@ -136,6 +154,36 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
       console.warn('Failed to load MusicBrainz mappings:', error);
     } finally {
       setMbidMappingsLoading(false);
+    }
+  };
+
+  const handleDeleteTrackMapping = async (
+    historyArtist: string,
+    historyAlbum: string,
+    historyTrack: string
+  ) => {
+    if (
+      !window.confirm('Are you sure you want to delete this track mapping?')
+    ) {
+      return;
+    }
+    try {
+      await api.removeTrackMapping(historyArtist, historyAlbum, historyTrack);
+      setTrackMappings(prev =>
+        prev.filter(
+          m =>
+            !(
+              m.historyArtist === historyArtist &&
+              m.historyAlbum === historyAlbum &&
+              m.historyTrack === historyTrack
+            )
+        )
+      );
+      setSuccess('Track mapping deleted');
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : 'Failed to delete mapping'
+      );
     }
   };
 
@@ -346,7 +394,7 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
   const handleExportMappings = async () => {
     try {
       const data = await api.exportArtistMappings();
-      // eslint-disable-next-line no-undef
+
       const blob = new Blob([JSON.stringify(data, null, 2)], {
         type: 'application/json',
       });
@@ -900,6 +948,87 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                 )}
               </div>
             </>
+          )}
+        </div>
+      </div>
+
+      {/* Track Mappings (for Forgotten Favorites) */}
+      <div className='settings-section-card'>
+        <div className='settings-section-header'>
+          <span className='settings-section-icon'>🎵</span>
+          <div>
+            <h3>Track Mappings</h3>
+            <p className='settings-section-description'>
+              Link Forgotten Favorites tracks to local scrobble cache when
+              auto-matching fails
+            </p>
+          </div>
+          <span className='settings-section-badge'>{trackMappings.length}</span>
+        </div>
+
+        <div className='settings-section-content'>
+          <div className='settings-info-box'>
+            Track mappings are created from the Forgotten Favorites page when
+            automatic normalization fails to match a track. These mappings help
+            the app recognize tracks with different naming (e.g.,
+            &quot;[Explicit]&quot; suffixes).
+          </div>
+
+          {trackMappingsLoading ? (
+            <div className='loading'>
+              <div className='spinner'></div>
+              Loading track mappings...
+            </div>
+          ) : trackMappings.length === 0 ? (
+            <div className='settings-empty-text'>
+              No track mappings yet. Create them from the Forgotten Favorites
+              page when a track fails to match automatically.
+            </div>
+          ) : (
+            <div className='settings-subsection'>
+              <h4>Mapped Tracks ({trackMappings.length})</h4>
+              <div className='settings-discovery-list'>
+                {trackMappings.map(mapping => (
+                  <div
+                    key={`${mapping.historyArtist}-${mapping.historyAlbum}-${mapping.historyTrack}`}
+                    className='settings-discovery-item'
+                  >
+                    <div className='settings-discovery-info'>
+                      <div className='settings-discovery-source'>
+                        <span className='settings-discovery-label source'>
+                          Forgotten Favorites:
+                        </span>
+                        {mapping.historyArtist} — {mapping.historyAlbum} —{' '}
+                        {mapping.historyTrack}
+                      </div>
+                      <div className='settings-discovery-target'>
+                        <span className='settings-discovery-label target'>
+                          Local Cache:
+                        </span>
+                        {mapping.cacheArtist} — {mapping.cacheAlbum} —{' '}
+                        {mapping.cacheTrack}
+                      </div>
+                      <div className='settings-mapping-meta'>
+                        Created on{' '}
+                        {new Date(mapping.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <button
+                      className='btn btn-small btn-danger'
+                      onClick={() =>
+                        handleDeleteTrackMapping(
+                          mapping.historyArtist,
+                          mapping.historyAlbum,
+                          mapping.historyTrack
+                        )
+                      }
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>

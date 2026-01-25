@@ -296,6 +296,32 @@ export interface HistoryArtistMappingsStore {
   mappings: ArtistMapping[];
 }
 
+/**
+ * Manual mapping for individual tracks in Forgotten Favorites.
+ * Maps a track from Last.fm history (with different naming) to a track in the local cache.
+ * Used when automatic normalization fails to match tracks.
+ */
+export interface TrackMapping {
+  // The Last.fm naming (from scrobble history / Forgotten Favorites)
+  historyArtist: string;
+  historyAlbum: string;
+  historyTrack: string;
+  // The target track in local scrobble cache
+  cacheArtist: string;
+  cacheAlbum: string;
+  cacheTrack: string;
+  // Metadata
+  createdAt: number;
+}
+
+/**
+ * Versioned store for track mappings
+ */
+export interface TrackMappingsStore {
+  schemaVersion: 1;
+  mappings: TrackMapping[];
+}
+
 // ============================================
 // Scrobble Artist Mappings (Discogs -> Last.fm)
 // ============================================

@@ -22,6 +22,7 @@ import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
+import { TrackMappingService } from './trackMappingService';
 
 const STATS_CACHE_FILE = 'stats/stats-cache.json';
 
@@ -46,6 +47,7 @@ const AVG_TRACK_DURATION_SECONDS = 210;
 export class StatsService {
   private fileStorage: FileStorage;
   private historyStorage: ScrobbleHistoryStorage;
+  private trackMappingService: TrackMappingService | null = null;
   private logger = createLogger('StatsService');
 
   // In-memory cache for forgotten favorites (5 minute TTL)
@@ -62,6 +64,23 @@ export class StatsService {
   ) {
     this.fileStorage = fileStorage;
     this.historyStorage = historyStorage;
+  }
+
+  /**
+   * Set the track mapping service for applying mappings in forgotten favorites.
+   * This is optional and should be set after construction.
+   */
+  setTrackMappingService(service: TrackMappingService): void {
+    this.trackMappingService = service;
+  }
+
+  /**
+   * Clear the forgotten favorites cache.
+   * Should be called when track mappings change.
+   */
+  clearForgottenFavoritesCache(): void {
+    this.forgottenFavoritesCache = null;
+    this.logger.debug('Cleared forgotten favorites cache');
   }
 
   /**
@@ -1209,7 +1228,30 @@ export class StatsService {
         // Skip plays without track info
         if (!play.track) continue;
 
-        const trackKey = createNormalizedTrackKey(artist, album, play.track);
+        // Check if this track has a mapping and apply it
+        let targetArtist = artist;
+        let targetAlbum = album;
+        let targetTrack = play.track;
+
+        if (this.trackMappingService) {
+          const mapping = await this.trackMappingService.getTrackMapping(
+            artist,
+            album,
+            play.track
+          );
+          if (mapping) {
+            // Use the mapped track coordinates for aggregation
+            targetArtist = mapping.cacheArtist;
+            targetAlbum = mapping.cacheAlbum;
+            targetTrack = mapping.cacheTrack;
+          }
+        }
+
+        const trackKey = createNormalizedTrackKey(
+          targetArtist,
+          targetAlbum,
+          targetTrack
+        );
         const existing = trackStats.get(trackKey);
 
         if (existing) {
@@ -1222,9 +1264,9 @@ export class StatsService {
           }
         } else {
           trackStats.set(trackKey, {
-            artist,
-            album,
-            track: play.track,
+            artist: targetArtist,
+            album: targetAlbum,
+            track: targetTrack,
             count: 1,
             lastPlayed: play.timestamp,
             firstPlayed: play.timestamp,

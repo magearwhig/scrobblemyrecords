@@ -19,10 +19,12 @@ import {
 } from '../services/ollamaService';
 import { ScrobbleHistoryStorage } from '../services/scrobbleHistoryStorage';
 import { ScrobbleHistorySyncService } from '../services/scrobbleHistorySyncService';
+import { StatsService } from '../services/statsService';
 import {
   DEFAULT_WEIGHTS,
   SuggestionService,
 } from '../services/suggestionService';
+import { TrackMappingService } from '../services/trackMappingService';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -41,7 +43,9 @@ export default function createSuggestionsRouter(
   analyticsService: AnalyticsService,
   suggestionService: SuggestionService,
   mappingService: MappingService,
-  hiddenItemService: HiddenItemService
+  trackMappingService: TrackMappingService,
+  hiddenItemService: HiddenItemService,
+  statsService: StatsService
 ) {
   const router = express.Router();
   const logger = createLogger('SuggestionsRoutes');
@@ -504,6 +508,65 @@ export default function createSuggestionsRouter(
     }
   });
 
+  /**
+   * GET /api/v1/suggestions/history/tracks
+   * Get paginated track history with sorting and search
+   */
+  router.get('/history/tracks', async (req: Request, res: Response) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const perPage = Math.min(
+        parseInt(req.query.per_page as string) || 50,
+        100
+      );
+      const sortBy = (req.query.sort_by as string) || 'playCount';
+      const sortOrder = (req.query.sort_order as string) || 'desc';
+      const search = req.query.search as string | undefined;
+
+      // Validate sortBy
+      const validSortBy = [
+        'playCount',
+        'lastPlayed',
+        'artist',
+        'album',
+        'track',
+      ];
+      if (!validSortBy.includes(sortBy)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid sort_by. Must be one of: ${validSortBy.join(', ')}`,
+        });
+      }
+
+      // Validate sortOrder
+      if (sortOrder !== 'asc' && sortOrder !== 'desc') {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid sort_order. Must be "asc" or "desc"',
+        });
+      }
+
+      const result = await historyStorage.getTracksPaginated(
+        page,
+        perPage,
+        sortBy as 'playCount' | 'lastPlayed' | 'artist' | 'album' | 'track',
+        sortOrder as 'asc' | 'desc',
+        search
+      );
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      logger.error('Error getting paginated track history', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
   // ============================================
   // Album History Endpoint (for Release Details page)
   // ============================================
@@ -564,6 +627,55 @@ export default function createSuggestionsRouter(
           });
         }
 
+        // Apply track mappings to normalize track names
+        // This ensures that tracks mapped in Forgotten Favorites show correctly
+        // We need to check mappings for ALL matched album variants from Last.fm history
+        const mappedPlays = await Promise.all(
+          result.entry.plays.map(async play => {
+            if (!play.track) return play;
+
+            // Try to find a mapping for this track
+            // Strategy 1: Check against the Discogs album name (what was requested)
+            let mappedTrack = await trackMappingService.getTrackMapping(
+              decodedArtist,
+              decodedAlbum,
+              play.track
+            );
+
+            // Strategy 2: If not found, check against all matched Last.fm history keys
+            if (!mappedTrack && result.matchedKeys) {
+              for (const key of result.matchedKeys) {
+                // Parse the key to get the actual Last.fm artist/album names
+                const parts = key.split('|');
+                if (parts.length >= 2) {
+                  const historyArtist = parts[0];
+                  const historyAlbum = parts.slice(1).join('|'); // Handle album names with | in them
+
+                  mappedTrack = await trackMappingService.getTrackMapping(
+                    historyArtist,
+                    historyAlbum,
+                    play.track
+                  );
+
+                  if (mappedTrack) {
+                    break; // Found a mapping, stop searching
+                  }
+                }
+              }
+            }
+
+            if (mappedTrack) {
+              // Use the cache track name (the target of the mapping)
+              return {
+                ...play,
+                track: mappedTrack.cacheTrack,
+              };
+            }
+
+            return play;
+          })
+        );
+
         res.json({
           success: true,
           data: {
@@ -572,7 +684,9 @@ export default function createSuggestionsRouter(
             album: decodedAlbum,
             lastPlayed: result.entry.lastPlayed,
             playCount: result.entry.playCount,
-            plays: result.entry.plays.slice(0, 50), // Most recent 50 plays (array is sorted newest-first)
+            plays: [...mappedPlays]
+              .sort((a, b) => b.timestamp - a.timestamp)
+              .slice(0, 50), // Most recent 50 plays
             matchType: result.matchType,
             matchedKeys: result.matchedKeys,
           },
@@ -1352,6 +1466,146 @@ export default function createSuggestionsRouter(
       });
     } catch (error) {
       logger.error('Error removing artist mapping', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // ============================================
+  // Track Mapping Endpoints (for Forgotten Favorites)
+  // ============================================
+
+  /**
+   * GET /api/v1/suggestions/mappings/tracks
+   * Get all track mappings
+   */
+  router.get('/mappings/tracks', async (req: Request, res: Response) => {
+    try {
+      const mappings = await trackMappingService.getAllTrackMappings();
+      res.json({
+        success: true,
+        data: mappings,
+        total: mappings.length,
+      });
+    } catch (error) {
+      logger.error('Error getting track mappings', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * POST /api/v1/suggestions/mappings/tracks
+   * Create a new track mapping
+   */
+  router.post('/mappings/tracks', async (req: Request, res: Response) => {
+    try {
+      const {
+        historyArtist,
+        historyAlbum,
+        historyTrack,
+        cacheArtist,
+        cacheAlbum,
+        cacheTrack,
+      } = req.body;
+
+      if (
+        !historyArtist ||
+        !historyAlbum ||
+        !historyTrack ||
+        !cacheArtist ||
+        !cacheAlbum ||
+        !cacheTrack
+      ) {
+        return res.status(400).json({
+          success: false,
+          error:
+            'Missing required fields: historyArtist, historyAlbum, historyTrack, cacheArtist, cacheAlbum, cacheTrack',
+        });
+      }
+
+      await trackMappingService.addTrackMapping({
+        historyArtist,
+        historyAlbum,
+        historyTrack,
+        cacheArtist,
+        cacheAlbum,
+        cacheTrack,
+      });
+
+      // Invalidate forgotten favorites cache since mappings affect the results
+      statsService.clearForgottenFavoritesCache();
+
+      res.json({
+        success: true,
+        message: 'Track mapping created',
+      });
+    } catch (error) {
+      logger.error('Error creating track mapping', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * DELETE /api/v1/suggestions/mappings/tracks
+   * Remove a track mapping
+   */
+  router.delete('/mappings/tracks', async (req: Request, res: Response) => {
+    try {
+      const { historyArtist, historyAlbum, historyTrack } = req.body;
+
+      if (!historyArtist || !historyAlbum || !historyTrack) {
+        return res.status(400).json({
+          success: false,
+          error:
+            'Missing required fields: historyArtist, historyAlbum, historyTrack',
+        });
+      }
+
+      const removed = await trackMappingService.removeTrackMapping(
+        historyArtist,
+        historyAlbum,
+        historyTrack
+      );
+
+      // Invalidate forgotten favorites cache since mappings affect the results
+      if (removed) {
+        statsService.clearForgottenFavoritesCache();
+      }
+
+      res.json({
+        success: true,
+        removed,
+      });
+    } catch (error) {
+      logger.error('Error removing track mapping', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * GET /api/v1/suggestions/mappings/tracks/count
+   * Get the count of track mappings
+   */
+  router.get('/mappings/tracks/count', async (_req: Request, res: Response) => {
+    try {
+      const count = await trackMappingService.getTrackMappingCount();
+      res.json({
+        success: true,
+        count,
+      });
+    } catch (error) {
+      logger.error('Error getting track mapping count', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

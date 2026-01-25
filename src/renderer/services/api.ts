@@ -49,6 +49,7 @@ import {
   SyncSettings,
   SyncStatus,
   TrackedRelease,
+  TrackMapping,
   UpdateDiscardPileItemRequest,
   WishlistNewRelease,
   WishlistSettings,
@@ -652,6 +653,48 @@ class ApiService {
   }
 
   // ============================================
+  // Track history paginated (for History page)
+  // ============================================
+
+  async getTrackHistoryPaginated(
+    page: number = 1,
+    perPage: number = 50,
+    sortBy:
+      | 'playCount'
+      | 'lastPlayed'
+      | 'artist'
+      | 'album'
+      | 'track' = 'playCount',
+    sortOrder: 'asc' | 'desc' = 'desc',
+    search?: string
+  ): Promise<{
+    items: Array<{
+      artist: string;
+      album: string;
+      track: string;
+      playCount: number;
+      lastPlayed: number;
+    }>;
+    total: number;
+    totalPages: number;
+    page: number;
+  }> {
+    const params: Record<string, string | number> = {
+      page,
+      per_page: perPage,
+      sort_by: sortBy,
+      sort_order: sortOrder,
+    };
+    if (search) {
+      params.search = search;
+    }
+    const response = await this.api.get('/suggestions/history/tracks', {
+      params,
+    });
+    return response.data.data;
+  }
+
+  // ============================================
   // Album history methods (for release details)
   // ============================================
 
@@ -790,6 +833,41 @@ class ApiService {
     await this.api.delete('/suggestions/mappings/artists', {
       data: { historyArtist },
     });
+  }
+
+  // ============================================
+  // Track Mapping methods (for Forgotten Favorites)
+  // ============================================
+
+  async getTrackMappings(): Promise<TrackMapping[]> {
+    const response = await this.api.get('/suggestions/mappings/tracks');
+    return response.data.data;
+  }
+
+  async createTrackMapping(mapping: {
+    historyArtist: string;
+    historyAlbum: string;
+    historyTrack: string;
+    cacheArtist: string;
+    cacheAlbum: string;
+    cacheTrack: string;
+  }): Promise<void> {
+    await this.api.post('/suggestions/mappings/tracks', mapping);
+  }
+
+  async removeTrackMapping(
+    historyArtist: string,
+    historyAlbum: string,
+    historyTrack: string
+  ): Promise<void> {
+    await this.api.delete('/suggestions/mappings/tracks', {
+      data: { historyArtist, historyAlbum, historyTrack },
+    });
+  }
+
+  async getTrackMappingCount(): Promise<number> {
+    const response = await this.api.get('/suggestions/mappings/tracks/count');
+    return response.data.count;
   }
 
   // ============================================

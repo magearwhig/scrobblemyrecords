@@ -44,7 +44,7 @@ const TABS: TabConfig[] = [
     id: 'mappings',
     label: 'Mappings',
     icon: '🔄',
-    description: 'Artist & album name mappings',
+    description: 'Artist, album & track mappings',
   },
   {
     id: 'filters',
@@ -116,16 +116,18 @@ const SettingsPage: React.FC = () => {
       try {
         // Load mappings count
         const mappingsData = await api.getArtistMappings();
-        const [discoveryAlbums, discoveryArtists, mbidMappings] =
+        const [discoveryAlbums, discoveryArtists, trackMappings, mbidMappings] =
           await Promise.all([
             api.getDiscoveryAlbumMappings(),
             api.getDiscoveryArtistMappings(),
+            api.getTrackMappings(),
             api.getArtistMbidMappings(),
           ]);
         setMappingsCount(
           mappingsData.stats.totalMappings +
             discoveryAlbums.length +
             discoveryArtists.length +
+            trackMappings.length +
             mbidMappings.mappings.length
         );
 

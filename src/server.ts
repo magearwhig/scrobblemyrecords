@@ -40,6 +40,7 @@ import { ScrobbleHistorySyncService } from './backend/services/scrobbleHistorySy
 import { SellerMonitoringService } from './backend/services/sellerMonitoringService';
 import { StatsService } from './backend/services/statsService';
 import { SuggestionService } from './backend/services/suggestionService';
+import { TrackMappingService } from './backend/services/trackMappingService';
 import { WishlistService } from './backend/services/wishlistService';
 import { FileStorage } from './backend/utils/fileStorage';
 import { createLogger } from './backend/utils/logger';
@@ -201,6 +202,7 @@ const syncService = new ScrobbleHistorySyncService(
   historyStorage
 );
 const mappingService = new MappingService(fileStorage);
+const trackMappingService = new TrackMappingService(fileStorage);
 const hiddenItemService = new HiddenItemService(fileStorage);
 const hiddenReleasesService = new HiddenReleasesService(fileStorage);
 const analyticsService = new AnalyticsService(historyStorage, lastfmService);
@@ -210,6 +212,7 @@ const suggestionService = new SuggestionService(
   historyStorage
 );
 const statsService = new StatsService(fileStorage, historyStorage);
+statsService.setTrackMappingService(trackMappingService);
 const imageService = new ImageService(fileStorage, lastfmService);
 const wishlistService = new WishlistService(fileStorage, authService);
 const sellerMonitoringService = new SellerMonitoringService(
@@ -269,7 +272,9 @@ app.use(
     analyticsService,
     suggestionService,
     mappingService,
-    hiddenItemService
+    trackMappingService,
+    hiddenItemService,
+    statsService
   )
 );
 app.use(

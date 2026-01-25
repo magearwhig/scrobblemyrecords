@@ -544,6 +544,128 @@ export class ScrobbleHistoryStorage {
   }
 
   /**
+   * Get paginated tracks with sorting and search
+   * Aggregates all plays from all albums into individual track entries
+   */
+  async getTracksPaginated(
+    page: number = 1,
+    perPage: number = 50,
+    sortBy:
+      | 'playCount'
+      | 'lastPlayed'
+      | 'artist'
+      | 'album'
+      | 'track' = 'playCount',
+    sortOrder: 'asc' | 'desc' = 'desc',
+    searchQuery?: string
+  ): Promise<{
+    items: Array<{
+      artist: string;
+      album: string;
+      track: string;
+      playCount: number;
+      lastPlayed: number;
+    }>;
+    total: number;
+    totalPages: number;
+    page: number;
+  }> {
+    const index = await this.getIndex();
+    if (!index) {
+      return { items: [], total: 0, totalPages: 0, page };
+    }
+
+    // Aggregate all tracks across all albums
+    const trackMap = new Map<
+      string,
+      {
+        artist: string;
+        album: string;
+        track: string;
+        playCount: number;
+        lastPlayed: number;
+      }
+    >();
+
+    for (const [key, history] of Object.entries(index.albums)) {
+      const [artist, album] = key.split('|');
+
+      for (const play of history.plays) {
+        if (!play.track) continue;
+
+        // Create a unique key for this track (artist|album|track)
+        const trackKey = `${artist}|${album}|${play.track.toLowerCase()}`;
+        const existing = trackMap.get(trackKey);
+
+        if (existing) {
+          existing.playCount++;
+          if (play.timestamp > existing.lastPlayed) {
+            existing.lastPlayed = play.timestamp;
+          }
+        } else {
+          trackMap.set(trackKey, {
+            artist,
+            album,
+            track: play.track,
+            playCount: 1,
+            lastPlayed: play.timestamp,
+          });
+        }
+      }
+    }
+
+    let tracks = Array.from(trackMap.values());
+
+    // Filter by search query if provided
+    if (searchQuery && searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      tracks = tracks.filter(
+        item =>
+          item.artist.toLowerCase().includes(query) ||
+          item.album.toLowerCase().includes(query) ||
+          item.track.toLowerCase().includes(query)
+      );
+    }
+
+    // Sort
+    tracks.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'playCount':
+          comparison = a.playCount - b.playCount;
+          break;
+        case 'lastPlayed':
+          comparison = a.lastPlayed - b.lastPlayed;
+          break;
+        case 'artist':
+          comparison = a.artist.localeCompare(b.artist);
+          break;
+        case 'album':
+          comparison = a.album.localeCompare(b.album);
+          break;
+        case 'track':
+          comparison = a.track.localeCompare(b.track);
+          break;
+      }
+      return sortOrder === 'desc' ? -comparison : comparison;
+    });
+
+    // Paginate
+    const total = tracks.length;
+    const totalPages = Math.ceil(total / perPage);
+    const startIndex = (page - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const paginatedItems = tracks.slice(startIndex, endIndex);
+
+    return {
+      items: paginatedItems,
+      total,
+      totalPages,
+      page,
+    };
+  }
+
+  /**
    * Get storage statistics
    */
   async getStorageStats(): Promise<{
