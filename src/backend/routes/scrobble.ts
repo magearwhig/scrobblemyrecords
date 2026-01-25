@@ -4,6 +4,7 @@ import { ScrobbleTrack, ScrobbleSession, Track } from '../../shared/types';
 import { artistMappingService } from '../services/artistMappingService';
 import { AuthService } from '../services/authService';
 import { LastFmService } from '../services/lastfmService';
+import { ScrobbleHistorySyncService } from '../services/scrobbleHistorySyncService';
 import { FileStorage } from '../utils/fileStorage';
 import { validateSessionId } from '../utils/validation';
 
@@ -14,7 +15,8 @@ export default function createScrobbleRouter(
   lastfmService: LastFmService,
   discogsService?: {
     searchCollection: (username: string, album: string) => Promise<any>;
-  }
+  },
+  scrobbleHistorySyncService?: ScrobbleHistorySyncService
 ) {
   const router = express.Router();
 
@@ -37,6 +39,16 @@ export default function createScrobbleRouter(
       }
 
       await lastfmService.scrobbleTrack(track);
+
+      // Trigger incremental sync after successful scrobble
+      if (scrobbleHistorySyncService) {
+        // Fire and forget - don't wait for sync to complete
+        scrobbleHistorySyncService
+          .startIncrementalSync()
+          .catch(err =>
+            console.error('Failed to auto-sync after scrobble:', err)
+          );
+      }
 
       res.json({
         success: true,
@@ -94,6 +106,16 @@ export default function createScrobbleRouter(
       }));
 
       const results = await lastfmService.scrobbleBatch(tracksWithTimestamps);
+
+      // Trigger incremental sync after successful scrobble
+      if (results.success > 0 && scrobbleHistorySyncService) {
+        // Fire and forget - don't wait for sync to complete
+        scrobbleHistorySyncService
+          .startIncrementalSync()
+          .catch(err =>
+            console.error('Failed to auto-sync after scrobble:', err)
+          );
+      }
 
       res.json({
         success: true,

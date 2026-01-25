@@ -242,7 +242,13 @@ app.use(
 );
 app.use(
   '/api/v1/scrobble',
-  createScrobbleRouter(fileStorage, authService, lastfmService, discogsService)
+  createScrobbleRouter(
+    fileStorage,
+    authService,
+    lastfmService,
+    discogsService,
+    syncService
+  )
 );
 app.use('/api/v1/artist-mappings', artistMappingRoutes);
 app.use(
