@@ -1291,6 +1291,266 @@ describe('ScrobbleHistoryStorage', () => {
     });
   });
 
+  describe('getTracksPaginated', () => {
+    it('should return empty result when no index exists', async () => {
+      // Act
+      const result = await storage.getTracksPaginated();
+
+      // Assert
+      expect(result.items).toEqual([]);
+      expect(result.total).toBe(0);
+      expect(result.totalPages).toBe(0);
+      expect(result.page).toBe(1);
+    });
+
+    it('should aggregate tracks from all albums', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: now,
+              playCount: 10,
+              plays: [
+                { timestamp: now, track: 'Everything In Its Right Place' },
+                { timestamp: now - 100, track: 'Kid A' },
+                {
+                  timestamp: now - 200,
+                  track: 'Everything In Its Right Place',
+                },
+              ],
+            },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getTracksPaginated();
+
+      // Assert
+      expect(result.items).toHaveLength(2); // 2 unique tracks
+      expect(result.total).toBe(2);
+      // Find the track with 2 plays
+      const eiirp = result.items.find(
+        t => t.track === 'Everything In Its Right Place'
+      );
+      expect(eiirp?.playCount).toBe(2);
+    });
+
+    it('should sort by playCount descending by default', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: now,
+              playCount: 5,
+              plays: [
+                { timestamp: now, track: 'Track A' },
+                { timestamp: now - 100, track: 'Track B' },
+                { timestamp: now - 200, track: 'Track B' },
+                { timestamp: now - 300, track: 'Track B' },
+              ],
+            },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getTracksPaginated();
+
+      // Assert
+      expect(result.items[0].track).toBe('Track B'); // 3 plays
+      expect(result.items[0].playCount).toBe(3);
+      expect(result.items[1].track).toBe('Track A'); // 1 play
+      expect(result.items[1].playCount).toBe(1);
+    });
+
+    it('should support sorting by track name', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: now,
+              playCount: 3,
+              plays: [
+                { timestamp: now, track: 'Zeta' },
+                { timestamp: now - 100, track: 'Alpha' },
+                { timestamp: now - 200, track: 'Beta' },
+              ],
+            },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getTracksPaginated(1, 50, 'track', 'asc');
+
+      // Assert
+      expect(result.items[0].track).toBe('Alpha');
+      expect(result.items[1].track).toBe('Beta');
+      expect(result.items[2].track).toBe('Zeta');
+    });
+
+    it('should support sorting by lastPlayed', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: now,
+              playCount: 3,
+              plays: [
+                { timestamp: now - 1000, track: 'Old Track' },
+                { timestamp: now, track: 'New Track' },
+                { timestamp: now - 500, track: 'Mid Track' },
+              ],
+            },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getTracksPaginated(
+        1,
+        50,
+        'lastPlayed',
+        'desc'
+      );
+
+      // Assert
+      expect(result.items[0].track).toBe('New Track'); // Most recent
+      expect(result.items[2].track).toBe('Old Track'); // Oldest
+    });
+
+    it('should filter by search query including track name', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: now,
+              playCount: 3,
+              plays: [
+                { timestamp: now, track: 'Everything In Its Right Place' },
+                { timestamp: now - 100, track: 'Kid A' },
+                { timestamp: now - 200, track: 'National Anthem' },
+              ],
+            },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getTracksPaginated(
+        1,
+        50,
+        'playCount',
+        'desc',
+        'everything'
+      );
+
+      // Assert
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].track).toBe('Everything In Its Right Place');
+    });
+
+    it('should support pagination', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const plays = [];
+      for (let i = 0; i < 10; i++) {
+        plays.push({ timestamp: now - i * 100, track: `Track ${i}` });
+      }
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: now,
+              playCount: 10,
+              plays,
+            },
+          },
+        })
+      );
+
+      // Act
+      const page1 = await storage.getTracksPaginated(1, 3);
+      const page2 = await storage.getTracksPaginated(2, 3);
+
+      // Assert
+      expect(page1.items).toHaveLength(3);
+      expect(page1.totalPages).toBe(4); // 10 tracks / 3 per page = ceil(3.33) = 4
+      expect(page2.items).toHaveLength(3);
+      expect(page2.page).toBe(2);
+    });
+
+    it('should skip plays without track names', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: now,
+              playCount: 3,
+              plays: [
+                { timestamp: now, track: 'Named Track' },
+                { timestamp: now - 100 }, // No track name
+                { timestamp: now - 200, track: undefined as any },
+              ],
+            },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getTracksPaginated();
+
+      // Assert
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].track).toBe('Named Track');
+    });
+
+    it('should include artist and album in track results', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: now,
+              playCount: 1,
+              plays: [{ timestamp: now, track: 'Everything' }],
+            },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.getTracksPaginated();
+
+      // Assert
+      expect(result.items[0].artist).toBe('radiohead');
+      expect(result.items[0].album).toBe('kid a');
+      expect(result.items[0].track).toBe('Everything');
+    });
+  });
+
   describe('getStorageStats', () => {
     it('should return zero stats when no index exists', async () => {
       // Act

@@ -37,6 +37,7 @@ jest.mock('../../../src/renderer/context/AppContext', () => ({
 
 const createMockApiInstance = () => ({
   getAlbumHistoryPaginated: jest.fn(),
+  getTrackHistoryPaginated: jest.fn(),
   getHistorySyncStatus: jest.fn(),
   startHistorySync: jest.fn(),
   pauseHistorySync: jest.fn(),
@@ -49,6 +50,19 @@ const createMockAlbumHistory = (count: number) => ({
     album: `Album ${i + 1}`,
     playCount: 100 - i,
     lastPlayed: Date.now() - i * 86400000, // Days ago
+  })),
+  total: count,
+  totalPages: Math.ceil(count / 50),
+  page: 1,
+});
+
+const createMockTrackHistory = (count: number) => ({
+  items: Array.from({ length: count }, (_, i) => ({
+    artist: `Artist ${i + 1}`,
+    album: `Album ${i + 1}`,
+    track: `Track ${i + 1}`,
+    playCount: 100 - i,
+    lastPlayed: Math.floor(Date.now() / 1000) - i * 86400, // Days ago in seconds
   })),
   total: count,
   totalPages: Math.ceil(count / 50),
@@ -82,7 +96,7 @@ describe('LastFmHistoryTab', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText('Loading album history...')
+          screen.getByText('Loading albums history...')
         ).toBeInTheDocument();
       });
     });
@@ -493,6 +507,122 @@ describe('LastFmHistoryTab', () => {
       await waitFor(() => {
         expect(screen.getByText('Today')).toBeInTheDocument();
         expect(screen.getByText('Yesterday')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('View Mode Toggle', () => {
+    beforeEach(() => {
+      mockApi.getAlbumHistoryPaginated.mockResolvedValue(
+        createMockAlbumHistory(3)
+      );
+      mockApi.getTrackHistoryPaginated.mockResolvedValue(
+        createMockTrackHistory(3)
+      );
+    });
+
+    it('shows view toggle buttons', async () => {
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: 'Albums' })
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole('button', { name: 'Tracks' })
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('starts in albums view by default', async () => {
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        const albumsBtn = screen.getByRole('button', { name: 'Albums' });
+        expect(albumsBtn).toHaveClass('active');
+      });
+    });
+
+    it('switches to tracks view when clicking Tracks button', async () => {
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist 1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Tracks' }));
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(mockApi.getTrackHistoryPaginated).toHaveBeenCalled();
+        expect(screen.getByText('Track 1')).toBeInTheDocument();
+      });
+    });
+
+    it('shows track column headers in tracks view', async () => {
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist 1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Tracks' }));
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(screen.getByText('Track')).toBeInTheDocument();
+        expect(screen.getByText('Artist')).toBeInTheDocument();
+        expect(screen.getByText('Album')).toBeInTheDocument();
+      });
+    });
+
+    it('shows correct stats text in tracks view', async () => {
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Showing 3 of 3 albums/)).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Tracks' }));
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Showing 3 of 3 tracks/)).toBeInTheDocument();
+      });
+    });
+
+    it('updates search placeholder in tracks view', async () => {
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(
+          screen.getByPlaceholderText('Search artists or albums...')
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Tracks' }));
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(
+          screen.getByPlaceholderText('Search artists, albums, or tracks...')
+        ).toBeInTheDocument();
       });
     });
   });
