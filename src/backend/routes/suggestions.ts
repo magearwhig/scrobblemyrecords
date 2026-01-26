@@ -592,23 +592,41 @@ export default function createSuggestionsRouter(
         const decodedArtist = decodeURIComponent(artist);
         const decodedAlbum = decodeURIComponent(album);
 
-        // First try with fuzzy matching on the original artist name
-        let result = await historyStorage.getAlbumHistoryFuzzy(
+        // Check if there's an album mapping from collection -> history
+        // This allows us to find albums with different names in Last.fm history
+        const albumMapping = await mappingService.getAlbumMappingForCollection(
           decodedArtist,
           decodedAlbum
         );
 
+        let searchArtist = decodedArtist;
+        let searchAlbum = decodedAlbum;
+
+        if (albumMapping) {
+          // Use the Last.fm history names from the mapping
+          searchArtist = albumMapping.historyArtist;
+          searchAlbum = albumMapping.historyAlbum;
+          logger.debug(
+            `Album history: using album mapping "${decodedArtist}|${decodedAlbum}" -> "${searchArtist}|${searchAlbum}"`
+          );
+        }
+
+        // First try with fuzzy matching on the (possibly mapped) names
+        let result = await historyStorage.getAlbumHistoryFuzzy(
+          searchArtist,
+          searchAlbum
+        );
+
         // If not found, check if artist has a scrobble mapping and try that
         if (result.matchType === 'none') {
-          const mappedArtist =
-            artistMappingService.getLastfmName(decodedArtist);
-          if (mappedArtist !== decodedArtist) {
+          const mappedArtist = artistMappingService.getLastfmName(searchArtist);
+          if (mappedArtist !== searchArtist) {
             logger.debug(
-              `Album history: trying mapped artist "${mappedArtist}" for "${decodedArtist}"`
+              `Album history: trying mapped artist "${mappedArtist}" for "${searchArtist}"`
             );
             result = await historyStorage.getAlbumHistoryFuzzy(
               mappedArtist,
-              decodedAlbum
+              searchAlbum
             );
           }
         }

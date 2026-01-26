@@ -245,6 +245,36 @@ export class MappingService {
   }
 
   /**
+   * Reverse lookup: given collection artist/album, find the Last.fm history mapping.
+   * This is used when viewing a release from your collection and you need to find
+   * its scrobble history which might be under a different name.
+   */
+  async getAlbumMappingForCollection(
+    collectionArtist: string,
+    collectionAlbum: string
+  ): Promise<AlbumMapping | null> {
+    await this.loadMappings();
+
+    const normalizedCollectionKey = this.albumKey(
+      collectionArtist,
+      collectionAlbum
+    );
+
+    // Search through all mappings to find one that matches the collection artist/album
+    for (const mapping of this.albumMappings.values()) {
+      const mappingCollectionKey = this.albumKey(
+        mapping.collectionArtist,
+        mapping.collectionAlbum
+      );
+      if (mappingCollectionKey === normalizedCollectionKey) {
+        return mapping;
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Get all artist mappings
    */
   async getAllArtistMappings(): Promise<ArtistMapping[]> {
