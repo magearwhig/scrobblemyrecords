@@ -39,6 +39,8 @@ const CollectionPage: React.FC = () => {
     'artist' | 'title' | 'year' | 'date_added' | 'scrobbles'
   >('artist');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [viewMode, setViewMode] = useState<'grid' | 'single'>('grid');
+  const [currentRecordIndex, setCurrentRecordIndex] = useState(0);
 
   // Filter state
   const [filterFormat, setFilterFormat] = useState<string>('');
@@ -98,12 +100,48 @@ const CollectionPage: React.FC = () => {
     visibleCount,
     reset: resetInfiniteScroll,
   } = useInfiniteScroll({
-    enabled: !isSearchMode && !loading,
+    enabled: !isSearchMode && !loading && viewMode === 'grid',
     totalItems: entireCollection.length,
     loadedItems: filteredCollection.length,
     itemsPerPage: scrollBatchSize,
     threshold: 600, // Trigger loading earlier for smoother experience
   });
+
+  // Keyboard navigation for single record view
+  useEffect(() => {
+    if (viewMode !== 'single') return;
+
+    const handleKeyDown = (e: globalThis.KeyboardEvent): void => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setCurrentRecordIndex(prev =>
+          prev > 0 ? prev - 1 : filteredCollection.length - 1
+        );
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setCurrentRecordIndex(prev =>
+          prev < filteredCollection.length - 1 ? prev + 1 : 0
+        );
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewMode, filteredCollection.length]);
+
+  // Reset current index when switching views or changing filters
+  useEffect(() => {
+    setCurrentRecordIndex(0);
+  }, [
+    viewMode,
+    searchQuery,
+    filterFormat,
+    filterYearFrom,
+    filterYearTo,
+    filterDateAdded,
+    sortBy,
+    sortOrder,
+  ]);
 
   // Compute available filter options from collection data
   const filterOptions = useMemo(() => {
@@ -1464,7 +1502,61 @@ const CollectionPage: React.FC = () => {
             margin: '1rem 0',
           }}
         >
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: '1rem',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div
+              style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}
+            >
+              <label
+                style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}
+              >
+                View:
+              </label>
+              <button
+                onClick={() => setViewMode('grid')}
+                style={{
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '4px',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor:
+                    viewMode === 'grid'
+                      ? 'var(--primary-color)'
+                      : 'var(--bg-primary)',
+                  color: viewMode === 'grid' ? 'white' : 'var(--text-primary)',
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                }}
+                title='Grid view'
+              >
+                ⊞
+              </button>
+              <button
+                onClick={() => setViewMode('single')}
+                style={{
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '4px',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor:
+                    viewMode === 'single'
+                      ? 'var(--primary-color)'
+                      : 'var(--bg-primary)',
+                  color:
+                    viewMode === 'single' ? 'white' : 'var(--text-primary)',
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                }}
+                title='Single record view'
+              >
+                ▭
+              </button>
+            </div>
+
             <label
               style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}
             >
@@ -1614,7 +1706,7 @@ const CollectionPage: React.FC = () => {
         </div>
       )}
 
-      {!loading && filteredCollection.length > 0 && (
+      {!loading && filteredCollection.length > 0 && viewMode === 'grid' && (
         <div className='collection-grid'>
           {getVisibleItems().map((item, index) => (
             <AlbumCard
@@ -1673,6 +1765,125 @@ const CollectionPage: React.FC = () => {
                 </span>
               </div>
             )}
+        </div>
+      )}
+
+      {/* Single Record View */}
+      {!loading && filteredCollection.length > 0 && viewMode === 'single' && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '2rem',
+            padding: '2rem 0',
+          }}
+        >
+          {/* Navigation Controls */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '2rem',
+              width: '100%',
+              maxWidth: '600px',
+            }}
+          >
+            <button
+              onClick={() =>
+                setCurrentRecordIndex(prev =>
+                  prev > 0 ? prev - 1 : filteredCollection.length - 1
+                )
+              }
+              style={{
+                padding: '1rem 1.5rem',
+                borderRadius: '8px',
+                border: '2px solid var(--border-color)',
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
+                fontSize: '1.5rem',
+                cursor: 'pointer',
+                minWidth: '80px',
+              }}
+              title='Previous record (←)'
+            >
+              ←
+            </button>
+
+            <div
+              style={{
+                flex: 1,
+                textAlign: 'center',
+                fontSize: '0.9rem',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              {currentRecordIndex + 1} of {filteredCollection.length}
+            </div>
+
+            <button
+              onClick={() =>
+                setCurrentRecordIndex(prev =>
+                  prev < filteredCollection.length - 1 ? prev + 1 : 0
+                )
+              }
+              style={{
+                padding: '1rem 1.5rem',
+                borderRadius: '8px',
+                border: '2px solid var(--border-color)',
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
+                fontSize: '1.5rem',
+                cursor: 'pointer',
+                minWidth: '80px',
+              }}
+              title='Next record (→)'
+            >
+              →
+            </button>
+          </div>
+
+          {/* Single Album Card */}
+          <div style={{ width: '100%', maxWidth: '600px' }}>
+            <AlbumCard
+              key={`single-${filteredCollection[currentRecordIndex].id}`}
+              item={filteredCollection[currentRecordIndex]}
+              selected={selectedAlbums.has(
+                filteredCollection[currentRecordIndex].release.id
+              )}
+              onSelect={() =>
+                handleAlbumSelect(
+                  filteredCollection[currentRecordIndex].release.id
+                )
+              }
+              onViewDetails={release => {
+                localStorage.setItem(
+                  'selectedRelease',
+                  JSON.stringify(release)
+                );
+                localStorage.setItem(
+                  'selectedCollectionItemId',
+                  filteredCollection[currentRecordIndex].id.toString()
+                );
+                window.location.hash = '#release-details';
+              }}
+              isInDiscardPile={discardPileIds.has(
+                filteredCollection[currentRecordIndex].id
+              )}
+              onAddToDiscardPile={handleOpenDiscardModal}
+            />
+          </div>
+
+          {/* Keyboard hint */}
+          <div
+            style={{
+              fontSize: '0.8rem',
+              color: 'var(--text-muted)',
+              textAlign: 'center',
+            }}
+          >
+            Use ← → arrow keys to navigate
+          </div>
         </div>
       )}
 
