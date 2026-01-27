@@ -8,6 +8,7 @@ import {
 import { createLogger } from '../utils/logger';
 
 import { AnalyticsService } from './analyticsService';
+import { MappingService } from './mappingService';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 
 /**
@@ -33,6 +34,7 @@ export const DEFAULT_WEIGHTS: SuggestionWeights = {
 export class SuggestionService {
   private analyticsService: AnalyticsService;
   private historyStorage: ScrobbleHistoryStorage;
+  private mappingService: MappingService | null = null;
   private logger = createLogger('SuggestionService');
 
   // Track recently suggested albums to avoid repetition
@@ -48,17 +50,42 @@ export class SuggestionService {
   }
 
   /**
+   * Set the mapping service for applying album mappings.
+   * This is optional and should be set after construction.
+   */
+  setMappingService(service: MappingService): void {
+    this.mappingService = service;
+  }
+
+  /**
    * Calculate all suggestion factors for a single album
    */
   async calculateFactors(album: CollectionItem): Promise<SuggestionFactors> {
     const artist = album.release.artist;
     const title = album.release.title;
 
+    // Check if there's an album mapping for this collection item
+    let searchArtist = artist;
+    let searchAlbum = title;
+
+    if (this.mappingService) {
+      const albumMapping =
+        await this.mappingService.getAlbumMappingForCollection(artist, title);
+
+      if (albumMapping) {
+        searchArtist = albumMapping.historyArtist;
+        searchAlbum = albumMapping.historyAlbum;
+        this.logger.debug(
+          `Suggestion Factors: using album mapping "${artist}|${title}" -> "${searchArtist}|${searchAlbum}"`
+        );
+      }
+    }
+
     // Get album history from local index with fuzzy matching
     // This allows "Shame Shame" to match "Shame Shame (Deluxe Edition)"
     const historyResult = await this.historyStorage.getAlbumHistoryFuzzy(
-      artist,
-      title
+      searchArtist,
+      searchAlbum
     );
 
     // Calculate recency gap (days since last played)

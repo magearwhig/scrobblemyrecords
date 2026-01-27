@@ -172,7 +172,27 @@ export class AnalyticsService {
       return 0.5; // Neutral if no track info
     }
 
-    const history = await this.historyStorage.getAlbumHistory(artist, album);
+    // Check if there's an album mapping for this collection item
+    let searchArtist = artist;
+    let searchAlbum = album;
+
+    if (this.mappingService) {
+      const albumMapping =
+        await this.mappingService.getAlbumMappingForCollection(artist, album);
+
+      if (albumMapping) {
+        searchArtist = albumMapping.historyArtist;
+        searchAlbum = albumMapping.historyAlbum;
+        this.logger.debug(
+          `Album Completeness: using album mapping "${artist}|${album}" -> "${searchArtist}|${searchAlbum}"`
+        );
+      }
+    }
+
+    const history = await this.historyStorage.getAlbumHistory(
+      searchArtist,
+      searchAlbum
+    );
     if (!history || history.playCount === 0) {
       return 0.5; // Neutral if never played
     }

@@ -211,8 +211,10 @@ const suggestionService = new SuggestionService(
   analyticsService,
   historyStorage
 );
+suggestionService.setMappingService(mappingService);
 const statsService = new StatsService(fileStorage, historyStorage);
 statsService.setTrackMappingService(trackMappingService);
+statsService.setMappingService(mappingService);
 const imageService = new ImageService(fileStorage, lastfmService);
 const wishlistService = new WishlistService(fileStorage, authService);
 const sellerMonitoringService = new SellerMonitoringService(

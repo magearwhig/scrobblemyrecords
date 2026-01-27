@@ -21,6 +21,7 @@ import { createNormalizedTrackKey } from '../../shared/utils/trackNormalization'
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
+import { MappingService } from './mappingService';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 import { TrackMappingService } from './trackMappingService';
 
@@ -48,6 +49,7 @@ export class StatsService {
   private fileStorage: FileStorage;
   private historyStorage: ScrobbleHistoryStorage;
   private trackMappingService: TrackMappingService | null = null;
+  private mappingService: MappingService | null = null;
   private logger = createLogger('StatsService');
 
   // In-memory cache for forgotten favorites (5 minute TTL)
@@ -72,6 +74,14 @@ export class StatsService {
    */
   setTrackMappingService(service: TrackMappingService): void {
     this.trackMappingService = service;
+  }
+
+  /**
+   * Set the mapping service for applying album mappings in dusty corners and other features.
+   * This is optional and should be set after construction.
+   */
+  setMappingService(service: MappingService): void {
+    this.mappingService = service;
   }
 
   /**
@@ -616,9 +626,29 @@ export class StatsService {
     let albumsPlayedDays365 = 0;
 
     for (const item of collection) {
+      // Check if there's an album mapping for this collection item
+      let searchArtist = item.release.artist;
+      let searchAlbum = item.release.title;
+
+      if (this.mappingService) {
+        const albumMapping =
+          await this.mappingService.getAlbumMappingForCollection(
+            item.release.artist,
+            item.release.title
+          );
+
+        if (albumMapping) {
+          searchArtist = albumMapping.historyArtist;
+          searchAlbum = albumMapping.historyAlbum;
+          this.logger.debug(
+            `Collection Coverage: using album mapping "${item.release.artist}|${item.release.title}" -> "${searchArtist}|${searchAlbum}"`
+          );
+        }
+      }
+
       const result = await this.historyStorage.getAlbumHistoryFuzzy(
-        item.release.artist,
-        item.release.title
+        searchArtist,
+        searchAlbum
       );
 
       if (result.entry && result.entry.playCount > 0) {
@@ -696,9 +726,29 @@ export class StatsService {
     const dustyAlbums: DustyCornerAlbum[] = [];
 
     for (const item of collection) {
+      // Check if there's an album mapping for this collection item
+      let searchArtist = item.release.artist;
+      let searchAlbum = item.release.title;
+
+      if (this.mappingService) {
+        const albumMapping =
+          await this.mappingService.getAlbumMappingForCollection(
+            item.release.artist,
+            item.release.title
+          );
+
+        if (albumMapping) {
+          searchArtist = albumMapping.historyArtist;
+          searchAlbum = albumMapping.historyAlbum;
+          this.logger.debug(
+            `Dusty Corners: using album mapping "${item.release.artist}|${item.release.title}" -> "${searchArtist}|${searchAlbum}"`
+          );
+        }
+      }
+
       const result = await this.historyStorage.getAlbumHistoryFuzzy(
-        item.release.artist,
-        item.release.title
+        searchArtist,
+        searchAlbum
       );
 
       // Album never played or last played more than 6 months ago
@@ -742,9 +792,29 @@ export class StatsService {
     const albumsWithPlays: AlbumPlayCount[] = [];
 
     for (const item of collection) {
+      // Check if there's an album mapping for this collection item
+      let searchArtist = item.release.artist;
+      let searchAlbum = item.release.title;
+
+      if (this.mappingService) {
+        const albumMapping =
+          await this.mappingService.getAlbumMappingForCollection(
+            item.release.artist,
+            item.release.title
+          );
+
+        if (albumMapping) {
+          searchArtist = albumMapping.historyArtist;
+          searchAlbum = albumMapping.historyAlbum;
+          this.logger.debug(
+            `Heavy Rotation: using album mapping "${item.release.artist}|${item.release.title}" -> "${searchArtist}|${searchAlbum}"`
+          );
+        }
+      }
+
       const result = await this.historyStorage.getAlbumHistoryFuzzy(
-        item.release.artist,
-        item.release.title
+        searchArtist,
+        searchAlbum
       );
 
       if (result.entry && result.entry.playCount > 0) {

@@ -1342,7 +1342,8 @@ export default function createSuggestionsRouter(
       if (
         !historyArtist ||
         !historyAlbum ||
-        !collectionId ||
+        collectionId === undefined ||
+        collectionId === null ||
         !collectionArtist ||
         !collectionAlbum
       ) {
