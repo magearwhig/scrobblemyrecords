@@ -519,7 +519,12 @@ View detailed listening history for any album:
 - **Total Plays**: Track-level scrobble count
 - **Play Timeline**: Chronological list of listening sessions
 - **Spotify Integration**: Play buttons for album and individual tracks
-- **Track Mapping Support**: Manual mappings ensure accurate history matching across naming variants
+- **Album Mapping**: Map Last.fm scrobble history to Discogs collection items when names differ
+  - Search-and-click interface to find matching albums
+  - Create multiple mappings for reissues, deluxe editions, etc.
+  - Visual indicators show already-mapped albums
+  - Prevents duplicate mappings
+- **Track Mapping Support**: Manual track-level mappings for naming variants
 - Visible on the Release Details page
 
 ### 💾 Backup & Restore
@@ -527,7 +532,9 @@ Protect your user-generated data with manual and automatic backups:
 
 **What's Backed Up:**
 - All settings (user, suggestions, AI, wishlist, sellers, releases, sync)
-- Album and artist name mappings
+- Album mappings (Last.fm → Discogs collection)
+- Track mappings (Last.fm → normalized cache)
+- Artist name mappings (scrobbling and discovery)
 - Hidden albums and artists (Discovery page)
 - Local want list and vinyl watch list
 - Monitored sellers list
