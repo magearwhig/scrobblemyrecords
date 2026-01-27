@@ -808,6 +808,22 @@ class ApiService {
     await this.api.post('/suggestions/mappings/albums', mapping);
   }
 
+  /**
+   * Create an album mapping (convenience method for Release Details page).
+   * Note: collectionId will be set to 0 as it's not available in Release Details context.
+   */
+  async createAlbumMapping(mapping: {
+    historyArtist: string;
+    historyAlbum: string;
+    collectionArtist: string;
+    collectionAlbum: string;
+  }): Promise<void> {
+    await this.api.post('/suggestions/mappings/albums', {
+      ...mapping,
+      collectionId: 0, // Not available in Release Details context
+    });
+  }
+
   async removeDiscoveryAlbumMapping(
     historyArtist: string,
     historyAlbum: string
