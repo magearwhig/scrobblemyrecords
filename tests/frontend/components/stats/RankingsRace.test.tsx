@@ -248,4 +248,76 @@ describe('RankingsRace', () => {
       expect(screen.getByText(/Track 2.*Artist 2/)).toBeInTheDocument();
     });
   });
+
+  describe('Rankings that enter and leave', () => {
+    const mockSnapshotsChanging = [
+      {
+        period: '2024-01',
+        timestamp: 1704067200000,
+        rankings: [
+          { name: 'Artist 1', count: 10, rank: 1 },
+          { name: 'Artist 2', count: 5, rank: 2 },
+        ],
+      },
+      {
+        period: '2024-02',
+        timestamp: 1706745600000,
+        rankings: [
+          { name: 'Artist 2', count: 12, rank: 1 },
+          { name: 'Artist 3', count: 8, rank: 2 },
+        ],
+      },
+    ];
+
+    it('should handle items that leave the rankings', () => {
+      render(
+        <RankingsRace
+          snapshots={mockSnapshotsChanging}
+          type='artists'
+          topN={2}
+        />
+      );
+
+      // Initially Artist 1 and Artist 2 should be visible
+      expect(screen.getByText('Artist 1')).toBeInTheDocument();
+      expect(screen.getByText('Artist 2')).toBeInTheDocument();
+    });
+
+    it('should show all items that appear in any snapshot', () => {
+      render(
+        <RankingsRace
+          snapshots={mockSnapshotsChanging}
+          type='artists'
+          topN={2}
+        />
+      );
+
+      // All three artists should be present even if not all visible initially
+      expect(screen.getByText('Artist 1')).toBeInTheDocument();
+      expect(screen.getByText('Artist 2')).toBeInTheDocument();
+      expect(screen.getByText('Artist 3')).toBeInTheDocument();
+    });
+
+    it('should restart animation when reaching the end', () => {
+      render(
+        <RankingsRace
+          snapshots={mockSnapshotsChanging}
+          type='artists'
+          topN={2}
+        />
+      );
+
+      const playButton = screen.getByLabelText(/play/i);
+      const slider = screen.getByLabelText(/Time scrubber/i);
+
+      // Move to the last snapshot
+      fireEvent.change(slider, { target: { value: '1' } });
+
+      // Click play - should restart from beginning
+      fireEvent.click(playButton);
+
+      // Should now be playing
+      expect(playButton).toHaveTextContent('⏸');
+    });
+  });
 });

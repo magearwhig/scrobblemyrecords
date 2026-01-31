@@ -342,6 +342,194 @@ describe('statsApi', () => {
       );
     });
   });
+
+  describe('getTopTracks', () => {
+    it('should fetch top tracks for a period', async () => {
+      const mockData = {
+        success: true,
+        data: [
+          {
+            artist: 'Radiohead',
+            album: 'OK Computer',
+            track: 'Paranoid Android',
+            playCount: 25,
+          },
+        ],
+      };
+      mockJsonResponse(mockData);
+
+      const result = await statsApi.getTopTracks('month', 10);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/stats/top/tracks/month?limit=10')
+      );
+      expect(result).toEqual(mockData);
+    });
+
+    it('should use default limit of 10', async () => {
+      const mockData = { success: true, data: [] };
+      mockJsonResponse(mockData);
+
+      await statsApi.getTopTracks('week');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('limit=10')
+      );
+    });
+
+    it('should include date range for custom period', async () => {
+      const mockData = { success: true, data: [] };
+      mockJsonResponse(mockData);
+
+      await statsApi.getTopTracks('custom', 10, {
+        startDate: 1704067200,
+        endDate: 1706745600,
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/stats/top/tracks/custom')
+      );
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('startDate=1704067200')
+      );
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('endDate=1706745600')
+      );
+    });
+
+    it('should not include date range if period is not custom', async () => {
+      const mockData = { success: true, data: [] };
+      mockJsonResponse(mockData);
+
+      await statsApi.getTopTracks('year', 10, {
+        startDate: 1704067200,
+        endDate: 1706745600,
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/stats/top/tracks/year')
+      );
+      expect(mockFetch).not.toHaveBeenCalledWith(
+        expect.stringContaining('startDate=')
+      );
+    });
+  });
+
+  describe('getRankingsOverTime', () => {
+    it('should fetch rankings with default parameters', async () => {
+      const mockData = {
+        success: true,
+        data: {
+          snapshots: [],
+          type: 'artists',
+          topN: 10,
+        },
+      };
+      mockJsonResponse(mockData);
+
+      const result = await statsApi.getRankingsOverTime();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '/stats/rankings-over-time?type=artists&topN=10'
+        )
+      );
+      expect(result).toEqual(mockData);
+    });
+
+    it('should fetch rankings with custom type and topN', async () => {
+      const mockData = {
+        success: true,
+        data: {
+          snapshots: [],
+          type: 'albums',
+          topN: 20,
+        },
+      };
+      mockJsonResponse(mockData);
+
+      await statsApi.getRankingsOverTime('albums', 20);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/stats/rankings-over-time?type=albums&topN=20')
+      );
+    });
+
+    it('should include startDate when provided', async () => {
+      const mockData = {
+        success: true,
+        data: { snapshots: [], type: 'artists', topN: 10 },
+      };
+      mockJsonResponse(mockData);
+
+      await statsApi.getRankingsOverTime('artists', 10, 1704067200000);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('startDate=1704067200000')
+      );
+    });
+
+    it('should include endDate when provided', async () => {
+      const mockData = {
+        success: true,
+        data: { snapshots: [], type: 'artists', topN: 10 },
+      };
+      mockJsonResponse(mockData);
+
+      await statsApi.getRankingsOverTime(
+        'artists',
+        10,
+        undefined,
+        1706745600000
+      );
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('endDate=1706745600000')
+      );
+    });
+
+    it('should include both startDate and endDate when provided', async () => {
+      const mockData = {
+        success: true,
+        data: { snapshots: [], type: 'tracks', topN: 15 },
+      };
+      mockJsonResponse(mockData);
+
+      await statsApi.getRankingsOverTime(
+        'tracks',
+        15,
+        1704067200000,
+        1706745600000
+      );
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('type=tracks')
+      );
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('topN=15')
+      );
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('startDate=1704067200000')
+      );
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('endDate=1706745600000')
+      );
+    });
+
+    it('should not include date parameters when not provided', async () => {
+      const mockData = {
+        success: true,
+        data: { snapshots: [], type: 'artists', topN: 10 },
+      };
+      mockJsonResponse(mockData);
+
+      await statsApi.getRankingsOverTime('artists', 10);
+
+      const fetchCallUrl = mockFetch.mock.calls[0][0] as string;
+      expect(fetchCallUrl).not.toContain('startDate=');
+      expect(fetchCallUrl).not.toContain('endDate=');
+    });
+  });
 });
 
 describe('imagesApi', () => {

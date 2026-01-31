@@ -9,6 +9,7 @@ import {
   formatLocalDateOnly,
   formatUTCToLocal,
   getTimezoneOffset,
+  formatRelativeTime,
 } from '../../../src/renderer/utils/dateUtils';
 
 describe('dateUtils', () => {
@@ -163,6 +164,76 @@ describe('dateUtils', () => {
       expect(result).toBe('UTC-4');
 
       Date.prototype.getTimezoneOffset = originalGetTimezoneOffset;
+    });
+  });
+
+  describe('formatRelativeTime', () => {
+    it('should return "Today" for current timestamp', () => {
+      const now = Math.floor(Date.now() / 1000);
+      const result = formatRelativeTime(now);
+      expect(result).toBe('Today');
+    });
+
+    it('should return "Yesterday" for 1 day ago', () => {
+      const yesterday = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000);
+      const result = formatRelativeTime(yesterday);
+      expect(result).toBe('Yesterday');
+    });
+
+    it('should return days ago for 2-6 days', () => {
+      const threeDaysAgo = Math.floor(
+        (Date.now() - 3 * 24 * 60 * 60 * 1000) / 1000
+      );
+      const result = formatRelativeTime(threeDaysAgo);
+      expect(result).toBe('3 days ago');
+    });
+
+    it('should return weeks ago for 7-29 days', () => {
+      const twoWeeksAgo = Math.floor(
+        (Date.now() - 14 * 24 * 60 * 60 * 1000) / 1000
+      );
+      const result = formatRelativeTime(twoWeeksAgo);
+      expect(result).toBe('2 weeks ago');
+    });
+
+    it('should return months ago for 30-364 days', () => {
+      const twoMonthsAgo = Math.floor(
+        (Date.now() - 60 * 24 * 60 * 60 * 1000) / 1000
+      );
+      const result = formatRelativeTime(twoMonthsAgo);
+      expect(result).toBe('2 months ago');
+    });
+
+    it('should return years ago for 365+ days', () => {
+      const twoYearsAgo = Math.floor(
+        (Date.now() - 730 * 24 * 60 * 60 * 1000) / 1000
+      );
+      const result = formatRelativeTime(twoYearsAgo);
+      expect(result).toBe('2 years ago');
+    });
+
+    it('should handle edge case at 7 days', () => {
+      const sevenDaysAgo = Math.floor(
+        (Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000
+      );
+      const result = formatRelativeTime(sevenDaysAgo);
+      expect(result).toBe('1 weeks ago');
+    });
+
+    it('should handle edge case at 30 days', () => {
+      const thirtyDaysAgo = Math.floor(
+        (Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000
+      );
+      const result = formatRelativeTime(thirtyDaysAgo);
+      expect(result).toBe('1 months ago');
+    });
+
+    it('should handle edge case at 365 days', () => {
+      const oneYearAgo = Math.floor(
+        (Date.now() - 365 * 24 * 60 * 60 * 1000) / 1000
+      );
+      const result = formatRelativeTime(oneYearAgo);
+      expect(result).toBe('1 years ago');
     });
   });
 
