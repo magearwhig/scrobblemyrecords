@@ -970,9 +970,19 @@ export class StatsService {
    * Count new artists discovered this month
    */
   async getNewArtistsThisMonth(): Promise<number> {
+    const details = await this.getNewArtistsDetails();
+    return details.length;
+  }
+
+  /**
+   * Get detailed list of new artists discovered this month
+   */
+  async getNewArtistsDetails(): Promise<
+    Array<{ artist: string; firstPlayed: number; playCount: number }>
+  > {
     const index = await this.historyStorage.getIndex();
     if (!index) {
-      return 0;
+      return [];
     }
 
     const now = new Date();
@@ -980,10 +990,16 @@ export class StatsService {
 
     // Find artists with their first play this month
     const artistFirstPlay = new Map<string, number>();
+    const artistOriginalName = new Map<string, string>();
 
     for (const [key, albumHistory] of Object.entries(index.albums)) {
       const [artist] = key.split('|');
       const normalizedArtist = artist.toLowerCase();
+
+      // Track original casing
+      if (!artistOriginalName.has(normalizedArtist)) {
+        artistOriginalName.set(normalizedArtist, artist);
+      }
 
       for (const play of albumHistory.plays) {
         const existing = artistFirstPlay.get(normalizedArtist);
@@ -993,15 +1009,36 @@ export class StatsService {
       }
     }
 
-    // Count artists whose first play was this month
-    let newArtists = 0;
-    for (const firstPlay of artistFirstPlay.values()) {
+    // Filter artists whose first play was this month and calculate play counts
+    const newArtists: Array<{
+      artist: string;
+      firstPlayed: number;
+      playCount: number;
+    }> = [];
+
+    for (const [normalizedArtist, firstPlay] of artistFirstPlay.entries()) {
       if (firstPlay >= monthStart) {
-        newArtists++;
+        // Calculate total plays this month for this artist
+        let playCount = 0;
+        for (const [key, albumHistory] of Object.entries(index.albums)) {
+          const [artist] = key.split('|');
+          if (artist.toLowerCase() === normalizedArtist) {
+            playCount += albumHistory.plays.filter(
+              p => p.timestamp >= monthStart
+            ).length;
+          }
+        }
+
+        newArtists.push({
+          artist: artistOriginalName.get(normalizedArtist) || normalizedArtist,
+          firstPlayed: firstPlay * 1000, // Convert to milliseconds
+          playCount,
+        });
       }
     }
 
-    return newArtists;
+    // Sort by first play time (most recent first)
+    return newArtists.sort((a, b) => b.firstPlayed - a.firstPlayed);
   }
 
   /**

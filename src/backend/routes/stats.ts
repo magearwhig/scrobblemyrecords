@@ -867,6 +867,27 @@ export default function createStatsRouter(
   });
 
   /**
+   * GET /api/v1/stats/new-artists/details
+   * Get detailed list of new artists discovered this month
+   */
+  router.get('/new-artists/details', async (_req: Request, res: Response) => {
+    try {
+      const artists = await statsService.getNewArtistsDetails();
+
+      res.json({
+        success: true,
+        data: artists,
+      });
+    } catch (error) {
+      logger.error('Error getting new artists details', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
    * GET /api/v1/stats/listening-hours
    * Get listening hours for various periods
    */

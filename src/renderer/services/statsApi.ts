@@ -8,6 +8,7 @@ import {
   DustyCornerAlbum,
   ListeningHours,
   MilestoneInfo,
+  NewArtistDetail,
   RankingsOverTimeResponse,
   ScrobbleCounts,
   SourceBreakdownItem,
@@ -60,6 +61,14 @@ export const statsApi = {
    */
   async getNewArtists(): Promise<ApiResponse<{ count: number }>> {
     const response = await fetch(`${API_BASE}/stats/new-artists`);
+    return response.json();
+  },
+
+  /**
+   * Get detailed list of new artists discovered this month
+   */
+  async getNewArtistsDetails(): Promise<ApiResponse<NewArtistDetail[]>> {
+    const response = await fetch(`${API_BASE}/stats/new-artists/details`);
     return response.json();
   },
 

@@ -1642,4 +1642,62 @@ describe('Stats Routes', () => {
       );
     });
   });
+
+  describe('GET /api/v1/stats/new-artists/details', () => {
+    beforeEach(() => {
+      mockStatsService.getNewArtistsDetails = jest.fn().mockResolvedValue([
+        {
+          artist: 'Artist 1',
+          firstPlayed: 1704067200000,
+          playCount: 5,
+        },
+        {
+          artist: 'Artist 2',
+          firstPlayed: 1706745600000,
+          playCount: 3,
+        },
+      ]);
+    });
+
+    it('should return detailed list of new artists', async () => {
+      const response = await request(app).get(
+        '/api/v1/stats/new-artists/details'
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveLength(2);
+      expect(response.body.data[0]).toEqual({
+        artist: 'Artist 1',
+        firstPlayed: 1704067200000,
+        playCount: 5,
+      });
+    });
+
+    it('should return empty array when no new artists', async () => {
+      mockStatsService.getNewArtistsDetails = jest.fn().mockResolvedValue([]);
+
+      const response = await request(app).get(
+        '/api/v1/stats/new-artists/details'
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toEqual([]);
+    });
+
+    it('should handle errors', async () => {
+      mockStatsService.getNewArtistsDetails = jest
+        .fn()
+        .mockRejectedValue(new Error('Database error'));
+
+      const response = await request(app).get(
+        '/api/v1/stats/new-artists/details'
+      );
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Database error');
+    });
+  });
 });

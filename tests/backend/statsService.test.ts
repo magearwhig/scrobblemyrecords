@@ -739,6 +739,136 @@ describe('StatsService', () => {
     });
   });
 
+  describe('getNewArtistsDetails', () => {
+    it('should return empty array when no history', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex.mockResolvedValue(null);
+
+      // Act
+      const details = await statsService.getNewArtistsDetails();
+
+      // Assert
+      expect(details).toEqual([]);
+    });
+
+    it('should return detailed info for new artists this month', async () => {
+      // Arrange
+      const now = new Date();
+      const thisMonthTimestamp = Math.floor(now.getTime() / 1000);
+      const lastYearTimestamp = Math.floor(
+        new Date(now.getFullYear() - 1, 0, 1).getTime() / 1000
+      );
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'New Artist|Album 1': {
+            lastPlayed: thisMonthTimestamp,
+            playCount: 5,
+            plays: [
+              { timestamp: thisMonthTimestamp },
+              { timestamp: thisMonthTimestamp + 100 },
+              { timestamp: thisMonthTimestamp + 200 },
+              { timestamp: thisMonthTimestamp + 300 },
+              { timestamp: thisMonthTimestamp + 400 },
+            ],
+          },
+          'New Artist|Album 2': {
+            lastPlayed: thisMonthTimestamp + 500,
+            playCount: 2,
+            plays: [
+              { timestamp: thisMonthTimestamp + 500 },
+              { timestamp: thisMonthTimestamp + 600 },
+            ],
+          },
+          'Old Artist|Album': {
+            lastPlayed: thisMonthTimestamp,
+            playCount: 3,
+            plays: [
+              { timestamp: lastYearTimestamp }, // First play was last year
+              { timestamp: thisMonthTimestamp },
+              { timestamp: thisMonthTimestamp + 50 },
+            ],
+          },
+        })
+      );
+
+      // Act
+      const details = await statsService.getNewArtistsDetails();
+
+      // Assert
+      expect(details).toHaveLength(1);
+      expect(details[0]).toEqual({
+        artist: 'New Artist',
+        firstPlayed: thisMonthTimestamp * 1000, // Converted to milliseconds
+        playCount: 7, // Total plays for all albums by this artist this month
+      });
+    });
+
+    it('should sort by first played time (most recent first)', async () => {
+      // Arrange
+      const now = new Date();
+      const thisMonthTimestamp = Math.floor(now.getTime() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'Artist A|Album': {
+            lastPlayed: thisMonthTimestamp,
+            playCount: 1,
+            plays: [{ timestamp: thisMonthTimestamp }],
+          },
+          'Artist B|Album': {
+            lastPlayed: thisMonthTimestamp + 1000,
+            playCount: 1,
+            plays: [{ timestamp: thisMonthTimestamp + 1000 }],
+          },
+          'Artist C|Album': {
+            lastPlayed: thisMonthTimestamp + 500,
+            playCount: 1,
+            plays: [{ timestamp: thisMonthTimestamp + 500 }],
+          },
+        })
+      );
+
+      // Act
+      const details = await statsService.getNewArtistsDetails();
+
+      // Assert
+      expect(details).toHaveLength(3);
+      expect(details[0].artist).toBe('Artist B'); // Most recent
+      expect(details[1].artist).toBe('Artist C');
+      expect(details[2].artist).toBe('Artist A'); // Oldest
+    });
+
+    it('should preserve original artist name casing', async () => {
+      // Arrange
+      const now = new Date();
+      const thisMonthTimestamp = Math.floor(now.getTime() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'The Beatles|Abbey Road': {
+            lastPlayed: thisMonthTimestamp,
+            playCount: 1,
+            plays: [{ timestamp: thisMonthTimestamp }],
+          },
+          'THE BEATLES|White Album': {
+            lastPlayed: thisMonthTimestamp + 100,
+            playCount: 1,
+            plays: [{ timestamp: thisMonthTimestamp + 100 }],
+          },
+        })
+      );
+
+      // Act
+      const details = await statsService.getNewArtistsDetails();
+
+      // Assert - Should count as one artist with first encountered casing
+      expect(details).toHaveLength(1);
+      expect(details[0].artist).toBe('The Beatles');
+      expect(details[0].playCount).toBe(2);
+    });
+  });
+
   describe('getStatsOverview', () => {
     it('should return complete overview', async () => {
       // Arrange

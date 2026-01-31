@@ -88,6 +88,43 @@ describe('statsApi', () => {
     });
   });
 
+  describe('getNewArtistsDetails', () => {
+    it('should fetch detailed new artists list', async () => {
+      const mockData = {
+        success: true,
+        data: [
+          {
+            artist: 'The Beatles',
+            firstPlayed: 1704067200000,
+            playCount: 5,
+          },
+          {
+            artist: 'Pink Floyd',
+            firstPlayed: 1706745600000,
+            playCount: 3,
+          },
+        ],
+      };
+      mockJsonResponse(mockData);
+
+      const result = await statsApi.getNewArtistsDetails();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/stats/new-artists/details')
+      );
+      expect(result).toEqual(mockData);
+    });
+
+    it('should handle empty results', async () => {
+      const mockData = { success: true, data: [] };
+      mockJsonResponse(mockData);
+
+      const result = await statsApi.getNewArtistsDetails();
+
+      expect(result).toEqual(mockData);
+    });
+  });
+
   describe('getTopArtists', () => {
     it('should fetch top artists for a period', async () => {
       const mockData = {

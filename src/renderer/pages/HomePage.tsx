@@ -7,7 +7,9 @@ import {
   MonthlyHighlights,
   QuickActionsGrid,
   RecentAlbums,
+  StatDetailsModal,
 } from '../components/dashboard';
+import { StatType } from '../components/dashboard/StatDetailsModal';
 import { CalendarHeatmap } from '../components/stats/CalendarHeatmap';
 import { MilestoneProgress } from '../components/stats/MilestoneProgress';
 import { useApp } from '../context/AppContext';
@@ -39,6 +41,19 @@ const HomePage: React.FC = () => {
     null
   );
   const [secondaryDataLoaded, setSecondaryDataLoaded] = useState(false);
+
+  // Stat details modal state
+  const [statDetailsOpen, setStatDetailsOpen] = useState(false);
+  const [selectedStat, setSelectedStat] = useState<StatType | null>(null);
+
+  const openStatDetails = (statType: StatType) => {
+    setSelectedStat(statType);
+    setStatDetailsOpen(true);
+  };
+
+  const closeStatDetails = () => {
+    setStatDetailsOpen(false);
+  };
 
   // Check server connection and load auth status
   useEffect(() => {
@@ -265,6 +280,7 @@ const HomePage: React.FC = () => {
             value={quickStats.newArtistsThisMonth}
             label='New Artists'
             subValue='This month'
+            onClick={() => openStatDetails('new-artists')}
           />
           <DashboardStatCard
             icon='📀'
@@ -357,6 +373,15 @@ const HomePage: React.FC = () => {
             </button>
           </div>
         )}
+
+      {/* Stat Details Modal */}
+      {selectedStat && (
+        <StatDetailsModal
+          isOpen={statDetailsOpen}
+          onClose={closeStatDetails}
+          statType={selectedStat}
+        />
+      )}
     </div>
   );
 };

@@ -429,6 +429,12 @@ export interface ArtistPlayCount {
   imageUrl?: string;
 }
 
+export interface NewArtistDetail {
+  artist: string;
+  firstPlayed: number; // Timestamp in milliseconds
+  playCount: number; // Number of plays this month
+}
+
 export interface AlbumPlayCount {
   artist: string;
   album: string;
