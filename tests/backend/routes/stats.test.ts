@@ -5,17 +5,22 @@ import request from 'supertest';
 
 import createStatsRouter from '../../../src/backend/routes/stats';
 import { AuthService } from '../../../src/backend/services/authService';
+import { RankingsService } from '../../../src/backend/services/rankingsService';
 import { StatsService } from '../../../src/backend/services/statsService';
 import { FileStorage } from '../../../src/backend/utils/fileStorage';
 
 // Mock dependencies
 jest.mock('../../../src/backend/services/authService');
 jest.mock('../../../src/backend/services/statsService');
+jest.mock('../../../src/backend/services/rankingsService');
 jest.mock('../../../src/backend/utils/fileStorage');
 
 const MockedAuthService = AuthService as jest.MockedClass<typeof AuthService>;
 const MockedStatsService = StatsService as jest.MockedClass<
   typeof StatsService
+>;
+const MockedRankingsService = RankingsService as jest.MockedClass<
+  typeof RankingsService
 >;
 const MockedFileStorage = FileStorage as jest.MockedClass<typeof FileStorage>;
 
@@ -1363,6 +1368,278 @@ describe('Stats Routes', () => {
       // Assert
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('GET /api/v1/stats/rankings-over-time', () => {
+    let appWithRankings: express.Application;
+    let mockRankingsService: jest.Mocked<RankingsService>;
+
+    beforeEach(() => {
+      // Create mock rankings service
+      mockRankingsService = new MockedRankingsService(
+        {} as any
+      ) as jest.Mocked<RankingsService>;
+
+      mockRankingsService.getRankingsOverTime = jest.fn().mockResolvedValue({
+        snapshots: [
+          {
+            period: '2024-01',
+            timestamp: 1704067200000,
+            rankings: [
+              { name: 'Artist 1', count: 10, rank: 1 },
+              { name: 'Artist 2', count: 5, rank: 2 },
+            ],
+          },
+        ],
+        type: 'artists',
+        topN: 10,
+      });
+
+      // Create Express app with rankings service
+      appWithRankings = express();
+      appWithRankings.use(helmet());
+      appWithRankings.use(cors());
+      appWithRankings.use(express.json());
+
+      appWithRankings.use(
+        '/api/v1/stats',
+        createStatsRouter(
+          mockFileStorage,
+          mockAuthService,
+          mockStatsService,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          mockRankingsService
+        )
+      );
+    });
+
+    it('should return 501 when rankings service is not available', async () => {
+      // Use app without rankings service
+      const response = await request(app).get(
+        '/api/v1/stats/rankings-over-time'
+      );
+
+      expect(response.status).toBe(501);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Rankings service not available');
+    });
+
+    it('should return rankings over time with default parameters', async () => {
+      const response = await request(appWithRankings).get(
+        '/api/v1/stats/rankings-over-time'
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.type).toBe('artists');
+      expect(response.body.data.topN).toBe(10);
+      expect(response.body.data.snapshots).toHaveLength(1);
+      expect(mockRankingsService.getRankingsOverTime).toHaveBeenCalledWith(
+        'artists',
+        10,
+        undefined,
+        undefined
+      );
+    });
+
+    it('should accept type query parameter', async () => {
+      const response = await request(appWithRankings).get(
+        '/api/v1/stats/rankings-over-time?type=tracks'
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockRankingsService.getRankingsOverTime).toHaveBeenCalledWith(
+        'tracks',
+        10,
+        undefined,
+        undefined
+      );
+    });
+
+    it('should accept topN query parameter', async () => {
+      const response = await request(appWithRankings).get(
+        '/api/v1/stats/rankings-over-time?topN=20'
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockRankingsService.getRankingsOverTime).toHaveBeenCalledWith(
+        'artists',
+        20,
+        undefined,
+        undefined
+      );
+    });
+
+    it('should accept startDate and endDate parameters', async () => {
+      const startDate = 1704067200000;
+      const endDate = 1735689600000;
+
+      const response = await request(appWithRankings).get(
+        `/api/v1/stats/rankings-over-time?startDate=${startDate}&endDate=${endDate}`
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockRankingsService.getRankingsOverTime).toHaveBeenCalledWith(
+        'artists',
+        10,
+        startDate,
+        endDate
+      );
+    });
+
+    it('should return 400 for invalid type', async () => {
+      const response = await request(appWithRankings).get(
+        '/api/v1/stats/rankings-over-time?type=invalid'
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Invalid type');
+    });
+
+    it('should use default topN when given 0', async () => {
+      const response = await request(appWithRankings).get(
+        '/api/v1/stats/rankings-over-time?topN=0'
+      );
+
+      // topN=0 is falsy, so || 10 makes it default to 10
+      expect(response.status).toBe(200);
+      expect(mockRankingsService.getRankingsOverTime).toHaveBeenCalledWith(
+        'artists',
+        10,
+        undefined,
+        undefined
+      );
+    });
+
+    it('should return 400 for topN greater than 50', async () => {
+      const response = await request(appWithRankings).get(
+        '/api/v1/stats/rankings-over-time?topN=51'
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Invalid topN');
+    });
+
+    it('should use default topN when given non-numeric value', async () => {
+      const response = await request(appWithRankings).get(
+        '/api/v1/stats/rankings-over-time?topN=abc'
+      );
+
+      // parseInt('abc') returns NaN, which is falsy, so || 10 makes it default to 10
+      expect(response.status).toBe(200);
+      expect(mockRankingsService.getRankingsOverTime).toHaveBeenCalledWith(
+        'artists',
+        10,
+        undefined,
+        undefined
+      );
+    });
+
+    it('should handle errors gracefully', async () => {
+      mockRankingsService.getRankingsOverTime.mockRejectedValue(
+        new Error('Rankings error')
+      );
+
+      const response = await request(appWithRankings).get(
+        '/api/v1/stats/rankings-over-time'
+      );
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Rankings error');
+    });
+
+    it('should return albums rankings', async () => {
+      mockRankingsService.getRankingsOverTime.mockResolvedValue({
+        snapshots: [
+          {
+            period: '2024-01',
+            timestamp: 1704067200000,
+            rankings: [
+              { name: 'Album 1', artist: 'Artist 1', count: 10, rank: 1 },
+              { name: 'Album 2', artist: 'Artist 2', count: 5, rank: 2 },
+            ],
+          },
+        ],
+        type: 'albums',
+        topN: 10,
+      });
+
+      const response = await request(appWithRankings).get(
+        '/api/v1/stats/rankings-over-time?type=albums'
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.type).toBe('albums');
+      expect(response.body.data.snapshots[0].rankings[0].artist).toBe(
+        'Artist 1'
+      );
+    });
+
+    it('should return tracks rankings', async () => {
+      mockRankingsService.getRankingsOverTime.mockResolvedValue({
+        snapshots: [
+          {
+            period: '2024-01',
+            timestamp: 1704067200000,
+            rankings: [
+              { name: 'Track 1', artist: 'Artist 1', count: 10, rank: 1 },
+              { name: 'Track 2', artist: 'Artist 2', count: 5, rank: 2 },
+            ],
+          },
+        ],
+        type: 'tracks',
+        topN: 10,
+      });
+
+      const response = await request(appWithRankings).get(
+        '/api/v1/stats/rankings-over-time?type=tracks'
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.type).toBe('tracks');
+      expect(response.body.data.snapshots[0].rankings[0].artist).toBe(
+        'Artist 1'
+      );
+    });
+
+    it('should handle empty snapshots', async () => {
+      mockRankingsService.getRankingsOverTime.mockResolvedValue({
+        snapshots: [],
+        type: 'artists',
+        topN: 10,
+      });
+
+      const response = await request(appWithRankings).get(
+        '/api/v1/stats/rankings-over-time'
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.snapshots).toEqual([]);
+    });
+
+    it('should accept all query parameters together', async () => {
+      const startDate = 1704067200000;
+      const endDate = 1735689600000;
+
+      const response = await request(appWithRankings).get(
+        `/api/v1/stats/rankings-over-time?type=albums&topN=15&startDate=${startDate}&endDate=${endDate}`
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockRankingsService.getRankingsOverTime).toHaveBeenCalledWith(
+        'albums',
+        15,
+        startDate,
+        endDate
+      );
     });
   });
 });
