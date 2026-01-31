@@ -131,23 +131,47 @@ export default function createCollectionRouter(
         }
       );
 
-      // If we have no items and expired cache was detected, return appropriate response
-      if (allItems.length === 0 && hasExpiredCache) {
+      // Deduplicate items by ID (in case cache has duplicates)
+      const uniqueItemsMap = new Map<number, CollectionItem>();
+      for (const item of allItems) {
+        if (!uniqueItemsMap.has(item.id)) {
+          uniqueItemsMap.set(item.id, item);
+        }
+      }
+      const deduplicatedItems = Array.from(uniqueItemsMap.values());
+
+      if (deduplicatedItems.length !== allItems.length) {
+        logger.warn(
+          `Removed ${allItems.length - deduplicatedItems.length} duplicate items from cache`
+        );
+      }
+
+      // If we have no items at all, trigger background refresh
+      if (deduplicatedItems.length === 0) {
+        logger.info(
+          `No cache data found for ${username}, starting background refresh`
+        );
+        discogsService.preloadAllCollectionPages(username).catch(error => {
+          logger.error('Background refresh failed', error);
+        });
+
         return res.json({
           success: true,
           data: [],
           total: 0,
-          cacheStatus: 'expired',
+          cacheStatus: hasExpiredCache ? 'expired' : 'empty',
           refreshing: true,
-          message: 'Cache expired, refreshing in background...',
+          message: hasExpiredCache
+            ? 'Cache expired, refreshing in background...'
+            : 'Cache empty, fetching from Discogs...',
           timestamp: Date.now(),
         });
       }
 
       res.json({
         success: true,
-        data: allItems,
-        total: allItems.length,
+        data: deduplicatedItems,
+        total: deduplicatedItems.length,
         cacheStatus: hasExpiredCache
           ? hasValidCache
             ? 'partially_expired'

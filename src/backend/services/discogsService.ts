@@ -623,9 +623,24 @@ export class DiscogsService {
         `Loaded ${allItems.length} items from cache${hasExpiredCache ? ' (some expired, refresh triggered)' : ''}`
       );
 
+      // Deduplicate items by release ID (in case cache has duplicates)
+      const uniqueItemsMap = new Map<number, CollectionItem>();
+      for (const item of allItems) {
+        if (!uniqueItemsMap.has(item.id)) {
+          uniqueItemsMap.set(item.id, item);
+        }
+      }
+      const deduplicatedItems = Array.from(uniqueItemsMap.values());
+
+      if (deduplicatedItems.length !== allItems.length) {
+        this.logger.warn(
+          `Removed ${allItems.length - deduplicatedItems.length} duplicate items from cache`
+        );
+      }
+
       // Filter results
       const lowerQuery = query.toLowerCase();
-      const filteredItems = allItems.filter(
+      const filteredItems = deduplicatedItems.filter(
         item =>
           item.release.title.toLowerCase().includes(lowerQuery) ||
           item.release.artist.toLowerCase().includes(lowerQuery)
@@ -722,9 +737,33 @@ export class DiscogsService {
   }
 
   async clearCache(): Promise<void> {
-    const files = await this.fileStorage.listFiles('collections');
-    for (const file of files) {
-      await this.fileStorage.delete(`collections/${file}`);
+    try {
+      const files = await this.fileStorage.listFiles('collections');
+      // Only delete collection page cache files (username-page-N.json)
+      // Don't delete progress files, backup files, or other files in the directory
+      const cacheFiles = files.filter(file =>
+        file.match(/^[^-]+-page-\d+\.json$/)
+      );
+
+      this.logger.info(
+        `Clearing ${cacheFiles.length} collection cache files (${files.length} total files in directory)`
+      );
+
+      for (const file of cacheFiles) {
+        try {
+          await this.fileStorage.delete(`collections/${file}`);
+        } catch (error) {
+          this.logger.warn(`Failed to delete cache file ${file}:`, error);
+          // Continue with other files even if one fails
+        }
+      }
+
+      this.logger.info('Collection cache cleared successfully');
+    } catch (error) {
+      this.logger.error('Error clearing collection cache:', error);
+      throw new Error(
+        `Failed to clear collection cache: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 

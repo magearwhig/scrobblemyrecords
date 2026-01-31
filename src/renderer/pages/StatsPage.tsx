@@ -21,6 +21,7 @@ import { ListeningHoursCard } from '../components/stats/ListeningHoursCard';
 import { ListeningTimeline } from '../components/stats/ListeningTimeline';
 import { MilestoneProgress } from '../components/stats/MilestoneProgress';
 import { PeriodStatCard } from '../components/stats/PeriodStatCard';
+import { RankingsOverTime } from '../components/stats/RankingsOverTime';
 import { SourcePieChart } from '../components/stats/SourcePieChart';
 import { StatCard } from '../components/stats/StatCard';
 import { StreakCard } from '../components/stats/StreakCard';
@@ -476,6 +477,11 @@ export const StatsPage: React.FC = () => {
       {/* Dusty corners */}
       <section className='stats-section'>
         <DustyCornersSection albums={dustyCorners} loading={dustyLoading} />
+      </section>
+
+      {/* Rankings over time */}
+      <section className='stats-section'>
+        <RankingsOverTime />
       </section>
     </div>
   );

@@ -34,6 +34,7 @@ import { LastFmService } from './backend/services/lastfmService';
 import { MappingService } from './backend/services/mappingService';
 import { MigrationService } from './backend/services/migrationService';
 import { MusicBrainzService } from './backend/services/musicbrainzService';
+import { RankingsService } from './backend/services/rankingsService';
 import { ReleaseTrackingService } from './backend/services/releaseTrackingService';
 import { ScrobbleHistoryStorage } from './backend/services/scrobbleHistoryStorage';
 import { ScrobbleHistorySyncService } from './backend/services/scrobbleHistorySyncService';
@@ -152,7 +153,7 @@ app.use(
       return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     optionsSuccessStatus: 200, // Some legacy browsers choke on 204
   })
@@ -215,6 +216,7 @@ suggestionService.setMappingService(mappingService);
 const statsService = new StatsService(fileStorage, historyStorage);
 statsService.setTrackMappingService(trackMappingService);
 statsService.setMappingService(mappingService);
+const rankingsService = new RankingsService(historyStorage);
 const imageService = new ImageService(fileStorage, lastfmService);
 const wishlistService = new WishlistService(fileStorage, authService);
 const sellerMonitoringService = new SellerMonitoringService(
@@ -262,7 +264,8 @@ app.use(
     historyStorage,
     wishlistService,
     sellerMonitoringService,
-    analyticsService
+    analyticsService,
+    rankingsService
   )
 );
 app.use(

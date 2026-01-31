@@ -525,6 +525,25 @@ export interface DustyCornerAlbum {
   collectionId: number;
 }
 
+export interface RankingItem {
+  name: string;
+  artist?: string;
+  count: number;
+  rank: number;
+}
+
+export interface RankingSnapshot {
+  period: string;
+  timestamp: number;
+  rankings: RankingItem[];
+}
+
+export interface RankingsOverTimeResponse {
+  snapshots: RankingSnapshot[];
+  type: 'tracks' | 'artists' | 'albums';
+  topN: number;
+}
+
 // ============================================
 // Notification System Types
 // ============================================

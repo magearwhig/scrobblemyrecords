@@ -289,7 +289,7 @@ const CollectionPage: React.FC = () => {
       });
       performSearch(searchQuery, searchPage);
     }
-  }, [searchPage, sortBy, sortOrder]);
+  }, [isSearchMode, searchQuery, searchPage, sortBy, sortOrder]);
 
   useEffect(() => {
     console.log('🔄 Search mode changed:', {
@@ -519,7 +519,7 @@ const CollectionPage: React.FC = () => {
     if (query.trim()) {
       setIsSearchMode(true);
       setSearchPage(1);
-      await performSearch(query, 1);
+      // Don't call performSearch here - let the useEffect handle it to avoid double calls
     } else {
       setIsSearchMode(false);
       // Don't set filteredCollection directly - let the useEffect handle it

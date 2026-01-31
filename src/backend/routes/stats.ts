@@ -14,6 +14,7 @@ import {
 } from '../../shared/types';
 import { AnalyticsService } from '../services/analyticsService';
 import { AuthService } from '../services/authService';
+import { RankingsService } from '../services/rankingsService';
 import { ScrobbleHistoryStorage } from '../services/scrobbleHistoryStorage';
 import { SellerMonitoringService } from '../services/sellerMonitoringService';
 import { StatsService } from '../services/statsService';
@@ -31,7 +32,8 @@ export default function createStatsRouter(
   historyStorage?: ScrobbleHistoryStorage,
   wishlistService?: WishlistService,
   sellerMonitoringService?: SellerMonitoringService,
-  analyticsService?: AnalyticsService
+  analyticsService?: AnalyticsService,
+  rankingsService?: RankingsService
 ) {
   const router = express.Router();
   const logger = createLogger('StatsRoutes');
@@ -1049,6 +1051,65 @@ export default function createStatsRouter(
       });
     } catch (error) {
       logger.error('Error getting album play counts', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * GET /rankings-over-time
+   * Get rankings (tracks/artists/albums) over time for animated visualization
+   */
+  router.get('/rankings-over-time', async (req: Request, res: Response) => {
+    try {
+      if (!rankingsService) {
+        return res.status(501).json({
+          success: false,
+          error: 'Rankings service not available',
+        });
+      }
+
+      // Extract query parameters
+      const type = (req.query.type as string) || 'artists';
+      const topN = parseInt(req.query.topN as string, 10) || 10;
+      const startDate = req.query.startDate
+        ? parseInt(req.query.startDate as string, 10)
+        : undefined;
+      const endDate = req.query.endDate
+        ? parseInt(req.query.endDate as string, 10)
+        : undefined;
+
+      // Validate type
+      if (!['tracks', 'artists', 'albums'].includes(type)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid type. Must be tracks, artists, or albums',
+        });
+      }
+
+      // Validate topN
+      if (isNaN(topN) || topN < 1 || topN > 50) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid topN. Must be between 1 and 50',
+        });
+      }
+
+      const response = await rankingsService.getRankingsOverTime(
+        type as 'tracks' | 'artists' | 'albums',
+        topN,
+        startDate,
+        endDate
+      );
+
+      res.json({
+        success: true,
+        data: response,
+      });
+    } catch (error) {
+      logger.error('Error getting rankings over time', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

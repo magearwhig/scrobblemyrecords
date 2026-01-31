@@ -8,6 +8,7 @@ import {
   DustyCornerAlbum,
   ListeningHours,
   MilestoneInfo,
+  RankingsOverTimeResponse,
   ScrobbleCounts,
   SourceBreakdownItem,
   StatsOverview,
@@ -228,6 +229,32 @@ export const statsApi = {
 
     if (period === 'custom' && dateRange) {
       url += `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;
+    }
+
+    const response = await fetch(url);
+    return response.json();
+  },
+
+  /**
+   * Get rankings over time for animated visualization
+   * @param type - Type of ranking (tracks, artists, or albums)
+   * @param topN - Number of top items to show (1-50)
+   * @param startDate - Optional start date (milliseconds)
+   * @param endDate - Optional end date (milliseconds)
+   */
+  async getRankingsOverTime(
+    type: 'tracks' | 'artists' | 'albums' = 'artists',
+    topN: number = 10,
+    startDate?: number,
+    endDate?: number
+  ): Promise<ApiResponse<RankingsOverTimeResponse>> {
+    let url = `${API_BASE}/stats/rankings-over-time?type=${type}&topN=${topN}`;
+
+    if (startDate) {
+      url += `&startDate=${startDate}`;
+    }
+    if (endDate) {
+      url += `&endDate=${endDate}`;
     }
 
     const response = await fetch(url);

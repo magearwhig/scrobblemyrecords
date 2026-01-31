@@ -162,7 +162,8 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
       setSearchResults([]);
     } catch (err) {
       addNotification({
-        type: 'error',
+        type: 'alert',
+        title: 'Mapping Error',
         message:
           err instanceof Error
             ? `Failed to create mapping: ${err.message}`

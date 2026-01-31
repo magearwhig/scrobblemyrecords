@@ -47,6 +47,9 @@ describe('Collection Routes', () => {
     mockDiscogsService.checkForNewItems = jest.fn();
     mockDiscogsService.updateCacheWithNewItems = jest.fn();
     mockDiscogsService.getReleaseDetails = jest.fn();
+    mockDiscogsService.preloadAllCollectionPages = jest
+      .fn()
+      .mockResolvedValue(undefined);
 
     // Setup authentication mocks
     mockAuthService.getDiscogsToken = jest.fn().mockResolvedValue('mock-token');

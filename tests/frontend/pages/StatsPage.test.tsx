@@ -21,6 +21,7 @@ jest.mock('../../../src/renderer/services/statsApi', () => ({
     getTimeline: jest.fn(),
     getNewArtists: jest.fn(),
     getListeningHours: jest.fn(),
+    getRankingsOverTime: jest.fn(),
   },
   imagesApi: {
     batchGetAlbumCovers: jest.fn(),
@@ -130,6 +131,28 @@ describe('StatsPage', () => {
       thisWeek: 15,
       thisMonth: 62.8,
     },
+    rankingsOverTime: {
+      snapshots: [
+        {
+          period: '2024-01',
+          timestamp: Date.now() - 86400000 * 60,
+          rankings: [
+            { name: 'Radiohead', count: 100, rank: 1 },
+            { name: 'The Beatles', count: 80, rank: 2 },
+          ],
+        },
+        {
+          period: '2024-02',
+          timestamp: Date.now() - 86400000 * 30,
+          rankings: [
+            { name: 'Radiohead', count: 150, rank: 1 },
+            { name: 'The Beatles', count: 120, rank: 2 },
+          ],
+        },
+      ],
+      type: 'artists' as const,
+      topN: 10,
+    },
   };
 
   beforeEach(() => {
@@ -188,6 +211,10 @@ describe('StatsPage', () => {
       success: true,
       data: defaultMockData.listeningHours,
     });
+    mockStatsApi.getRankingsOverTime.mockResolvedValue({
+      success: true,
+      data: defaultMockData.rankingsOverTime,
+    });
     mockImagesApi.batchGetAlbumCovers.mockResolvedValue({
       success: true,
       data: {},
@@ -219,11 +246,11 @@ describe('StatsPage', () => {
     render(<StatsPage />);
 
     await waitFor(() => {
-      // The streak card is rendered with value '5'
-      expect(screen.getByText('5')).toBeInTheDocument();
-      // And shows the fire emoji
+      // The streak card is rendered
       const streakCard = document.querySelector('.streak-card');
       expect(streakCard).toBeInTheDocument();
+      // And shows the current streak value
+      expect(streakCard).toHaveTextContent('5');
     });
   });
 
@@ -254,8 +281,11 @@ describe('StatsPage', () => {
     render(<StatsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('New Artists')).toBeInTheDocument();
-      expect(screen.getByText('15')).toBeInTheDocument();
+      const newArtistsCard = screen
+        .getByText('New Artists')
+        .closest('.stat-card');
+      expect(newArtistsCard).toBeInTheDocument();
+      expect(newArtistsCard).toHaveTextContent('15');
     });
   });
 
@@ -271,10 +301,11 @@ describe('StatsPage', () => {
     render(<StatsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Top Artists')).toBeInTheDocument();
       // Top lists section is rendered
       const topListsRow = document.querySelector('.stats-top-lists-row');
       expect(topListsRow).toBeInTheDocument();
+      // Check for Top Artists within the top lists section
+      expect(topListsRow).toHaveTextContent('Top Artists');
     });
   });
 
@@ -282,7 +313,8 @@ describe('StatsPage', () => {
     render(<StatsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Top Albums')).toBeInTheDocument();
+      const topListsRow = document.querySelector('.stats-top-lists-row');
+      expect(topListsRow).toHaveTextContent('Top Albums');
       expect(screen.getByText('OK Computer')).toBeInTheDocument();
     });
   });
@@ -368,8 +400,9 @@ describe('StatsPage', () => {
     // Should still render the page despite image errors
     await waitFor(() => {
       expect(screen.getByText('Stats Dashboard')).toBeInTheDocument();
-      // Top artists section still renders
-      expect(screen.getByText('Top Artists')).toBeInTheDocument();
+      // Top lists section still renders
+      const topListsRow = document.querySelector('.stats-top-lists-row');
+      expect(topListsRow).toHaveTextContent('Top Artists');
     });
   });
 
