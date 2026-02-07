@@ -22,7 +22,7 @@ import { WishlistService } from './wishlistService';
 // Scan timing constants
 const FULL_SCAN_INTERVAL_DAYS = 7;
 const QUICK_CHECK_INTERVAL_HOURS = 24;
-const INVENTORY_CACHE_HOURS = 24;
+const INVENTORY_CACHE_HOURS = 6; // Reduced from 24h for fresher data
 const STALE_MATCH_PRUNE_DAYS = 30;
 
 // Retry constants for rate limiting
@@ -571,6 +571,143 @@ export class SellerMonitoringService {
       await this.fileStorage.writeJSON(this.MATCHES_FILE, store);
       this.logger.debug(`Marked match ${matchId} as notified`);
     }
+  }
+
+  /**
+   * Verify if a specific listing is still available on Discogs
+   * Returns true if listing exists and is available, false if sold/unavailable
+   */
+  async verifyListingStatus(
+    listingId: number
+  ): Promise<{ available: boolean; error?: string }> {
+    try {
+      const headers = await this.getAuthHeaders();
+
+      // Discogs marketplace listing endpoint
+      const response = await this.executeWithRetry(
+        () =>
+          this.axios.get(`/marketplace/listings/${listingId}`, {
+            headers,
+          }),
+        `verify listing ${listingId}`
+      );
+
+      // If we get a 200 response, listing exists and is available
+      if (response.status === 200 && response.data) {
+        return { available: true };
+      }
+
+      return { available: false };
+    } catch (error) {
+      // 404 means listing was sold or removed
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return { available: false };
+      }
+
+      // Other errors - we can't determine status
+      this.logger.error(`Error verifying listing ${listingId}:`, error);
+      return {
+        available: false,
+        error:
+          error instanceof Error ? error.message : 'Failed to verify listing',
+      };
+    }
+  }
+
+  /**
+   * Verify and update the status of a single match
+   * Called by frontend when user clicks "Refresh" on a sold item
+   */
+  async verifyAndUpdateMatch(
+    matchId: string
+  ): Promise<{ updated: boolean; status: string; error?: string }> {
+    const store = await this.getMatchesStore();
+    const match = store.matches.find(m => m.id === matchId);
+
+    if (!match) {
+      return { updated: false, status: 'not_found', error: 'Match not found' };
+    }
+
+    const result = await this.verifyListingStatus(match.listingId);
+
+    if (result.error) {
+      // Couldn't verify - mark as unverified
+      match.statusConfidence = 'unverified';
+      match.lastVerifiedAt = Date.now();
+      store.lastUpdated = Date.now();
+      await this.fileStorage.writeJSON(this.MATCHES_FILE, store);
+      return { updated: true, status: match.status, error: result.error };
+    }
+
+    const previousStatus = match.status;
+
+    if (result.available) {
+      // Listing is still available
+      if (match.status === 'sold') {
+        // Was marked as sold but is actually still available - reactivate
+        match.status = 'active';
+        match.statusChangedAt = Date.now();
+        this.logger.info(
+          `Match ${matchId} was marked as sold but is still available - reactivated`
+        );
+      }
+      match.statusConfidence = 'verified';
+    } else {
+      // Listing is not available
+      if (match.status !== 'sold') {
+        match.status = 'sold';
+        match.statusChangedAt = Date.now();
+      }
+      match.statusConfidence = 'verified';
+    }
+
+    match.lastVerifiedAt = Date.now();
+    store.lastUpdated = Date.now();
+    await this.fileStorage.writeJSON(this.MATCHES_FILE, store);
+
+    return {
+      updated: previousStatus !== match.status,
+      status: match.status,
+    };
+  }
+
+  /**
+   * Get all matches with cache information
+   */
+  async getAllMatchesWithCacheInfo(): Promise<{
+    matches: SellerMatch[];
+    cacheInfo: {
+      lastUpdated: number;
+      oldestScanAge: number;
+      nextScanDue: number;
+    };
+  }> {
+    const store = await this.getMatchesStore();
+    const sellers = await this.getSellers();
+
+    // Calculate oldest scan age
+    let oldestScanTime = Date.now();
+    for (const seller of sellers) {
+      const scanTime = seller.lastScanned || 0;
+      if (scanTime > 0 && scanTime < oldestScanTime) {
+        oldestScanTime = scanTime;
+      }
+    }
+
+    const oldestScanAge = Date.now() - oldestScanTime;
+
+    // Calculate when next scan is due based on cache TTL
+    const cacheMaxAge = INVENTORY_CACHE_HOURS * 60 * 60 * 1000;
+    const nextScanDue = Math.max(0, cacheMaxAge - oldestScanAge);
+
+    return {
+      matches: store.matches,
+      cacheInfo: {
+        lastUpdated: store.lastUpdated,
+        oldestScanAge,
+        nextScanDue,
+      },
+    };
   }
 
   /**
@@ -1807,11 +1944,54 @@ export class SellerMonitoringService {
           m.status !== 'sold'
       );
 
+      // Verify up to 5 items before marking as sold to reduce false positives
+      const MAX_VERIFY_PER_SCAN = 5;
+      let verifiedCount = 0;
+
       for (const existing of sellerExistingMatches) {
         if (!currentListingIds.has(existing.listingId)) {
-          existing.status = 'sold';
-          existing.statusChangedAt = Date.now();
-          this.logger.debug(`Marked match ${existing.id} as sold`);
+          // Item not found in current inventory - verify before marking sold
+          let shouldMarkSold = true;
+          let confidence: 'verified' | 'unverified' = 'unverified';
+
+          if (verifiedCount < MAX_VERIFY_PER_SCAN) {
+            try {
+              const verification = await this.verifyListingStatus(
+                existing.listingId
+              );
+              verifiedCount++;
+
+              if (verification.available) {
+                // Listing is still available - don't mark as sold
+                // This could happen due to pagination issues or API inconsistencies
+                shouldMarkSold = false;
+                this.logger.info(
+                  `Listing ${existing.listingId} not found in inventory but still available on Discogs - keeping as active`
+                );
+              } else if (!verification.error) {
+                // Confirmed sold
+                confidence = 'verified';
+              }
+              // If there was an error, we'll mark as unverified
+            } catch (error) {
+              this.logger.warn(
+                `Failed to verify listing ${existing.listingId}:`,
+                error
+              );
+              // Mark as sold but unverified
+            }
+          }
+
+          if (shouldMarkSold) {
+            existing.status = 'sold';
+            existing.statusChangedAt = Date.now();
+            existing.statusConfidence = confidence;
+            existing.lastVerifiedAt =
+              confidence === 'verified' ? Date.now() : undefined;
+            this.logger.debug(
+              `Marked match ${existing.id} as sold (${confidence})`
+            );
+          }
         }
       }
 

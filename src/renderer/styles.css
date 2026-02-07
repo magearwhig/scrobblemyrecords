@@ -6015,6 +6015,29 @@ body {
   color: white;
 }
 
+.seller-match-badge-unverified {
+  background: var(--accent-warning, #f59e0b);
+  cursor: help;
+}
+
+/* Cache info banner */
+.seller-matches-cache-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.cache-info-icon {
+  font-size: 1rem;
+}
+
 /* Settings Page - Seller Section */
 .settings-seller-config {
   display: flex;

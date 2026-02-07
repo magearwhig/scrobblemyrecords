@@ -1635,4 +1635,175 @@ describe('SellerMonitoringService', () => {
       expect(requestedPage).toBe(1);
     });
   });
+
+  describe('verifyListingStatus', () => {
+    it('should return available=true when listing exists', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: { id: 123, status: 'For Sale' },
+      });
+
+      const result = await sellerMonitoringService.verifyListingStatus(123);
+
+      expect(result.available).toBe(true);
+      expect(result.error).toBeUndefined();
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+        '/marketplace/listings/123',
+        expect.any(Object)
+      );
+    });
+
+    it('should return available=false when listing returns 404', async () => {
+      const error: any = new Error('Not found');
+      error.response = { status: 404 };
+      error.isAxiosError = true;
+      mockAxiosInstance.get.mockRejectedValue(error);
+
+      // Mock axios.isAxiosError
+      (axios.isAxiosError as unknown as jest.Mock) = jest
+        .fn()
+        .mockReturnValue(true);
+
+      const result = await sellerMonitoringService.verifyListingStatus(123);
+
+      expect(result.available).toBe(false);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('should return error when request fails with other error', async () => {
+      const error = new Error('Network error');
+      mockAxiosInstance.get.mockRejectedValue(error);
+
+      // Mock axios.isAxiosError to return false
+      (axios.isAxiosError as unknown as jest.Mock) = jest
+        .fn()
+        .mockReturnValue(false);
+
+      const result = await sellerMonitoringService.verifyListingStatus(123);
+
+      expect(result.available).toBe(false);
+      expect(result.error).toBe('Network error');
+    });
+  });
+
+  describe('verifyAndUpdateMatch', () => {
+    beforeEach(() => {
+      // Setup a match to verify
+      mockFileStorage.readJSON.mockImplementation((path: string) => {
+        if (path.includes('matches')) {
+          const store: SellerMatchesStore = {
+            schemaVersion: 1,
+            lastUpdated: Date.now() - 86400000,
+            matches: [
+              createMatch({
+                id: 'match-1',
+                listingId: 123,
+                status: 'sold',
+                statusConfidence: 'unverified',
+              }),
+            ],
+          };
+          return Promise.resolve(store);
+        }
+        return Promise.resolve(null);
+      });
+    });
+
+    it('should reactivate match when listing is still available', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: { id: 123 },
+      });
+
+      const result =
+        await sellerMonitoringService.verifyAndUpdateMatch('match-1');
+
+      expect(result.updated).toBe(true);
+      expect(result.status).toBe('active');
+
+      // Check that store was updated
+      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+      const savedStore = mockFileStorage.writeJSON.mock
+        .calls[0][1] as SellerMatchesStore;
+      const savedMatch = savedStore.matches.find(
+        (m: SellerMatch) => m.id === 'match-1'
+      );
+      expect(savedMatch?.status).toBe('active');
+      expect(savedMatch?.statusConfidence).toBe('verified');
+    });
+
+    it('should confirm sold status when listing is not available', async () => {
+      const error: any = new Error('Not found');
+      error.response = { status: 404 };
+      error.isAxiosError = true;
+      mockAxiosInstance.get.mockRejectedValue(error);
+      (axios.isAxiosError as unknown as jest.Mock) = jest
+        .fn()
+        .mockReturnValue(true);
+
+      const result =
+        await sellerMonitoringService.verifyAndUpdateMatch('match-1');
+
+      expect(result.updated).toBe(false); // Status unchanged
+      expect(result.status).toBe('sold');
+
+      const savedStore = mockFileStorage.writeJSON.mock
+        .calls[0][1] as SellerMatchesStore;
+      const savedMatch = savedStore.matches.find(
+        (m: SellerMatch) => m.id === 'match-1'
+      );
+      expect(savedMatch?.statusConfidence).toBe('verified');
+    });
+
+    it('should return not_found for unknown match', async () => {
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        matches: [],
+      });
+
+      const result =
+        await sellerMonitoringService.verifyAndUpdateMatch('unknown-id');
+
+      expect(result.updated).toBe(false);
+      expect(result.status).toBe('not_found');
+      expect(result.error).toBe('Match not found');
+    });
+  });
+
+  describe('getAllMatchesWithCacheInfo', () => {
+    it('should return matches with cache info', async () => {
+      const now = Date.now();
+      mockFileStorage.readJSON.mockImplementation((path: string) => {
+        if (path.includes('matches')) {
+          return Promise.resolve({
+            schemaVersion: 1,
+            lastUpdated: now - 3600000, // 1 hour ago
+            matches: [createMatch({ id: 'match-1' })],
+          });
+        }
+        if (path.includes('monitored-sellers')) {
+          return Promise.resolve({
+            schemaVersion: 1,
+            sellers: [
+              {
+                username: 'TestShop',
+                displayName: 'Test Shop',
+                addedAt: now - 86400000,
+                lastScanned: now - 7200000, // 2 hours ago
+              },
+            ],
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      const result = await sellerMonitoringService.getAllMatchesWithCacheInfo();
+
+      expect(result.matches).toHaveLength(1);
+      expect(result.cacheInfo.lastUpdated).toBe(now - 3600000);
+      expect(result.cacheInfo.oldestScanAge).toBeGreaterThan(7000000);
+      expect(result.cacheInfo.nextScanDue).toBeDefined();
+    });
+  });
 });

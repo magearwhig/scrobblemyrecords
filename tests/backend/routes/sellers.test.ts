@@ -647,4 +647,95 @@ describe('Sellers Routes', () => {
       ).not.toHaveBeenCalled();
     });
   });
+
+  describe('GET /api/v1/sellers/matches with cache info', () => {
+    it('should return matches with cache info when includeCacheInfo=true', async () => {
+      const now = Date.now();
+      mockSellerMonitoringService.getAllMatchesWithCacheInfo = jest
+        .fn()
+        .mockResolvedValue({
+          matches: [createMatch({ id: 'match-1' })],
+          cacheInfo: {
+            lastUpdated: now - 3600000,
+            oldestScanAge: 7200000,
+            nextScanDue: 14400000,
+          },
+        });
+
+      const response = await request(app).get(
+        '/api/v1/sellers/matches?includeCacheInfo=true'
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.cacheInfo).toBeDefined();
+      expect(response.body.cacheInfo.lastUpdated).toBe(now - 3600000);
+      expect(response.body.cacheInfo.oldestScanAge).toBe(7200000);
+    });
+
+    it('should return matches without cache info when not requested', async () => {
+      mockSellerMonitoringService.getAllMatches = jest
+        .fn()
+        .mockResolvedValue([createMatch({ id: 'match-1' })]);
+
+      const response = await request(app).get('/api/v1/sellers/matches');
+
+      expect(response.status).toBe(200);
+      expect(response.body.cacheInfo).toBeUndefined();
+      expect(mockSellerMonitoringService.getAllMatches).toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /api/v1/sellers/matches/:matchId/verify', () => {
+    beforeEach(() => {
+      mockSellerMonitoringService.verifyAndUpdateMatch = jest.fn();
+    });
+
+    it('should verify match and return result', async () => {
+      mockSellerMonitoringService.verifyAndUpdateMatch.mockResolvedValue({
+        updated: true,
+        status: 'active',
+      });
+
+      const response = await request(app).post(
+        '/api/v1/sellers/matches/match-1/verify'
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.updated).toBe(true);
+      expect(response.body.data.status).toBe('active');
+      expect(response.body.message).toContain('updated to active');
+    });
+
+    it('should return unchanged message when status not updated', async () => {
+      mockSellerMonitoringService.verifyAndUpdateMatch.mockResolvedValue({
+        updated: false,
+        status: 'sold',
+      });
+
+      const response = await request(app).post(
+        '/api/v1/sellers/matches/match-2/verify'
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.updated).toBe(false);
+      expect(response.body.message).toContain('unchanged');
+    });
+
+    it('should handle verification errors', async () => {
+      mockSellerMonitoringService.verifyAndUpdateMatch.mockRejectedValue(
+        new Error('Verification failed')
+      );
+
+      const response = await request(app).post(
+        '/api/v1/sellers/matches/match-3/verify'
+      );
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBe('Verification failed');
+    });
+  });
 });

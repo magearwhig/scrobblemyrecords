@@ -73,11 +73,24 @@ export default function createSellersRouter(
     }
   });
 
-  // GET /api/v1/sellers/matches - All matches
-  router.get('/matches', async (_req, res) => {
+  // GET /api/v1/sellers/matches - All matches with cache info
+  router.get('/matches', async (req, res) => {
     try {
-      const matches = await sellerMonitoringService.getAllMatches();
-      res.json({ success: true, data: matches, total: matches.length });
+      const includeCacheInfo = req.query.includeCacheInfo === 'true';
+
+      if (includeCacheInfo) {
+        const result =
+          await sellerMonitoringService.getAllMatchesWithCacheInfo();
+        res.json({
+          success: true,
+          data: result.matches,
+          total: result.matches.length,
+          cacheInfo: result.cacheInfo,
+        });
+      } else {
+        const matches = await sellerMonitoringService.getAllMatches();
+        res.json({ success: true, data: matches, total: matches.length });
+      }
     } catch (error) {
       logger.error('Error getting matches', error);
       res.status(500).json({
@@ -206,6 +219,29 @@ export default function createSellersRouter(
       res.json({ success: true, message: 'Match marked as notified' });
     } catch (error) {
       logger.error('Error marking match as notified', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // POST /api/v1/sellers/matches/:matchId/verify - Verify listing status on Discogs
+  // Checks if listing is still available and updates status accordingly
+  router.post('/matches/:matchId/verify', async (req, res) => {
+    try {
+      const { matchId } = req.params;
+      const result =
+        await sellerMonitoringService.verifyAndUpdateMatch(matchId);
+      res.json({
+        success: true,
+        data: result,
+        message: result.updated
+          ? `Match status updated to ${result.status}`
+          : `Match status unchanged (${result.status})`,
+      });
+    } catch (error) {
+      logger.error('Error verifying match', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

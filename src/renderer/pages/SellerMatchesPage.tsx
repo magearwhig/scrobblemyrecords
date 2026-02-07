@@ -6,6 +6,12 @@ import { getApiService } from '../services/api';
 
 type SortOption = 'newest' | 'price' | 'artist';
 
+interface CacheInfo {
+  lastUpdated: number;
+  oldestScanAge: number;
+  nextScanDue: number;
+}
+
 const SellerMatchesPage: React.FC = () => {
   const { state } = useApp();
   const api = getApiService(state.serverUrl);
@@ -19,6 +25,8 @@ const SellerMatchesPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [showSold, setShowSold] = useState(false);
   const [markingAsSeen, setMarkingAsSeen] = useState<Set<string>>(new Set());
+  const [cacheInfo, setCacheInfo] = useState<CacheInfo | null>(null);
+  const [verifying, setVerifying] = useState<Set<string>>(new Set());
 
   // Parse query param for seller filter
   useEffect(() => {
@@ -38,11 +46,12 @@ const SellerMatchesPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const [matchesData, sellersData] = await Promise.all([
-        api.getSellerMatches(),
+      const [matchesResponse, sellersData] = await Promise.all([
+        api.getSellerMatchesWithCacheInfo(),
         api.getSellers(),
       ]);
-      setMatches(matchesData);
+      setMatches(matchesResponse.matches);
+      setCacheInfo(matchesResponse.cacheInfo);
       setSellers(sellersData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load matches');
@@ -74,6 +83,61 @@ const SellerMatchesPage: React.FC = () => {
         return next;
       });
     }
+  };
+
+  // Handle verify listing status
+  const handleVerify = async (matchId: string) => {
+    try {
+      setVerifying(prev => new Set([...prev, matchId]));
+      const result = await api.verifyMatch(matchId);
+
+      if (result.error) {
+        window.alert(`Could not verify: ${result.error}`);
+      } else {
+        // Update the match in local state
+        setMatches(prev =>
+          prev.map(m =>
+            m.id === matchId
+              ? {
+                  ...m,
+                  status: result.status as 'active' | 'sold' | 'seen',
+                  statusConfidence: 'verified',
+                  lastVerifiedAt: Date.now(),
+                }
+              : m
+          )
+        );
+
+        if (result.updated) {
+          window.alert(
+            result.status === 'active'
+              ? 'Good news! This item is still available.'
+              : 'Confirmed: This item has been sold.'
+          );
+        }
+      }
+    } catch (err) {
+      window.alert(
+        err instanceof Error ? err.message : 'Failed to verify listing'
+      );
+    } finally {
+      setVerifying(prev => {
+        const next = new Set(prev);
+        next.delete(matchId);
+        return next;
+      });
+    }
+  };
+
+  // Format cache age
+  const formatCacheAge = (ageMs: number): string => {
+    const hours = Math.floor(ageMs / (1000 * 60 * 60));
+    const minutes = Math.floor((ageMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (hours === 0) {
+      return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+    }
+    return `${hours}h ${minutes}m ago`;
   };
 
   // Get seller display name
@@ -169,6 +233,17 @@ const SellerMatchesPage: React.FC = () => {
           ? 'No matches found from your monitored sellers.'
           : `Showing ${filteredMatches.length} item${filteredMatches.length !== 1 ? 's' : ''} found at your monitored sellers.`}
       </p>
+
+      {/* Cache info banner */}
+      {cacheInfo && (
+        <div className='seller-matches-cache-info'>
+          <span className='cache-info-icon'>ℹ️</span>
+          <span>
+            Data from {formatCacheAge(cacheInfo.oldestScanAge)}
+            {cacheInfo.nextScanDue === 0 && ' (refresh recommended)'}
+          </span>
+        </div>
+      )}
 
       {/* Back link */}
       <div className='seller-matches-back'>
@@ -272,8 +347,17 @@ const SellerMatchesPage: React.FC = () => {
                     </span>
                   )}
                   {match.status === 'sold' && (
-                    <span className='seller-match-badge seller-match-badge-sold'>
-                      SOLD
+                    <span
+                      className={`seller-match-badge seller-match-badge-sold ${match.statusConfidence === 'unverified' ? 'seller-match-badge-unverified' : ''}`}
+                      title={
+                        match.statusConfidence === 'unverified'
+                          ? 'Status not verified - click Refresh to check'
+                          : match.lastVerifiedAt
+                            ? `Verified ${formatRelativeTime(match.lastVerifiedAt)}`
+                            : 'Sold'
+                      }
+                    >
+                      SOLD{match.statusConfidence === 'unverified' ? '?' : ''}
                     </span>
                   )}
                 </div>
@@ -291,7 +375,17 @@ const SellerMatchesPage: React.FC = () => {
                 </div>
               </div>
               <div className='seller-match-actions'>
-                {match.status !== 'seen' && (
+                {match.status === 'sold' && (
+                  <button
+                    className='btn btn-small btn-outline'
+                    onClick={() => handleVerify(match.id)}
+                    disabled={verifying.has(match.id)}
+                    title='Check if still available on Discogs'
+                  >
+                    {verifying.has(match.id) ? '...' : 'Refresh'}
+                  </button>
+                )}
+                {match.status !== 'seen' && match.status !== 'sold' && (
                   <button
                     className='btn btn-small btn-outline'
                     onClick={() => handleMarkAsSeen(match.id)}

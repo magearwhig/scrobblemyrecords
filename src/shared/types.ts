@@ -895,7 +895,9 @@ export interface SellerMatch {
   notified: boolean; // Whether notification was created (client-side)
   status: 'active' | 'sold' | 'seen'; // Match status
   statusChangedAt?: number; // When status last changed (for cleanup of sold matches)
+  statusConfidence?: 'verified' | 'unverified'; // Confidence level of sold status
   coverImage?: string; // Album cover URL
+  lastVerifiedAt?: number; // When status was last verified via API
 }
 
 /**
@@ -905,6 +907,18 @@ export interface SellerMatchesStore {
   schemaVersion: 1;
   lastUpdated: number;
   matches: SellerMatch[];
+}
+
+/**
+ * Response for matches endpoint with cache metadata
+ */
+export interface SellerMatchesResponse {
+  matches: SellerMatch[];
+  cacheInfo: {
+    lastUpdated: number; // When matches were last updated
+    oldestScanAge: number; // Age of oldest seller scan in ms
+    nextScanDue: number; // When next scan should run (ms from now, 0 if overdue)
+  };
 }
 
 /**

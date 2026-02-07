@@ -42,6 +42,7 @@ import {
   ScrobbleTrack,
   ScrobbleSession,
   SellerMatch,
+  SellerMatchesResponse,
   SellerMonitoringSettings,
   SellerScanStatus,
   SuggestionResult,
@@ -1260,6 +1261,23 @@ class ApiService {
 
   async markMatchAsNotified(matchId: string): Promise<void> {
     await this.api.post(`/sellers/matches/${matchId}/notified`);
+  }
+
+  async verifyMatch(
+    matchId: string
+  ): Promise<{ updated: boolean; status: string; error?: string }> {
+    const response = await this.api.post(`/sellers/matches/${matchId}/verify`);
+    return response.data.data;
+  }
+
+  async getSellerMatchesWithCacheInfo(): Promise<SellerMatchesResponse> {
+    const response = await this.api.get(
+      '/sellers/matches?includeCacheInfo=true'
+    );
+    return {
+      matches: response.data.data,
+      cacheInfo: response.data.cacheInfo,
+    };
   }
 
   async getSellerSettings(): Promise<SellerMonitoringSettings> {
