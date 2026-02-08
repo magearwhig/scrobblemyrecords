@@ -251,7 +251,8 @@ app.use(
     authService,
     lastfmService,
     discogsService,
-    syncService
+    syncService,
+    mappingService
   )
 );
 app.use('/api/v1/artist-mappings', artistMappingRoutes);

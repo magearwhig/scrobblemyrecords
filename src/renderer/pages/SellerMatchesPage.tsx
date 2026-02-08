@@ -90,23 +90,32 @@ const SellerMatchesPage: React.FC = () => {
     try {
       setVerifying(prev => new Set([...prev, matchId]));
       const result = await api.verifyMatch(matchId);
+      console.log('[SellerMatches] Verify result:', result);
 
       if (result.error) {
         window.alert(`Could not verify: ${result.error}`);
       } else {
-        // Update the match in local state
-        setMatches(prev =>
-          prev.map(m =>
-            m.id === matchId
-              ? {
-                  ...m,
-                  status: result.status as 'active' | 'sold' | 'seen',
-                  statusConfidence: 'verified',
-                  lastVerifiedAt: Date.now(),
-                }
-              : m
-          )
+        // Reload from server to ensure UI is in sync with backend
+        const matchesResponse = await api.getSellerMatchesWithCacheInfo();
+        console.log('[SellerMatches] Reloaded matches:', {
+          total: matchesResponse.matches.length,
+          matchStatuses: matchesResponse.matches.map(m => ({
+            id: m.id,
+            status: m.status,
+          })),
+        });
+
+        // Find the verified match in the response
+        const verifiedMatch = matchesResponse.matches.find(
+          m => m.id === matchId
         );
+        console.log(
+          '[SellerMatches] Verified match in response:',
+          verifiedMatch
+        );
+
+        setMatches(matchesResponse.matches);
+        setCacheInfo(matchesResponse.cacheInfo);
 
         if (result.updated) {
           window.alert(
@@ -117,6 +126,7 @@ const SellerMatchesPage: React.FC = () => {
         }
       }
     } catch (err) {
+      console.error('[SellerMatches] Verify error:', err);
       window.alert(
         err instanceof Error ? err.message : 'Failed to verify listing'
       );

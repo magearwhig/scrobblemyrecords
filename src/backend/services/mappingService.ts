@@ -275,6 +275,38 @@ export class MappingService {
   }
 
   /**
+   * Reverse lookup: given collection artist/album, find ALL Last.fm history mappings.
+   * This is used for Various Artists albums where multiple track artists map to
+   * the same collection album.
+   */
+  async getAllAlbumMappingsForCollection(
+    collectionArtist: string,
+    collectionAlbum: string
+  ): Promise<AlbumMapping[]> {
+    await this.loadMappings();
+
+    const normalizedCollectionKey = this.albumKey(
+      collectionArtist,
+      collectionAlbum
+    );
+
+    const mappings: AlbumMapping[] = [];
+
+    // Search through all mappings to find ALL that match the collection artist/album
+    for (const mapping of this.albumMappings.values()) {
+      const mappingCollectionKey = this.albumKey(
+        mapping.collectionArtist,
+        mapping.collectionAlbum
+      );
+      if (mappingCollectionKey === normalizedCollectionKey) {
+        mappings.push(mapping);
+      }
+    }
+
+    return mappings;
+  }
+
+  /**
    * Get all artist mappings
    */
   async getAllArtistMappings(): Promise<ArtistMapping[]> {

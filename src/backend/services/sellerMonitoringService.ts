@@ -621,14 +621,24 @@ export class SellerMonitoringService {
   async verifyAndUpdateMatch(
     matchId: string
   ): Promise<{ updated: boolean; status: string; error?: string }> {
+    this.logger.info(
+      `[verifyAndUpdateMatch] Starting verification for match ${matchId}`
+    );
     const store = await this.getMatchesStore();
     const match = store.matches.find(m => m.id === matchId);
 
     if (!match) {
+      this.logger.warn(`[verifyAndUpdateMatch] Match ${matchId} not found`);
       return { updated: false, status: 'not_found', error: 'Match not found' };
     }
 
+    this.logger.info(
+      `[verifyAndUpdateMatch] Found match: ${match.artist} - ${match.title}, current status: ${match.status}`
+    );
     const result = await this.verifyListingStatus(match.listingId);
+    this.logger.info(
+      `[verifyAndUpdateMatch] Listing verification result: available=${result.available}, error=${result.error}`
+    );
 
     if (result.error) {
       // Couldn't verify - mark as unverified
@@ -663,7 +673,35 @@ export class SellerMonitoringService {
 
     match.lastVerifiedAt = Date.now();
     store.lastUpdated = Date.now();
+    this.logger.info(
+      `[verifyAndUpdateMatch] Saving match with new status: ${match.status} (was: ${previousStatus})`
+    );
     await this.fileStorage.writeJSON(this.MATCHES_FILE, store);
+    this.logger.info(`[verifyAndUpdateMatch] Saved successfully`);
+
+    // Update seller's matchCount if status changed
+    if (previousStatus !== match.status) {
+      const sellers = await this.getSellers();
+      const seller = sellers.find(
+        s => s.username.toLowerCase() === match.sellerId.toLowerCase()
+      );
+      if (seller) {
+        const activeMatches = store.matches.filter(
+          m =>
+            m.sellerId.toLowerCase() === seller.username.toLowerCase() &&
+            m.status !== 'sold'
+        );
+        seller.matchCount = activeMatches.length;
+        const sellersStore: MonitoredSellersStore = {
+          schemaVersion: 1,
+          sellers,
+        };
+        await this.fileStorage.writeJSON(this.SELLERS_FILE, sellersStore);
+        this.logger.info(
+          `[verifyAndUpdateMatch] Updated ${seller.displayName} matchCount to ${seller.matchCount}`
+        );
+      }
+    }
 
     return {
       updated: previousStatus !== match.status,
@@ -683,6 +721,12 @@ export class SellerMonitoringService {
     };
   }> {
     const store = await this.getMatchesStore();
+    this.logger.debug(
+      `[getAllMatchesWithCacheInfo] Loaded ${store.matches.length} matches`
+    );
+    this.logger.debug(
+      `[getAllMatchesWithCacheInfo] Match statuses: ${JSON.stringify(store.matches.map(m => ({ id: m.id, status: m.status })))}`
+    );
     const sellers = await this.getSellers();
 
     // Calculate oldest scan age
@@ -2003,6 +2047,24 @@ export class SellerMonitoringService {
           m.status === 'sold'
       );
       matchesStore.matches.push(...matches);
+
+      // Remove duplicate sold matches if the same item was re-found in this scan
+      // This handles the case where an item was incorrectly marked as sold but is still available
+      const newListingIds = new Set(matches.map(m => m.listingId));
+      matchesStore.matches = matchesStore.matches.filter(m => {
+        // If this is a 'sold' match for this seller and we just added an active version, remove the sold one
+        if (
+          m.sellerId.toLowerCase() === seller.username.toLowerCase() &&
+          m.status === 'sold' &&
+          newListingIds.has(m.listingId)
+        ) {
+          this.logger.info(
+            `Removing duplicate sold match ${m.id} - item was re-found as active`
+          );
+          return false;
+        }
+        return true;
+      });
     } else {
       seller.lastQuickCheck = Date.now();
 

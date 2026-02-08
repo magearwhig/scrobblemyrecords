@@ -304,7 +304,12 @@ class ApiService {
 
   async scrobbleBatch(
     tracks: ScrobbleTrack[],
-    baseTimestamp?: number
+    baseTimestamp?: number,
+    collectionRelease?: {
+      releaseId: number;
+      artist: string;
+      album: string;
+    }
   ): Promise<{
     success: number;
     failed: number;
@@ -315,6 +320,7 @@ class ApiService {
     const response = await this.api.post('/scrobble/batch', {
       tracks,
       baseTimestamp,
+      collectionRelease,
     });
     return response.data.data.results;
   }

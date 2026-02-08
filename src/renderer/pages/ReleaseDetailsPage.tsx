@@ -574,7 +574,12 @@ const ReleaseDetailsPage: React.FC = () => {
       );
 
       // Start scrobbling and get session ID
-      const scrobbleResult = await api.scrobbleBatch(result.tracks);
+      // Pass collection release info for auto-mapping (handles Various Artists, etc.)
+      const scrobbleResult = await api.scrobbleBatch(result.tracks, undefined, {
+        releaseId: release.id,
+        artist: release.artist,
+        album: release.title,
+      });
 
       // Start polling for progress
       const pollProgress = async () => {

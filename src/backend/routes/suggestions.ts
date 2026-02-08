@@ -575,6 +575,7 @@ export default function createSuggestionsRouter(
    * GET /api/v1/suggestions/album-history/:artist/:album
    * Get scrobble history for a specific album
    * Uses fuzzy matching and checks artist name mappings
+   * For Various Artists albums, aggregates plays from ALL mapped track artists
    */
   router.get(
     '/album-history/:artist/:album',
@@ -592,46 +593,136 @@ export default function createSuggestionsRouter(
         const decodedArtist = decodeURIComponent(artist);
         const decodedAlbum = decodeURIComponent(album);
 
-        // Check if there's an album mapping from collection -> history
-        // This allows us to find albums with different names in Last.fm history
-        const albumMapping = await mappingService.getAlbumMappingForCollection(
+        // Get ALL album mappings for this collection album
+        // For Various Artists albums, this returns mappings for each track artist
+        const albumMappings =
+          await mappingService.getAllAlbumMappingsForCollection(
+            decodedArtist,
+            decodedAlbum
+          );
+
+        // Collect all plays from all mappings
+        const allPlays: Array<{ timestamp: number; track?: string }> = [];
+        const allMatchedKeys: string[] = [];
+        let latestPlayed: number | null = null;
+        let bestMatchType: 'exact' | 'fuzzy' | 'none' = 'none';
+
+        // If we have mappings, query scrobble history for each one
+        if (albumMappings.length > 0) {
+          logger.debug(
+            `Album history: found ${albumMappings.length} mappings for "${decodedArtist}|${decodedAlbum}"`
+          );
+
+          for (const mapping of albumMappings) {
+            const searchArtist = mapping.historyArtist;
+            const searchAlbum = mapping.historyAlbum;
+
+            logger.debug(
+              `Album history: querying mapping "${searchArtist}|${searchAlbum}"`
+            );
+
+            // Try with fuzzy matching on the mapped names
+            let result = await historyStorage.getAlbumHistoryFuzzy(
+              searchArtist,
+              searchAlbum
+            );
+
+            // If not found, check if artist has a scrobble mapping and try that
+            if (result.matchType === 'none') {
+              const mappedArtist =
+                artistMappingService.getLastfmName(searchArtist);
+              if (mappedArtist !== searchArtist) {
+                logger.debug(
+                  `Album history: trying mapped artist "${mappedArtist}" for "${searchArtist}"`
+                );
+                result = await historyStorage.getAlbumHistoryFuzzy(
+                  mappedArtist,
+                  searchAlbum
+                );
+              }
+            }
+
+            if (result.matchType !== 'none' && result.entry) {
+              allPlays.push(...result.entry.plays);
+              if (result.matchedKeys) {
+                allMatchedKeys.push(...result.matchedKeys);
+              }
+              if (
+                result.entry.lastPlayed &&
+                (!latestPlayed || result.entry.lastPlayed > latestPlayed)
+              ) {
+                latestPlayed = result.entry.lastPlayed;
+              }
+              // Track best match type (exact > fuzzy)
+              if (result.matchType === 'exact') {
+                bestMatchType = 'exact';
+              } else if (
+                result.matchType === 'fuzzy' &&
+                bestMatchType !== 'exact'
+              ) {
+                bestMatchType = 'fuzzy';
+              }
+            }
+          }
+        }
+
+        // Also try direct search with the collection artist/album name
+        let directResult = await historyStorage.getAlbumHistoryFuzzy(
           decodedArtist,
           decodedAlbum
         );
 
-        let searchArtist = decodedArtist;
-        let searchAlbum = decodedAlbum;
-
-        if (albumMapping) {
-          // Use the Last.fm history names from the mapping
-          searchArtist = albumMapping.historyArtist;
-          searchAlbum = albumMapping.historyAlbum;
-          logger.debug(
-            `Album history: using album mapping "${decodedArtist}|${decodedAlbum}" -> "${searchArtist}|${searchAlbum}"`
-          );
-        }
-
-        // First try with fuzzy matching on the (possibly mapped) names
-        let result = await historyStorage.getAlbumHistoryFuzzy(
-          searchArtist,
-          searchAlbum
-        );
-
         // If not found, check if artist has a scrobble mapping and try that
-        if (result.matchType === 'none') {
-          const mappedArtist = artistMappingService.getLastfmName(searchArtist);
-          if (mappedArtist !== searchArtist) {
+        if (directResult.matchType === 'none') {
+          const mappedArtist =
+            artistMappingService.getLastfmName(decodedArtist);
+          if (mappedArtist !== decodedArtist) {
             logger.debug(
-              `Album history: trying mapped artist "${mappedArtist}" for "${searchArtist}"`
+              `Album history: trying mapped artist "${mappedArtist}" for "${decodedArtist}"`
             );
-            result = await historyStorage.getAlbumHistoryFuzzy(
+            directResult = await historyStorage.getAlbumHistoryFuzzy(
               mappedArtist,
-              searchAlbum
+              decodedAlbum
             );
           }
         }
 
-        if (result.matchType === 'none' || !result.entry) {
+        if (directResult.matchType !== 'none' && directResult.entry) {
+          allPlays.push(...directResult.entry.plays);
+          if (directResult.matchedKeys) {
+            allMatchedKeys.push(...directResult.matchedKeys);
+          }
+          if (
+            directResult.entry.lastPlayed &&
+            (!latestPlayed || directResult.entry.lastPlayed > latestPlayed)
+          ) {
+            latestPlayed = directResult.entry.lastPlayed;
+          }
+          // Track best match type (exact > fuzzy)
+          if (directResult.matchType === 'exact') {
+            bestMatchType = 'exact';
+          } else if (
+            directResult.matchType === 'fuzzy' &&
+            bestMatchType !== 'exact'
+          ) {
+            bestMatchType = 'fuzzy';
+          }
+        }
+
+        // Deduplicate plays by timestamp (same scrobble could appear in multiple searches)
+        const uniquePlays = new Map<
+          number,
+          { timestamp: number; track?: string }
+        >();
+        for (const play of allPlays) {
+          const key = play.timestamp;
+          if (!uniquePlays.has(key)) {
+            uniquePlays.set(key, play);
+          }
+        }
+        const deduplicatedPlays = Array.from(uniquePlays.values());
+
+        if (deduplicatedPlays.length === 0) {
           return res.json({
             success: true,
             data: {
@@ -645,11 +736,24 @@ export default function createSuggestionsRouter(
           });
         }
 
+        // Create a combined result for track mapping
+        // Use deduplicated plays count to avoid double-counting when same plays
+        // are found through both mapping search and direct search
+        const combinedResult = {
+          entry: {
+            plays: deduplicatedPlays,
+            lastPlayed: latestPlayed,
+            playCount: deduplicatedPlays.length,
+          },
+          matchType: bestMatchType,
+          matchedKeys: [...new Set(allMatchedKeys)],
+        };
+
         // Apply track mappings to normalize track names
         // This ensures that tracks mapped in Forgotten Favorites show correctly
         // We need to check mappings for ALL matched album variants from Last.fm history
         const mappedPlays = await Promise.all(
-          result.entry.plays.map(async play => {
+          combinedResult.entry.plays.map(async play => {
             if (!play.track) return play;
 
             // Try to find a mapping for this track
@@ -661,8 +765,8 @@ export default function createSuggestionsRouter(
             );
 
             // Strategy 2: If not found, check against all matched Last.fm history keys
-            if (!mappedTrack && result.matchedKeys) {
-              for (const key of result.matchedKeys) {
+            if (!mappedTrack && combinedResult.matchedKeys) {
+              for (const key of combinedResult.matchedKeys) {
                 // Parse the key to get the actual Last.fm artist/album names
                 const parts = key.split('|');
                 if (parts.length >= 2) {
@@ -700,13 +804,13 @@ export default function createSuggestionsRouter(
             found: true,
             artist: decodedArtist,
             album: decodedAlbum,
-            lastPlayed: result.entry.lastPlayed,
-            playCount: result.entry.playCount,
+            lastPlayed: combinedResult.entry.lastPlayed,
+            playCount: combinedResult.entry.playCount,
             plays: [...mappedPlays]
               .sort((a, b) => b.timestamp - a.timestamp)
               .slice(0, 50), // Most recent 50 plays
-            matchType: result.matchType,
-            matchedKeys: result.matchedKeys,
+            matchType: combinedResult.matchType,
+            matchedKeys: combinedResult.matchedKeys,
           },
         });
       } catch (error) {

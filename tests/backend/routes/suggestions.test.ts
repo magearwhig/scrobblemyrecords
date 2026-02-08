@@ -206,6 +206,11 @@ describe('Suggestions Routes', () => {
       context: [],
     });
 
+    // Setup MappingService mocks
+    mockMappingService.getAllAlbumMappingsForCollection = jest
+      .fn()
+      .mockResolvedValue([]);
+
     // Create Express app
     app = express();
     app.use(helmet());
@@ -894,7 +899,8 @@ describe('Suggestions Routes', () => {
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data.found).toBe(true);
-      expect(response.body.data.playCount).toBe(5);
+      // playCount is now the deduplicated plays count, not entry.playCount
+      expect(response.body.data.playCount).toBe(2);
       expect(response.body.data.plays).toHaveLength(2);
       expect(response.body.data.matchType).toBe('exact');
     });

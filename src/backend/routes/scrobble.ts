@@ -4,9 +4,13 @@ import { ScrobbleTrack, ScrobbleSession, Track } from '../../shared/types';
 import { artistMappingService } from '../services/artistMappingService';
 import { AuthService } from '../services/authService';
 import { LastFmService } from '../services/lastfmService';
+import { MappingService } from '../services/mappingService';
 import { ScrobbleHistorySyncService } from '../services/scrobbleHistorySyncService';
 import { FileStorage } from '../utils/fileStorage';
+import { createLogger } from '../utils/logger';
 import { validateSessionId } from '../utils/validation';
+
+const logger = createLogger('ScrobbleRouter');
 
 // Create router factory function for dependency injection
 export default function createScrobbleRouter(
@@ -16,7 +20,8 @@ export default function createScrobbleRouter(
   discogsService?: {
     searchCollection: (username: string, album: string) => Promise<any>;
   },
-  scrobbleHistorySyncService?: ScrobbleHistorySyncService
+  scrobbleHistorySyncService?: ScrobbleHistorySyncService,
+  mappingService?: MappingService
 ) {
   const router = express.Router();
 
@@ -68,7 +73,7 @@ export default function createScrobbleRouter(
   // Scrobble multiple tracks
   router.post('/batch', async (req: Request, res: Response) => {
     try {
-      const { tracks, baseTimestamp } = req.body;
+      const { tracks, baseTimestamp, collectionRelease } = req.body;
 
       if (!Array.isArray(tracks) || tracks.length === 0) {
         return res.status(400).json({
@@ -115,6 +120,65 @@ export default function createScrobbleRouter(
           .catch(err =>
             console.error('Failed to auto-sync after scrobble:', err)
           );
+      }
+
+      // Auto-create album mappings for tracks where artist differs from collection artist
+      // This handles Various Artists compilations and artist name variations
+      if (
+        results.success > 0 &&
+        mappingService &&
+        collectionRelease?.artist &&
+        collectionRelease?.album
+      ) {
+        const collectionArtistNormalized = collectionRelease.artist
+          .toLowerCase()
+          .trim();
+
+        // Collect unique track artists that differ from collection artist
+        const uniqueTrackArtists = new Set<string>();
+        for (const track of tracksWithTimestamps) {
+          const trackArtistNormalized = track.artist.toLowerCase().trim();
+          if (trackArtistNormalized !== collectionArtistNormalized) {
+            uniqueTrackArtists.add(track.artist);
+          }
+        }
+
+        // Create mappings for each unique artist (fire and forget)
+        if (uniqueTrackArtists.size > 0) {
+          const mappingPromises = Array.from(uniqueTrackArtists).map(
+            async trackArtist => {
+              try {
+                // Check if mapping already exists
+                const existingMapping = await mappingService.getAlbumMapping(
+                  trackArtist,
+                  collectionRelease.album
+                );
+
+                if (!existingMapping) {
+                  await mappingService.addAlbumMapping({
+                    historyArtist: trackArtist,
+                    historyAlbum: collectionRelease.album,
+                    collectionId: collectionRelease.releaseId || 0,
+                    collectionArtist: collectionRelease.artist,
+                    collectionAlbum: collectionRelease.album,
+                  });
+                  logger.info(
+                    `Auto-created album mapping: "${trackArtist} - ${collectionRelease.album}" -> "${collectionRelease.artist} - ${collectionRelease.album}"`
+                  );
+                }
+              } catch (err) {
+                logger.warn(
+                  `Failed to create auto-mapping for "${trackArtist}": ${err}`
+                );
+              }
+            }
+          );
+
+          // Fire and forget - don't block response
+          Promise.all(mappingPromises).catch(err =>
+            logger.error('Failed to create auto-mappings:', err)
+          );
+        }
       }
 
       res.json({
