@@ -43,6 +43,7 @@
     "crypto-js": "^4.2.0",
     "dotenv": "^17.0.1",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.2.1",
     "helmet": "^8.1.0",
     "oauth-1.0a": "^2.2.6",
     "react": "^19.1.0",
