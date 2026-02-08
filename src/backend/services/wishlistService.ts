@@ -21,6 +21,7 @@ import {
   WishlistStore,
   WishlistSyncStatus,
 } from '../../shared/types';
+import { getDiscogsAxios } from '../utils/discogsAxios';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -95,19 +96,7 @@ export class WishlistService {
       },
     });
 
-    this.axios = axios.create({
-      baseURL: this.baseUrl,
-      timeout: 10000,
-      headers: {
-        'User-Agent': 'RecordScrobbles/1.0',
-      },
-    });
-
-    // Rate limiting interceptor - 1 second between requests
-    this.axios.interceptors.request.use(async config => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return config;
-    });
+    this.axios = getDiscogsAxios();
   }
 
   /**

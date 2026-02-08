@@ -14,6 +14,7 @@ import {
   SellerScanStatus,
 } from '../../shared/types';
 import { safeJsonParse } from '../../shared/utils/safeJsonParse';
+import { getDiscogsAxios } from '../utils/discogsAxios';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -109,19 +110,7 @@ export class SellerMonitoringService {
       },
     });
 
-    this.axios = axios.create({
-      baseURL: this.baseUrl,
-      timeout: 30000,
-      headers: {
-        'User-Agent': 'RecordScrobbles/1.0',
-      },
-    });
-
-    // Rate limiting interceptor - 1 second between requests
-    this.axios.interceptors.request.use(async config => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return config;
-    });
+    this.axios = getDiscogsAxios();
 
     // Initialize on construction (reset stale scan status)
     this.initialize();

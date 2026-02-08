@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-import axios, { AxiosInstance } from 'axios';
+import { AxiosInstance } from 'axios';
 import OAuth from 'oauth-1.0a';
 
 import {
@@ -9,6 +9,7 @@ import {
   ApiResponse,
 } from '../../shared/types';
 import { safeJsonParse } from '../../shared/utils/safeJsonParse';
+import { getDiscogsAxios } from '../utils/discogsAxios';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -43,20 +44,7 @@ export class DiscogsService {
       },
     });
 
-    this.axios = axios.create({
-      baseURL: this.baseUrl,
-      timeout: 10000,
-      headers: {
-        'User-Agent': 'DiscogLastfmScrobbler/1.0',
-      },
-    });
-
-    // Rate limiting interceptor
-    this.axios.interceptors.request.use(async config => {
-      // Simple rate limiting: wait 1 second between requests
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return config;
-    });
+    this.axios = getDiscogsAxios();
   }
 
   async getAuthUrl(): Promise<string> {
