@@ -577,53 +577,93 @@ npm run test:coverage # Run tests with coverage
 ### Project Structure
 ```
 src/
-├── server.ts                   # Express server entrypoint
-├── backend/                    # Node.js API server
-│   ├── routes/                 # API endpoints
-│   │   ├── auth.ts             # Authentication routes
-│   │   ├── collection.ts       # Discogs collection routes
-│   │   ├── scrobble.ts         # Scrobbling routes
-│   │   ├── stats.ts            # Stats dashboard routes
-│   │   ├── images.ts           # Album/artist image routes
-│   │   ├── suggestions.ts      # Suggestions, discovery, AI routes
-│   │   ├── wishlist.ts         # Wishlist and vinyl tracking routes
-│   │   ├── sellers.ts          # Local seller monitoring routes
-│   │   ├── releases.ts         # New release tracking routes
-│   │   └── backup.ts           # Backup and restore routes
-│   ├── services/               # Business logic
-│   │   ├── analyticsService.ts # Listening analytics
-│   │   ├── statsService.ts     # Stats dashboard calculations
-│   │   ├── imageService.ts     # Album/artist image fetching
-│   │   ├── suggestionService.ts # Recommendation algorithm
+├── server.ts                      # Express server entrypoint
+├── backend/                       # Node.js API server
+│   ├── routes/                    # API endpoints
+│   │   ├── auth.ts                # Authentication (Discogs OAuth, Last.fm)
+│   │   ├── collection.ts          # Discogs collection sync & browsing
+│   │   ├── scrobble.ts            # Scrobbling to Last.fm
+│   │   ├── stats.ts               # Stats dashboard & rankings
+│   │   ├── images.ts              # Album/artist image fetching
+│   │   ├── suggestions.ts         # Suggestions, discovery, AI
+│   │   ├── artistMapping.ts       # Artist name mapping CRUD
+│   │   ├── wishlist.ts            # Wishlist & vinyl tracking
+│   │   ├── sellers.ts             # Local seller monitoring
+│   │   ├── releases.ts            # New release tracking
+│   │   ├── backup.ts              # Backup & restore
+│   │   └── discardPile.ts         # Discard pile management
+│   ├── services/                  # Business logic
+│   │   ├── authService.ts         # Encrypted credential storage
+│   │   ├── discogsService.ts      # Discogs API client (rate-limited)
+│   │   ├── lastfmService.ts       # Last.fm API client
+│   │   ├── analyticsService.ts    # Listening analytics
+│   │   ├── statsService.ts        # Stats calculations
+│   │   ├── rankingsService.ts     # Rankings over time
+│   │   ├── imageService.ts        # Album/artist images
+│   │   ├── suggestionService.ts   # Recommendation algorithm
 │   │   ├── scrobbleHistorySyncService.ts # Last.fm history sync
-│   │   ├── scrobbleHistoryStorage.ts # History index storage
-│   │   ├── ollamaService.ts    # AI integration
-│   │   ├── aiPromptBuilder.ts  # AI prompt generation
-│   │   ├── wishlistService.ts  # Wishlist and vinyl tracking
+│   │   ├── scrobbleHistoryStorage.ts     # History index storage
+│   │   ├── mappingService.ts      # Scrobble artist mappings
+│   │   ├── trackMappingService.ts # Discogs↔Last.fm track mappings
+│   │   ├── artistMappingService.ts # Artist name mappings
+│   │   ├── hiddenItemService.ts   # User-hidden suggestions
+│   │   ├── hiddenReleasesService.ts # User-hidden releases
+│   │   ├── wishlistService.ts     # Wishlist & vinyl tracking
 │   │   ├── sellerMonitoringService.ts # Local seller monitoring
-│   │   ├── musicbrainzService.ts # MusicBrainz API integration
-│   │   ├── releaseTrackingService.ts # New release tracking
-│   │   └── backupService.ts      # Backup and restore logic
-│   └── utils/                  # Utilities
-├── renderer/                   # React frontend
-│   ├── components/             # UI components
-│   │   └── settings/           # Settings page sections
-│   ├── pages/                  # Application pages
-│   │   ├── HomePage.tsx
-│   │   ├── SetupPage.tsx
-│   │   ├── CollectionPage.tsx
-│   │   ├── ReleaseDetailsPage.tsx
-│   │   ├── ScrobblePage.tsx
-│   │   ├── SuggestionsPage.tsx
-│   │   ├── DiscoveryPage.tsx
-│   │   ├── HistoryPage.tsx
-│   │   ├── StatsPage.tsx
-│   │   ├── WishlistPage.tsx
-│   │   ├── SellersPage.tsx
-│   │   ├── NewReleasesPage.tsx
-│   │   └── SettingsPage.tsx
-│   └── context/                # State management
-└── shared/                     # Shared types
+│   │   ├── musicbrainzService.ts  # MusicBrainz API
+│   │   ├── releaseTrackingService.ts  # New release tracking
+│   │   ├── discardPileService.ts  # Discard pile logic
+│   │   ├── backupService.ts       # Backup & restore
+│   │   ├── cleanupService.ts      # Cache cleanup
+│   │   ├── migrationService.ts    # Data schema migrations
+│   │   ├── ollamaService.ts       # AI integration (Ollama)
+│   │   └── aiPromptBuilder.ts     # AI prompt generation
+│   └── utils/                     # Utilities
+│       ├── fileStorage.ts         # File-based JSON storage
+│       ├── logger.ts              # Secure logger with redaction
+│       ├── validation.ts          # Input validation & sanitization
+│       ├── encryptionValidator.ts # Encryption key strength checks
+│       └── timestamps.ts          # Timestamp utilities
+├── renderer/                      # React frontend
+│   ├── components/                # UI components
+│   │   ├── ErrorBoundary.tsx      # Render error recovery
+│   │   ├── Header.tsx             # App header
+│   │   ├── Sidebar.tsx            # Navigation sidebar
+│   │   ├── MainContent.tsx        # Page router
+│   │   ├── AlbumCard.tsx          # Album grid card
+│   │   ├── SearchBar.tsx          # Search input
+│   │   ├── ui/                    # Reusable primitives (Button, Modal, Badge, etc.)
+│   │   ├── dashboard/             # Dashboard widgets
+│   │   ├── discovery/             # Discovery tab components
+│   │   ├── settings/              # Settings page sections
+│   │   ├── stats/                 # Stats visualizations
+│   │   └── wishlist/              # Wishlist components
+│   ├── pages/                     # Application pages
+│   │   ├── HomePage.tsx           # Dashboard
+│   │   ├── CollectionPage.tsx     # Discogs collection browser
+│   │   ├── ReleaseDetailsPage.tsx # Album detail & scrobble
+│   │   ├── ScrobblePage.tsx       # Quick scrobble
+│   │   ├── HistoryPage.tsx        # Scrobble history & Last.fm
+│   │   ├── SuggestionsPage.tsx    # Listening suggestions & AI
+│   │   ├── DiscoveryPage.tsx      # Music discovery
+│   │   ├── StatsPage.tsx          # Listening statistics
+│   │   ├── WishlistPage.tsx       # Vinyl wishlist
+│   │   ├── SellersPage.tsx        # Local seller monitoring
+│   │   ├── SellerMatchesPage.tsx  # Seller inventory matches
+│   │   ├── NewReleasesPage.tsx    # New release tracking
+│   │   ├── DiscardPilePage.tsx    # Discard pile
+│   │   └── SettingsPage.tsx       # Settings (tabs: Connections, Mappings, Filters, etc.)
+│   ├── context/                   # React Context providers
+│   │   ├── AppContext.tsx         # Global app state
+│   │   ├── AuthContext.tsx        # Auth status
+│   │   └── ThemeContext.tsx       # Dark/light theme
+│   ├── hooks/                     # Custom hooks
+│   ├── services/                  # API client (api.ts, statsApi.ts)
+│   └── utils/                     # Frontend utilities (logger, dates)
+└── shared/                        # Shared types & utilities
+    ├── types.ts                   # TypeScript interfaces
+    └── utils/
+        └── trackNormalization.ts  # Track/artist name normalization
 ```
 
 ## 🔒 Security & Privacy
