@@ -44,6 +44,7 @@ import { StatsService } from './backend/services/statsService';
 import { SuggestionService } from './backend/services/suggestionService';
 import { TrackMappingService } from './backend/services/trackMappingService';
 import { WishlistService } from './backend/services/wishlistService';
+import { sendError } from './backend/utils/apiResponse';
 import { FileStorage } from './backend/utils/fileStorage';
 import { createLogger } from './backend/utils/logger';
 
@@ -221,10 +222,7 @@ app.use(
     next: express.NextFunction
   ) => {
     if (err instanceof SyntaxError && 'body' in err) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid JSON format',
-      });
+      return sendError(res, 400, 'Invalid JSON format');
     }
     next(err);
   }
@@ -405,19 +403,19 @@ app.use(
     _next: express.NextFunction
   ) => {
     log.error('Request error', { message: err.message, path: req.path });
-    res.status(500).json({
-      success: false,
-      error:
-        process.env.NODE_ENV === 'production'
-          ? 'Internal server error'
-          : err.message,
-    });
+    sendError(
+      res,
+      500,
+      process.env.NODE_ENV === 'production'
+        ? 'Internal server error'
+        : err.message
+    );
   }
 );
 
 // 404 handler
-app.use((req, res) => {
-  res.status(404).json({ success: false, error: 'Route not found' });
+app.use((_req, res) => {
+  sendError(res, 404, 'Route not found');
 });
 
 async function startServer() {
