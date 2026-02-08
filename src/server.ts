@@ -159,6 +159,10 @@ const PORT = parseInt(
 );
 const HOST = process.env.HOST || '127.0.0.1';
 
+// Ensure the data directory exists before any service or lock file touches it.
+// New users cloning the repo won't have it because it's gitignored.
+fs.mkdirSync(path.join(process.cwd(), 'data'), { recursive: true });
+
 // Initialize file storage
 const fileStorage = new FileStorage();
 
