@@ -89,6 +89,53 @@ jobs:
         name: build-files
         path: dist/
 
+  e2e:
+    runs-on: ubuntu-latest
+    needs: build
+
+    env:
+      LASTFM_SECRET: "test_lastfm_secret_for_ci"
+      LASTFM_API_KEY: "test_lastfm_api_key_for_ci"
+      LASTFM_CALLBACK_URL: "http://localhost:3000/auth/lastfm/callback"
+      DISCOGS_CLIENT_ID: "test_discogs_client_id_for_ci"
+      DISCOGS_CLIENT_SECRET: "test_discogs_client_secret_for_ci"
+      DISCOGS_CALLBACK_URL: "http://localhost:3000/auth/discogs/callback"
+      ENCRYPTION_KEY: "test_encryption_key_32_chars_long_for_ci"
+      NODE_ENV: "test"
+      PORT: "3002"
+      BACKEND_PORT: "3001"
+      HOST: "127.0.0.1"
+      FRONTEND_URL: "http://localhost:3000"
+      REACT_APP_BACKEND_PORT: "3001"
+      CI: "true"
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps chromium
+
+    - name: Run E2E tests (Chromium)
+      run: npx playwright test --project=chromium
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-report
+        path: playwright-report/
+        retention-days: 14
+
   security:
     runs-on: ubuntu-latest
     needs: test
