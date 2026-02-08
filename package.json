@@ -31,8 +31,11 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "description": "A web application that connects your Discogs collection with Last.fm scrobbling",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "homepage": "https://github.com/user/recordscrobbles",
   "dependencies": {
     "axios": "^1.10.0",
@@ -96,7 +99,6 @@
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
-    "wait-on": "^8.0.3",
     "webpack": "^5.99.9",
     "webpack-cli": "^6.0.1",
     "webpack-dev-server": "^5.2.2"
