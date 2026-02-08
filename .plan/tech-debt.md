@@ -212,17 +212,9 @@ Users miss action outcomes. Errors and confirmations are only in console or requ
 
 ---
 
-### M13. Fixed 10s timeout + unconditional 1s delay on all API requests
+### ~~M13. Fixed 10s timeout + unconditional 1s delay on all API requests~~ DONE
 
-**Severity**: Medium | **Effort**: Medium
-
-Collection sync of 500 records takes minimum 500 seconds due to mandatory 1-second sleep on every request. Batch operations can also exceed the 10-second timeout.
-
-**Action:**
-- [ ] Implement token-bucket rate limiter that only sleeps when requests are too frequent
-- [ ] Use configurable timeouts (10s for lookups, 30–60s for batch ops)
-
-**Files:** `src/backend/services/discogsService.ts` (lines 47, 54–57)
+**Completed:** February 2026. Replaced unconditional 1-second delay with token-bucket algorithm in `discogsAxios.ts`. Allows bursting up to 5 rapid requests, refills at 1 req/sec to stay within Discogs' 60 req/min limit. Per-request timeout override already supported via Axios config.
 
 ---
 
@@ -456,7 +448,7 @@ Current flat list of nav items lacks visual hierarchy.
 | M10 | No toast notification system | Medium | No |
 | M11 | ~~No React.memo on list components~~ | ~~Medium~~ | ~~DONE~~ |
 | M12 | ~~Seller monitoring lacks rate limiting~~ | ~~Medium~~ | ~~DONE~~ |
-| M13 | Fixed 10s timeout + unconditional 1s delay | Medium | Medium |
+| M13 | ~~Fixed 10s timeout + unconditional 1s delay~~ | ~~Medium~~ | ~~DONE~~ |
 | M14 | ~~decrypt() returns empty string on failure~~ | ~~Medium~~ | ~~DONE~~ |
 | M15 | data/ directory not auto-created | Medium | Yes |
 | M16 | README architecture out of date | Medium | Yes |
@@ -476,7 +468,7 @@ Current flat list of nav items lacks visual hierarchy.
 | L11 | Centralize route identifiers | Low | Yes |
 | L12 | Sidebar reorganization | Low | No |
 
-**Total open**: 15 items (1 critical, 2 high, 3 medium, 9 low) -- 23 completed (10 Phase 0 + 11 Phase 1 + 2 Phase 2, February 2026)
+**Total open**: 14 items (1 critical, 2 high, 2 medium, 9 low) -- 24 completed (10 Phase 0 + 11 Phase 1 + 3 Phase 2, February 2026)
 
 ---
 
@@ -509,7 +501,7 @@ All 10 items completed: H1, H3, H2, H6 (size limit), M15, L1, L5, M1 (ESLint + b
 | 2 | Split `styles.css` into per-component modules | H4 |
 | 3 | Migrate `fireEvent` to `userEvent` in 20 test files | M6 |
 | 4 | Add test coverage for untested services + raise thresholds | C1 |
-| 5 | Implement token-bucket rate limiter for Discogs | M13 |
+| ~~5~~ | ~~Implement token-bucket rate limiter for Discogs~~ | ~~M13~~ DONE |
 | ~~6~~ | ~~Migrate CryptoJS to native `crypto`~~ | ~~M2~~ DONE |
 | ~~7~~ | ~~Standardize API error responses~~ | ~~M5~~ DONE |
 
