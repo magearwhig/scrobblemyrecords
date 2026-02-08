@@ -143,12 +143,10 @@ dev-debug.log
 # MCP configuration (may contain sensitive data)
 .mcp.json
 
-# Documentation and analysis files (project-specific)
+# Documentation and analysis files (internal/private)
 potential_tasks.md
-security.md
 dev_plan.md
 dev_prompt.md
-TESTING_GUIDE.md
 TESTING_QUICK_REFERENCE.md
 TESTING_ASSESSMENT.md
 

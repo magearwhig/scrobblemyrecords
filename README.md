@@ -711,12 +711,17 @@ npm run test:watch    # Run in watch mode
 
 ## 🤝 Contributing
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidance on architecture, coding standards, and development workflow.
+
+Quick start:
+
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes
-4. Run tests: `npm test`
-5. Ensure coverage: `npm run test:coverage`
-6. Submit a pull request
+3. Make your changes following the [coding standards](CONTRIBUTING.md#coding-standards)
+4. Run tests: `npm test` and `npm run test:coverage`
+5. Submit a pull request
+
+See also: [TEST_STYLE_GUIDE.md](TEST_STYLE_GUIDE.md) | [TESTING_GUIDE.md](TESTING_GUIDE.md) | [SECURITY.md](SECURITY.md)
 
 ## 📄 License
 
