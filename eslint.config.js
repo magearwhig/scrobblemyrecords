@@ -148,7 +148,7 @@ module.exports = [
     },
   },
 
-  // Backend files
+  // Backend files -- use createLogger(), not console.*
   {
     files: ['src/backend/**/*.ts', 'src/server.ts'],
     languageOptions: {
@@ -168,7 +168,15 @@ module.exports = [
       },
     },
     rules: {
-      'no-console': 'off', // Allow console in backend
+      'no-console': 'error',
+    },
+  },
+
+  // Logger utilities are the one place console.* is allowed
+  {
+    files: ['src/backend/utils/logger.ts', 'src/renderer/utils/logger.ts'],
+    rules: {
+      'no-console': 'off',
     },
   },
 

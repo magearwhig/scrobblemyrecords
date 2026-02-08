@@ -51,7 +51,7 @@ export default function createScrobbleRouter(
         scrobbleHistorySyncService
           .startIncrementalSync()
           .catch(err =>
-            console.error('Failed to auto-sync after scrobble:', err)
+            logger.error('Failed to auto-sync after scrobble:', err)
           );
       }
 
@@ -118,7 +118,7 @@ export default function createScrobbleRouter(
         scrobbleHistorySyncService
           .startIncrementalSync()
           .catch(err =>
-            console.error('Failed to auto-sync after scrobble:', err)
+            logger.error('Failed to auto-sync after scrobble:', err)
           );
       }
 
@@ -585,7 +585,7 @@ export default function createScrobbleRouter(
               }
             } catch (error) {
               // Continue with other tracks if one fails
-              console.warn(
+              logger.warn(
                 `Failed to find cover for album: ${track.album}`,
                 error
               );

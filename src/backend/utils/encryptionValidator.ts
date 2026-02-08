@@ -1,5 +1,9 @@
 import crypto from 'crypto';
 
+import { createLogger } from './logger';
+
+const log = createLogger('EncryptionValidator');
+
 /**
  * Validation utility for encryption key security
  */
@@ -165,7 +169,7 @@ export class EncryptionKeyValidator {
       message += `⚠️  Never commit encryption keys to version control!\n`;
       message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
 
-      console.error(message);
+      log.error(message);
       throw error;
     }
   }
