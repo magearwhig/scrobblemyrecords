@@ -145,4 +145,4 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
   );
 };
 
-export default AlbumCard;
+export default React.memo(AlbumCard);

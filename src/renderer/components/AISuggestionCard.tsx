@@ -168,4 +168,4 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
   );
 };
 
-export default AISuggestionCard;
+export default React.memo(AISuggestionCard);

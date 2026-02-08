@@ -148,4 +148,4 @@ export const NewReleaseCard: React.FC<Props> = ({ release, onDismiss }) => {
   );
 };
 
-export default NewReleaseCard;
+export default React.memo(NewReleaseCard);
