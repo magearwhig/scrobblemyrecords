@@ -8,6 +8,7 @@ import {
   DiscogsRelease,
   ApiResponse,
 } from '../../shared/types';
+import { safeJsonParse } from '../../shared/utils/safeJsonParse';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -236,8 +237,11 @@ export class DiscogsService {
       method: 'GET',
     };
 
-    const tokenObj = JSON.parse(token);
-    return this.oauth.toHeader(this.oauth.authorize(requestData, tokenObj));
+    const parsed = safeJsonParse<{ key: string; secret: string }>(token);
+    if (!parsed.success) {
+      throw new Error(`Corrupted Discogs OAuth token: ${parsed.error.message}`);
+    }
+    return this.oauth.toHeader(this.oauth.authorize(requestData, parsed.data));
   }
 
   async getUserProfile(): Promise<any> {

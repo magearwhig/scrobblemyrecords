@@ -13,6 +13,7 @@ import {
   SellerMonitoringSettings,
   SellerScanStatus,
 } from '../../shared/types';
+import { safeJsonParse } from '../../shared/utils/safeJsonParse';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -189,9 +190,12 @@ export class SellerMonitoringService {
       method: 'GET',
     };
 
-    const tokenObj = JSON.parse(token);
+    const parsed = safeJsonParse<{ key: string; secret: string }>(token);
+    if (!parsed.success) {
+      throw new Error(`Corrupted Discogs OAuth token: ${parsed.error.message}`);
+    }
     const oauthHeader = this.oauth.toHeader(
-      this.oauth.authorize(requestData, tokenObj)
+      this.oauth.authorize(requestData, parsed.data)
     );
     return oauthHeader as unknown as Record<string, string>;
   }
