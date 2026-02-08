@@ -158,31 +158,15 @@ CryptoJS is unmaintained. `authService.ts` already imports Node.js native `crypt
 
 ---
 
-### M3. Startup migrations not awaited before accepting requests
+### ~~M3. Startup migrations not awaited before accepting requests~~ DONE
 
-**Severity**: Medium | **Effort**: Medium
-
-Server accepts HTTP requests while data migrations are still running. Requests could hit un-migrated schemas.
-
-**Action:**
-- [ ] `await` migrations before calling `app.listen()`
-- [ ] Cleanup and backup can remain fire-and-forget
-
-**Files:** `src/server.ts` (lines 384–412)
+**Completed:** February 2026. Changed `startServer()` to `await` migrations before `app.listen()`. Cleanup and backup remain fire-and-forget.
 
 ---
 
-### M4. Unguarded `JSON.parse` calls
+### ~~M4. Unguarded `JSON.parse` calls~~ DONE
 
-**Severity**: Medium | **Effort**: Quick win
-
-Corrupted data files or unexpected API responses crash the process.
-
-**Action:**
-- [ ] Create shared `safeJsonParse<T>()` utility returning typed result-or-error
-- [ ] Apply across codebase
-
-**Files:** `sellerMonitoringService.ts`, `discogsService.ts`, `suggestions.ts`, `aiPromptBuilder.ts`
+**Completed:** February 2026. Created `src/shared/utils/safeJsonParse.ts` with typed `JsonParseResult<T>` union type. Applied to OAuth token parsing in `discogsService.ts` and `sellerMonitoringService.ts`.
 
 ---
 
@@ -270,27 +254,15 @@ Users miss action outcomes. Errors and confirmations are only in console or requ
 
 ---
 
-### M11. No `React.memo` on any list-item component
+### ~~M11. No `React.memo` on any list-item component~~ DONE
 
-**Severity**: Medium | **Effort**: Quick win per component
-
-`AlbumCard`, `SuggestionCard`, `AISuggestionCard` re-render on every parent state change. Combined with no virtualization (M9), this compounds performance issues.
-
-**Action:**
-- [ ] Wrap list-item components with `React.memo` (start with `AlbumCard`)
+**Completed:** February 2026. Wrapped `AlbumCard`, `SuggestionCard`, `AISuggestionCard`, and `NewReleaseCard` with `React.memo`.
 
 ---
 
-### M12. Seller monitoring service lacks rate limiting
+### ~~M12. Seller monitoring service lacks rate limiting~~ DONE
 
-**Severity**: Medium | **Effort**: Quick win
-
-`sellerMonitoringService.ts` creates its own Axios instance without the rate-limiting interceptor that `discogsService.ts` has, risking Discogs 429 errors.
-
-**Action:**
-- [ ] Share the rate-limited Axios instance from `discogsService`, or add the same interceptor
-
-**Files:** `src/backend/services/sellerMonitoringService.ts`
+**Completed:** February 2026. Extracted shared singleton Axios instance with global 1 req/sec rate limiting into `src/backend/utils/discogsAxios.ts`. All three Discogs-calling services now use `getDiscogsAxios()` instead of creating separate instances.
 
 ---
 
@@ -308,17 +280,9 @@ Collection sync of 500 records takes minimum 500 seconds due to mandatory 1-seco
 
 ---
 
-### M14. `decrypt()` returns empty string on failure
+### ~~M14. `decrypt()` returns empty string on failure~~ DONE
 
-**Severity**: Medium | **Effort**: Quick win
-
-If the encryption key changes, `decrypt()` silently returns `''` instead of signaling the error. Downstream code uses empty credentials.
-
-**Action:**
-- [ ] Throw `DecryptionError` so callers can distinguish "no credentials" from "corrupted/wrong key"
-- [ ] Prompt re-authentication on decryption failure
-
-**Files:** `src/backend/services/authService.ts` (lines 51–54)
+**Completed:** February 2026. Created `DecryptionError` class in `authService.ts`. `decrypt()` now throws `DecryptionError` instead of returning empty string, with validation in `getUserSettings()` to detect and block credential loss from key changes.
 
 ---
 
@@ -550,18 +514,18 @@ Current flat list of nav items lacks visual hierarchy.
 | H6 | Missing request size limits and rate limiting | **High** | Partial |
 | M1 | Direct console.* bypasses secure logger (24 files) | Medium | Partial |
 | M2 | CryptoJS deprecated library | Medium | No |
-| M3 | Startup migrations not awaited | Medium | Medium |
-| M4 | Unguarded JSON.parse calls | Medium | Yes |
+| M3 | ~~Startup migrations not awaited~~ | ~~Medium~~ | ~~DONE~~ |
+| M4 | ~~Unguarded JSON.parse calls~~ | ~~Medium~~ | ~~DONE~~ |
 | M5 | Standardize API error responses | Medium | Low |
 | M6 | fireEvent vs userEvent test inconsistency | Medium | Partial |
 | M7 | Accessibility gaps on form controls/buttons | Medium | Yes |
 | M8 | E2E tests not in CI | Medium | Medium |
 | M9 | No virtualization for large lists | Medium | No |
 | M10 | No toast notification system | Medium | No |
-| M11 | No React.memo on list components | Medium | Yes |
-| M12 | Seller monitoring lacks rate limiting | Medium | Yes |
+| M11 | ~~No React.memo on list components~~ | ~~Medium~~ | ~~DONE~~ |
+| M12 | ~~Seller monitoring lacks rate limiting~~ | ~~Medium~~ | ~~DONE~~ |
 | M13 | Fixed 10s timeout + unconditional 1s delay | Medium | Medium |
-| M14 | decrypt() returns empty string on failure | Medium | Yes |
+| M14 | ~~decrypt() returns empty string on failure~~ | ~~Medium~~ | ~~DONE~~ |
 | M15 | data/ directory not auto-created | Medium | Yes |
 | M16 | README architecture out of date | Medium | Yes |
 | M17 | No contributor development guide | Medium | Medium |
@@ -580,7 +544,7 @@ Current flat list of nav items lacks visual hierarchy.
 | L11 | Centralize route identifiers | Low | Yes |
 | L12 | Sidebar reorganization | Low | No |
 
-**Total open**: 28 items (1 critical, 3 high, 15 medium, 9 low) -- 10 completed in Phase 0 (February 2026)
+**Total open**: 23 items (1 critical, 3 high, 10 medium, 9 low) -- 15 completed (10 Phase 0 + 5 Phase 1, February 2026)
 
 ---
 
@@ -597,12 +561,12 @@ All 10 items completed: H1, H3, H2, H6 (size limit), M15, L1, L5, M1 (ESLint + b
 | 1 | Replace all `console.*` with logger (24 files) | M1 |
 | 2 | Add `express-rate-limit` middleware | H6 |
 | 3 | Add Playwright to CI workflow | M8 |
-| 4 | Add `React.memo` to list-item components | M11 |
-| 5 | Create `safeJsonParse<T>()` utility | M4 |
-| 6 | Await migrations before `app.listen()` | M3 |
-| 7 | Throw `DecryptionError` instead of returning `''` | M14 |
+| ~~4~~ | ~~Add `React.memo` to list-item components~~ | ~~M11~~ DONE |
+| ~~5~~ | ~~Create `safeJsonParse<T>()` utility~~ | ~~M4~~ DONE |
+| ~~6~~ | ~~Await migrations before `app.listen()`~~ | ~~M3~~ DONE |
+| ~~7~~ | ~~Throw `DecryptionError` instead of returning `''`~~ | ~~M14~~ DONE |
 | 8 | Add `aria-label` to all icon-only buttons/inputs | M7 |
-| 9 | Share rate-limited Axios instance with seller service | M12 |
+| ~~9~~ | ~~Share rate-limited Axios instance with seller service~~ | ~~M12~~ DONE |
 | 10 | Publish sanitized security + testing guides | M17, M18 |
 
 ### Phase 2 -- Systematic Refactors (2–4 weeks)
