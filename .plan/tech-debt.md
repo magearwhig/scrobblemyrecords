@@ -1,6 +1,6 @@
-# Technical Debt & UI Improvements
+# Technical Debt & Improvements
 
-This document consolidates feedback from multiple sources and outlines improvements for code quality, UI/UX, and architecture.
+Consolidated from multiple audits (January–February 2026). Items completed in earlier cycles are archived at the bottom for historical reference.
 
 ---
 
@@ -8,55 +8,35 @@ This document consolidates feedback from multiple sources and outlines improveme
 
 | Priority | Meaning |
 |----------|---------|
-| **P0** | Critical - Do immediately |
-| **P1** | High - Do soon |
-| **P2** | Medium - Plan for next cycle |
-| **P3** | Low - Nice to have |
+| **Critical** | Violates stated project policy or causes data loss risk -- fix immediately |
+| **High** | Causes runtime failures, security gaps, or major maintenance burden |
+| **Medium** | Degrades quality, performance, or developer experience |
+| **Low** | Cleanup, polish, or minor inconsistency |
 
 ---
 
-## 1. Settings Page Restructure
+## CRITICAL
 
-**Priority: P1** | **Effort: Medium** | **Impact: High (usability)** | **Status: ✅ COMPLETE**
+### C1. Test coverage thresholds (48–60%) vs stated 90% baseline
 
-> **Completed January 2026:** Settings page has been restructured into 4 tabs with modular section components.
+**Severity**: Critical | **Effort**: Deeper (ongoing) | **Quick Win**: No (documenting the gap is)
 
-### What Was Implemented
-- 4 tabs: Integrations, Mappings, Filters, Wishlist
-- Extracted section components: `SettingsIntegrationsSection.tsx`, `SettingsMappingsSection.tsx`, `SettingsFiltersSection.tsx`, `SettingsWishlistSection.tsx`
-- Badge counts on tabs showing metrics
-- Visual separation with card components and section headers
-
-### Remaining Minor Items (Optional)
-- [ ] Mobile viewport testing/optimization
-- [ ] Some inline styles may still exist in section components
-
-**Files:** `src/renderer/pages/SettingsPage.tsx`, `src/renderer/components/settings/*`
-
----
-
-## 2. Code Quality Issues
-
-### 2.1 Test Coverage Gap
-
-**Priority: P0** | **Effort: Medium** | **Impact: High (reliability)**
-
-README and dev_prompt.md specify 90% coverage target but Jest config enforces only 55-60% thresholds. This is a known gap that will be addressed incrementally.
+README and `dev_prompt.md` specify 90% coverage target but Jest config enforces only 48–60%. This is a known gap being addressed incrementally.
 
 **Current State:**
-- `jest.config.js` thresholds: branches 55%, functions/lines/statements 60%
-- README target: 90%
-- Current actual coverage: ~60%+
+- `jest.config.js` thresholds: branches 48%, functions 55%, lines/statements 60%
+- Target: 90%
+- `hiddenItemService.ts` and `trackMappingService.ts` have no dedicated test files
 
 **Improvement Plan:**
-The 90% target is aspirational. Thresholds will be raised incrementally as tests are added:
-1. Current baseline (55-60%) prevents regression
-2. As coverage improves, thresholds will be raised in 5-10% increments
-3. Do NOT change jest.config.js until tests are written to support higher thresholds
+1. Current baseline prevents regression
+2. Raise thresholds in 5–10% increments as tests are added
+3. Do NOT change `jest.config.js` until tests exist to support higher thresholds
 
 **Action:**
-- [ ] Write tests for services with low coverage: `wishlistService.ts`, `imageService.ts`
-- [ ] After coverage improves, raise jest.config.js thresholds incrementally
+- [ ] Write tests for services with low coverage: `wishlistService`, `imageService`, `hiddenItemService`, `trackMappingService`
+- [ ] Prioritize coverage for critical paths: `authService`, `lastfmService`, `discogsService`, scrobble routes
+- [ ] After coverage improves, raise `jest.config.js` thresholds incrementally
 - [ ] Add coverage report to CI output for visibility
 - [ ] Consider separate thresholds for backend vs frontend
 
@@ -64,68 +44,179 @@ The 90% target is aspirational. Thresholds will be raised incrementally as tests
 
 ---
 
-### 2.2 Centralized Error Logging
+## HIGH
 
-**Priority: P1** | **Effort: Low** | **Impact: Medium (debugging)** | **Status: ✅ COMPLETE**
+### H1. No React Error Boundary
 
-> **Completed January 2026:** Created frontend logger utility, removed token exposure, standardized logging across frontend and backend.
+**Severity**: High | **Effort**: Quick win
 
-**What Was Implemented:**
-- Created `src/renderer/utils/logger.ts` matching backend pattern with sensitive data redaction
-- Removed all token/auth URL logging from `SetupPage.tsx` (security fix)
-- Replaced `console.log/error` with secure logger in `api.ts`
-- Removed debug logging from `MainContent.tsx` and `ThemeContext.tsx`
-- Updated `server.ts` to use backend logger instead of console
-- Updated `fileStorage.ts` to use backend logger instead of console
-- Environment-based log level filtering (DEBUG in dev, WARN in production)
+Any unhandled render-time error crashes the entire app to a white screen with zero recovery. Zero files in `src/renderer/` contain `ErrorBoundary`, `componentDidCatch`, or `getDerivedStateFromError`.
 
 **Action:**
-- [x] Create frontend logger utility matching backend pattern
-- [x] Remove/gate debug logging that may expose tokens
-- [x] Use redacting logger consistently in backend
-- [x] Add environment-based log level filtering
+- [ ] Create `ErrorBoundary` component wrapping `<MainContent>` in `App.tsx`
+- [ ] Show "Something went wrong" UI with retry button
 
-**Files:** `src/renderer/utils/logger.ts`, `src/renderer/services/api.ts`, `src/renderer/components/MainContent.tsx`, `src/renderer/context/ThemeContext.tsx`, `src/renderer/pages/SetupPage.tsx`, `src/server.ts`, `src/backend/utils/fileStorage.ts`
+**Files:** `src/renderer/App.tsx`
 
 ---
 
-### 2.3 Remove `any` Types
+### H2. Empty-string fallbacks for API secrets
 
-**Priority: P1** | **Effort: Low** | **Impact: Medium (type safety)**
+**Severity**: High | **Effort**: Quick win
 
-~~Types like `notes?: any[]` in CollectionItem and `payload?: any` in AppAction bypass TypeScript safety.~~
+Missing env vars silently produce empty credentials instead of failing fast. GitHub users who misconfigure `.env` get cryptic auth failures deep in the OAuth flow.
+
+```ts
+key: process.env.DISCOGS_CLIENT_ID || '',
+secret: process.env.DISCOGS_CLIENT_SECRET || '',
+```
 
 **Action:**
-- [x] Audit codebase for `any` types - Replaced `notes?: any[]` with `notes?: CollectionNote[]`
-- [x] Define proper interfaces for each usage - Added `CollectionNote` interface
-- [ ] Enable stricter TypeScript checks
+- [ ] Validate all required env vars at startup (like `AuthService` already does for `ENCRYPTION_KEY`)
+- [ ] Throw with a message referencing `.env.example`
+- [ ] Centralize in a startup validation function
 
-**Files:** `src/shared/types.ts`, various component files
+**Files:** `src/backend/services/discogsService.ts`, `sellerMonitoringService.ts`, `wishlistService.ts`, `lastfmService.ts`
 
 ---
 
-### 2.4 Missing/Duplicate CSS
+### H3. Lock file TOCTOU race condition
 
-**Priority: P1** | **Effort: Low** | **Impact: Medium (consistency)** | **Status: ✅ COMPLETE**
+**Severity**: High | **Effort**: Quick win
 
-> **Completed January 2026:** All CSS issues have been resolved.
-
-- ~~`--text-tertiary` CSS variable is used but not defined (falls back inconsistently)~~ **RESOLVED**
-- ~~Duplicate `.sync-status-bar` class definitions cause style conflicts~~ **RESOLVED**
-- ~~Missing `--bg-primary-rgb` CSS variable~~ **RESOLVED**
+Two server processes launched simultaneously can both pass the `existsSync` check before either writes the lock file.
 
 **Action:**
-- [x] Define `--text-tertiary` in `:root` and `.dark-mode` - Added in styles.css
-- [x] Resolve duplicate class definitions - Removed duplicate at line 4293, kept complete definition at line 636
-- [x] Audit for other missing variables - Added `--bg-primary-rgb` for rgba usage
+- [ ] Use `fs.writeFileSync(LOCK_FILE, data, { flag: 'wx' })` which atomically fails if the file exists
 
-**Files:** `src/renderer/styles.css`
+**Files:** `src/server.ts` (lines 58–90)
 
 ---
 
-### 2.5 Standardize API Error Responses
+### H4. Massive inline styling + monolithic stylesheet
 
-**Priority: P2** | **Effort: Low** | **Impact: Medium (consistency)**
+**Severity**: High | **Effort**: Deeper (phased)
+
+The repo's `CLAUDE.md` and `.cursor/rules` explicitly forbid inline styles, yet every major page uses them. Combined with a single `styles.css`, CSS maintenance is fragile.
+
+Worst offenders by inline `style=` count:
+- `ReleaseDetailsPage.tsx` -- 100+
+- `CollectionPage.tsx` -- 80+
+- `ScrobblePage.tsx` -- 40+
+- `HistoryPage.tsx` -- 28+
+- `SearchBar.tsx`, `AlbumCard.tsx` -- 15+
+
+**Action:**
+- [ ] Phase 1: Extract static inline styles to CSS classes (start with `AlbumCard`, `SearchBar`)
+- [ ] Phase 2: Split `styles.css` into CSS modules per component/page
+- [ ] Or adopt CSS modules globally
+- [ ] Document exceptions (dynamic values only)
+
+**Files:** `src/renderer/styles.css`, all page/component files listed above
+
+---
+
+### H5. Background operations fail silently
+
+**Severity**: High | **Effort**: Deeper
+
+Routes kick off background sync/scrobble operations with `.catch()` that only logs. Users never learn if their operation failed.
+
+```ts
+scrobbleHistorySyncService
+  .startIncrementalSync()
+  .catch(err => console.error('Failed to auto-sync after scrobble:', err));
+```
+
+**Action:**
+- [ ] Implement lightweight job-status mechanism (in-memory map of `jobId -> {status, error}`)
+- [ ] Let the frontend poll for completion
+- [ ] Pairs well with M10 (toast system)
+
+**Files:** `src/backend/routes/scrobble.ts`, `src/backend/routes/suggestions.ts`
+
+---
+
+### H6. Missing request size limits and rate limiting on API
+
+**Severity**: High | **Effort**: Quick win (size limit) / Medium (rate limiting)
+
+No payload size limit on `express.json()` means large POSTs could exhaust memory. No server-side rate limiting.
+
+**Action:**
+- [ ] Add `express.json({ limit: '1mb' })` (quick win)
+- [ ] Add `express-rate-limit` middleware for API routes
+- [ ] Longer-term: validate request schemas with Zod or Joi
+
+**Files:** `src/server.ts` (lines 162–164)
+
+---
+
+## MEDIUM
+
+### M1. Direct `console.*` bypasses secure logger (24 files)
+
+**Severity**: Medium | **Effort**: Quick win per file, medium overall
+
+The logger utility was created (January 2026) and adopted in some files, but 24 source files still use raw `console.log/error/warn`, bypassing sensitive-data redaction.
+
+**All offending files:**
+- Pages: `SellerMatchesPage`, `ReleaseDetailsPage`, `CollectionPage`, `StatsPage`, `SettingsPage`, `DiscoveryPage`, `WishlistPage`, `DiscardPilePage`, `SuggestionsPage`, `HistoryPage`, `ScrobblePage`
+- Components: `SettingsMappingsSection`, `SettingsBackupSection`, `SettingsWishlistSection`, `SettingsIntegrationsSection`, `SettingsFiltersSection`, `ForgottenFavoritesTab`, `AISuggestionCard`, `SuggestionCard`
+- Hooks: `useNotifications`
+- Backend: `scrobble.ts`, `encryptionValidator.ts`
+
+**Action:**
+- [ ] Replace all `console.*` with `createLogger()` across 24 files
+- [ ] Add ESLint `no-console: error` rule to prevent regression
+
+---
+
+### M2. CryptoJS (deprecated) used for encryption
+
+**Severity**: Medium | **Effort**: Deeper
+
+CryptoJS is unmaintained. `authService.ts` already imports Node.js native `crypto` but uses CryptoJS for AES.
+
+**Action:**
+- [ ] Migrate to `crypto.createCipheriv`/`createDecipheriv` with AES-256-GCM
+- [ ] Migration path: decrypt existing tokens with CryptoJS, re-encrypt with native
+
+**Files:** `src/backend/services/authService.ts`
+
+---
+
+### M3. Startup migrations not awaited before accepting requests
+
+**Severity**: Medium | **Effort**: Medium
+
+Server accepts HTTP requests while data migrations are still running. Requests could hit un-migrated schemas.
+
+**Action:**
+- [ ] `await` migrations before calling `app.listen()`
+- [ ] Cleanup and backup can remain fire-and-forget
+
+**Files:** `src/server.ts` (lines 384–412)
+
+---
+
+### M4. Unguarded `JSON.parse` calls
+
+**Severity**: Medium | **Effort**: Quick win
+
+Corrupted data files or unexpected API responses crash the process.
+
+**Action:**
+- [ ] Create shared `safeJsonParse<T>()` utility returning typed result-or-error
+- [ ] Apply across codebase
+
+**Files:** `sellerMonitoringService.ts`, `discogsService.ts`, `suggestions.ts`, `aiPromptBuilder.ts`
+
+---
+
+### M5. Standardize API error responses
+
+**Severity**: Medium | **Effort**: Low
 
 Some endpoints return `{success: false, error}`, others throw. This creates frontend edge cases.
 
@@ -138,88 +229,54 @@ Some endpoints return `{success: false, error}`, others throw. This creates fron
 
 ---
 
-### 2.6 Centralize Route Identifiers
+### M6. `fireEvent` vs `userEvent` test inconsistency
 
-**Priority: P2** | **Effort: Low** | **Impact: Medium (maintainability)**
+**Severity**: Medium | **Effort**: Medium (mechanical, 20 files)
 
-String literals for routing in App.tsx, MainContent.tsx, and Sidebar.tsx can drift out of sync.
+`TEST_STYLE_GUIDE.md` mandates `userEvent.setup()`, but 20 test files still use `fireEvent` (~194 instances) while only 8 use `userEvent` (~76 instances).
+
+**Worst offenders:** `ReleaseDetailsPage.test.tsx` (39), `DiscoveryPage.test.tsx` (26), `SettingsConnectionsSection.test.tsx` (18), `DateRangePicker.test.tsx` (16), `SuggestionCard.test.tsx` (13), and 15 more.
 
 **Action:**
-- [ ] Create `routes.ts` constants file
-- [ ] Replace string literals with constants
-- [ ] Add TypeScript enum or const object
-
-**Files:** `src/renderer/App.tsx`, `src/renderer/components/MainContent.tsx`, `src/renderer/components/Sidebar.tsx`
+- [ ] Migrate remaining `fireEvent` calls to `userEvent.setup()` per the style guide
 
 ---
 
-## 3. UI/UX Improvements
+### M7. Accessibility gaps on form controls and buttons
 
-### 3.1 Loading Skeletons
+**Severity**: Medium | **Effort**: Quick win per component
 
-**Priority: P1** | **Effort: Low** | **Impact: High (perceived performance)**
-
-Current loading states show spinners which cause layout shifts. Skeleton loaders matching content shape create smoother experience.
+Icon-only buttons lack `aria-label`; inputs lack explicit labels. Screen readers can't identify them.
 
 **Action:**
-- [ ] Create skeleton components for: album cards, stat cards, lists
-- [ ] Replace spinners with skeletons in major views
-- [ ] Ensure skeletons match final content dimensions
+- [ ] Add `aria-label` to all icon-only buttons and form inputs without visible labels
+- [ ] Ensure keyboard focus states
+
+**Files:** `SearchBar.tsx`, `Header.tsx`, various action buttons
 
 ---
 
-### 3.2 Collapsible Sidebar
+### M8. E2E tests not run in CI
 
-**Priority: P1** | **Effort: Low** | **Impact: Medium (usability)**
+**Severity**: Medium | **Effort**: Medium
 
-Fixed 250px sidebar takes significant space on smaller screens.
+Four Playwright specs exist but CI only runs Jest. Integration regressions ship uncaught.
 
 **Action:**
-- [ ] Add toggle to collapse to icons-only mode
-- [ ] Persist preference in localStorage
-- [ ] Add responsive breakpoint for auto-collapse on mobile
+- [ ] Add Playwright CI job with `npx playwright install --with-deps` and `npm run test:e2e`
 
-**Files:** `src/renderer/components/Sidebar.tsx`, `src/renderer/styles.css`
+**Files:** `.github/workflows/ci.yml`
 
 ---
 
-### 3.3 Better Empty States
+### M9. No virtualization for large lists
 
-**Priority: P1** | **Effort: Low** | **Impact: Medium (onboarding)**
+**Severity**: Medium | **Effort**: Deeper (UI refactor)
 
-Empty states show minimal text which feels like broken functionality.
-
-**Action:**
-- [ ] Add illustrations or icons to empty states
-- [ ] Include helpful suggestions ("Try syncing your collection first")
-- [ ] Add prominent call-to-action buttons
-
-**Files:** Various page components
-
----
-
-### 3.4 Toast Notifications System
-
-**Priority: P2** | **Effort: Medium** | **Impact: High (UX feedback)**
-
-Feedback for actions often requires modal dialogs or inline messages that can be missed.
+Collection pages render all items in the DOM. Users with 1000+ records experience sluggish scrolling and high memory usage.
 
 **Action:**
-- [ ] Implement toast notification component
-- [ ] Add auto-dismiss with configurable duration
-- [ ] Support action buttons ("Undo", "View Details")
-- [ ] Position in corner, non-blocking
-
----
-
-### 3.5 Virtual Scrolling for Large Lists
-
-**Priority: P2** | **Effort: Medium** | **Impact: High (performance)**
-
-Users with 1000+ albums experience performance degradation rendering all cards.
-
-**Action:**
-- [ ] Implement `react-window` or similar for collection grid
+- [ ] Implement `react-window` or `@tanstack/virtual` for collection grid
 - [ ] Only render visible items
 - [ ] Maintain scroll position on navigation
 
@@ -227,365 +284,474 @@ Users with 1000+ albums experience performance degradation rendering all cards.
 
 ---
 
-### 3.6 Sidebar Reorganization
+### M10. No toast notification system
 
-**Priority: P2** | **Effort: Low** | **Impact: Medium (scanability)**
+**Severity**: Medium | **Effort**: Deeper (high UX payoff)
+
+Users miss action outcomes. Errors and confirmations are only in console or require modal dialogs.
+
+**Action:**
+- [ ] Implement toast notification component (e.g., `react-hot-toast` or custom)
+- [ ] Add auto-dismiss with configurable duration
+- [ ] Support action buttons ("Undo", "View Details")
+- [ ] Position in corner, non-blocking
+
+---
+
+### M11. No `React.memo` on any list-item component
+
+**Severity**: Medium | **Effort**: Quick win per component
+
+`AlbumCard`, `SuggestionCard`, `AISuggestionCard` re-render on every parent state change. Combined with no virtualization (M9), this compounds performance issues.
+
+**Action:**
+- [ ] Wrap list-item components with `React.memo` (start with `AlbumCard`)
+
+---
+
+### M12. Seller monitoring service lacks rate limiting
+
+**Severity**: Medium | **Effort**: Quick win
+
+`sellerMonitoringService.ts` creates its own Axios instance without the rate-limiting interceptor that `discogsService.ts` has, risking Discogs 429 errors.
+
+**Action:**
+- [ ] Share the rate-limited Axios instance from `discogsService`, or add the same interceptor
+
+**Files:** `src/backend/services/sellerMonitoringService.ts`
+
+---
+
+### M13. Fixed 10s timeout + unconditional 1s delay on all API requests
+
+**Severity**: Medium | **Effort**: Medium
+
+Collection sync of 500 records takes minimum 500 seconds due to mandatory 1-second sleep on every request. Batch operations can also exceed the 10-second timeout.
+
+**Action:**
+- [ ] Implement token-bucket rate limiter that only sleeps when requests are too frequent
+- [ ] Use configurable timeouts (10s for lookups, 30–60s for batch ops)
+
+**Files:** `src/backend/services/discogsService.ts` (lines 47, 54–57)
+
+---
+
+### M14. `decrypt()` returns empty string on failure
+
+**Severity**: Medium | **Effort**: Quick win
+
+If the encryption key changes, `decrypt()` silently returns `''` instead of signaling the error. Downstream code uses empty credentials.
+
+**Action:**
+- [ ] Throw `DecryptionError` so callers can distinguish "no credentials" from "corrupted/wrong key"
+- [ ] Prompt re-authentication on decryption failure
+
+**Files:** `src/backend/services/authService.ts` (lines 51–54)
+
+---
+
+### M15. `data/` directory not auto-created for new users
+
+**Severity**: Medium | **Effort**: Quick win
+
+New GitHub users cloning the repo won't have the `data/` directory (gitignored). Server crashes on first file write or lock acquisition.
+
+**Action:**
+- [ ] Add `fs.mkdirSync('data', { recursive: true })` to server startup, or have `FileStorage` create directories on demand
+
+**Files:** `src/server.ts`, `src/backend/utils/fileStorage.ts`
+
+---
+
+### M16. README architecture section is out of date
+
+**Severity**: Medium | **Effort**: Quick win
+
+References `SetupPage.tsx` (doesn't exist -- it's `SettingsPage.tsx`). Omits `DiscardPilePage.tsx`, `NewReleasesPage.tsx`, `SellerMatchesPage.tsx`.
+
+**Action:**
+- [ ] Regenerate directory tree from the actual filesystem
+
+**Files:** `README.md` (lines 600–627)
+
+---
+
+### M17. No contributor development guide
+
+**Severity**: Medium | **Effort**: Medium
+
+Contributing section is 6 lines. No architecture decisions, no "how to add a route," no test patterns documented.
+
+**Action:**
+- [ ] Create `CONTRIBUTING.md` with architecture overview, coding patterns, and testing guide
+- [ ] Reference existing `TEST_STYLE_GUIDE.md`
+
+---
+
+### M18. Documentation gaps: security docs and internal guides gitignored
+
+**Severity**: Medium | **Effort**: Quick win
+
+GitHub users don't see security guidance or testing guides. Several docs are gitignored.
+
+**Action:**
+- [ ] Create public, sanitized versions of security notes and testing guide
+- [ ] Keep sensitive/internal analysis private
+
+**Files:** `.gitignore` (lines 146–153)
+
+---
+
+### M19. Component extraction -- Level 3 & 4
+
+**Severity**: Medium | **Effort**: Medium
+
+Large inline JSX blocks in page files that should be their own components. Level 1 (Button, Badge, ProgressBar) and Level 2 (Modal) are complete.
+
+**Level 3 -- Feature-specific cards:**
+- [ ] `DiscoveryItemCard` from `DiscoveryPage.tsx` (~100+ lines per card type)
+- [ ] `WishlistItemCard` from `WishlistPage.tsx` (~130 lines)
+- [ ] `ReleaseCard` from `NewReleasesPage.tsx` (~115 lines)
+- [ ] `SellerCard` & `MatchCard` from `SellersPage.tsx` / `SellerMatchesPage.tsx`
+- [ ] `ScrobbleSessionCard` from `HistoryPage.tsx` (~230 lines)
+
+**Level 4 -- Complex logic blocks:**
+- [ ] `CollectionFilterControls` from `CollectionPage.tsx` (~150 lines)
+- [ ] `CacheStatusIndicator` from `CollectionPage.tsx` (~185 lines)
+
+---
+
+## LOW
+
+### L1. License metadata mismatch
+
+**Effort**: Quick win (one-line change)
+
+`README.md` says MIT, `package.json` says ISC. `LICENSE` file contains MIT.
+
+**Action:**
+- [ ] Update `package.json` to `"license": "MIT"`
+
+---
+
+### L2. Legacy endpoints likely unused
+
+**Effort**: Quick win after validation
+
+Legacy endpoints remain in `auth.ts`: `POST /discogs/token` and `POST /lastfm/callback`.
+
+**Action:**
+- [ ] Confirm whether frontend uses these; if not, deprecate and remove
+
+**Files:** `src/backend/routes/auth.ts` (lines 121–129, 261–269)
+
+---
+
+### L3. Security audit doesn't fail CI
+
+**Effort**: Quick win
+
+`npm audit` logs vulnerabilities but doesn't fail the build.
+
+**Action:**
+- [ ] Make `npm audit --audit-level=moderate` fail on findings
+
+**Files:** `.github/workflows/ci.yml` (line 110)
+
+---
+
+### L4. Remaining `useState<any>` -- 3 untyped state variables
+
+**Effort**: Quick win
+
+Reduced from 52→22 in January 2026, but 3 `useState<any>` remain.
+
+**Action:**
+- [ ] Define proper TypeScript interfaces for:
+  - `ReleaseDetailsPage.tsx:45` (`connectionTest`)
+  - `CollectionPage.tsx:37` (`cacheProgress`)
+  - `ScrobblePage.tsx:23` (`results`)
+- [ ] Enable stricter TypeScript checks
+
+---
+
+### L5. No Node.js version enforcement
+
+**Effort**: Quick win
+
+README says 18+ but nothing enforces it.
+
+**Action:**
+- [ ] Add `"engines": { "node": ">=18.0.0" }` to `package.json`
+- [ ] Add `.nvmrc` file
+
+---
+
+### L6. Configuration drift: deprecated `PORT` + `HOST=0.0.0.0` risk
+
+**Effort**: Quick win
+
+`.env.example` documents `HOST=0.0.0.0` without security warnings. Deprecated `PORT` var still supported.
+
+**Action:**
+- [ ] Add explicit security warning in README about non-localhost binding
+- [ ] Consider logging deprecation notice at startup for `PORT`
+
+**Files:** `.env.example`, `src/server.ts` (lines 112–116)
+
+---
+
+### L7. Unused dependency: `wait-on`
+
+**Effort**: Quick win
+
+Listed in `devDependencies` but not referenced in any script or source file.
+
+**Action:**
+- [ ] `npm uninstall wait-on`
+
+---
+
+### L8. CI doesn't test Node 22 (current LTS)
+
+**Effort**: Quick win
+
+CI matrix tests Node 18.x and 20.x but not the current LTS.
+
+**Action:**
+- [ ] Add `22.x` to CI matrix
+
+**Files:** `.github/workflows/ci.yml`
+
+---
+
+### L9. No request logging middleware / observability
+
+**Effort**: Quick win (morgan) / Medium (structured logging)
+
+No HTTP request/response logging. Debugging API issues requires manually adding log statements.
+
+**Action:**
+- [ ] Add `morgan` for dev-mode request logging
+- [ ] Consider structured JSON logging with `pino` longer-term
+
+**Files:** `src/server.ts`
+
+---
+
+### L10. No focus trap in modals + possibly dead state
+
+**Effort**: Quick win
+
+Tab key escapes modals. `connectionTest` state in `ReleaseDetailsPage.tsx` may be unused.
+
+**Action:**
+- [ ] Add `focus-trap-react` to `Modal.tsx`
+- [ ] Verify and remove `connectionTest` state if unused
+
+---
+
+### L11. Centralize route identifiers
+
+**Effort**: Low
+
+String literals for routing in `App.tsx`, `MainContent.tsx`, and `Sidebar.tsx` can drift out of sync.
+
+**Action:**
+- [ ] Create `routes.ts` constants file
+- [ ] Replace string literals with constants
+
+**Files:** `src/renderer/App.tsx`, `MainContent.tsx`, `Sidebar.tsx`
+
+---
+
+### L12. Sidebar reorganization
+
+**Effort**: Low
 
 Current flat list of nav items lacks visual hierarchy.
 
 **Action:**
-- [ ] Group into sections: Setup / Library / Insights / Settings
+- [ ] Group into sections: Library / Insights / Marketplace / Settings
 - [ ] Add section headers or dividers
 - [ ] Make disabled items explain why (tooltip: "Connect Discogs first")
-- [ ] Consider moving auth status to header (persistent + visible)
 
 **Files:** `src/renderer/components/Sidebar.tsx`
 
 ---
 
-### 3.7 Keyboard Shortcuts
-
-**Priority: P3** | **Effort: Low** | **Impact: Medium (power users)**
-
-Power users appreciate keyboard navigation for efficiency.
-
-**Action:**
-- [ ] Add "/" for search focus
-- [ ] Add "Esc" to close modals
-- [ ] Add arrow keys for grid navigation
-- [ ] Add keyboard shortcut help modal
-
----
-
-### 3.8 Advanced Filtering
-
-**Priority: P3** | **Effort: Medium** | **Impact: High (discoverability)**
-
-Current search is text-based only. Collectors want to filter by year, format, genre, rating.
-
-**Action:**
-- [ ] Add filter panel with quick-toggle chips
-- [ ] Support year range, format (LP vs 7"), genre
-- [ ] Add saved filter presets
-
----
-
-### 3.9 Command Palette
-
-**Priority: P3** | **Effort: Medium** | **Impact: Low (power users)**
-
-Global command palette (Cmd+K) for searching actions, pages, albums.
-
-**Action:**
-- [ ] Implement command palette component
-- [ ] Index pages, actions, and searchable content
-- [ ] Add fuzzy search
-
----
-
-## 4. CSS/Styling Debt
-
-### 4.1 Reduce Inline Styles
-
-**Priority: P2** | **Effort: Medium** | **Impact: Medium (maintainability)**
-
-Sidebar and SetupPage have many inline style blocks. Per CLAUDE.md guidelines, avoid inline styles.
-
-**Action:**
-- [ ] Audit components for inline styles
-- [ ] Move to CSS classes using CSS variables
-- [ ] Document exceptions (dynamic values only)
-
-**Files:** `src/renderer/components/Sidebar.tsx`, `src/renderer/pages/SetupPage.tsx`, `src/renderer/pages/SettingsPage.tsx`
-
----
-
-### 4.2 Split styles.css
-
-**Priority: P2** | **Effort: Medium** | **Impact: Medium (maintainability)**
-
-Single large `styles.css` file causes coupling and potential collisions.
-
-**Action:**
-- [ ] Split into: `global.css`, `components.css`, page-specific files
-- [ ] Or adopt CSS modules per component
-- [ ] Extract shared patterns into utility classes
-
-**Files:** `src/renderer/styles.css`
-
----
-
-### 4.3 Extract Shared UI Patterns
-
-**Priority: P2** | **Effort: Low** | **Impact: Medium (consistency)**
-
-Repeated patterns across pages: section headers, empty states, info boxes, action rows.
-
-**Action:**
-- [ ] Create reusable components: `SectionHeader`, `EmptyState`, `InfoBox`, `ActionRow`
-- [ ] Document in component library or storybook
-
----
-
-### 4.4 Component Extraction Roadmap
-
-**Priority: P2** | **Effort: High** | **Impact: High (maintainability, consistency)**
-
-> **Comprehensive analysis completed January 2026:** The frontend codebase relies heavily on CSS classes for consistency (good!) but duplicates JSX structure in many places (bad!). This section documents all extraction opportunities.
-
-#### 4.4.1 Core UI Primitives
-
-These foundational components should replace raw HTML elements and CSS classes everywhere.
-
-##### `Button` Component
-
-**Current State:** Repetitive `<button className="btn btn-primary ...">` elements. Loading states are manually handled with spinners inside buttons.
-
-**Locations:** Every page file (`CollectionPage`, `DiscoveryPage`, `WishlistPage`, `SellersPage`, etc.)
-
-**Requirements:**
-| Feature | Options |
-|---------|---------|
-| Variants | `primary`, `secondary`, `danger`, `outline`, `link` |
-| Sizes | `normal`, `small` |
-| States | `isLoading` (replaces text with spinner), `disabled`, `active` |
-| Props | `icon` (left/right), `fluid` (width: 100%) |
-
-**Action:**
-- [ ] Create `src/renderer/components/ui/Button.tsx`
-- [ ] Define CSS classes `.btn-*` variants in styles or use CSS-in-JS
-- [ ] Add unit tests for all states and variants
-
----
-
-##### `Card` Component
-
-**Current State:** Hundreds of `div.card` elements. Some have headers/actions defined ad-hoc.
-
-**Locations:** `StatsPage.tsx`, `SellersPage.tsx`, `HistoryPage.tsx`
-
-**Requirements:**
-| Feature | Options |
-|---------|---------|
-| Props | `title` (optional header), `subtitle`, `actions` (header buttons), `padding` (default/none) |
-| Slots | `children` (body), `footer` |
-
-**Action:**
-- [ ] Create `src/renderer/components/ui/Card.tsx`
-- [ ] Support `Card.Header`, `Card.Body`, `Card.Footer` compound pattern
-
----
-
-##### `Modal` Component
-
-**Current State:** 4+ duplicate implementations of the Overlay → Container → Header/Body/Footer structure.
-
-**Locations:**
-- `DiscoveryPage.tsx` (`MappingModal`)
-- `WishlistPage.tsx` (`VersionsModal`)
-- `SellersPage.tsx` (`AddSellerModal`)
-- `NewReleasesPage.tsx` (`DisambiguationModal`)
-
-**Requirements:**
-| Feature | Options |
-|---------|---------|
-| Props | `isOpen`, `onClose`, `title`, `size` (`sm`, `md`, `lg`), `isLoading` |
-| Behavior | `stopPropagation` on click, close on overlay click, generic close button |
-
-**Action:**
-- [ ] Create `src/renderer/components/ui/Modal.tsx`
-- [ ] Refactor all 4 page modals to use the shared component
-- [ ] Add keyboard support (Esc to close)
-
----
-
-##### `ProgressBar` Component
-
-**Current State:** 3 different implementations with slightly different HTML structures.
-
-**Locations:**
-- `SyncStatusBar.tsx` (Sync progress)
-- `MilestoneProgress.tsx` (Stats progress)
-- `SellersPage.tsx` (Scan progress)
-
-**Requirements:**
-| Feature | Options |
-|---------|---------|
-| Props | `value` (0-100), `label` (optional text), `showPercentage` (boolean), `color` (optional override), `height` |
-
-**Action:**
-- [ ] Create `src/renderer/components/ui/ProgressBar.tsx`
-- [ ] Unify all 3 implementations to use shared component
-- [ ] Add animation support for value changes
-
----
-
-##### `Badge` Component
-
-**Current State:** `span` elements with various classes (`badge`, `discovery-badge`, `wishlist-badge`).
-
-**Locations:** `DiscoveryPage`, `WishlistPage`, `NewReleasesPage`, `SellerMatchesPage`
-
-**Requirements:**
-| Feature | Options |
-|---------|---------|
-| Variants | `success`, `warning`, `error`, `info`, `neutral`, `purple` (Wishlist) |
-| Props | `label`, `icon` (optional) |
-
-**Action:**
-- [ ] Create `src/renderer/components/ui/Badge.tsx`
-- [ ] Consolidate all badge CSS classes
-
----
-
-#### 4.4.2 Feature-Specific Lists & Cards
-
-Complex items currently defined inline within large page files.
-
-##### `DiscoveryItemCard`
-
-**Source:** `DiscoveryPage.tsx` (inline, ~100+ lines per card type)
-
-**Description:** Displays a missing album/artist with stats and action buttons (Last.fm, Discogs, Map, etc.)
-
-**Impact:** `DiscoveryPage` is over 1000 lines; extracting these will reduce it by ~300 lines.
-
-**Action:**
-- [ ] Create `src/renderer/components/discovery/DiscoveryItemCard.tsx`
-- [ ] Support both album and artist variants
-
----
-
-##### `WishlistItemCard`
-
-**Source:** `WishlistPage.tsx` (inline, ~130 lines)
-
-**Description:** Displays a wishlist item or local want item with price data, cover art, and vinyl status.
-
-**Variation:** Needs to handle both "Discogs Wishlist" items and "Local Want List" items (slightly different metadata).
-
-**Action:**
-- [ ] Create `src/renderer/components/wishlist/WishlistItemCard.tsx`
-- [ ] Add prop to distinguish between Discogs and Local variants
-
----
-
-##### `ReleaseCard`
-
-**Source:** `NewReleasesPage.tsx` (inline, ~115 lines)
-
-**Description:** Displays a new release with "Upcoming" badges, vinyl availability, and hide/exclude actions.
-
-**Action:**
-- [ ] Create `src/renderer/components/releases/ReleaseCard.tsx`
-
----
-
-##### `SellerCard` & `MatchCard`
-
-**Source:** `SellersPage.tsx` and `SellerMatchesPage.tsx`
-
-**Description:** Seller info card and Match result card. Both share similar "cover + info + actions" layouts.
-
-**Action:**
-- [ ] Create `src/renderer/components/sellers/SellerCard.tsx`
-- [ ] Create `src/renderer/components/sellers/MatchCard.tsx`
-
----
-
-##### `ScrobbleSessionCard`
-
-**Source:** `HistoryPage.tsx` (inline, ~230 lines)
-
-**Description:** A complex expandable card showing session status, track list, and album thumbnails.
-
-**Action:**
-- [ ] Create `src/renderer/components/history/ScrobbleSessionCard.tsx`
-
----
-
-#### 4.4.3 Complex Logic Blocks
-
-Large chunks of logic/UI that should be their own files to reduce page complexity.
-
-| Block | Source | Target Path |
-|-------|--------|-------------|
-| `ForgottenFavoritesTab` | `DiscoveryPage.tsx` (~150 lines) | `src/renderer/components/discovery/ForgottenFavoritesTab.tsx` |
-| `CollectionFilterControls` | `CollectionPage.tsx` (~150 lines) | `src/renderer/components/collection/CollectionFilters.tsx` |
-| `CacheStatusIndicator` | `CollectionPage.tsx` (~185 lines) | `src/renderer/components/collection/CacheStatus.tsx` |
-
-**Action:**
-- [ ] Extract `ForgottenFavoritesTab` to its own component
-- [ ] Extract `CollectionFilterControls` to its own component
-- [ ] Extract `CacheStatusIndicator` to its own component
-
----
-
-#### 4.4.4 Implementation Priority
-
-| Level | Components | Risk | Effort |
-|-------|------------|------|--------|
-| **Level 1** (Quick Wins) | `Button`, `Badge`, `ProgressBar` | Low | Low |
-| **Level 2** (Cleanup) | `Modal` + refactor 4 page modals | Low | Medium |
-| **Level 3** (Page Diet) | `DiscoveryItemCard`, `WishlistItemCard` | Medium | Medium |
-| **Level 4** (Logic Separation) | `ForgottenFavoritesTab`, `CollectionFilterControls`, `CacheStatus` | Medium | Medium |
-
-**Recommended Order:**
-1. Start with Level 1 - these can be swapped in immediately with low risk
-2. Level 2 significantly reduces code duplication across 4 files
-3. Levels 3-4 reduce the largest page files (DiscoveryPage, CollectionPage)
-
----
-
-## 5. Future Enhancements (P3)
-
-These are nice-to-have features for later consideration:
+## FUTURE ENHANCEMENTS (P3 -- nice to have)
 
 | Feature | Effort | Notes |
 |---------|--------|-------|
-| Theme Variants | Low | Warm/vinyl-inspired, custom accent picker |
-| Playlist/Queue System | High | Build listening queue, batch scrobble |
-| Export Capabilities | Medium | CSV/JSON for collection, stats, history |
-| Onboarding Wizard | High | Guided first-run setup flow |
-| Quick Actions on Home | Low | Sync, Scrobble, Suggestions buttons |
-| Setup Stepper | Medium | Discogs -> Last.fm -> Verify flow |
+| Keyboard shortcuts (/, Esc, arrows) | Low | Power user productivity |
+| Advanced filtering (year, format, genre, rating) | Medium | Filter chips and saved presets |
+| Command palette (Cmd+K) | Medium | Fuzzy search across pages/actions/albums |
+| Theme variants | Low | Warm/vinyl-inspired, custom accent picker |
+| Playlist/Queue system | High | Build listening queue, batch scrobble |
+| Export capabilities | Medium | CSV/JSON for collection, stats, history |
+| Onboarding wizard | High | Guided first-run setup flow |
+| Quick actions on home | Low | Sync, Scrobble, Suggestions buttons |
 
 ---
 
-## Summary by Priority
+## Summary Table
 
-### P0 - Do Immediately
-- [ ] Align test coverage (README vs jest.config.js)
+| # | Finding | Severity | Quick Win? |
+|---|---------|----------|------------|
+| C1 | Coverage thresholds (48–60%) vs 90% target | **Critical** | No |
+| H1 | No React Error Boundary | **High** | Yes |
+| H2 | Empty-string fallbacks for API secrets | **High** | Yes |
+| H3 | Lock file TOCTOU race condition | **High** | Yes |
+| H4 | Massive inline styling + monolithic stylesheet | **High** | No |
+| H5 | Background operations fail silently | **High** | No |
+| H6 | Missing request size limits and rate limiting | **High** | Partial |
+| M1 | Direct console.* bypasses secure logger (24 files) | Medium | Partial |
+| M2 | CryptoJS deprecated library | Medium | No |
+| M3 | Startup migrations not awaited | Medium | Medium |
+| M4 | Unguarded JSON.parse calls | Medium | Yes |
+| M5 | Standardize API error responses | Medium | Low |
+| M6 | fireEvent vs userEvent test inconsistency | Medium | Partial |
+| M7 | Accessibility gaps on form controls/buttons | Medium | Yes |
+| M8 | E2E tests not in CI | Medium | Medium |
+| M9 | No virtualization for large lists | Medium | No |
+| M10 | No toast notification system | Medium | No |
+| M11 | No React.memo on list components | Medium | Yes |
+| M12 | Seller monitoring lacks rate limiting | Medium | Yes |
+| M13 | Fixed 10s timeout + unconditional 1s delay | Medium | Medium |
+| M14 | decrypt() returns empty string on failure | Medium | Yes |
+| M15 | data/ directory not auto-created | Medium | Yes |
+| M16 | README architecture out of date | Medium | Yes |
+| M17 | No contributor development guide | Medium | Medium |
+| M18 | Documentation gaps (gitignored docs) | Medium | Yes |
+| M19 | Component extraction Level 3 & 4 | Medium | No |
+| L1 | License metadata mismatch (ISC vs MIT) | Low | Yes |
+| L2 | Legacy auth endpoints likely unused | Low | Yes |
+| L3 | Security audit doesn't fail CI | Low | Yes |
+| L4 | Remaining useState\<any\> (3 left) | Low | Yes |
+| L5 | No Node.js version enforcement | Low | Yes |
+| L6 | Config drift: deprecated PORT + HOST risk | Low | Yes |
+| L7 | Unused dependency: wait-on | Low | Yes |
+| L8 | CI doesn't test Node 22 | Low | Yes |
+| L9 | No request logging / observability | Low | Quick+ |
+| L10 | No focus trap in modals + dead state | Low | Yes |
+| L11 | Centralize route identifiers | Low | Yes |
+| L12 | Sidebar reorganization | Low | No |
 
-### P1 - Do Soon
-- [x] Settings page restructure with visual separation ✅ COMPLETE
-- [x] Centralized logging (remove token exposure) ✅ COMPLETE
-- [x] Remove `any` types ✅ COMPLETE (reduced from 52 to 22, ~58%)
-- [x] Fix missing/duplicate CSS ✅ COMPLETE
-- [x] Loading skeletons ✅ COMPLETE (Skeleton component with variants)
-- [x] Collapsible sidebar ✅ COMPLETE (with localStorage persistence)
-- [x] Better empty states ✅ COMPLETE (EmptyState component)
+**Total open**: 38 items (1 critical, 6 high, 19 medium, 12 low)
 
-### P2 - Next Cycle
-- [ ] Standardize API error responses
-- [ ] Centralize route identifiers
-- [ ] Toast notifications
-- [ ] Virtual scrolling
-- [ ] Sidebar reorganization
-- [ ] Reduce inline styles
-- [ ] Split styles.css
-- [ ] Extract shared UI patterns
-- [ ] Component extraction (see 4.4 for full roadmap):
-  - [x] Level 1: `Button`, `Badge`, `ProgressBar` components ✅ COMPLETE
-  - [x] Level 2: `Modal` component + refactor 4 page modals ✅ COMPLETE
-  - [ ] Level 3: `DiscoveryItemCard`, `WishlistItemCard` extraction
-  - [ ] Level 4: `ForgottenFavoritesTab`, `CollectionFilters`, `CacheStatus` extraction
+---
 
-### P3 - Nice to Have
-- [ ] Keyboard shortcuts
-- [ ] Advanced filtering
-- [ ] Command palette
-- [ ] Theme variants
-- [ ] Playlist system
-- [ ] Export capabilities
-- [ ] Onboarding wizard
+## Prioritized Action Plan
+
+### Phase 0 -- Immediate Quick Wins (1–2 days)
+
+| # | Action | Findings |
+|---|--------|----------|
+| 1 | Add `ErrorBoundary` wrapping `<MainContent>` | H1 |
+| 2 | Fix lock file with `{ flag: 'wx' }` | H3 |
+| 3 | Add startup env validation for all required secrets | H2 |
+| 4 | Add `express.json({ limit: '1mb' })` | H6 |
+| 5 | Auto-create `data/` directory on startup | M15 |
+| 6 | Fix `package.json` license to MIT | L1 |
+| 7 | Add `"engines": { "node": ">=18.0.0" }` + `.nvmrc` | L5 |
+| 8 | Add `no-console` ESLint rule | M1 (prevention) |
+| 9 | Uninstall `wait-on` | L7 |
+| 10 | Update README directory tree | M16 |
+
+### Phase 1 -- High-Impact Medium Work (1–2 weeks)
+
+| # | Action | Findings |
+|---|--------|----------|
+| 1 | Replace all `console.*` with logger (24 files) | M1 |
+| 2 | Add `express-rate-limit` middleware | H6 |
+| 3 | Add Playwright to CI workflow | M8 |
+| 4 | Add `React.memo` to list-item components | M11 |
+| 5 | Create `safeJsonParse<T>()` utility | M4 |
+| 6 | Await migrations before `app.listen()` | M3 |
+| 7 | Throw `DecryptionError` instead of returning `''` | M14 |
+| 8 | Add `aria-label` to all icon-only buttons/inputs | M7 |
+| 9 | Share rate-limited Axios instance with seller service | M12 |
+| 10 | Publish sanitized security + testing guides | M17, M18 |
+
+### Phase 2 -- Systematic Refactors (2–4 weeks)
+
+| # | Action | Findings |
+|---|--------|----------|
+| 1 | Inline styles to CSS modules (start with list components) | H4 |
+| 2 | Split `styles.css` into per-component modules | H4 |
+| 3 | Migrate `fireEvent` to `userEvent` in 20 test files | M6 |
+| 4 | Add test coverage for untested services + raise thresholds | C1 |
+| 5 | Implement token-bucket rate limiter for Discogs | M13 |
+| 6 | Migrate CryptoJS to native `crypto` | M2 |
+| 7 | Standardize API error responses | M5 |
+
+### Phase 3 -- Strategic Improvements (ongoing)
+
+| # | Action | Findings |
+|---|--------|----------|
+| 1 | Add `react-window` virtualization to collection grid | M9 |
+| 2 | Implement toast notification system | M10 |
+| 3 | Add background job status tracking | H5 |
+| 4 | Component extraction Level 3 & 4 | M19 |
+| 5 | Remove legacy auth endpoints after verification | L2 |
+| 6 | Add structured logging + request metrics | L9 |
+| 7 | Continue raising coverage toward 90% | C1 |
+
+---
+
+## Completed Items Archive
+
+Items completed in previous cycles, kept for historical reference.
+
+### ✅ Settings Page Restructure (January 2026)
+
+Restructured into 4 tabs with modular section components: Integrations, Mappings, Filters, Wishlist. Badge counts on tabs, visual separation with cards and section headers.
+
+**Files:** `src/renderer/pages/SettingsPage.tsx`, `src/renderer/components/settings/*`
+
+---
+
+### ✅ Logger Utility Created (January 2026)
+
+Created `src/renderer/utils/logger.ts` matching backend pattern with sensitive-data redaction. Removed token exposure from `SetupPage.tsx`. Replaced `console.*` in `api.ts`, `MainContent.tsx`, `ThemeContext.tsx`, `server.ts`, `fileStorage.ts`. Environment-based log level filtering.
+
+**Note:** Logger exists but adoption is incomplete -- 24 files still use `console.*` (see M1).
+
+---
+
+### ✅ Missing/Duplicate CSS Fixed (January 2026)
+
+Defined `--text-tertiary` in `:root` and `.dark-mode`. Removed duplicate `.sync-status-bar` class. Added `--bg-primary-rgb` for rgba usage.
+
+---
+
+### ✅ UI Primitives -- Level 1 & 2 (January 2026)
+
+Created reusable components: `Button`, `Badge`, `ProgressBar`, `Skeleton`, `EmptyState`, `Modal`. Refactored 4 page modals to use shared Modal component.
+
+**Files:** `src/renderer/components/ui/Button.tsx`, `Badge.tsx`, `ProgressBar.tsx`, `Skeleton.tsx`, `EmptyState.tsx`, `Modal.tsx`
+
+---
+
+### ✅ Loading Skeletons (January 2026)
+
+Created Skeleton component with variants for album cards, stat cards, and lists.
+
+---
+
+### ✅ Collapsible Sidebar (January 2026)
+
+Added toggle to collapse to icons-only mode with localStorage persistence.
+
+---
+
+### ✅ Better Empty States (January 2026)
+
+Created EmptyState component with illustrations and call-to-action buttons.
+
+---
+
+### ✅ `any` Type Reduction (January 2026)
+
+Reduced from 52 to 22 instances (~58%). Added `CollectionNote` interface. 3 `useState<any>` remain (see L4).
