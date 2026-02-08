@@ -122,17 +122,9 @@ scrobbleHistorySyncService
 
 ---
 
-### M2. CryptoJS (deprecated) used for encryption
+### ~~M2. CryptoJS (deprecated) used for encryption~~ DONE
 
-**Severity**: Medium | **Effort**: Deeper
-
-CryptoJS is unmaintained. `authService.ts` already imports Node.js native `crypto` but uses CryptoJS for AES.
-
-**Action:**
-- [ ] Migrate to `crypto.createCipheriv`/`createDecipheriv` with AES-256-GCM
-- [ ] Migration path: decrypt existing tokens with CryptoJS, re-encrypt with native
-
-**Files:** `src/backend/services/authService.ts`
+**Completed:** February 2026. Replaced CryptoJS with native Node.js `crypto` module. New encryption uses AES-256-GCM with scrypt key derivation. Legacy CryptoJS format (EVP_BytesToKey + AES-256-CBC) auto-detected and decrypted for backward compatibility. Removed `crypto-js` and `@types/crypto-js` dependencies.
 
 ---
 
@@ -462,7 +454,7 @@ Current flat list of nav items lacks visual hierarchy.
 | H5 | Background operations fail silently | **High** | No |
 | H6 | ~~Missing request size limits and rate limiting~~ | ~~**High**~~ | ~~DONE~~ |
 | M1 | ~~Direct console.* bypasses secure logger (24 files)~~ | ~~Medium~~ | ~~DONE~~ |
-| M2 | CryptoJS deprecated library | Medium | No |
+| M2 | ~~CryptoJS deprecated library~~ | ~~Medium~~ | ~~DONE~~ |
 | M3 | ~~Startup migrations not awaited~~ | ~~Medium~~ | ~~DONE~~ |
 | M4 | ~~Unguarded JSON.parse calls~~ | ~~Medium~~ | ~~DONE~~ |
 | M5 | Standardize API error responses | Medium | Low |
@@ -493,7 +485,7 @@ Current flat list of nav items lacks visual hierarchy.
 | L11 | Centralize route identifiers | Low | Yes |
 | L12 | Sidebar reorganization | Low | No |
 
-**Total open**: 17 items (1 critical, 2 high, 5 medium, 9 low) -- 21 completed (10 Phase 0 + 11 Phase 1, February 2026)
+**Total open**: 16 items (1 critical, 2 high, 4 medium, 9 low) -- 22 completed (10 Phase 0 + 11 Phase 1 + 1 Phase 2, February 2026)
 
 ---
 
@@ -527,7 +519,7 @@ All 10 items completed: H1, H3, H2, H6 (size limit), M15, L1, L5, M1 (ESLint + b
 | 3 | Migrate `fireEvent` to `userEvent` in 20 test files | M6 |
 | 4 | Add test coverage for untested services + raise thresholds | C1 |
 | 5 | Implement token-bucket rate limiter for Discogs | M13 |
-| 6 | Migrate CryptoJS to native `crypto` | M2 |
+| ~~6~~ | ~~Migrate CryptoJS to native `crypto`~~ | ~~M2~~ DONE |
 | 7 | Standardize API error responses | M5 |
 
 ### Phase 3 -- Strategic Improvements (ongoing)
