@@ -190,16 +190,9 @@ Icon-only buttons lack `aria-label`; inputs lack explicit labels. Screen readers
 
 ---
 
-### M8. E2E tests not run in CI
+### ~~M8. E2E tests not run in CI~~ DONE
 
-**Severity**: Medium | **Effort**: Medium
-
-Four Playwright specs exist but CI only runs Jest. Integration regressions ship uncaught.
-
-**Action:**
-- [ ] Add Playwright CI job with `npx playwright install --with-deps` and `npm run test:e2e`
-
-**Files:** `.github/workflows/ci.yml`
+**Completed:** February 2026. Added `e2e` job to CI pipeline that runs after build, installs Chromium, and executes all 4 Playwright specs. Uploads HTML report as artifact.
 
 ---
 
@@ -497,7 +490,7 @@ Current flat list of nav items lacks visual hierarchy.
 | M5 | Standardize API error responses | Medium | Low |
 | M6 | fireEvent vs userEvent test inconsistency | Medium | Partial |
 | M7 | Accessibility gaps on form controls/buttons | Medium | Yes |
-| M8 | E2E tests not in CI | Medium | Medium |
+| M8 | ~~E2E tests not in CI~~ | ~~Medium~~ | ~~DONE~~ |
 | M9 | No virtualization for large lists | Medium | No |
 | M10 | No toast notification system | Medium | No |
 | M11 | ~~No React.memo on list components~~ | ~~Medium~~ | ~~DONE~~ |
@@ -522,7 +515,7 @@ Current flat list of nav items lacks visual hierarchy.
 | L11 | Centralize route identifiers | Low | Yes |
 | L12 | Sidebar reorganization | Low | No |
 
-**Total open**: 21 items (1 critical, 2 high, 9 medium, 9 low) -- 17 completed (10 Phase 0 + 7 Phase 1, February 2026)
+**Total open**: 20 items (1 critical, 2 high, 8 medium, 9 low) -- 18 completed (10 Phase 0 + 8 Phase 1, February 2026)
 
 ---
 
@@ -538,7 +531,7 @@ All 10 items completed: H1, H3, H2, H6 (size limit), M15, L1, L5, M1 (ESLint + b
 |---|--------|----------|
 | 1 | Replace all `console.*` with logger (24 files) | M1 |
 | ~~2~~ | ~~Add `express-rate-limit` middleware~~ | ~~H6~~ DONE |
-| 3 | Add Playwright to CI workflow | M8 |
+| ~~3~~ | ~~Add Playwright to CI workflow~~ | ~~M8~~ DONE |
 | ~~4~~ | ~~Add `React.memo` to list-item components~~ | ~~M11~~ DONE |
 | ~~5~~ | ~~Create `safeJsonParse<T>()` utility~~ | ~~M4~~ DONE |
 | ~~6~~ | ~~Await migrations before `app.listen()`~~ | ~~M3~~ DONE |
