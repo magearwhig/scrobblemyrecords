@@ -176,17 +176,9 @@ Some endpoints return `{success: false, error}`, others throw. This creates fron
 
 ---
 
-### M7. Accessibility gaps on form controls and buttons
+### ~~M7. Accessibility gaps on form controls and buttons~~ DONE
 
-**Severity**: Medium | **Effort**: Quick win per component
-
-Icon-only buttons lack `aria-label`; inputs lack explicit labels. Screen readers can't identify them.
-
-**Action:**
-- [ ] Add `aria-label` to all icon-only buttons and form inputs without visible labels
-- [ ] Ensure keyboard focus states
-
-**Files:** `SearchBar.tsx`, `Header.tsx`, various action buttons
+**Completed:** February 2026. Added `aria-label` attributes to all icon-only buttons across 5 components: `Header.tsx` (theme toggle), `SearchBar.tsx` (clear button), `AISuggestionCard.tsx` (refresh button), `NewReleaseCard.tsx` (dismiss button), `DashboardStatCard.tsx` (clickable stat cards).
 
 ---
 
@@ -489,7 +481,7 @@ Current flat list of nav items lacks visual hierarchy.
 | M4 | ~~Unguarded JSON.parse calls~~ | ~~Medium~~ | ~~DONE~~ |
 | M5 | Standardize API error responses | Medium | Low |
 | M6 | fireEvent vs userEvent test inconsistency | Medium | Partial |
-| M7 | Accessibility gaps on form controls/buttons | Medium | Yes |
+| M7 | ~~Accessibility gaps on form controls/buttons~~ | ~~Medium~~ | ~~DONE~~ |
 | M8 | ~~E2E tests not in CI~~ | ~~Medium~~ | ~~DONE~~ |
 | M9 | No virtualization for large lists | Medium | No |
 | M10 | No toast notification system | Medium | No |
@@ -515,7 +507,7 @@ Current flat list of nav items lacks visual hierarchy.
 | L11 | Centralize route identifiers | Low | Yes |
 | L12 | Sidebar reorganization | Low | No |
 
-**Total open**: 20 items (1 critical, 2 high, 8 medium, 9 low) -- 18 completed (10 Phase 0 + 8 Phase 1, February 2026)
+**Total open**: 19 items (1 critical, 2 high, 7 medium, 9 low) -- 19 completed (10 Phase 0 + 9 Phase 1, February 2026)
 
 ---
 
@@ -536,7 +528,7 @@ All 10 items completed: H1, H3, H2, H6 (size limit), M15, L1, L5, M1 (ESLint + b
 | ~~5~~ | ~~Create `safeJsonParse<T>()` utility~~ | ~~M4~~ DONE |
 | ~~6~~ | ~~Await migrations before `app.listen()`~~ | ~~M3~~ DONE |
 | ~~7~~ | ~~Throw `DecryptionError` instead of returning `''`~~ | ~~M14~~ DONE |
-| 8 | Add `aria-label` to all icon-only buttons/inputs | M7 |
+| ~~8~~ | ~~Add `aria-label` to all icon-only buttons/inputs~~ | ~~M7~~ DONE |
 | ~~9~~ | ~~Share rate-limited Axios instance with seller service~~ | ~~M12~~ DONE |
 | 10 | Publish sanitized security + testing guides | M17, M18 |
 
