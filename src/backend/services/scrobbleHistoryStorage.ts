@@ -544,6 +544,104 @@ export class ScrobbleHistoryStorage {
   }
 
   /**
+   * Get paginated artists with sorting and search
+   * Aggregates play counts across all albums per artist
+   */
+  async getArtistsPaginated(
+    page: number = 1,
+    perPage: number = 50,
+    sortBy: 'playCount' | 'lastPlayed' | 'artist' | 'albumCount' = 'playCount',
+    sortOrder: 'asc' | 'desc' = 'desc',
+    searchQuery?: string
+  ): Promise<{
+    items: Array<{
+      artist: string;
+      playCount: number;
+      albumCount: number;
+      lastPlayed: number;
+    }>;
+    total: number;
+    totalPages: number;
+    page: number;
+  }> {
+    const allAlbums = await this.getAllAlbums();
+
+    // Aggregate by artist, preserving first-seen casing
+    const artistMap = new Map<
+      string,
+      {
+        artist: string;
+        playCount: number;
+        albumCount: number;
+        lastPlayed: number;
+      }
+    >();
+
+    for (const { artist, history } of allAlbums) {
+      const key = artist.toLowerCase();
+      const existing = artistMap.get(key);
+      if (existing) {
+        existing.playCount += history.playCount;
+        existing.albumCount++;
+        if (history.lastPlayed > existing.lastPlayed) {
+          existing.lastPlayed = history.lastPlayed;
+        }
+      } else {
+        artistMap.set(key, {
+          artist,
+          playCount: history.playCount,
+          albumCount: 1,
+          lastPlayed: history.lastPlayed,
+        });
+      }
+    }
+
+    let artists = Array.from(artistMap.values());
+
+    // Filter by search query if provided
+    if (searchQuery && searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      artists = artists.filter(item =>
+        item.artist.toLowerCase().includes(query)
+      );
+    }
+
+    // Sort
+    artists.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'playCount':
+          comparison = a.playCount - b.playCount;
+          break;
+        case 'lastPlayed':
+          comparison = a.lastPlayed - b.lastPlayed;
+          break;
+        case 'artist':
+          comparison = a.artist.localeCompare(b.artist);
+          break;
+        case 'albumCount':
+          comparison = a.albumCount - b.albumCount;
+          break;
+      }
+      return sortOrder === 'desc' ? -comparison : comparison;
+    });
+
+    // Paginate
+    const total = artists.length;
+    const totalPages = Math.ceil(total / perPage);
+    const startIndex = (page - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const paginatedItems = artists.slice(startIndex, endIndex);
+
+    return {
+      items: paginatedItems,
+      total,
+      totalPages,
+      page,
+    };
+  }
+
+  /**
    * Get paginated tracks with sorting and search
    * Aggregates all plays from all albums into individual track entries
    */

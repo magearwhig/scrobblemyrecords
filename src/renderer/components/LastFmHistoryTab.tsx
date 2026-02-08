@@ -21,23 +21,52 @@ interface TrackHistoryItem {
   lastPlayed: number;
 }
 
-type ViewMode = 'albums' | 'tracks';
+interface ArtistHistoryItem {
+  artist: string;
+  playCount: number;
+  albumCount: number;
+  lastPlayed: number;
+}
+
+type ViewMode = 'albums' | 'tracks' | 'artists';
 type AlbumSortBy = 'playCount' | 'lastPlayed' | 'artist' | 'album';
 type TrackSortBy = 'playCount' | 'lastPlayed' | 'artist' | 'album' | 'track';
+type ArtistSortBy = 'playCount' | 'lastPlayed' | 'artist' | 'albumCount';
 type SortOrder = 'asc' | 'desc';
+
+// Parse view mode from URL hash query params (e.g., #history?view=artists)
+const getViewFromUrl = (): ViewMode | null => {
+  const hash = window.location.hash;
+  const queryIndex = hash.indexOf('?');
+  if (queryIndex === -1) return null;
+
+  const queryString = hash.slice(queryIndex + 1);
+  const params = new URLSearchParams(queryString);
+  const view = params.get('view');
+
+  if (view === 'albums' || view === 'tracks' || view === 'artists') {
+    return view;
+  }
+  return null;
+};
 
 const LastFmHistoryTab: React.FC = () => {
   const { state } = useApp();
   const api = getApiService(state.serverUrl);
 
-  // View mode toggle
-  const [viewMode, setViewMode] = useState<ViewMode>('albums');
+  // View mode toggle (supports deep-linking via ?view= param)
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    () => getViewFromUrl() || 'albums'
+  );
 
   // Album data
   const [albums, setAlbums] = useState<AlbumHistoryItem[]>([]);
 
   // Track data
   const [tracks, setTracks] = useState<TrackHistoryItem[]>([]);
+
+  // Artist data
+  const [artists, setArtists] = useState<ArtistHistoryItem[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +81,7 @@ const LastFmHistoryTab: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [albumSortBy, setAlbumSortBy] = useState<AlbumSortBy>('playCount');
   const [trackSortBy, setTrackSortBy] = useState<TrackSortBy>('playCount');
+  const [artistSortBy, setArtistSortBy] = useState<ArtistSortBy>('playCount');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
 
   // Debounce search
@@ -118,20 +148,48 @@ const LastFmHistoryTab: React.FC = () => {
     }
   }, [api, page, perPage, trackSortBy, sortOrder, debouncedSearch]);
 
+  const loadArtists = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await api.getArtistHistoryPaginated(
+        page,
+        perPage,
+        artistSortBy,
+        sortOrder,
+        debouncedSearch || undefined
+      );
+      setArtists(result.items);
+      setTotalPages(result.totalPages);
+      setTotal(result.total);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to load artist history'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [api, page, perPage, artistSortBy, sortOrder, debouncedSearch]);
+
   useEffect(() => {
     if (viewMode === 'albums') {
       loadAlbums();
-    } else {
+    } else if (viewMode === 'tracks') {
       loadTracks();
+    } else {
+      loadArtists();
     }
-  }, [viewMode, loadAlbums, loadTracks]);
+  }, [viewMode, loadAlbums, loadTracks, loadArtists]);
 
   const handleSyncComplete = () => {
     // Reload data when sync completes
     if (viewMode === 'albums') {
       loadAlbums();
-    } else {
+    } else if (viewMode === 'tracks') {
       loadTracks();
+    } else {
+      loadArtists();
     }
   };
 
@@ -150,6 +208,16 @@ const LastFmHistoryTab: React.FC = () => {
       setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
     } else {
       setTrackSortBy(newSortBy);
+      setSortOrder('desc');
+    }
+    setPage(1);
+  };
+
+  const handleArtistSortChange = (newSortBy: ArtistSortBy) => {
+    if (newSortBy === artistSortBy) {
+      setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
+    } else {
+      setArtistSortBy(newSortBy);
       setSortOrder('desc');
     }
     setPage(1);
@@ -179,8 +247,19 @@ const LastFmHistoryTab: React.FC = () => {
     return sortOrder === 'desc' ? ' ↓' : ' ↑';
   };
 
-  const items = viewMode === 'albums' ? albums : tracks;
-  const itemType = viewMode === 'albums' ? 'albums' : 'tracks';
+  const getArtistSortIndicator = (field: ArtistSortBy) => {
+    if (artistSortBy !== field) return null;
+    return sortOrder === 'desc' ? ' ↓' : ' ↑';
+  };
+
+  const items =
+    viewMode === 'albums' ? albums : viewMode === 'tracks' ? tracks : artists;
+  const itemType =
+    viewMode === 'albums'
+      ? 'albums'
+      : viewMode === 'tracks'
+        ? 'tracks'
+        : 'artists';
 
   return (
     <div className='lastfm-history-tab'>
@@ -202,6 +281,12 @@ const LastFmHistoryTab: React.FC = () => {
               Albums
             </button>
             <button
+              className={`lastfm-history-view-btn ${viewMode === 'artists' ? 'active' : ''}`}
+              onClick={() => setViewMode('artists')}
+            >
+              Artists
+            </button>
+            <button
               className={`lastfm-history-view-btn ${viewMode === 'tracks' ? 'active' : ''}`}
               onClick={() => setViewMode('tracks')}
             >
@@ -215,7 +300,9 @@ const LastFmHistoryTab: React.FC = () => {
               placeholder={
                 viewMode === 'albums'
                   ? 'Search artists or albums...'
-                  : 'Search artists, albums, or tracks...'
+                  : viewMode === 'tracks'
+                    ? 'Search artists, albums, or tracks...'
+                    : 'Search artists...'
               }
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
@@ -257,7 +344,7 @@ const LastFmHistoryTab: React.FC = () => {
                 <option value='album-asc'>Album (A-Z)</option>
                 <option value='album-desc'>Album (Z-A)</option>
               </select>
-            ) : (
+            ) : viewMode === 'tracks' ? (
               <select
                 value={`${trackSortBy}-${sortOrder}`}
                 onChange={e => {
@@ -280,6 +367,29 @@ const LastFmHistoryTab: React.FC = () => {
                 <option value='track-asc'>Track (A-Z)</option>
                 <option value='track-desc'>Track (Z-A)</option>
               </select>
+            ) : (
+              <select
+                value={`${artistSortBy}-${sortOrder}`}
+                onChange={e => {
+                  const [newSort, newOrder] = e.target.value.split('-') as [
+                    ArtistSortBy,
+                    SortOrder,
+                  ];
+                  setArtistSortBy(newSort);
+                  setSortOrder(newOrder);
+                  setPage(1);
+                }}
+                className='lastfm-history-sort-select'
+              >
+                <option value='playCount-desc'>Most Played</option>
+                <option value='playCount-asc'>Least Played</option>
+                <option value='lastPlayed-desc'>Recently Played</option>
+                <option value='lastPlayed-asc'>Oldest Played</option>
+                <option value='artist-asc'>Artist (A-Z)</option>
+                <option value='artist-desc'>Artist (Z-A)</option>
+                <option value='albumCount-desc'>Most Albums</option>
+                <option value='albumCount-asc'>Fewest Albums</option>
+              </select>
             )}
           </div>
         </div>
@@ -299,7 +409,13 @@ const LastFmHistoryTab: React.FC = () => {
             {error}
             <button
               className='btn btn-small'
-              onClick={viewMode === 'albums' ? loadAlbums : loadTracks}
+              onClick={
+                viewMode === 'albums'
+                  ? loadAlbums
+                  : viewMode === 'tracks'
+                    ? loadTracks
+                    : loadArtists
+              }
               style={{ marginLeft: '1rem' }}
             >
               Retry
@@ -494,6 +610,72 @@ const LastFmHistoryTab: React.FC = () => {
 
           {/* Loading overlay for pagination */}
           {loading && tracks.length > 0 && (
+            <div className='lastfm-history-loading-overlay'>
+              <div className='spinner'></div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Artist list */}
+      {viewMode === 'artists' && artists.length > 0 && (
+        <div className='card lastfm-history-list-card'>
+          {/* Header row */}
+          <div className='lastfm-history-list-header lastfm-history-artist-header'>
+            <button
+              className={`lastfm-history-header-btn lastfm-history-col-artist ${artistSortBy === 'artist' ? 'active' : ''}`}
+              onClick={() => handleArtistSortChange('artist')}
+            >
+              Artist{getArtistSortIndicator('artist')}
+            </button>
+            <button
+              className={`lastfm-history-header-btn lastfm-history-col-albums ${artistSortBy === 'albumCount' ? 'active' : ''}`}
+              onClick={() => handleArtistSortChange('albumCount')}
+            >
+              Albums{getArtistSortIndicator('albumCount')}
+            </button>
+            <button
+              className={`lastfm-history-header-btn lastfm-history-col-plays ${artistSortBy === 'playCount' ? 'active' : ''}`}
+              onClick={() => handleArtistSortChange('playCount')}
+            >
+              Plays{getArtistSortIndicator('playCount')}
+            </button>
+            <button
+              className={`lastfm-history-header-btn lastfm-history-col-last ${artistSortBy === 'lastPlayed' ? 'active' : ''}`}
+              onClick={() => handleArtistSortChange('lastPlayed')}
+            >
+              Last Played{getArtistSortIndicator('lastPlayed')}
+            </button>
+          </div>
+
+          {/* Artist rows */}
+          <div className='lastfm-history-list'>
+            {artists.map((artist, index) => (
+              <div
+                key={`${artist.artist}-${index}`}
+                className='lastfm-history-item lastfm-history-artist-item'
+              >
+                <div
+                  className='lastfm-history-col-artist'
+                  title={artist.artist}
+                >
+                  {artist.artist}
+                </div>
+                <div className='lastfm-history-col-albums'>
+                  {artist.albumCount.toLocaleString()}
+                </div>
+                <div className='lastfm-history-col-plays'>
+                  {artist.playCount.toLocaleString()}
+                </div>
+                <div className='lastfm-history-col-last'>
+                  {formatLastPlayed(artist.lastPlayed)}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Loading overlay for pagination */}
+          {loading && artists.length > 0 && (
             <div className='lastfm-history-loading-overlay'>
               <div className='spinner'></div>
             </div>

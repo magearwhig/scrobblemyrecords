@@ -702,6 +702,42 @@ class ApiService {
   }
 
   // ============================================
+  // Artist history paginated (for History page)
+  // ============================================
+
+  async getArtistHistoryPaginated(
+    page: number = 1,
+    perPage: number = 50,
+    sortBy: 'playCount' | 'lastPlayed' | 'artist' | 'albumCount' = 'playCount',
+    sortOrder: 'asc' | 'desc' = 'desc',
+    search?: string
+  ): Promise<{
+    items: Array<{
+      artist: string;
+      playCount: number;
+      albumCount: number;
+      lastPlayed: number;
+    }>;
+    total: number;
+    totalPages: number;
+    page: number;
+  }> {
+    const params: Record<string, string | number> = {
+      page,
+      per_page: perPage,
+      sort_by: sortBy,
+      sort_order: sortOrder,
+    };
+    if (search) {
+      params.search = search;
+    }
+    const response = await this.api.get('/suggestions/history/artists', {
+      params,
+    });
+    return response.data.data;
+  }
+
+  // ============================================
   // Album history methods (for release details)
   // ============================================
 

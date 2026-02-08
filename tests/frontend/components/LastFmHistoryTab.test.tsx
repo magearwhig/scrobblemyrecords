@@ -38,6 +38,7 @@ jest.mock('../../../src/renderer/context/AppContext', () => ({
 const createMockApiInstance = () => ({
   getAlbumHistoryPaginated: jest.fn(),
   getTrackHistoryPaginated: jest.fn(),
+  getArtistHistoryPaginated: jest.fn(),
   getHistorySyncStatus: jest.fn(),
   startHistorySync: jest.fn(),
   pauseHistorySync: jest.fn(),
@@ -63,6 +64,18 @@ const createMockTrackHistory = (count: number) => ({
     track: `Track ${i + 1}`,
     playCount: 100 - i,
     lastPlayed: Math.floor(Date.now() / 1000) - i * 86400, // Days ago in seconds
+  })),
+  total: count,
+  totalPages: Math.ceil(count / 50),
+  page: 1,
+});
+
+const createMockArtistHistory = (count: number) => ({
+  items: Array.from({ length: count }, (_, i) => ({
+    artist: `Artist ${i + 1}`,
+    playCount: 500 - i * 50,
+    albumCount: 10 - i,
+    lastPlayed: Math.floor(Date.now() / 1000) - i * 86400,
   })),
   total: count,
   totalPages: Math.ceil(count / 50),
@@ -624,6 +637,272 @@ describe('LastFmHistoryTab', () => {
           screen.getByPlaceholderText('Search artists, albums, or tracks...')
         ).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Artists View', () => {
+    beforeEach(() => {
+      mockApi.getAlbumHistoryPaginated.mockResolvedValue(
+        createMockAlbumHistory(3)
+      );
+      mockApi.getArtistHistoryPaginated.mockResolvedValue(
+        createMockArtistHistory(3)
+      );
+    });
+
+    it('shows Artists toggle button', async () => {
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: 'Artists' })
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('switches to artists view when clicking Artists button', async () => {
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist 1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Artists' }));
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(mockApi.getArtistHistoryPaginated).toHaveBeenCalled();
+        expect(screen.getByText('500')).toBeInTheDocument(); // Play count
+        expect(screen.getByText('10')).toBeInTheDocument(); // Album count
+      });
+    });
+
+    it('shows artist column headers in artists view', async () => {
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist 1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Artists' }));
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        // "Artist" header button (distinct from "Artists" toggle button)
+        const artistHeaders = screen.getAllByText('Artist');
+        expect(artistHeaders.length).toBeGreaterThanOrEqual(1);
+        // "Albums" appears as both view toggle and column header
+        const albumsElements = screen.getAllByText('Albums');
+        expect(albumsElements.length).toBe(2); // toggle btn + column header
+        expect(screen.getByText(/^Plays/)).toBeInTheDocument();
+        expect(screen.getByText('Last Played')).toBeInTheDocument();
+      });
+    });
+
+    it('shows correct stats text in artists view', async () => {
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Showing 3 of 3 albums/)).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Artists' }));
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Showing 3 of 3 artists/)).toBeInTheDocument();
+      });
+    });
+
+    it('updates search placeholder in artists view', async () => {
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(
+          screen.getByPlaceholderText('Search artists or albums...')
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Artists' }));
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(
+          screen.getByPlaceholderText('Search artists...')
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('sorts by album count when dropdown changed', async () => {
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist 1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Artists' }));
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(mockApi.getArtistHistoryPaginated).toHaveBeenCalled();
+      });
+
+      const sortSelect = screen.getByRole('combobox');
+      fireEvent.change(sortSelect, {
+        target: { value: 'albumCount-desc' },
+      });
+
+      await waitFor(() => {
+        expect(mockApi.getArtistHistoryPaginated).toHaveBeenCalledWith(
+          1,
+          50,
+          'albumCount',
+          'desc',
+          undefined
+        );
+      });
+    });
+
+    it('toggles sort order when clicking artist column header', async () => {
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist 1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Artists' }));
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(screen.getByText(/^Plays/)).toBeInTheDocument();
+      });
+
+      // Click Plays header to toggle sort order (already sorted by playCount desc)
+      fireEvent.click(screen.getByText(/^Plays/));
+
+      await waitFor(() => {
+        expect(mockApi.getArtistHistoryPaginated).toHaveBeenCalledWith(
+          1,
+          50,
+          'playCount',
+          'asc',
+          undefined
+        );
+      });
+    });
+
+    it('reloads artists when sync completes in artists view', async () => {
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist 1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Artists' }));
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(mockApi.getArtistHistoryPaginated).toHaveBeenCalledTimes(1);
+      });
+
+      fireEvent.click(screen.getByText('Trigger Sync Complete'));
+
+      await waitFor(() => {
+        expect(mockApi.getArtistHistoryPaginated).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it('shows pagination in artists view', async () => {
+      mockApi.getArtistHistoryPaginated.mockResolvedValue({
+        items: createMockArtistHistory(50).items,
+        total: 150,
+        totalPages: 3,
+        page: 1,
+      });
+
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist 1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Artists' }));
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Deep Linking', () => {
+    beforeEach(() => {
+      mockApi.getAlbumHistoryPaginated.mockResolvedValue(
+        createMockAlbumHistory(3)
+      );
+      mockApi.getArtistHistoryPaginated.mockResolvedValue(
+        createMockArtistHistory(3)
+      );
+    });
+
+    it('opens in artists view when URL has ?view=artists', async () => {
+      window.location.hash = '#history?view=artists';
+
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(mockApi.getArtistHistoryPaginated).toHaveBeenCalled();
+        const artistsBtn = screen.getByRole('button', { name: 'Artists' });
+        expect(artistsBtn).toHaveClass('active');
+      });
+
+      // Clean up
+      window.location.hash = '';
+    });
+
+    it('opens in albums view by default when no URL param', async () => {
+      window.location.hash = '#history';
+
+      render(<LastFmHistoryTab />);
+
+      jest.advanceTimersByTime(300);
+
+      await waitFor(() => {
+        expect(mockApi.getAlbumHistoryPaginated).toHaveBeenCalled();
+        const albumsBtn = screen.getByRole('button', { name: 'Albums' });
+        expect(albumsBtn).toHaveClass('active');
+      });
+
+      // Clean up
+      window.location.hash = '';
     });
   });
 });

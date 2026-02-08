@@ -227,67 +227,79 @@ export const TopList: React.FC<TopListProps> = ({
             No {getEmptyMessage()} for this period
           </div>
         ) : (
-          <ol className='top-list-items'>
-            {data.map((item, index) => (
-              <li key={index} className='top-list-item'>
-                <span className='top-list-rank'>{index + 1}</span>
-                <div className='top-list-cover'>
-                  {isAlbumData(item) ? (
-                    item.coverUrl ? (
+          <>
+            <ol className='top-list-items'>
+              {data.map((item, index) => (
+                <li key={index} className='top-list-item'>
+                  <span className='top-list-rank'>{index + 1}</span>
+                  <div className='top-list-cover'>
+                    {isAlbumData(item) ? (
+                      item.coverUrl ? (
+                        <img
+                          src={item.coverUrl}
+                          alt={`${item.album} cover`}
+                          loading='lazy'
+                        />
+                      ) : (
+                        <AlbumPlaceholder />
+                      )
+                    ) : isTrackData(item) ? (
+                      <AlbumPlaceholder />
+                    ) : (item as ArtistPlayCount).imageUrl ? (
                       <img
-                        src={item.coverUrl}
-                        alt={`${item.album} cover`}
+                        src={(item as ArtistPlayCount).imageUrl}
+                        alt={`${item.artist}`}
                         loading='lazy'
                       />
                     ) : (
-                      <AlbumPlaceholder />
-                    )
-                  ) : isTrackData(item) ? (
-                    <AlbumPlaceholder />
-                  ) : (item as ArtistPlayCount).imageUrl ? (
-                    <img
-                      src={(item as ArtistPlayCount).imageUrl}
-                      alt={`${item.artist}`}
-                      loading='lazy'
-                    />
-                  ) : (
-                    <ArtistPlaceholder />
-                  )}
-                </div>
-                <div className='top-list-info'>
-                  {isTrackData(item) ? (
-                    <>
-                      <div className='top-list-name'>{item.track}</div>
-                      <div className='top-list-artist'>{item.artist}</div>
-                    </>
-                  ) : isAlbumData(item) ? (
-                    <>
-                      <div className='top-list-name'>{item.album}</div>
-                      <div className='top-list-artist'>{item.artist}</div>
-                    </>
-                  ) : (
-                    <div className='top-list-name'>{item.artist}</div>
-                  )}
-                </div>
-                <button
-                  className='btn btn-small btn-icon top-list-play-btn'
-                  onClick={() => {
-                    if (isTrackData(item)) {
-                      playTrackOnSpotify(item.artist, item.track, item.album);
-                    } else if (isAlbumData(item)) {
-                      playAlbumOnSpotify(item.artist, item.album);
-                    }
-                  }}
-                  title='Play on Spotify'
+                      <ArtistPlaceholder />
+                    )}
+                  </div>
+                  <div className='top-list-info'>
+                    {isTrackData(item) ? (
+                      <>
+                        <div className='top-list-name'>{item.track}</div>
+                        <div className='top-list-artist'>{item.artist}</div>
+                      </>
+                    ) : isAlbumData(item) ? (
+                      <>
+                        <div className='top-list-name'>{item.album}</div>
+                        <div className='top-list-artist'>{item.artist}</div>
+                      </>
+                    ) : (
+                      <div className='top-list-name'>{item.artist}</div>
+                    )}
+                  </div>
+                  <button
+                    className='btn btn-small btn-icon top-list-play-btn'
+                    onClick={() => {
+                      if (isTrackData(item)) {
+                        playTrackOnSpotify(item.artist, item.track, item.album);
+                      } else if (isAlbumData(item)) {
+                        playAlbumOnSpotify(item.artist, item.album);
+                      }
+                    }}
+                    title='Play on Spotify'
+                  >
+                    ▶️
+                  </button>
+                  <div className='top-list-count'>
+                    {item.playCount.toLocaleString()}
+                  </div>
+                </li>
+              ))}
+            </ol>
+            {type === 'artists' && (
+              <div className='top-list-view-all'>
+                <a
+                  href='#history?view=artists'
+                  className='top-list-view-all-link'
                 >
-                  ▶️
-                </button>
-                <div className='top-list-count'>
-                  {item.playCount.toLocaleString()}
-                </div>
-              </li>
-            ))}
-          </ol>
+                  View All Artists
+                </a>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

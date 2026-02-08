@@ -3028,6 +3028,21 @@ body {
   color: var(--text-secondary);
 }
 
+/* Artist view styles */
+.lastfm-history-artist-header {
+  grid-template-columns: 2fr 80px 80px 120px;
+}
+
+.lastfm-history-artist-item {
+  grid-template-columns: 2fr 80px 80px 120px;
+}
+
+.lastfm-history-col-albums {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
 /* Settings Section Boxes */
 .settings-section {
   margin-bottom: 2rem;
@@ -4146,6 +4161,23 @@ body {
   padding: 0.25rem 0.5rem;
   background: var(--bg-tertiary);
   border-radius: 4px;
+}
+
+.top-list-view-all {
+  text-align: center;
+  padding: 0.75rem 0 0.25rem;
+  border-top: 1px solid var(--border-color);
+  margin-top: 0.5rem;
+}
+
+.top-list-view-all-link {
+  font-size: 0.85rem;
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+.top-list-view-all-link:hover {
+  text-decoration: underline;
 }
 
 .top-list-loading,

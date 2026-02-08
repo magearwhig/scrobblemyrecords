@@ -509,6 +509,59 @@ export default function createSuggestionsRouter(
   });
 
   /**
+   * GET /api/v1/suggestions/history/artists
+   * Get paginated artist history with sorting and search
+   */
+  router.get('/history/artists', async (req: Request, res: Response) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const perPage = Math.min(
+        parseInt(req.query.per_page as string) || 50,
+        100
+      );
+      const sortBy = (req.query.sort_by as string) || 'playCount';
+      const sortOrder = (req.query.sort_order as string) || 'desc';
+      const search = req.query.search as string | undefined;
+
+      // Validate sortBy
+      const validSortBy = ['playCount', 'lastPlayed', 'artist', 'albumCount'];
+      if (!validSortBy.includes(sortBy)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid sort_by. Must be one of: ${validSortBy.join(', ')}`,
+        });
+      }
+
+      // Validate sortOrder
+      if (sortOrder !== 'asc' && sortOrder !== 'desc') {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid sort_order. Must be "asc" or "desc"',
+        });
+      }
+
+      const result = await historyStorage.getArtistsPaginated(
+        page,
+        perPage,
+        sortBy as 'playCount' | 'lastPlayed' | 'artist' | 'albumCount',
+        sortOrder as 'asc' | 'desc',
+        search
+      );
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      logger.error('Error getting paginated artist history', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
    * GET /api/v1/suggestions/history/tracks
    * Get paginated track history with sorting and search
    */

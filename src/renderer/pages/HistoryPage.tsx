@@ -11,10 +11,22 @@ import { formatLocalTimeClean, getTimezoneOffset } from '../utils/dateUtils';
 
 type HistoryTab = 'sessions' | 'lastfm';
 
+// Auto-select lastfm tab when deep-linked with ?view= param
+const getInitialTab = (): HistoryTab => {
+  const hash = window.location.hash;
+  const queryIndex = hash.indexOf('?');
+  if (queryIndex === -1) return 'sessions';
+
+  const queryString = hash.slice(queryIndex + 1);
+  const params = new URLSearchParams(queryString);
+  if (params.get('view')) return 'lastfm';
+  return 'sessions';
+};
+
 const HistoryPage: React.FC = () => {
   const { authStatus, setAuthStatus } = useAuth();
   const { state } = useApp();
-  const [activeTab, setActiveTab] = useState<HistoryTab>('sessions');
+  const [activeTab, setActiveTab] = useState<HistoryTab>(getInitialTab);
   const [sessions, setSessions] = useState<ScrobbleSession[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
