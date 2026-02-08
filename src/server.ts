@@ -424,40 +424,40 @@ async function startServer() {
       log.info(`Server lock acquired (PID: ${process.pid})`);
     }
 
-    // Run migrations asynchronously - don't block server startup
-    // This ensures all data files have proper schema versioning
+    // Await migrations before accepting requests to prevent hitting un-migrated schemas
     const migrationService = new MigrationService(fileStorage);
     const cleanupService = new CleanupService(fileStorage);
 
-    migrationService
-      .migrateAllOnStartup((file, status) => {
+    const migrationReport = await migrationService.migrateAllOnStartup(
+      (file, status) => {
         if (status === 'migrating') {
           log.info(`Migrating data file: ${file}`);
         }
-      })
-      .then(report => {
-        if (report.errors.length > 0) {
-          log.warn(`Migration completed with ${report.errors.length} errors`);
-        }
+      }
+    );
+    if (migrationReport.errors.length > 0) {
+      log.warn(
+        `Migration completed with ${migrationReport.errors.length} errors`
+      );
+    }
 
-        // Run cleanup after migrations complete - non-blocking
-        // This removes stale cache data based on retention policies
-        return cleanupService.runCleanup();
-      })
+    // Cleanup and backup are best-effort -- fire and forget
+    cleanupService
+      .runCleanup()
       .then(cleanupReport => {
         if (cleanupReport && cleanupReport.errors.length > 0) {
           log.warn(
             `Cleanup completed with ${cleanupReport.errors.length} errors`
           );
         }
-
-        // Check and run auto-backup if due - non-blocking
-        return backupService.checkAndRunAutoBackup();
       })
       .catch(err => {
-        log.error('Startup maintenance tasks failed:', err);
-        // Don't crash server - maintenance tasks are best-effort on startup
+        log.error('Startup cleanup failed:', err);
       });
+
+    backupService.checkAndRunAutoBackup().catch(err => {
+      log.error('Startup auto-backup check failed:', err);
+    });
 
     // Only start server if not in test environment
     if (process.env.NODE_ENV !== 'test') {
