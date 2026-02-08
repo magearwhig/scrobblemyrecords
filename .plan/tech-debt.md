@@ -108,18 +108,9 @@ scrobbleHistorySyncService
 
 ---
 
-### H6. Missing request size limits and rate limiting on API
+### ~~H6. Missing request size limits and rate limiting on API~~ DONE
 
-**Severity**: High | **Effort**: Quick win (size limit) / Medium (rate limiting)
-
-No server-side rate limiting.
-
-**Action:**
-- [x] ~~Add `express.json({ limit: '1mb' })`~~ DONE February 2026
-- [ ] Add `express-rate-limit` middleware for API routes
-- [ ] Longer-term: validate request schemas with Zod or Joi
-
-**Files:** `src/server.ts`
+**Completed:** February 2026. Added `express.json({ limit: '1mb' })` for body size limits and `express-rate-limit` middleware (300 req/15min per IP) on all `/api/` routes. Schema validation (Zod/Joi) deferred to future work.
 
 ---
 
@@ -498,7 +489,7 @@ Current flat list of nav items lacks visual hierarchy.
 | H3 | Lock file TOCTOU race condition | **High** | Yes |
 | H4 | Massive inline styling + monolithic stylesheet | **High** | No |
 | H5 | Background operations fail silently | **High** | No |
-| H6 | Missing request size limits and rate limiting | **High** | Partial |
+| H6 | ~~Missing request size limits and rate limiting~~ | ~~**High**~~ | ~~DONE~~ |
 | M1 | ~~Direct console.* bypasses secure logger (24 files)~~ | ~~Medium~~ | ~~DONE~~ |
 | M2 | CryptoJS deprecated library | Medium | No |
 | M3 | ~~Startup migrations not awaited~~ | ~~Medium~~ | ~~DONE~~ |
@@ -531,7 +522,7 @@ Current flat list of nav items lacks visual hierarchy.
 | L11 | Centralize route identifiers | Low | Yes |
 | L12 | Sidebar reorganization | Low | No |
 
-**Total open**: 22 items (1 critical, 3 high, 9 medium, 9 low) -- 16 completed (10 Phase 0 + 6 Phase 1, February 2026)
+**Total open**: 21 items (1 critical, 2 high, 9 medium, 9 low) -- 17 completed (10 Phase 0 + 7 Phase 1, February 2026)
 
 ---
 
@@ -546,7 +537,7 @@ All 10 items completed: H1, H3, H2, H6 (size limit), M15, L1, L5, M1 (ESLint + b
 | # | Action | Findings |
 |---|--------|----------|
 | 1 | Replace all `console.*` with logger (24 files) | M1 |
-| 2 | Add `express-rate-limit` middleware | H6 |
+| ~~2~~ | ~~Add `express-rate-limit` middleware~~ | ~~H6~~ DONE |
 | 3 | Add Playwright to CI workflow | M8 |
 | ~~4~~ | ~~Add `React.memo` to list-item components~~ | ~~M11~~ DONE |
 | ~~5~~ | ~~Create `safeJsonParse<T>()` utility~~ | ~~M4~~ DONE |
