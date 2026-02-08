@@ -57,12 +57,19 @@ const LOCK_FILE = path.join(process.cwd(), 'data', '.server.lock');
  */
 function acquireServerLock(): boolean {
   try {
-    // Check if lock file exists
-    if (fs.existsSync(LOCK_FILE)) {
+    // Attempt atomic lock file creation -- fails if file already exists (TOCTOU-safe)
+    fs.writeFileSync(
+      LOCK_FILE,
+      JSON.stringify({ pid: process.pid, startTime: Date.now() }),
+      { flag: 'wx' }
+    );
+    return true;
+  } catch {
+    // File already exists -- check if the owning process is still alive
+    try {
       const lockData = fs.readFileSync(LOCK_FILE, 'utf-8');
       const { pid, startTime } = JSON.parse(lockData);
 
-      // Check if the process is still running
       try {
         process.kill(pid, 0); // Signal 0 just checks if process exists
         // Process exists - another instance is running
@@ -71,21 +78,20 @@ function acquireServerLock(): boolean {
         );
         return false;
       } catch {
-        // Process doesn't exist - stale lock file, remove it
+        // Process doesn't exist - stale lock file, replace it
         log.warn('Removing stale lock file from previous crashed instance');
         fs.unlinkSync(LOCK_FILE);
+        fs.writeFileSync(
+          LOCK_FILE,
+          JSON.stringify({ pid: process.pid, startTime: Date.now() }),
+          { flag: 'wx' }
+        );
+        return true;
       }
+    } catch (innerError) {
+      log.error('Failed to acquire server lock', innerError);
+      return false;
     }
-
-    // Create lock file with our PID
-    fs.writeFileSync(
-      LOCK_FILE,
-      JSON.stringify({ pid: process.pid, startTime: Date.now() })
-    );
-    return true;
-  } catch (error) {
-    log.error('Failed to acquire server lock', error);
-    return false;
   }
 }
 
