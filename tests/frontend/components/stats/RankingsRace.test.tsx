@@ -292,10 +292,12 @@ describe('RankingsRace', () => {
         />
       );
 
-      // All three artists should be present even if not all visible initially
+      // Items in the current snapshot (index 0) should have visible text
       expect(screen.getByText('Artist 1')).toBeInTheDocument();
       expect(screen.getByText('Artist 2')).toBeInTheDocument();
-      expect(screen.getByText('Artist 3')).toBeInTheDocument();
+      // Artist 3 only appears in snapshot index 1; at index 0 it renders as
+      // a hidden empty bar with no text content, so it won't be found by getByText
+      expect(screen.queryByText('Artist 3')).not.toBeInTheDocument();
     });
 
     it('should restart animation when reaching the end', () => {

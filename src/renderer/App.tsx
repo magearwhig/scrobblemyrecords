@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 import { AuthStatus } from '../shared/types';
 
+import ErrorBoundary from './components/ErrorBoundary';
 import Header from './components/Header';
 import MainContent from './components/MainContent';
 import Sidebar from './components/Sidebar';
@@ -63,7 +64,9 @@ const App: React.FC = () => {
                 onCollapsedChange={handleSidebarCollapsedChange}
               />
               <div className='content'>
-                <MainContent currentPage={currentPage} />
+                <ErrorBoundary>
+                  <MainContent currentPage={currentPage} />
+                </ErrorBoundary>
               </div>
             </div>
           </div>
