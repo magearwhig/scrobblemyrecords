@@ -10,6 +10,16 @@ import { createLogger } from '../utils/logger';
 const logger = createLogger('AuthService');
 const SETTINGS_PATH = 'settings/user-settings.json';
 
+/**
+ * Thrown when decryption fails, distinguishing "wrong key" from "no credentials."
+ */
+export class DecryptionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DecryptionError';
+  }
+}
+
 export class AuthService {
   private fileStorage: FileStorage;
   private encryptionKey: string;
@@ -42,15 +52,19 @@ export class AuthService {
 
       // If decryption returns empty string for non-empty input, key may have changed
       if (!decrypted && encryptedText) {
-        logger.warn(
-          'Decryption returned empty string - encryption key may have changed'
+        throw new DecryptionError(
+          'Decryption returned empty result - encryption key may have changed. ' +
+            'Re-authenticate with Discogs and Last.fm, or restore from backup.'
         );
       }
 
       return decrypted;
     } catch (error) {
-      logger.error('Decryption failed', error);
-      return '';
+      if (error instanceof DecryptionError) throw error;
+      throw new DecryptionError(
+        `Decryption failed: ${error instanceof Error ? error.message : String(error)}. ` +
+          'The encryption key may have changed. Re-authenticate or restore from backup.'
+      );
     }
   }
 
