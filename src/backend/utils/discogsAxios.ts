@@ -1,15 +1,59 @@
 import axios, { AxiosInstance } from 'axios';
 
 /**
+ * Token-bucket rate limiter.
+ * Allows bursting up to `maxTokens` requests, then throttles to
+ * `refillRatePerSecond` requests per second on average.
+ */
+class TokenBucket {
+  private tokens: number;
+  private readonly maxTokens: number;
+  private readonly refillRatePerMs: number;
+  private lastRefill: number;
+
+  constructor(maxTokens: number, refillRatePerSecond: number) {
+    this.maxTokens = maxTokens;
+    this.tokens = maxTokens;
+    this.refillRatePerMs = refillRatePerSecond / 1000;
+    this.lastRefill = Date.now();
+  }
+
+  async acquire(): Promise<void> {
+    this.refill();
+
+    if (this.tokens >= 1) {
+      this.tokens -= 1;
+      return;
+    }
+
+    // Wait until a token is available
+    const waitMs = Math.ceil((1 - this.tokens) / this.refillRatePerMs);
+    await new Promise(resolve => setTimeout(resolve, waitMs));
+    this.refill();
+    this.tokens -= 1;
+  }
+
+  private refill(): void {
+    const now = Date.now();
+    const elapsed = now - this.lastRefill;
+    this.tokens = Math.min(
+      this.maxTokens,
+      this.tokens + elapsed * this.refillRatePerMs
+    );
+    this.lastRefill = now;
+  }
+}
+
+/**
  * Shared rate-limited Axios instance for all Discogs API calls.
- * Enforces a global 1 request/second rate limit across all services
- * to avoid Discogs 429 errors.
+ * Uses a token-bucket algorithm: allows bursting up to 5 rapid requests,
+ * then throttles to 1 req/sec (Discogs allows 60 req/min authenticated).
  *
  * Individual requests can override the timeout via config:
  *   this.axios.get('/path', { timeout: 30000 })
  */
 let sharedInstance: AxiosInstance | null = null;
-let lastRequestTime = 0;
+const bucket = new TokenBucket(5, 1);
 
 export function getDiscogsAxios(): AxiosInstance {
   if (sharedInstance) return sharedInstance;
@@ -22,14 +66,9 @@ export function getDiscogsAxios(): AxiosInstance {
     },
   });
 
-  // Global rate limiting interceptor: 1 req/sec across all callers
+  // Token-bucket rate limiting: burst up to 5, refill at 1/sec
   sharedInstance.interceptors.request.use(async config => {
-    const now = Date.now();
-    const elapsed = now - lastRequestTime;
-    if (elapsed < 1000) {
-      await new Promise(resolve => setTimeout(resolve, 1000 - elapsed));
-    }
-    lastRequestTime = Date.now();
+    await bucket.acquire();
     return config;
   });
 
