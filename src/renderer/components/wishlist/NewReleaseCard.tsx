@@ -140,6 +140,9 @@ export const NewReleaseCard: React.FC<Props> = ({ release, onDismiss }) => {
           className='btn btn-ghost btn-sm'
           onClick={() => onDismiss(release.id)}
           title={release.dismissed ? 'Already dismissed' : 'Dismiss'}
+          aria-label={
+            release.dismissed ? 'Already dismissed' : 'Dismiss this release'
+          }
         >
           {release.dismissed ? '\u2713' : '\u2715'}
         </button>

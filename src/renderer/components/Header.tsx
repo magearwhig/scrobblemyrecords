@@ -57,6 +57,9 @@ const Header: React.FC = () => {
           }}
           className='header-theme-toggle'
           title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          aria-label={
+            isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'
+          }
         >
           {isDarkMode ? '☀️' : '🌙'}
         </button>

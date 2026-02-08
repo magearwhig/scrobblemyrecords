@@ -215,6 +215,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
               justifyContent: 'center',
             }}
             title='Clear search'
+            aria-label='Clear search'
           >
             ✕
           </button>

@@ -25,6 +25,7 @@ export const DashboardStatCard: React.FC<DashboardStatCardProps> = ({
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? `View ${label} details` : undefined}
       onKeyDown={onClick ? e => e.key === 'Enter' && onClick() : undefined}
     >
       <div className='dashboard-stat-icon'>{icon}</div>

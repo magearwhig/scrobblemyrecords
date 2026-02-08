@@ -157,6 +157,7 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
               className='btn btn-small btn-secondary'
               onClick={onRefresh}
               title='Get another AI suggestion'
+              aria-label='Get another AI suggestion'
             >
               🔄
             </button>
