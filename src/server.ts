@@ -48,6 +48,44 @@ import { createLogger } from './backend/utils/logger';
 
 const log = createLogger('Server');
 
+/**
+ * Validate that all required environment variables are set.
+ * Throws with an actionable message referencing `.env.example` on failure.
+ * Skipped in test environment where CI provides dummy values.
+ */
+function validateRequiredEnvVars(): void {
+  if (process.env.NODE_ENV === 'test') return;
+
+  const required: Array<{ name: string; description: string }> = [
+    { name: 'ENCRYPTION_KEY', description: 'Token encryption key' },
+    { name: 'DISCOGS_CLIENT_ID', description: 'Discogs OAuth consumer key' },
+    {
+      name: 'DISCOGS_CLIENT_SECRET',
+      description: 'Discogs OAuth consumer secret',
+    },
+    { name: 'LASTFM_API_KEY', description: 'Last.fm API key' },
+    { name: 'LASTFM_SECRET', description: 'Last.fm shared secret' },
+  ];
+
+  const missing = required.filter(
+    v => !process.env[v.name] || process.env[v.name]!.trim() === ''
+  );
+
+  if (missing.length > 0) {
+    const list = missing
+      .map(v => `  - ${v.name} (${v.description})`)
+      .join('\n');
+    throw new Error(
+      `Missing required environment variables:\n${list}\n\n` +
+        'Copy .env.example to .env and fill in all required values.\n' +
+        'See README.md for setup instructions.'
+    );
+  }
+}
+
+// Validate env vars before initializing any services
+validateRequiredEnvVars();
+
 // Server lock file to prevent multiple instances
 const LOCK_FILE = path.join(process.cwd(), 'data', '.server.lock');
 
