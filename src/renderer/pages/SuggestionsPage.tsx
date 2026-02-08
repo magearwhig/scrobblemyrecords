@@ -13,6 +13,9 @@ import SyncStatusBar from '../components/SyncStatusBar';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useApp } from '../context/AppContext';
 import { getApiService } from '../services/api';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('SuggestionsPage');
 
 const SuggestionsPage: React.FC = () => {
   const { state } = useApp();
@@ -57,7 +60,7 @@ const SuggestionsPage: React.FC = () => {
       setSettings(currentSettings);
       setDefaultWeights(defaults.weights);
     } catch (err) {
-      console.error('Failed to load settings:', err);
+      logger.error('Failed to load settings', err);
     }
   }, [api]);
 
@@ -134,7 +137,7 @@ const SuggestionsPage: React.FC = () => {
         setSuggestions(prev => [...prev, ...newSuggestions]);
       }
     } catch (err) {
-      console.error('Failed to dismiss suggestion:', err);
+      logger.error('Failed to dismiss suggestion', err);
     }
   };
 
@@ -143,7 +146,7 @@ const SuggestionsPage: React.FC = () => {
       await api.refreshSuggestions();
       await loadSuggestions();
     } catch (err) {
-      console.error('Failed to refresh suggestions:', err);
+      logger.error('Failed to refresh suggestions', err);
     }
   };
 
@@ -158,7 +161,7 @@ const SuggestionsPage: React.FC = () => {
     try {
       await api.saveSuggestionSettings(newSettings);
     } catch (err) {
-      console.error('Failed to save settings:', err);
+      logger.error('Failed to save settings', err);
     } finally {
       setSavingSettings(false);
     }
@@ -174,7 +177,7 @@ const SuggestionsPage: React.FC = () => {
       await api.saveSuggestionSettings(newSettings);
       await loadSuggestions();
     } catch (err) {
-      console.error('Failed to reset weights:', err);
+      logger.error('Failed to reset weights', err);
     }
   };
 

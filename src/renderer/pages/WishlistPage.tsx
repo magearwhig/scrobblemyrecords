@@ -19,6 +19,9 @@ import {
   createSuccessNotification,
 } from '../hooks/useNotifications';
 import { getApiService } from '../services/api';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('WishlistPage');
 
 type TabType =
   | 'all'
@@ -147,7 +150,7 @@ const WishlistPage: React.FC = () => {
           return newMap;
         });
       } catch (err) {
-        console.error('Error fetching play counts:', err);
+        logger.error('Error fetching play counts', err);
       } finally {
         setLoadingPlayCounts(false);
       }
@@ -197,7 +200,7 @@ const WishlistPage: React.FC = () => {
           }
         }
       } catch (err) {
-        console.error('Error polling sync status:', err);
+        logger.error('Error polling sync status', err);
       }
     }, 2000);
 
@@ -406,7 +409,7 @@ const WishlistPage: React.FC = () => {
           loading: false,
         }));
       } catch (err) {
-        console.error('Error loading versions:', err);
+        logger.error('Error loading versions', err);
         setVersionsModal(prev => ({ ...prev, loading: false }));
       }
     }
@@ -465,7 +468,7 @@ const WishlistPage: React.FC = () => {
       await api.removeFromLocalWantList(id);
       setLocalWantItems(prev => prev.filter(item => item.id !== id));
     } catch (err) {
-      console.error('Error removing from local want list:', err);
+      logger.error('Error removing from local want list', err);
     }
   };
 

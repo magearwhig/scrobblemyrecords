@@ -6,6 +6,9 @@ import {
 } from '../../../shared/types';
 import { useAuth } from '../../context/AuthContext';
 import ApiService from '../../services/api';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('SettingsWishlistSection');
 
 interface SettingsWishlistSectionProps {
   api: ApiService;
@@ -44,7 +47,7 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
       const settings = await api.getWishlistSettings();
       setWishlistSettings(settings);
     } catch (error) {
-      console.warn('Failed to load wishlist settings:', error);
+      logger.warn('Failed to load wishlist settings', error);
     } finally {
       setWishlistLoading(false);
     }
@@ -80,7 +83,7 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
       const settings = await api.getSellerSettings();
       setSellerSettings(settings);
     } catch (error) {
-      console.warn('Failed to load seller settings:', error);
+      logger.warn('Failed to load seller settings', error);
     } finally {
       setSellerLoading(false);
     }

@@ -3,6 +3,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { MonitoredSeller, SellerMatch } from '../../shared/types';
 import { useApp } from '../context/AppContext';
 import { getApiService } from '../services/api';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('SellerMatchesPage');
 
 type SortOption = 'newest' | 'price' | 'artist';
 
@@ -90,14 +93,14 @@ const SellerMatchesPage: React.FC = () => {
     try {
       setVerifying(prev => new Set([...prev, matchId]));
       const result = await api.verifyMatch(matchId);
-      console.log('[SellerMatches] Verify result:', result);
+      logger.info('Verify result', result);
 
       if (result.error) {
         window.alert(`Could not verify: ${result.error}`);
       } else {
         // Reload from server to ensure UI is in sync with backend
         const matchesResponse = await api.getSellerMatchesWithCacheInfo();
-        console.log('[SellerMatches] Reloaded matches:', {
+        logger.info('Reloaded matches', {
           total: matchesResponse.matches.length,
           matchStatuses: matchesResponse.matches.map(m => ({
             id: m.id,
@@ -109,10 +112,7 @@ const SellerMatchesPage: React.FC = () => {
         const verifiedMatch = matchesResponse.matches.find(
           m => m.id === matchId
         );
-        console.log(
-          '[SellerMatches] Verified match in response:',
-          verifiedMatch
-        );
+        logger.info('Verified match in response', verifiedMatch);
 
         setMatches(matchesResponse.matches);
         setCacheInfo(matchesResponse.cacheInfo);
@@ -126,7 +126,7 @@ const SellerMatchesPage: React.FC = () => {
         }
       }
     } catch (err) {
-      console.error('[SellerMatches] Verify error:', err);
+      logger.error('Verify error', err);
       window.alert(
         err instanceof Error ? err.message : 'Failed to verify listing'
       );

@@ -9,6 +9,9 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
 import { formatLocalTimeClean } from '../utils/dateUtils';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('ScrobblePage');
 
 const ScrobblePage: React.FC = () => {
   const { authStatus, setAuthStatus } = useAuth();
@@ -56,7 +59,7 @@ const ScrobblePage: React.FC = () => {
       const status = await api.getAuthStatus();
       setAuthStatus(status);
     } catch (error) {
-      console.error('Error checking auth status:', error);
+      logger.error('Error checking auth status', error);
     }
   };
 

@@ -18,6 +18,9 @@ import { Modal, ModalFooter } from '../components/ui';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('DiscoveryPage');
 
 type TabType = 'albums' | 'artists' | 'forgotten';
 type AlbumSortOption = 'plays' | 'artist' | 'album' | 'recent';
@@ -278,7 +281,7 @@ const DiscoveryPage: React.FC = () => {
       );
       setSearchResults(results.slice(0, 20)); // Limit to 20 results
     } catch (err) {
-      console.error('Search failed:', err);
+      logger.error('Search failed', err);
     } finally {
       setSearchLoading(false);
     }
@@ -320,7 +323,7 @@ const DiscoveryPage: React.FC = () => {
 
       closeMappingModal();
     } catch (err) {
-      console.error('Failed to create mapping:', err);
+      logger.error('Failed to create mapping', err);
     } finally {
       setMappingInProgress(false);
     }
@@ -337,7 +340,7 @@ const DiscoveryPage: React.FC = () => {
         )
       );
     } catch (err) {
-      console.error('Failed to hide album:', err);
+      logger.error('Failed to hide album', err);
     }
   };
 
@@ -356,7 +359,7 @@ const DiscoveryPage: React.FC = () => {
       });
       setAddedToWantList(prev => new Set([...prev, key]));
     } catch (err) {
-      console.error('Failed to add to want list:', err);
+      logger.error('Failed to add to want list', err);
     } finally {
       setAddingToWantList(prev => {
         const next = new Set(prev);
@@ -373,7 +376,7 @@ const DiscoveryPage: React.FC = () => {
       // Remove from local state
       setMissingArtists(prev => prev.filter(a => a.artist !== artist.artist));
     } catch (err) {
-      console.error('Failed to hide artist:', err);
+      logger.error('Failed to hide artist', err);
     }
   };
 

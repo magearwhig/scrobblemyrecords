@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { AppNotification, NotificationStore } from '../../shared/types';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('useNotifications');
 
 const STORAGE_KEY = 'recordscrobbles.notifications';
 const MAX_NOTIFICATIONS = 50;
@@ -37,7 +40,7 @@ export function useNotifications() {
         }
       }
     } catch (error) {
-      console.error('Failed to load notifications:', error);
+      logger.error('Failed to load notifications', error);
     }
     setIsLoaded(true);
   }, []);
@@ -53,7 +56,7 @@ export function useNotifications() {
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (error) {
-      console.error('Failed to save notifications:', error);
+      logger.error('Failed to save notifications', error);
     }
   }, [notifications, isLoaded]);
 

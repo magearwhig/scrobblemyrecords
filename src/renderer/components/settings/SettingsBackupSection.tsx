@@ -7,8 +7,11 @@ import {
   BackupImportPreview,
 } from '../../../shared/types';
 import ApiService from '../../services/api';
+import { createLogger } from '../../utils/logger';
 
 import BackupImportDialog from './BackupImportDialog';
+
+const logger = createLogger('SettingsBackupSection');
 
 interface SettingsBackupSectionProps {
   api: ApiService;
@@ -45,8 +48,7 @@ const SettingsBackupSection: React.FC<SettingsBackupSectionProps> = ({
       const data = await api.getBackupPreview();
       setPreview(data);
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.warn('Failed to load backup preview:', error);
+      logger.warn('Failed to load backup preview', error);
     }
   }, [api]);
 
@@ -56,8 +58,7 @@ const SettingsBackupSection: React.FC<SettingsBackupSectionProps> = ({
       const data = await api.getBackupSettings();
       setSettings(data);
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.warn('Failed to load backup settings:', error);
+      logger.warn('Failed to load backup settings', error);
     } finally {
       setSettingsLoading(false);
     }
@@ -68,8 +69,7 @@ const SettingsBackupSection: React.FC<SettingsBackupSectionProps> = ({
       const data = await api.listAutoBackups();
       setAutoBackups(data);
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.warn('Failed to load auto-backups:', error);
+      logger.warn('Failed to load auto-backups', error);
     }
   }, [api]);
 

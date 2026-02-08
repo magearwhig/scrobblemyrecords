@@ -3,7 +3,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { SyncStatus, SyncSettings } from '../../../shared/types';
 import { useAuth } from '../../context/AuthContext';
 import ApiService from '../../services/api';
+import { createLogger } from '../../utils/logger';
 import SyncStatusBar from '../SyncStatusBar';
+
+const logger = createLogger('SettingsIntegrationsSection');
 
 interface SettingsIntegrationsSectionProps {
   api: ApiService;
@@ -62,7 +65,7 @@ const SettingsIntegrationsSection: React.FC<
       const data = await api.getHistorySyncStatus();
       setSyncData(data);
     } catch (error) {
-      console.warn('Failed to load sync status:', error);
+      logger.warn('Failed to load sync status', error);
     }
   }, [api]);
 
@@ -71,7 +74,7 @@ const SettingsIntegrationsSection: React.FC<
       const settings = await api.getSyncSettings();
       setSyncSettings(settings);
     } catch (error) {
-      console.warn('Failed to load sync settings:', error);
+      logger.warn('Failed to load sync settings', error);
     }
   }, [api]);
 
@@ -170,7 +173,7 @@ const SettingsIntegrationsSection: React.FC<
         }
       }
     } catch (error) {
-      console.warn('Failed to load AI settings:', error);
+      logger.warn('Failed to load AI settings', error);
     }
   }, [api]);
 

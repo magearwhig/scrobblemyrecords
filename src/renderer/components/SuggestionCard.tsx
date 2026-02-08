@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 
 import { SuggestionResult, SuggestionFactors } from '../../shared/types';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('SuggestionCard');
 
 interface SuggestionCardProps {
   suggestion: SuggestionResult;
@@ -72,22 +75,18 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
 
   const handleViewDetails = () => {
     // Store the release data for the details page (use same key as AlbumCard in collection)
-    console.log('[SuggestionCard] handleViewDetails called');
-    console.log('[SuggestionCard] release object:', release);
-    console.log(
-      '[SuggestionCard] release.id:',
-      release?.id,
-      'release.title:',
-      release?.title,
-      'release.artist:',
-      release?.artist
-    );
+    logger.info('handleViewDetails called');
+    logger.info('release object', release);
+    logger.info('release info', {
+      id: release?.id,
+      title: release?.title,
+      artist: release?.artist,
+    });
     localStorage.setItem('selectedRelease', JSON.stringify(release));
     const stored = localStorage.getItem('selectedRelease');
-    console.log(
-      '[SuggestionCard] localStorage set, verifying:',
-      stored ? JSON.parse(stored).title : 'null'
-    );
+    logger.info('localStorage set, verifying', {
+      title: stored ? JSON.parse(stored).title : 'null',
+    });
     window.location.hash = 'release-details';
   };
 

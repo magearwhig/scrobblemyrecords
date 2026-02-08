@@ -7,6 +7,9 @@ import {
   ExcludedArtist,
 } from '../../../shared/types';
 import ApiService from '../../services/api';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('SettingsFiltersSection');
 
 interface SettingsFiltersSectionProps {
   api: ApiService;
@@ -43,7 +46,7 @@ const SettingsFiltersSection: React.FC<SettingsFiltersSectionProps> = ({
       setHiddenAlbums(albums);
       setHiddenArtists(artists);
     } catch (error) {
-      console.warn('Failed to load hidden items:', error);
+      logger.warn('Failed to load hidden items', error);
     } finally {
       setHiddenLoading(false);
     }
@@ -59,7 +62,7 @@ const SettingsFiltersSection: React.FC<SettingsFiltersSectionProps> = ({
       setHiddenReleases(releases);
       setExcludedArtists(artists);
     } catch (error) {
-      console.warn('Failed to load release filters:', error);
+      logger.warn('Failed to load release filters', error);
     } finally {
       setReleasesLoading(false);
     }

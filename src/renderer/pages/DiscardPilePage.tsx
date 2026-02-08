@@ -15,6 +15,9 @@ import {
   createSuccessNotification,
 } from '../hooks/useNotifications';
 import { getApiService } from '../services/api';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('DiscardPilePage');
 
 type TabType = 'all' | 'marked' | 'listed' | 'sold' | 'orphaned';
 type SortOption = 'date' | 'artist' | 'title' | 'value' | 'status';
@@ -291,7 +294,7 @@ const DiscardPilePage: React.FC = () => {
       const stats = await api.getMarketplaceStats(item.releaseId);
       setEditMarketplaceStats(stats);
     } catch (error) {
-      console.error('Failed to fetch marketplace stats:', error);
+      logger.error('Failed to fetch marketplace stats', error);
     } finally {
       setLoadingEditMarketplaceStats(false);
     }

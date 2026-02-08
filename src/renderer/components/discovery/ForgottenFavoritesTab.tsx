@@ -3,8 +3,11 @@ import React, { useState, useEffect } from 'react';
 
 import { ForgottenTrack, TrackMapping } from '../../../shared/types';
 import ApiService from '../../services/api';
+import { createLogger } from '../../utils/logger';
 import { playTrackOnSpotify } from '../../utils/spotifyUtils';
 import { Modal, ModalSection } from '../ui/Modal';
+
+const logger = createLogger('ForgottenFavoritesTab');
 
 type ForgottenSortOption = 'plays' | 'artist' | 'track' | 'dormant';
 
@@ -67,7 +70,7 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
         const mappings = await api.getTrackMappings();
         setExistingMappings(mappings);
       } catch (error) {
-        console.warn('Failed to load existing track mappings:', error);
+        logger.warn('Failed to load existing track mappings', error);
       }
     };
     loadExistingMappings();
@@ -170,7 +173,7 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
 
       setSearchResults(filteredResults.slice(0, 10)); // Limit to 10 after filtering
     } catch (error) {
-      console.error('Failed to search tracks:', error);
+      logger.error('Failed to search tracks', error);
       setSearchResults([]);
     } finally {
       setSearchLoading(false);

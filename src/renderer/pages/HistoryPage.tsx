@@ -8,6 +8,9 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
 import { formatLocalTimeClean, getTimezoneOffset } from '../utils/dateUtils';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('HistoryPage');
 
 type HistoryTab = 'sessions' | 'lastfm';
 
@@ -55,7 +58,7 @@ const HistoryPage: React.FC = () => {
       const status = await api.getAuthStatus();
       setAuthStatus(status);
     } catch (error) {
-      console.error('Error checking auth status:', error);
+      logger.error('Error checking auth status', error);
     }
   };
 

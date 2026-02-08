@@ -9,6 +9,9 @@ import {
 } from '../../../shared/types';
 import { useAuth } from '../../context/AuthContext';
 import ApiService from '../../services/api';
+import { createLogger } from '../../utils/logger';
+
+const logger = createLogger('SettingsMappingsSection');
 
 interface SettingsMappingsSectionProps {
   api: ApiService;
@@ -127,7 +130,7 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
       setDiscoveryAlbumMappings(albums);
       setDiscoveryArtistMappings(artists);
     } catch (error) {
-      console.warn('Failed to load discovery mappings:', error);
+      logger.warn('Failed to load discovery mappings', error);
     } finally {
       setDiscoveryLoading(false);
     }
@@ -139,7 +142,7 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
       const mappings = await api.getTrackMappings();
       setTrackMappings(mappings);
     } catch (error) {
-      console.warn('Failed to load track mappings:', error);
+      logger.warn('Failed to load track mappings', error);
     } finally {
       setTrackMappingsLoading(false);
     }
@@ -151,7 +154,7 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
       const result = await api.getArtistMbidMappings();
       setMbidMappings(result.mappings);
     } catch (error) {
-      console.warn('Failed to load MusicBrainz mappings:', error);
+      logger.warn('Failed to load MusicBrainz mappings', error);
     } finally {
       setMbidMappingsLoading(false);
     }
@@ -243,7 +246,7 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
       );
       setSuggestions(result.suggestions);
     } catch (error) {
-      console.warn('Failed to load mapping suggestions:', error);
+      logger.warn('Failed to load mapping suggestions', error);
     } finally {
       setSuggestionsLoading(false);
     }

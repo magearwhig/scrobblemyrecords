@@ -28,6 +28,9 @@ import { StreakCard } from '../components/stats/StreakCard';
 import { TopList } from '../components/stats/TopList';
 import { StatsPageSkeleton } from '../components/ui/Skeleton';
 import { imagesApi, statsApi } from '../services/statsApi';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('StatsPage');
 
 type Period =
   | 'week'
@@ -113,7 +116,7 @@ export const StatsPage: React.FC = () => {
           });
         }
       } catch (err) {
-        console.error('Failed to fetch album images:', err);
+        logger.error('Failed to fetch album images', err);
       }
       return albums;
     },
@@ -136,7 +139,7 @@ export const StatsPage: React.FC = () => {
           });
         }
       } catch (err) {
-        console.error('Failed to fetch artist images:', err);
+        logger.error('Failed to fetch artist images', err);
       }
       return artists;
     },
@@ -236,7 +239,7 @@ export const StatsPage: React.FC = () => {
           enrichArtistsWithImages(res.data).then(setTopArtists);
         }
       } catch (err) {
-        console.error('Failed to load top artists:', err);
+        logger.error('Failed to load top artists', err);
       } finally {
         setTopListsLoading(false);
       }
@@ -257,7 +260,7 @@ export const StatsPage: React.FC = () => {
           enrichAlbumsWithImages(res.data).then(setTopAlbums);
         }
       } catch (err) {
-        console.error('Failed to load top albums:', err);
+        logger.error('Failed to load top albums', err);
       } finally {
         setTopListsLoading(false);
       }
@@ -277,7 +280,7 @@ export const StatsPage: React.FC = () => {
           setTopTracks(res.data);
         }
       } catch (err) {
-        console.error('Failed to load top tracks:', err);
+        logger.error('Failed to load top tracks', err);
       } finally {
         setTopListsLoading(false);
       }
@@ -292,7 +295,7 @@ export const StatsPage: React.FC = () => {
       const res = await statsApi.getHeatmap(year);
       if (res.success) setHeatmapData(res.data!);
     } catch (err) {
-      console.error('Failed to load heatmap:', err);
+      logger.error('Failed to load heatmap', err);
     }
   }, []);
 
@@ -326,7 +329,7 @@ export const StatsPage: React.FC = () => {
         const res = await statsApi.getTimeline(period, granularity, dateRange);
         if (res.success) setTimeline(res.data!);
       } catch (err) {
-        console.error('Failed to load timeline:', err);
+        logger.error('Failed to load timeline', err);
       }
     },
     []

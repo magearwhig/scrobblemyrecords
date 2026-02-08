@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 
 import { AISuggestion } from '../../shared/types';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('AISuggestionCard');
 
 interface AISuggestionCardProps {
   suggestion: AISuggestion;
@@ -27,21 +30,17 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
   const handleViewDetails = () => {
     if (release) {
       // Store the release data for the details page (use same key as AlbumCard in collection)
-      console.log('[AISuggestionCard] handleViewDetails called');
-      console.log(
-        '[AISuggestionCard] release.id:',
-        release.id,
-        'release.title:',
-        release.title,
-        'release.artist:',
-        release.artist
-      );
+      logger.info('handleViewDetails called');
+      logger.info('release info', {
+        id: release.id,
+        title: release.title,
+        artist: release.artist,
+      });
       localStorage.setItem('selectedRelease', JSON.stringify(release));
       const stored = localStorage.getItem('selectedRelease');
-      console.log(
-        '[AISuggestionCard] localStorage set, verifying:',
-        stored ? JSON.parse(stored).title : 'null'
-      );
+      logger.info('localStorage set, verifying', {
+        title: stored ? JSON.parse(stored).title : 'null',
+      });
       window.location.hash = 'release-details';
     }
   };

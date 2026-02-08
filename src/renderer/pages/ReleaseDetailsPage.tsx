@@ -12,7 +12,10 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
 import { formatLocalTimeClean, formatRelativeTime } from '../utils/dateUtils';
+import { createLogger } from '../utils/logger';
 import { playAlbumOnSpotify, playTrackOnSpotify } from '../utils/spotifyUtils';
+
+const logger = createLogger('ReleaseDetailsPage');
 
 interface TrackScrobbleStats {
   count: number;
@@ -111,8 +114,7 @@ const ReleaseDetailsPage: React.FC = () => {
         const data = await api.getAlbumHistory(artist, album);
         setAlbumHistory(data);
       } catch (err) {
-        // Silently fail - album history is optional enhancement
-        console.warn('Failed to load album history for track stats:', err);
+        logger.warn('Failed to load album history for track stats', err);
         setAlbumHistory(null);
       }
     },
@@ -173,10 +175,9 @@ const ReleaseDetailsPage: React.FC = () => {
       const storedCollectionItemId = localStorage.getItem(
         'selectedCollectionItemId'
       );
-      console.log('[ReleaseDetailsPage] loadReleaseDetails called');
-      console.log(
-        '[ReleaseDetailsPage] releaseData from localStorage:',
-        releaseData ? 'exists' : 'null'
+      logger.info('loadReleaseDetails called');
+      logger.info(
+        `releaseData from localStorage: ${releaseData ? 'exists' : 'null'}`
       );
 
       if (!releaseData) {
@@ -185,14 +186,11 @@ const ReleaseDetailsPage: React.FC = () => {
       }
 
       const releaseInfo = JSON.parse(releaseData);
-      console.log(
-        '[ReleaseDetailsPage] parsed releaseInfo.id:',
-        releaseInfo.id,
-        'releaseInfo.title:',
-        releaseInfo.title,
-        'releaseInfo.artist:',
-        releaseInfo.artist
-      );
+      logger.info('Parsed releaseInfo', {
+        id: releaseInfo.id,
+        title: releaseInfo.title,
+        artist: releaseInfo.artist,
+      });
 
       // Store collection item ID if available
       if (storedCollectionItemId) {
@@ -201,12 +199,10 @@ const ReleaseDetailsPage: React.FC = () => {
 
       // Fetch full release details from API
       const fullRelease = await api.getReleaseDetails(releaseInfo.id);
-      console.log(
-        '[ReleaseDetailsPage] API returned fullRelease.id:',
-        fullRelease.id,
-        'fullRelease.title:',
-        fullRelease.title
-      );
+      logger.info('API returned fullRelease', {
+        id: fullRelease.id,
+        title: fullRelease.title,
+      });
       setRelease(fullRelease);
 
       // Select all actual tracks by default (filter out section headers)
@@ -226,7 +222,7 @@ const ReleaseDetailsPage: React.FC = () => {
           );
         }
       } catch (err) {
-        console.warn('Failed to check discard pile status:', err);
+        logger.warn('Failed to check discard pile status', err);
       }
     } catch (error) {
       setError(
@@ -244,8 +240,7 @@ const ReleaseDetailsPage: React.FC = () => {
       const mapping = await api.lookupArtistMapping(artistName);
       setArtistMapping(mapping);
     } catch (error) {
-      // Silently fail for artist mapping lookup
-      console.warn('Failed to load artist mapping:', error);
+      logger.warn('Failed to load artist mapping', error);
       setArtistMapping(null);
     }
   };
@@ -266,7 +261,7 @@ const ReleaseDetailsPage: React.FC = () => {
       const stats = await api.getMarketplaceStats(release.id);
       setMarketplaceStats(stats);
     } catch (err) {
-      console.error('Failed to fetch marketplace stats:', err);
+      logger.error('Failed to fetch marketplace stats', err);
     } finally {
       setLoadingMarketplaceStats(false);
     }
@@ -562,8 +557,8 @@ const ReleaseDetailsPage: React.FC = () => {
         startTimestamp
       );
 
-      console.log(
-        'Prepared tracks with timing:',
+      logger.info(
+        'Prepared tracks with timing',
         result.tracks.map(t => ({
           track: t.track,
           timestamp: t.timestamp
@@ -606,7 +601,7 @@ const ReleaseDetailsPage: React.FC = () => {
           // Continue polling
           setTimeout(pollProgress, 1000);
         } catch (error) {
-          console.error('Error polling progress:', error);
+          logger.error('Error polling progress', error);
           setScrobbling(false);
         }
       };

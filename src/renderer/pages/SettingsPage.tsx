@@ -11,6 +11,9 @@ import {
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('SettingsPage');
 
 type SettingsTab =
   | 'connections'
@@ -138,7 +141,7 @@ const SettingsPage: React.FC = () => {
         ]);
         setHiddenCount(hiddenAlbums.length + hiddenArtists.length);
       } catch (error) {
-        console.warn('Failed to load settings counts:', error);
+        logger.warn('Failed to load settings counts', error);
       }
     };
 

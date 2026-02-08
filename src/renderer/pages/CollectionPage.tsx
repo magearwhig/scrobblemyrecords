@@ -14,6 +14,9 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
 import { getApiService } from '../services/api';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('CollectionPage');
 
 const CollectionPage: React.FC = () => {
   const { authStatus, setAuthStatus } = useAuth();
@@ -249,39 +252,37 @@ const CollectionPage: React.FC = () => {
   };
 
   useEffect(() => {
-    console.log('🔍 useEffect triggered:', {
+    logger.info('useEffect triggered', {
       authenticated: authStatus.discogs.authenticated,
       username: authStatus.discogs.username,
     });
 
     if (authStatus.discogs.authenticated && authStatus.discogs.username) {
-      console.log('✅ Starting collection load...');
+      logger.info('Starting collection load');
       loadCollection();
       // Start preloading in background
       startPreloadingCollection();
     } else if (!authChecked) {
-      console.log(
-        '❌ Not authenticated or no username - checking auth status...'
-      );
+      logger.info('Not authenticated or no username - checking auth status');
       checkAuthStatus();
     }
   }, [authStatus.discogs.authenticated, authStatus.discogs.username]);
 
   const checkAuthStatus = async () => {
     try {
-      console.log('🔐 Checking authentication status...');
+      logger.info('Checking authentication status');
       setAuthChecked(true);
       const status = await api.getAuthStatus();
-      console.log('📡 Auth status response:', status);
+      logger.info('Auth status response', status);
       setAuthStatus(status);
     } catch (error) {
-      console.error('💥 Error checking auth status:', error);
+      logger.error('Error checking auth status', error);
     }
   };
 
   useEffect(() => {
     if (isSearchMode && searchQuery.trim()) {
-      console.log('🔍 Search useEffect triggered:', {
+      logger.info('Search useEffect triggered', {
         searchQuery,
         searchPage,
         sortBy,
@@ -292,18 +293,17 @@ const CollectionPage: React.FC = () => {
   }, [isSearchMode, searchQuery, searchPage, sortBy, sortOrder]);
 
   useEffect(() => {
-    console.log('🔄 Search mode changed:', {
+    logger.info('Search mode changed', {
       isSearchMode,
       searchQuery: searchQuery.trim(),
     });
     if (!isSearchMode && searchQuery.trim() === '') {
-      // When exiting search mode, let the sorting useEffect handle the collection
-      console.log('🔄 Exiting search mode, collection will be re-sorted');
+      logger.info('Exiting search mode, collection will be re-sorted');
     }
   }, [isSearchMode, searchQuery]);
 
   useEffect(() => {
-    console.log('🔄 Sorting/Filtering useEffect triggered:', {
+    logger.info('Sorting/Filtering useEffect triggered', {
       collectionLength: entireCollection.length,
       isSearchMode,
       sortBy,
@@ -322,11 +322,11 @@ const CollectionPage: React.FC = () => {
       };
       const filtered = applyFilters(entireCollection, currentFilters);
       const sorted = sortCollection(filtered);
-      console.log(
-        `📊 Setting filtered collection: ${sorted.length} items (original: ${entireCollection.length}, after filters: ${filtered.length})`
+      logger.info(
+        `Setting filtered collection: ${sorted.length} items (original: ${entireCollection.length}, after filters: ${filtered.length})`
       );
-      console.log(
-        '📋 First few items:',
+      logger.info(
+        'First few items',
         sorted
           .slice(0, 3)
           .map(item => `${item.release.artist} - ${item.release.title}`)
@@ -336,7 +336,7 @@ const CollectionPage: React.FC = () => {
       // Reset infinite scroll when filters or sort changes
       resetInfiniteScroll();
     } else if (!isSearchMode && entireCollection.length === 0) {
-      console.log('📭 Collection is empty, clearing filtered collection');
+      logger.info('Collection is empty, clearing filtered collection');
       setFilteredCollection([]);
     }
     // Note: resetInfiniteScroll is excluded from deps as it's a stable callback
@@ -357,12 +357,12 @@ const CollectionPage: React.FC = () => {
 
   const loadCollection = async (forceReload: boolean = false) => {
     if (!authStatus.discogs.username) {
-      console.log('❌ No username available for collection loading');
+      logger.info('No username available for collection loading');
       return;
     }
 
-    console.log(
-      `🔄 Loading entire collection for ${authStatus.discogs.username}, forceReload: ${forceReload}`
+    logger.info(
+      `Loading entire collection for ${authStatus.discogs.username}, forceReload: ${forceReload}`
     );
     setLoading(true);
     setError('');
@@ -374,7 +374,7 @@ const CollectionPage: React.FC = () => {
         forceReload
       );
 
-      console.log('📡 API Response:', response);
+      logger.info('API Response', response);
 
       if (response.success) {
         // Handle cache status information
@@ -382,16 +382,16 @@ const CollectionPage: React.FC = () => {
         const isRefreshing = (response as any).refreshing || false;
         const message = (response as any).message;
 
-        console.log(
-          `📦 Setting entire collection data: ${response.data?.length || 0} items (cache: ${responseCacheStatus}, refreshing: ${isRefreshing})`
+        logger.info(
+          `Setting entire collection data: ${response.data?.length || 0} items (cache: ${responseCacheStatus}, refreshing: ${isRefreshing})`
         );
         // Update cache status state
         setCacheStatus(responseCacheStatus);
         setCacheRefreshing(isRefreshing);
         setInfoMessage(message || '');
         if (response.data && response.data.length > 0) {
-          console.log(
-            '📋 Sample items:',
+          logger.info(
+            'Sample items',
             response.data.slice(0, 2).map(item => ({
               id: item.id,
               artist: item.release.artist,
@@ -402,8 +402,8 @@ const CollectionPage: React.FC = () => {
           setEntireCollection(response.data);
           // Reset infinite scroll for new collection
           resetInfiniteScroll();
-          console.log(
-            `📄 Loaded ${response.data.length} items (${itemsPerPage} per scroll batch)`
+          logger.info(
+            `Loaded ${response.data.length} items (${itemsPerPage} per scroll batch)`
           );
         } else {
           // Empty collection or expired cache
@@ -416,40 +416,37 @@ const CollectionPage: React.FC = () => {
         setUsingCache(wasFromCache);
 
         if (wasFromCache) {
-          console.log(
-            `✅ Loaded entire collection from cache (${responseTime}ms)`
+          logger.info(
+            `Loaded entire collection from cache (${responseTime}ms)`
           );
         } else {
-          console.log(
-            `🌐 Loaded entire collection from API (${responseTime}ms)`
-          );
+          logger.info(`Loaded entire collection from API (${responseTime}ms)`);
         }
 
         // Handle different cache statuses
         if (responseCacheStatus === 'expired' && isRefreshing) {
-          console.log('⏰ Cache expired, background refresh started');
+          logger.info('Cache expired, background refresh started');
           setPreloading(true);
           startCacheProgressMonitoring();
         } else if (
           responseCacheStatus === 'partially_expired' &&
           isRefreshing
         ) {
-          console.log('⚠️ Some cache expired, background refresh started');
+          logger.info('Some cache expired, background refresh started');
           setPreloading(true);
           startCacheProgressMonitoring();
         } else if (response.data && response.data.length < 100) {
-          // Likely incomplete cache
-          console.log(
-            '⚠️ Collection appears incomplete, starting background preloading'
+          logger.info(
+            'Collection appears incomplete, starting background preloading'
           );
           startPreloadingCollection();
         }
       } else {
-        console.log('❌ API response not successful:', response);
+        logger.info('API response not successful', response);
         setError('Failed to load collection');
       }
     } catch (error) {
-      console.error('💥 Error loading collection:', error);
+      logger.error('Error loading collection', error);
       setError(
         error instanceof Error ? error.message : 'Failed to load collection'
       );
@@ -465,21 +462,21 @@ const CollectionPage: React.FC = () => {
     try {
       const progress = await api.getCacheProgress(authStatus.discogs.username);
       if (progress && progress.status === 'completed') {
-        console.log('Collection already cached, skipping preload');
+        logger.info('Collection already cached, skipping preload');
         return;
       }
     } catch (error) {
-      console.error('Error checking cache progress:', error);
+      logger.error('Error checking cache progress', error);
     }
 
     setPreloading(true);
     try {
       await api.preloadCollection(authStatus.discogs.username);
-      console.log('Collection preloading started');
+      logger.info('Collection preloading started');
       // Start monitoring progress - preload runs in background on server
       startCacheProgressMonitoring();
     } catch (error) {
-      console.error('Failed to start preloading:', error);
+      logger.error('Failed to start preloading', error);
       setPreloading(false);
     }
     // Note: Don't set preloading=false here - startCacheProgressMonitoring will do that when complete
@@ -498,7 +495,7 @@ const CollectionPage: React.FC = () => {
         page,
         itemsPerPage
       );
-      console.log(`🔍 Search results: ${results.items.length} items found`);
+      logger.info(`Search results: ${results.items.length} items found`);
       // Apply sorting to search results
       const sortedResults = sortCollection(results.items);
       setFilteredCollection(sortedResults);
@@ -523,7 +520,7 @@ const CollectionPage: React.FC = () => {
     } else {
       setIsSearchMode(false);
       // Don't set filteredCollection directly - let the useEffect handle it
-      console.log('🔍 Search cleared, switching back to normal mode');
+      logger.info('Search cleared, switching back to normal mode');
     }
   };
 
@@ -576,7 +573,7 @@ const CollectionPage: React.FC = () => {
 
   const startCacheProgressMonitoring = async () => {
     if (!authStatus.discogs.username || cacheMonitoring) {
-      console.log(
+      logger.info(
         'Cache monitoring already in progress or no username, skipping'
       );
       return;
@@ -595,22 +592,22 @@ const CollectionPage: React.FC = () => {
         if (progress && progress.status === 'loading') {
           setTimeout(monitorProgress, 2000); // Check every 2 seconds
         } else if (progress && progress.status === 'completed') {
-          console.log('Cache monitoring completed');
+          logger.info('Cache monitoring completed');
           // Reset cache refreshing state and info message when complete
           setCacheRefreshing(false);
           setInfoMessage('');
           setCacheStatus('valid');
           setPreloading(false);
           setCacheMonitoring(false);
-          console.log(
-            '✅ Cache refresh completed - collection should now have fresh data'
+          logger.info(
+            'Cache refresh completed - collection should now have fresh data'
           );
         } else {
           // If status is failed or other, stop monitoring
           setCacheMonitoring(false);
         }
       } catch (error) {
-        console.error('Error monitoring cache progress:', error);
+        logger.error('Error monitoring cache progress', error);
         setCacheMonitoring(false);
       }
     };
@@ -707,7 +704,7 @@ const CollectionPage: React.FC = () => {
       const ids = await api.getDiscardPileCollectionIds();
       setDiscardPileIds(new Set(ids));
     } catch (error) {
-      console.error('Failed to load discard pile IDs:', error);
+      logger.error('Failed to load discard pile IDs', error);
     }
   }, [api]);
 
@@ -751,7 +748,7 @@ const CollectionPage: React.FC = () => {
           return newMap;
         });
       } catch (err) {
-        console.error('Error fetching play counts:', err);
+        logger.error('Error fetching play counts', err);
       } finally {
         setLoadingPlayCounts(false);
       }
@@ -785,7 +782,7 @@ const CollectionPage: React.FC = () => {
       const stats = await api.getMarketplaceStats(item.release.id);
       setMarketplaceStats(stats);
     } catch (error) {
-      console.error('Failed to fetch marketplace stats:', error);
+      logger.error('Failed to fetch marketplace stats', error);
     } finally {
       setLoadingMarketplaceStats(false);
     }
@@ -899,8 +896,8 @@ const CollectionPage: React.FC = () => {
           // Update local state immediately for this item
           setDiscardPileIds(prev => new Set([...prev, item.id]));
         } catch (error) {
-          console.error(
-            `Failed to add ${item.release.title} to discard pile:`,
+          logger.error(
+            `Failed to add ${item.release.title} to discard pile`,
             error
           );
           failCount++;
@@ -940,7 +937,7 @@ const CollectionPage: React.FC = () => {
   }, [filteredCollection, selectedAlbums, discardPileIds]);
 
   const sortCollection = (items: CollectionItem[]): CollectionItem[] => {
-    console.log(`🔀 Sorting ${items.length} items by ${sortBy} (${sortOrder})`);
+    logger.info(`Sorting ${items.length} items by ${sortBy} (${sortOrder})`);
     const sorted = [...items].sort((a, b) => {
       // Handle scrobbles sort separately (it has different sort logic)
       if (sortBy === 'scrobbles') {
@@ -992,7 +989,7 @@ const CollectionPage: React.FC = () => {
       if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
-    console.log(`✅ Sorted ${sorted.length} items successfully`);
+    logger.info(`Sorted ${sorted.length} items successfully`);
     return sorted;
   };
 
