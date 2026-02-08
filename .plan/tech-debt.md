@@ -140,18 +140,9 @@ scrobbleHistorySyncService
 
 ---
 
-### M5. Standardize API error responses
+### ~~M5. Standardize API error responses~~ DONE
 
-**Severity**: Medium | **Effort**: Low
-
-Some endpoints return `{success: false, error}`, others throw. This creates frontend edge cases.
-
-**Action:**
-- [ ] Audit all API endpoints for response shape consistency
-- [ ] Create standard error response helper
-- [ ] Update frontend error handling to match
-
-**Files:** `src/backend/routes/*.ts`
+**Completed:** February 2026. Audited all 12 route files -- found 98% consistency already using `{ success: false, error }` pattern. Created `sendError()` and `sendSuccess()` helpers in `src/backend/utils/apiResponse.ts`. Applied to global error handler, 404, and JSON parse error handlers in `server.ts`. Existing routes are consistent; helpers prevent future drift.
 
 ---
 
@@ -457,7 +448,7 @@ Current flat list of nav items lacks visual hierarchy.
 | M2 | ~~CryptoJS deprecated library~~ | ~~Medium~~ | ~~DONE~~ |
 | M3 | ~~Startup migrations not awaited~~ | ~~Medium~~ | ~~DONE~~ |
 | M4 | ~~Unguarded JSON.parse calls~~ | ~~Medium~~ | ~~DONE~~ |
-| M5 | Standardize API error responses | Medium | Low |
+| M5 | ~~Standardize API error responses~~ | ~~Medium~~ | ~~DONE~~ |
 | M6 | fireEvent vs userEvent test inconsistency | Medium | Partial |
 | M7 | ~~Accessibility gaps on form controls/buttons~~ | ~~Medium~~ | ~~DONE~~ |
 | M8 | ~~E2E tests not in CI~~ | ~~Medium~~ | ~~DONE~~ |
@@ -485,7 +476,7 @@ Current flat list of nav items lacks visual hierarchy.
 | L11 | Centralize route identifiers | Low | Yes |
 | L12 | Sidebar reorganization | Low | No |
 
-**Total open**: 16 items (1 critical, 2 high, 4 medium, 9 low) -- 22 completed (10 Phase 0 + 11 Phase 1 + 1 Phase 2, February 2026)
+**Total open**: 15 items (1 critical, 2 high, 3 medium, 9 low) -- 23 completed (10 Phase 0 + 11 Phase 1 + 2 Phase 2, February 2026)
 
 ---
 
@@ -520,7 +511,7 @@ All 10 items completed: H1, H3, H2, H6 (size limit), M15, L1, L5, M1 (ESLint + b
 | 4 | Add test coverage for untested services + raise thresholds | C1 |
 | 5 | Implement token-bucket rate limiter for Discogs | M13 |
 | ~~6~~ | ~~Migrate CryptoJS to native `crypto`~~ | ~~M2~~ DONE |
-| 7 | Standardize API error responses | M5 |
+| ~~7~~ | ~~Standardize API error responses~~ | ~~M5~~ DONE |
 
 ### Phase 3 -- Strategic Improvements (ongoing)
 
