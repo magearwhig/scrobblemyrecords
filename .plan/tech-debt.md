@@ -261,29 +261,15 @@ Collection sync of 500 records takes minimum 500 seconds due to mandatory 1-seco
 
 ---
 
-### M17. No contributor development guide
+### ~~M17. No contributor development guide~~ DONE
 
-**Severity**: Medium | **Effort**: Medium
-
-Contributing section is 6 lines. No architecture decisions, no "how to add a route," no test patterns documented.
-
-**Action:**
-- [ ] Create `CONTRIBUTING.md` with architecture overview, coding patterns, and testing guide
-- [ ] Reference existing `TEST_STYLE_GUIDE.md`
+**Completed:** February 2026. Created comprehensive `CONTRIBUTING.md` with architecture overview, project structure, coding standards (TypeScript, logging, styling, accessibility, security), development workflow (adding routes, pages, components), testing guidance, and mapping system documentation. Updated README contributing section to link to new docs.
 
 ---
 
-### M18. Documentation gaps: security docs and internal guides gitignored
+### ~~M18. Documentation gaps: security docs and internal guides gitignored~~ DONE
 
-**Severity**: Medium | **Effort**: Quick win
-
-GitHub users don't see security guidance or testing guides. Several docs are gitignored.
-
-**Action:**
-- [ ] Create public, sanitized versions of security notes and testing guide
-- [ ] Keep sensitive/internal analysis private
-
-**Files:** `.gitignore` (lines 146–153)
+**Completed:** February 2026. Created sanitized public `SECURITY.md` with security policy, architecture controls, environment variable guidance, and self-hosting best practices. Un-ignored `TESTING_GUIDE.md` for public visibility. Internal security audit kept private. Updated `.gitignore` accordingly.
 
 ---
 
@@ -491,8 +477,8 @@ Current flat list of nav items lacks visual hierarchy.
 | M14 | ~~decrypt() returns empty string on failure~~ | ~~Medium~~ | ~~DONE~~ |
 | M15 | data/ directory not auto-created | Medium | Yes |
 | M16 | README architecture out of date | Medium | Yes |
-| M17 | No contributor development guide | Medium | Medium |
-| M18 | Documentation gaps (gitignored docs) | Medium | Yes |
+| M17 | ~~No contributor development guide~~ | ~~Medium~~ | ~~DONE~~ |
+| M18 | ~~Documentation gaps (gitignored docs)~~ | ~~Medium~~ | ~~DONE~~ |
 | M19 | Component extraction Level 3 & 4 | Medium | No |
 | L1 | License metadata mismatch (ISC vs MIT) | Low | Yes |
 | L2 | Legacy auth endpoints likely unused | Low | Yes |
@@ -507,7 +493,7 @@ Current flat list of nav items lacks visual hierarchy.
 | L11 | Centralize route identifiers | Low | Yes |
 | L12 | Sidebar reorganization | Low | No |
 
-**Total open**: 19 items (1 critical, 2 high, 7 medium, 9 low) -- 19 completed (10 Phase 0 + 9 Phase 1, February 2026)
+**Total open**: 17 items (1 critical, 2 high, 5 medium, 9 low) -- 21 completed (10 Phase 0 + 11 Phase 1, February 2026)
 
 ---
 
@@ -530,7 +516,7 @@ All 10 items completed: H1, H3, H2, H6 (size limit), M15, L1, L5, M1 (ESLint + b
 | ~~7~~ | ~~Throw `DecryptionError` instead of returning `''`~~ | ~~M14~~ DONE |
 | ~~8~~ | ~~Add `aria-label` to all icon-only buttons/inputs~~ | ~~M7~~ DONE |
 | ~~9~~ | ~~Share rate-limited Axios instance with seller service~~ | ~~M12~~ DONE |
-| 10 | Publish sanitized security + testing guides | M17, M18 |
+| ~~10~~ | ~~Publish sanitized security + testing guides~~ | ~~M17, M18~~ DONE |
 
 ### Phase 2 -- Systematic Refactors (2–4 weeks)
 
