@@ -125,22 +125,9 @@ No server-side rate limiting.
 
 ## MEDIUM
 
-### M1. Direct `console.*` bypasses secure logger (24 files)
+### ~~M1. Direct `console.*` bypasses secure logger (24 files)~~ DONE
 
-**Severity**: Medium | **Effort**: Quick win per file, medium overall
-
-The logger utility was created (January 2026) and adopted in some files, but 24 source files still use raw `console.log/error/warn`, bypassing sensitive-data redaction.
-
-**All offending files:**
-- Pages: `SellerMatchesPage`, `ReleaseDetailsPage`, `CollectionPage`, `StatsPage`, `SettingsPage`, `DiscoveryPage`, `WishlistPage`, `DiscardPilePage`, `SuggestionsPage`, `HistoryPage`, `ScrobblePage`
-- Components: `SettingsMappingsSection`, `SettingsBackupSection`, `SettingsWishlistSection`, `SettingsIntegrationsSection`, `SettingsFiltersSection`, `ForgottenFavoritesTab`, `AISuggestionCard`, `SuggestionCard`
-- Hooks: `useNotifications`
-- Backend: `scrobble.ts`, `encryptionValidator.ts`
-
-**Action:**
-- [ ] Replace remaining frontend `console.*` with `createLogger()` (22 files)
-- [x] ~~Add ESLint `no-console: error` rule for backend~~ DONE February 2026
-- [x] ~~Migrate backend files (scrobble.ts, encryptionValidator.ts)~~ DONE February 2026
+**Completed:** February 2026. Migrated all 20 frontend files (11 pages, 7 components, 1 hook, 1 tab) plus 2 backend files to use `createLogger()`. Added ESLint `no-console: error` rule for backend with exception for logger utility files. Zero `console.*` calls remain outside of `logger.ts` files.
 
 ---
 
@@ -512,7 +499,7 @@ Current flat list of nav items lacks visual hierarchy.
 | H4 | Massive inline styling + monolithic stylesheet | **High** | No |
 | H5 | Background operations fail silently | **High** | No |
 | H6 | Missing request size limits and rate limiting | **High** | Partial |
-| M1 | Direct console.* bypasses secure logger (24 files) | Medium | Partial |
+| M1 | ~~Direct console.* bypasses secure logger (24 files)~~ | ~~Medium~~ | ~~DONE~~ |
 | M2 | CryptoJS deprecated library | Medium | No |
 | M3 | ~~Startup migrations not awaited~~ | ~~Medium~~ | ~~DONE~~ |
 | M4 | ~~Unguarded JSON.parse calls~~ | ~~Medium~~ | ~~DONE~~ |
@@ -544,7 +531,7 @@ Current flat list of nav items lacks visual hierarchy.
 | L11 | Centralize route identifiers | Low | Yes |
 | L12 | Sidebar reorganization | Low | No |
 
-**Total open**: 23 items (1 critical, 3 high, 10 medium, 9 low) -- 15 completed (10 Phase 0 + 5 Phase 1, February 2026)
+**Total open**: 22 items (1 critical, 3 high, 9 medium, 9 low) -- 16 completed (10 Phase 0 + 6 Phase 1, February 2026)
 
 ---
 
