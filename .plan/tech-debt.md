@@ -46,50 +46,21 @@ README and `dev_prompt.md` specify 90% coverage target but Jest config enforces 
 
 ## HIGH
 
-### H1. No React Error Boundary
+### ~~H1. No React Error Boundary~~ DONE
 
-**Severity**: High | **Effort**: Quick win
-
-Any unhandled render-time error crashes the entire app to a white screen with zero recovery. Zero files in `src/renderer/` contain `ErrorBoundary`, `componentDidCatch`, or `getDerivedStateFromError`.
-
-**Action:**
-- [ ] Create `ErrorBoundary` component wrapping `<MainContent>` in `App.tsx`
-- [ ] Show "Something went wrong" UI with retry button
-
-**Files:** `src/renderer/App.tsx`
+**Completed:** February 2026. Created `ErrorBoundary` class component in `src/renderer/components/ErrorBoundary.tsx` wrapping `<MainContent>` in `App.tsx`. Shows "Something went wrong" UI with "Try Again" and "Reload Page" buttons. Logs errors via secure logger.
 
 ---
 
-### H2. Empty-string fallbacks for API secrets
+### ~~H2. Empty-string fallbacks for API secrets~~ DONE
 
-**Severity**: High | **Effort**: Quick win
-
-Missing env vars silently produce empty credentials instead of failing fast. GitHub users who misconfigure `.env` get cryptic auth failures deep in the OAuth flow.
-
-```ts
-key: process.env.DISCOGS_CLIENT_ID || '',
-secret: process.env.DISCOGS_CLIENT_SECRET || '',
-```
-
-**Action:**
-- [ ] Validate all required env vars at startup (like `AuthService` already does for `ENCRYPTION_KEY`)
-- [ ] Throw with a message referencing `.env.example`
-- [ ] Centralize in a startup validation function
-
-**Files:** `src/backend/services/discogsService.ts`, `sellerMonitoringService.ts`, `wishlistService.ts`, `lastfmService.ts`
+**Completed:** February 2026. Added centralized `validateRequiredEnvVars()` in `src/server.ts` that runs before any service initialization. Validates ENCRYPTION_KEY, DISCOGS_CLIENT_ID, DISCOGS_CLIENT_SECRET, LASTFM_API_KEY, and LASTFM_SECRET. Throws with actionable message referencing `.env.example`.
 
 ---
 
-### H3. Lock file TOCTOU race condition
+### ~~H3. Lock file TOCTOU race condition~~ DONE
 
-**Severity**: High | **Effort**: Quick win
-
-Two server processes launched simultaneously can both pass the `existsSync` check before either writes the lock file.
-
-**Action:**
-- [ ] Use `fs.writeFileSync(LOCK_FILE, data, { flag: 'wx' })` which atomically fails if the file exists
-
-**Files:** `src/server.ts` (lines 58–90)
+**Completed:** February 2026. Replaced `existsSync` + `writeFileSync` with `writeFileSync({ flag: 'wx' })` for atomic lock file creation. Stale lock cleanup retained as fallback.
 
 ---
 
@@ -141,14 +112,14 @@ scrobbleHistorySyncService
 
 **Severity**: High | **Effort**: Quick win (size limit) / Medium (rate limiting)
 
-No payload size limit on `express.json()` means large POSTs could exhaust memory. No server-side rate limiting.
+No server-side rate limiting.
 
 **Action:**
-- [ ] Add `express.json({ limit: '1mb' })` (quick win)
+- [x] ~~Add `express.json({ limit: '1mb' })`~~ DONE February 2026
 - [ ] Add `express-rate-limit` middleware for API routes
 - [ ] Longer-term: validate request schemas with Zod or Joi
 
-**Files:** `src/server.ts` (lines 162–164)
+**Files:** `src/server.ts`
 
 ---
 
@@ -167,8 +138,9 @@ The logger utility was created (January 2026) and adopted in some files, but 24 
 - Backend: `scrobble.ts`, `encryptionValidator.ts`
 
 **Action:**
-- [ ] Replace all `console.*` with `createLogger()` across 24 files
-- [ ] Add ESLint `no-console: error` rule to prevent regression
+- [ ] Replace remaining frontend `console.*` with `createLogger()` (22 files)
+- [x] ~~Add ESLint `no-console: error` rule for backend~~ DONE February 2026
+- [x] ~~Migrate backend files (scrobble.ts, encryptionValidator.ts)~~ DONE February 2026
 
 ---
 
@@ -350,29 +322,15 @@ If the encryption key changes, `decrypt()` silently returns `''` instead of sign
 
 ---
 
-### M15. `data/` directory not auto-created for new users
+### ~~M15. `data/` directory not auto-created for new users~~ DONE
 
-**Severity**: Medium | **Effort**: Quick win
-
-New GitHub users cloning the repo won't have the `data/` directory (gitignored). Server crashes on first file write or lock acquisition.
-
-**Action:**
-- [ ] Add `fs.mkdirSync('data', { recursive: true })` to server startup, or have `FileStorage` create directories on demand
-
-**Files:** `src/server.ts`, `src/backend/utils/fileStorage.ts`
+**Completed:** February 2026. Added synchronous `fs.mkdirSync('data', { recursive: true })` early in `src/server.ts` before any service initialization or lock file access.
 
 ---
 
-### M16. README architecture section is out of date
+### ~~M16. README architecture section is out of date~~ DONE
 
-**Severity**: Medium | **Effort**: Quick win
-
-References `SetupPage.tsx` (doesn't exist -- it's `SettingsPage.tsx`). Omits `DiscardPilePage.tsx`, `NewReleasesPage.tsx`, `SellerMatchesPage.tsx`.
-
-**Action:**
-- [ ] Regenerate directory tree from the actual filesystem
-
-**Files:** `README.md` (lines 600–627)
+**Completed:** February 2026. Regenerated full directory tree from actual filesystem. Removed SetupPage.tsx reference, added all missing pages, services, and component subdirectories.
 
 ---
 
@@ -423,14 +381,9 @@ Large inline JSX blocks in page files that should be their own components. Level
 
 ## LOW
 
-### L1. License metadata mismatch
+### ~~L1. License metadata mismatch~~ DONE
 
-**Effort**: Quick win (one-line change)
-
-`README.md` says MIT, `package.json` says ISC. `LICENSE` file contains MIT.
-
-**Action:**
-- [ ] Update `package.json` to `"license": "MIT"`
+**Completed:** February 2026. Updated `package.json` license from ISC to MIT.
 
 ---
 
@@ -475,15 +428,9 @@ Reduced from 52→22 in January 2026, but 3 `useState<any>` remain.
 
 ---
 
-### L5. No Node.js version enforcement
+### ~~L5. No Node.js version enforcement~~ DONE
 
-**Effort**: Quick win
-
-README says 18+ but nothing enforces it.
-
-**Action:**
-- [ ] Add `"engines": { "node": ">=18.0.0" }` to `package.json`
-- [ ] Add `.nvmrc` file
+**Completed:** February 2026. Added `engines.node >= 18.0.0` to `package.json` and `.nvmrc` file.
 
 ---
 
@@ -501,14 +448,9 @@ README says 18+ but nothing enforces it.
 
 ---
 
-### L7. Unused dependency: `wait-on`
+### ~~L7. Unused dependency: `wait-on`~~ DONE
 
-**Effort**: Quick win
-
-Listed in `devDependencies` but not referenced in any script or source file.
-
-**Action:**
-- [ ] `npm uninstall wait-on`
+**Completed:** February 2026. Removed unused `wait-on` from devDependencies.
 
 ---
 
@@ -638,26 +580,15 @@ Current flat list of nav items lacks visual hierarchy.
 | L11 | Centralize route identifiers | Low | Yes |
 | L12 | Sidebar reorganization | Low | No |
 
-**Total open**: 38 items (1 critical, 6 high, 19 medium, 12 low)
+**Total open**: 28 items (1 critical, 3 high, 15 medium, 9 low) -- 10 completed in Phase 0 (February 2026)
 
 ---
 
 ## Prioritized Action Plan
 
-### Phase 0 -- Immediate Quick Wins (1–2 days)
+### Phase 0 -- Immediate Quick Wins -- COMPLETE (February 2026)
 
-| # | Action | Findings |
-|---|--------|----------|
-| 1 | Add `ErrorBoundary` wrapping `<MainContent>` | H1 |
-| 2 | Fix lock file with `{ flag: 'wx' }` | H3 |
-| 3 | Add startup env validation for all required secrets | H2 |
-| 4 | Add `express.json({ limit: '1mb' })` | H6 |
-| 5 | Auto-create `data/` directory on startup | M15 |
-| 6 | Fix `package.json` license to MIT | L1 |
-| 7 | Add `"engines": { "node": ">=18.0.0" }` + `.nvmrc` | L5 |
-| 8 | Add `no-console` ESLint rule | M1 (prevention) |
-| 9 | Uninstall `wait-on` | L7 |
-| 10 | Update README directory tree | M16 |
+All 10 items completed: H1, H3, H2, H6 (size limit), M15, L1, L5, M1 (ESLint + backend migration), L7, M16.
 
 ### Phase 1 -- High-Impact Medium Work (1–2 weeks)
 
