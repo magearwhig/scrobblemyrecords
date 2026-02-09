@@ -322,16 +322,9 @@ Large inline JSX blocks in page files that should be their own components. Level
 
 ---
 
-### L12. Sidebar reorganization
+### ~~L12. Sidebar reorganization~~ DONE
 
-**Effort**: Low
-
-Current flat list of nav items lacks visual hierarchy.
-
-**Action:**
-- [ ] Group into sections: Library / Insights / Marketplace / Settings
-- [ ] Add section headers or dividers
-- [ ] Make disabled items explain why (tooltip: "Connect Discogs first")
+**Completed:** February 2026. Sidebar already had section grouping (Dashboard, Library, Listening, Explore, System) with category headers. Added `disabledReason` field to `NavItem` interface with contextual tooltips: "Connect Discogs first", "Connect Last.fm first", or "Connect Discogs and Last.fm first" depending on which services are needed. Tooltip displays on hover for disabled items.
 
 **Files:** `src/renderer/components/Sidebar.tsx`
 
@@ -393,9 +386,9 @@ Current flat list of nav items lacks visual hierarchy.
 | L9 | ~~No request logging / observability~~ | ~~Low~~ | ~~DONE~~ |
 | L10 | ~~No focus trap in modals + dead state~~ | ~~Low~~ | ~~DONE~~ |
 | L11 | ~~Centralize route identifiers~~ | ~~Low~~ | ~~DONE~~ |
-| L12 | Sidebar reorganization | Low | No |
+| L12 | ~~Sidebar reorganization~~ | ~~Low~~ | ~~DONE~~ |
 
-**Total open**: 11 items (1 critical, 2 high, 2 medium, 6 low) -- 27 completed (10 Phase 0 + 11 Phase 1 + 3 Phase 2 + 3 Phase 3, February 2026)
+**Total open**: 10 items (1 critical, 2 high, 2 medium, 5 low) -- 28 completed (10 Phase 0 + 11 Phase 1 + 3 Phase 2 + 4 Phase 3, February 2026)
 
 ---
 

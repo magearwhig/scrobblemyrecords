@@ -15,6 +15,7 @@ interface NavItem {
   label: string;
   icon: string;
   enabled: boolean;
+  disabledReason?: string;
 }
 
 interface NavCategory {
@@ -46,6 +47,17 @@ const Sidebar: React.FC<SidebarProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const discogsReason = !authStatus.discogs.authenticated
+    ? 'Connect Discogs first'
+    : undefined;
+  const lastfmReason = !authStatus.lastfm.authenticated
+    ? 'Connect Last.fm first'
+    : undefined;
+  const bothReason =
+    !authStatus.discogs.authenticated && !authStatus.lastfm.authenticated
+      ? 'Connect Discogs and Last.fm first'
+      : discogsReason || lastfmReason;
+
   const navCategories: NavCategory[] = [
     {
       label: 'Dashboard',
@@ -66,18 +78,21 @@ const Sidebar: React.FC<SidebarProps> = ({
           label: 'Browse Collection',
           icon: '💿',
           enabled: authStatus.discogs.authenticated,
+          disabledReason: discogsReason,
         },
         {
           id: ROUTES.WISHLIST,
           label: 'Wishlist',
           icon: '❤️',
           enabled: authStatus.discogs.authenticated,
+          disabledReason: discogsReason,
         },
         {
           id: ROUTES.DISCARD_PILE,
           label: 'Discard Pile',
           icon: '📦',
           enabled: authStatus.discogs.authenticated,
+          disabledReason: discogsReason,
         },
       ],
     },
@@ -90,18 +105,21 @@ const Sidebar: React.FC<SidebarProps> = ({
           icon: '🎲',
           enabled:
             authStatus.discogs.authenticated && authStatus.lastfm.authenticated,
+          disabledReason: bothReason,
         },
         {
           id: ROUTES.HISTORY,
           label: 'Scrobble History',
           icon: '📝',
           enabled: authStatus.lastfm.authenticated,
+          disabledReason: lastfmReason,
         },
         {
           id: ROUTES.STATS,
           label: 'Stats Dashboard',
           icon: '📊',
           enabled: authStatus.lastfm.authenticated,
+          disabledReason: lastfmReason,
         },
       ],
     },
@@ -113,18 +131,21 @@ const Sidebar: React.FC<SidebarProps> = ({
           label: 'Discovery',
           icon: '🔍',
           enabled: authStatus.lastfm.authenticated,
+          disabledReason: lastfmReason,
         },
         {
           id: ROUTES.RELEASES,
           label: 'New Releases',
           icon: '📢',
           enabled: authStatus.discogs.authenticated,
+          disabledReason: discogsReason,
         },
         {
           id: ROUTES.SELLERS,
           label: 'Local Sellers',
           icon: '🏪',
           enabled: authStatus.discogs.authenticated,
+          disabledReason: discogsReason,
         },
       ],
     },
@@ -169,7 +190,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                     }
                   }}
                   disabled={!item.enabled}
-                  title={collapsed ? item.label : undefined}
+                  title={
+                    !item.enabled && item.disabledReason
+                      ? item.disabledReason
+                      : collapsed
+                        ? item.label
+                        : undefined
+                  }
                 >
                   <span className='nav-link-icon'>{item.icon}</span>
                   {!collapsed && (
