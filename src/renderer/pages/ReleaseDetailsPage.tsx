@@ -45,7 +45,10 @@ const ReleaseDetailsPage: React.FC = () => {
     ignored: number;
     errors: string[];
   } | null>(null);
-  const [connectionTest, setConnectionTest] = useState<any>(null);
+  const [connectionTest, setConnectionTest] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
   const [sessionKey, setSessionKey] = useState<string>('');
   const [startTime, setStartTime] = useState<string>('');
   const [scrobbleProgress, setScrobbleProgress] = useState<{

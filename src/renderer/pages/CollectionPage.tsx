@@ -37,7 +37,11 @@ const CollectionPage: React.FC = () => {
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [selectedAlbums, setSelectedAlbums] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string>('');
-  const [cacheProgress, setCacheProgress] = useState<any>(null);
+  const [cacheProgress, setCacheProgress] = useState<{
+    status: 'loading' | 'completed';
+    currentPage: number;
+    totalPages: number;
+  } | null>(null);
   const [sortBy, setSortBy] = useState<
     'artist' | 'title' | 'year' | 'date_added' | 'scrobbles'
   >('artist');

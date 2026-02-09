@@ -23,7 +23,11 @@ const ScrobblePage: React.FC = () => {
   const [useCurrentTime, setUseCurrentTime] = useState(true);
   const [scrobbling, setScrobbling] = useState(false);
   const [progress, setProgress] = useState<ScrobbleProgress | null>(null);
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<{
+    success: number;
+    failed: number;
+    errors?: string[];
+  } | null>(null);
   const [error, setError] = useState<string>('');
   const [showDisambiguationWarning, setShowDisambiguationWarning] =
     useState(false);
