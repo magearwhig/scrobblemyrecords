@@ -256,44 +256,21 @@ Large inline JSX blocks in page files that should be their own components. Level
 
 ---
 
-### L2. Legacy endpoints likely unused
+### ~~L2. Legacy endpoints likely unused~~ NOT APPLICABLE
 
-**Effort**: Quick win after validation
-
-Legacy endpoints remain in `auth.ts`: `POST /discogs/token` and `POST /lastfm/callback`.
-
-**Action:**
-- [ ] Confirm whether frontend uses these; if not, deprecate and remove
-
-**Files:** `src/backend/routes/auth.ts` (lines 121–129, 261–269)
+**Investigated:** February 2026. Both endpoints (`POST /discogs/token` and `POST /lastfm/callback`) are actively used by the frontend in `src/renderer/services/api.ts` (lines 125, 142). They are not legacy and should not be removed.
 
 ---
 
-### L3. Security audit doesn't fail CI
+### ~~L3. Security audit doesn't fail CI~~ ALREADY DONE
 
-**Effort**: Quick win
-
-`npm audit` logs vulnerabilities but doesn't fail the build.
-
-**Action:**
-- [ ] Make `npm audit --audit-level=moderate` fail on findings
-
-**Files:** `.github/workflows/ci.yml` (line 110)
+**Verified:** February 2026. The CI already has `npm audit --audit-level=moderate` as a job step without `continue-on-error`, which exits non-zero and fails the build when moderate+ vulnerabilities are found.
 
 ---
 
-### L4. Remaining `useState<any>` -- 3 untyped state variables
+### ~~L4. Remaining `useState<any>` -- 3 untyped state variables~~ DONE
 
-**Effort**: Quick win
-
-Reduced from 52→22 in January 2026, but 3 `useState<any>` remain.
-
-**Action:**
-- [ ] Define proper TypeScript interfaces for:
-  - `ReleaseDetailsPage.tsx:45` (`connectionTest`)
-  - `CollectionPage.tsx:37` (`cacheProgress`)
-  - `ScrobblePage.tsx:23` (`results`)
-- [ ] Enable stricter TypeScript checks
+**Completed:** February 2026. Replaced all 3 `useState<any>` with proper inline types: `connectionTest` as `{ success: boolean; message: string } | null`, `results` as `{ success: number; failed: number; errors?: string[] } | null`, `cacheProgress` as `{ status: 'loading' | 'completed'; currentPage: number; totalPages: number } | null`. Zero `useState<any>` remaining.
 
 ---
 
@@ -303,17 +280,9 @@ Reduced from 52→22 in January 2026, but 3 `useState<any>` remain.
 
 ---
 
-### L6. Configuration drift: deprecated `PORT` + `HOST=0.0.0.0` risk
+### ~~L6. Configuration drift: deprecated `PORT` + `HOST=0.0.0.0` risk~~ ALREADY ADDRESSED
 
-**Effort**: Quick win
-
-`.env.example` documents `HOST=0.0.0.0` without security warnings. Deprecated `PORT` var still supported.
-
-**Action:**
-- [ ] Add explicit security warning in README about non-localhost binding
-- [ ] Consider logging deprecation notice at startup for `PORT`
-
-**Files:** `.env.example`, `src/server.ts` (lines 112–116)
+**Verified:** February 2026. `.env.example` already uses `HOST=127.0.0.1` (not `0.0.0.0`). Server defaults to `127.0.0.1`, logs a warning when bound to non-localhost, and falls back from deprecated `PORT` to `BACKEND_PORT`. Security doc covers localhost binding best practice.
 
 ---
 
@@ -323,16 +292,9 @@ Reduced from 52→22 in January 2026, but 3 `useState<any>` remain.
 
 ---
 
-### L8. CI doesn't test Node 22 (current LTS)
+### ~~L8. CI doesn't test Node 22 (current LTS)~~ DONE
 
-**Effort**: Quick win
-
-CI matrix tests Node 18.x and 20.x but not the current LTS.
-
-**Action:**
-- [ ] Add `22.x` to CI matrix
-
-**Files:** `.github/workflows/ci.yml`
+**Completed:** February 2026. Added `22.x` to CI test matrix alongside 18.x and 20.x.
 
 ---
 
