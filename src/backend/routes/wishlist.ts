@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 
 import { AuthService } from '../services/authService';
+import { jobStatusService } from '../services/jobStatusService';
 import { SellerMonitoringService } from '../services/sellerMonitoringService';
 import { WishlistService } from '../services/wishlistService';
 import { FileStorage } from '../utils/fileStorage';
@@ -527,9 +528,19 @@ export default function createWishlistRouter(
       res.json({ success: true, data: { message: 'Check started' } });
 
       // Run check asynchronously
-      wishlistService.checkForNewReleases(true).catch(error => {
-        logger.error('Background new release check failed', error);
-      });
+      const jobId = jobStatusService.startJob(
+        'new-release-check',
+        'Checking for new releases...'
+      );
+      wishlistService
+        .checkForNewReleases(true)
+        .then(() =>
+          jobStatusService.completeJob(jobId, 'New release check complete')
+        )
+        .catch(error => {
+          logger.error('Background new release check failed', error);
+          jobStatusService.failJob(jobId, 'New release check failed');
+        });
     } catch (error) {
       logger.error('Error starting new release check', error);
       res.status(500).json({

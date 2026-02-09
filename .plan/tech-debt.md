@@ -88,9 +88,9 @@ scrobbleHistorySyncService
 ```
 
 **Action:**
-- [ ] Implement lightweight job-status mechanism (in-memory map of `jobId -> {status, error}`)
-- [ ] Let the frontend poll for completion
-- [ ] Pairs well with M10 (toast system)
+- [x] Implement lightweight job-status mechanism (in-memory map of `jobId -> {status, error}`)
+- [x] Let the frontend poll for completion
+- [x] Pairs well with M10 (toast system)
 
 **Files:** `src/backend/routes/scrobble.ts`, `src/backend/routes/suggestions.ts`
 
@@ -353,7 +353,7 @@ All components wrapped with `React.memo`. Inline styles replaced with CSS classe
 | H2 | Empty-string fallbacks for API secrets | **High** | Yes |
 | H3 | Lock file TOCTOU race condition | **High** | Yes |
 | H4 | Massive inline styling + monolithic stylesheet | **High** | No |
-| H5 | Background operations fail silently | **High** | No |
+| H5 | ~~Background operations fail silently~~ | ~~**High**~~ | ~~DONE~~ |
 | H6 | ~~Missing request size limits and rate limiting~~ | ~~**High**~~ | ~~DONE~~ |
 | M1 | ~~Direct console.* bypasses secure logger (24 files)~~ | ~~Medium~~ | ~~DONE~~ |
 | M2 | ~~CryptoJS deprecated library~~ | ~~Medium~~ | ~~DONE~~ |
@@ -430,7 +430,7 @@ All 10 items completed: H1, H3, H2, H6 (size limit), M15, L1, L5, M1 (ESLint + b
 |---|--------|----------|
 | 1 | Add `react-window` virtualization to collection grid | M9 |
 | 2 | Implement toast notification system | M10 |
-| 3 | Add background job status tracking | H5 |
+| 3 | ~~Add background job status tracking~~ | ~~H5~~ |
 | 4 | Component extraction Level 3 & 4 | M19 |
 | 5 | Remove legacy auth endpoints after verification | L2 |
 | 6 | Add structured logging + request metrics | L9 |

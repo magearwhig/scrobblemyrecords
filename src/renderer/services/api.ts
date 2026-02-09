@@ -1755,6 +1755,22 @@ class ApiService {
     return response.data.data;
   }
 
+  // Job status tracking
+  async getJobStatuses(): Promise<
+    {
+      id: string;
+      type: string;
+      status: string;
+      message: string;
+      error?: string;
+      startedAt: number;
+      completedAt?: number;
+    }[]
+  > {
+    const response = await this.api.get('/jobs');
+    return response.data.data;
+  }
+
   // Update base URL (for when server URL changes)
   updateBaseUrl(baseUrl: string): void {
     this.baseUrl = baseUrl;

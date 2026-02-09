@@ -3,6 +3,7 @@ import express, { Request, Response } from 'express';
 import { CachedCollectionData, CollectionItem } from '../../shared/types';
 import { AuthService } from '../services/authService';
 import { DiscogsService } from '../services/discogsService';
+import { jobStatusService } from '../services/jobStatusService';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 import { validateUsername } from '../utils/validation';
@@ -108,9 +109,25 @@ export default function createCollectionRouter(
               `First page expired, starting background refresh for ${username}`
             );
             // Start background preloading without waiting for it
-            discogsService.preloadAllCollectionPages(username).catch(error => {
-              logger.error('Background refresh failed', error);
-            });
+            const jobId = jobStatusService.startJob(
+              'collection-refresh',
+              'Refreshing collection cache...'
+            );
+            discogsService
+              .preloadAllCollectionPages(username)
+              .then(() =>
+                jobStatusService.completeJob(
+                  jobId,
+                  'Collection cache refreshed'
+                )
+              )
+              .catch(error => {
+                logger.error('Background refresh failed', error);
+                jobStatusService.failJob(
+                  jobId,
+                  'Collection cache refresh failed'
+                );
+              });
           }
           // Still include expired cache data for now, but mark it as expired
           allItems.push(...cached.data);
@@ -151,9 +168,25 @@ export default function createCollectionRouter(
         logger.info(
           `No cache data found for ${username}, starting background refresh`
         );
-        discogsService.preloadAllCollectionPages(username).catch(error => {
-          logger.error('Background refresh failed', error);
-        });
+        const jobId = jobStatusService.startJob(
+          'collection-refresh',
+          'Fetching collection from Discogs...'
+        );
+        discogsService
+          .preloadAllCollectionPages(username)
+          .then(() =>
+            jobStatusService.completeJob(
+              jobId,
+              'Collection loaded from Discogs'
+            )
+          )
+          .catch(error => {
+            logger.error('Background refresh failed', error);
+            jobStatusService.failJob(
+              jobId,
+              'Failed to fetch collection from Discogs'
+            );
+          });
 
         return res.json({
           success: true,
@@ -312,9 +345,17 @@ export default function createCollectionRouter(
       }
 
       // Start preloading in background (don't await)
-      discogsService.preloadAllCollectionPages(username).catch(error => {
-        logger.error('Background preload failed', error);
-      });
+      const jobId = jobStatusService.startJob(
+        'collection-preload',
+        'Preloading collection...'
+      );
+      discogsService
+        .preloadAllCollectionPages(username)
+        .then(() => jobStatusService.completeJob(jobId, 'Collection preloaded'))
+        .catch(error => {
+          logger.error('Background preload failed', error);
+          jobStatusService.failJob(jobId, 'Collection preload failed');
+        });
 
       res.json({
         success: true,

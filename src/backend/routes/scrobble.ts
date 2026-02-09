@@ -3,6 +3,7 @@ import express, { Request, Response } from 'express';
 import { ScrobbleTrack, ScrobbleSession, Track } from '../../shared/types';
 import { artistMappingService } from '../services/artistMappingService';
 import { AuthService } from '../services/authService';
+import { jobStatusService } from '../services/jobStatusService';
 import { LastFmService } from '../services/lastfmService';
 import { MappingService } from '../services/mappingService';
 import { ScrobbleHistorySyncService } from '../services/scrobbleHistorySyncService';
@@ -47,12 +48,19 @@ export default function createScrobbleRouter(
 
       // Trigger incremental sync after successful scrobble
       if (scrobbleHistorySyncService) {
-        // Fire and forget - don't wait for sync to complete
+        const jobId = jobStatusService.startJob(
+          'sync',
+          'Syncing scrobble history...'
+        );
         scrobbleHistorySyncService
           .startIncrementalSync()
-          .catch(err =>
-            logger.error('Failed to auto-sync after scrobble:', err)
-          );
+          .then(() =>
+            jobStatusService.completeJob(jobId, 'Scrobble history synced')
+          )
+          .catch(err => {
+            logger.error('Failed to auto-sync after scrobble:', err);
+            jobStatusService.failJob(jobId, 'Failed to sync scrobble history');
+          });
       }
 
       res.json({
@@ -114,12 +122,19 @@ export default function createScrobbleRouter(
 
       // Trigger incremental sync after successful scrobble
       if (results.success > 0 && scrobbleHistorySyncService) {
-        // Fire and forget - don't wait for sync to complete
+        const jobId = jobStatusService.startJob(
+          'sync',
+          'Syncing scrobble history...'
+        );
         scrobbleHistorySyncService
           .startIncrementalSync()
-          .catch(err =>
-            logger.error('Failed to auto-sync after scrobble:', err)
-          );
+          .then(() =>
+            jobStatusService.completeJob(jobId, 'Scrobble history synced')
+          )
+          .catch(err => {
+            logger.error('Failed to auto-sync after scrobble:', err);
+            jobStatusService.failJob(jobId, 'Failed to sync scrobble history');
+          });
       }
 
       // Auto-create album mappings for tracks where artist differs from collection artist

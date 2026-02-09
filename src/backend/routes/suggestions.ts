@@ -11,6 +11,7 @@ import { artistMappingService } from '../services/artistMappingService';
 import { AuthService } from '../services/authService';
 import { DiscogsService } from '../services/discogsService';
 import { HiddenItemService } from '../services/hiddenItemService';
+import { jobStatusService } from '../services/jobStatusService';
 import { MappingService } from '../services/mappingService';
 import {
   DEFAULT_OLLAMA_SETTINGS,
@@ -309,13 +310,36 @@ export default function createSuggestionsRouter(
 
       // Start sync in background
       if (incremental) {
-        syncService.startIncrementalSync().catch(error => {
-          logger.error('Background incremental sync failed', error);
-        });
+        const jobId = jobStatusService.startJob(
+          'sync',
+          'Running incremental history sync...'
+        );
+        syncService
+          .startIncrementalSync()
+          .then(() =>
+            jobStatusService.completeJob(
+              jobId,
+              'Incremental history sync complete'
+            )
+          )
+          .catch(error => {
+            logger.error('Background incremental sync failed', error);
+            jobStatusService.failJob(jobId, 'Incremental history sync failed');
+          });
       } else {
-        syncService.startFullSync().catch(error => {
-          logger.error('Background full sync failed', error);
-        });
+        const jobId = jobStatusService.startJob(
+          'sync',
+          'Running full history sync...'
+        );
+        syncService
+          .startFullSync()
+          .then(() =>
+            jobStatusService.completeJob(jobId, 'Full history sync complete')
+          )
+          .catch(error => {
+            logger.error('Background full sync failed', error);
+            jobStatusService.failJob(jobId, 'Full history sync failed');
+          });
       }
 
       res.json({
@@ -366,9 +390,22 @@ export default function createSuggestionsRouter(
    */
   router.post('/history/sync/resume', async (req: Request, res: Response) => {
     try {
-      syncService.resumeSync().catch(error => {
-        logger.error('Background resume failed', error);
-      });
+      const jobId = jobStatusService.startJob(
+        'sync',
+        'Resuming history sync...'
+      );
+      syncService
+        .resumeSync()
+        .then(() =>
+          jobStatusService.completeJob(
+            jobId,
+            'History sync resumed and complete'
+          )
+        )
+        .catch(error => {
+          logger.error('Background resume failed', error);
+          jobStatusService.failJob(jobId, 'History sync resume failed');
+        });
 
       res.json({
         success: true,

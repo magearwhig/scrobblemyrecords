@@ -11,7 +11,13 @@ import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
+import { useJobPoller } from './hooks/useJobPoller';
 import { DEFAULT_ROUTE } from './routes';
+
+const JobPollerSetup: React.FC = () => {
+  useJobPoller();
+  return null;
+};
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
 
@@ -56,6 +62,7 @@ const App: React.FC = () => {
       <AppProvider>
         <AuthProvider value={{ authStatus, setAuthStatus }}>
           <ToastProvider>
+            <JobPollerSetup />
             <div className='app'>
               <Header />
               <div
