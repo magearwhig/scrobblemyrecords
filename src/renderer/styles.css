@@ -9110,3 +9110,142 @@ body {
   font-size: 0.75rem;
   color: var(--text-muted);
 }
+
+/* ===== Toast Notifications ===== */
+
+.toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.5rem;
+  pointer-events: none;
+  max-width: 400px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: auto;
+  animation: toast-enter 0.3s ease-out;
+  min-width: 280px;
+}
+
+.toast--exiting {
+  animation: toast-exit 0.3s ease-in forwards;
+}
+
+.toast--success {
+  border-left: 4px solid var(--success-color);
+}
+
+.toast--error {
+  border-left: 4px solid var(--error-color);
+}
+
+.toast--warning {
+  border-left: 4px solid var(--warning-color, #f59e0b);
+}
+
+.toast--info {
+  border-left: 4px solid var(--accent-color);
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: white;
+}
+
+.toast-icon--success {
+  background: var(--success-color);
+}
+
+.toast-icon--error {
+  background: var(--error-color);
+}
+
+.toast-icon--warning {
+  background: var(--warning-color, #f59e0b);
+}
+
+.toast-icon--info {
+  background: var(--accent-color);
+}
+
+.toast-message {
+  flex: 1;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.toast-action {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--accent-color);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.toast-action:hover {
+  background: var(--bg-hover);
+}
+
+.toast-dismiss {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.toast-dismiss:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+}

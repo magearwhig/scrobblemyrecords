@@ -167,17 +167,16 @@ Collection pages render all items in the DOM. Users with 1000+ records experienc
 
 ---
 
-### M10. No toast notification system
+### ~~M10. No toast notification system~~ DONE
 
-**Severity**: Medium | **Effort**: Deeper (high UX payoff)
+**Completed:** February 2026. Built custom toast notification system:
+- `ToastContext.tsx`: Provider + `useToast()` hook with `showToast(type, message, options)` API. Supports `success`, `error`, `warning`, `info` types, configurable duration (default 4s), and optional action buttons.
+- `ToastContainer.tsx`: Renders stacked toasts in bottom-right corner with enter/exit CSS animations. Each toast has a dismiss button and auto-dismisses after duration.
+- CSS styles in `styles.css` with themed colors via CSS variables, colored left border per type, and slide-up animations.
+- Wired into `App.tsx` via `ToastProvider` wrapping the main app.
+- 24 tests covering context API (13) and component rendering/interactions (11).
 
-Users miss action outcomes. Errors and confirmations are only in console or require modal dialogs.
-
-**Action:**
-- [ ] Implement toast notification component (e.g., `react-hot-toast` or custom)
-- [ ] Add auto-dismiss with configurable duration
-- [ ] Support action buttons ("Undo", "View Details")
-- [ ] Position in corner, non-blocking
+Migration of existing `alert()` and inline message patterns to use toasts is deferred as incremental work.
 
 ---
 
@@ -365,7 +364,7 @@ Large inline JSX blocks in page files that should be their own components. Level
 | M7 | ~~Accessibility gaps on form controls/buttons~~ | ~~Medium~~ | ~~DONE~~ |
 | M8 | ~~E2E tests not in CI~~ | ~~Medium~~ | ~~DONE~~ |
 | M9 | No virtualization for large lists | Medium | No |
-| M10 | No toast notification system | Medium | No |
+| M10 | ~~No toast notification system~~ | ~~Medium~~ | ~~DONE~~ |
 | M11 | ~~No React.memo on list components~~ | ~~Medium~~ | ~~DONE~~ |
 | M12 | ~~Seller monitoring lacks rate limiting~~ | ~~Medium~~ | ~~DONE~~ |
 | M13 | ~~Fixed 10s timeout + unconditional 1s delay~~ | ~~Medium~~ | ~~DONE~~ |
@@ -388,7 +387,7 @@ Large inline JSX blocks in page files that should be their own components. Level
 | L11 | ~~Centralize route identifiers~~ | ~~Low~~ | ~~DONE~~ |
 | L12 | ~~Sidebar reorganization~~ | ~~Low~~ | ~~DONE~~ |
 
-**Total open**: 10 items (1 critical, 2 high, 2 medium, 5 low) -- 28 completed (10 Phase 0 + 11 Phase 1 + 3 Phase 2 + 4 Phase 3, February 2026)
+**Total open**: 9 items (1 critical, 2 high, 1 medium, 5 low) -- 29 completed (10 Phase 0 + 11 Phase 1 + 3 Phase 2 + 5 Phase 3, February 2026)
 
 ---
 

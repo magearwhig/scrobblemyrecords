@@ -6,9 +6,11 @@ import ErrorBoundary from './components/ErrorBoundary';
 import Header from './components/Header';
 import MainContent from './components/MainContent';
 import Sidebar from './components/Sidebar';
+import ToastContainer from './components/ToastContainer';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { ToastProvider } from './context/ToastContext';
 import { DEFAULT_ROUTE } from './routes';
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
@@ -53,24 +55,27 @@ const App: React.FC = () => {
     <ThemeProvider>
       <AppProvider>
         <AuthProvider value={{ authStatus, setAuthStatus }}>
-          <div className='app'>
-            <Header />
-            <div
-              className={`main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
-            >
-              <Sidebar
-                currentPage={currentPage}
-                onPageChange={setCurrentPage}
-                collapsed={sidebarCollapsed}
-                onCollapsedChange={handleSidebarCollapsedChange}
-              />
-              <div className='content'>
-                <ErrorBoundary>
-                  <MainContent currentPage={currentPage} />
-                </ErrorBoundary>
+          <ToastProvider>
+            <div className='app'>
+              <Header />
+              <div
+                className={`main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+              >
+                <Sidebar
+                  currentPage={currentPage}
+                  onPageChange={setCurrentPage}
+                  collapsed={sidebarCollapsed}
+                  onCollapsedChange={handleSidebarCollapsedChange}
+                />
+                <div className='content'>
+                  <ErrorBoundary>
+                    <MainContent currentPage={currentPage} />
+                  </ErrorBoundary>
+                </div>
               </div>
+              <ToastContainer />
             </div>
-          </div>
+          </ToastProvider>
         </AuthProvider>
       </AppProvider>
     </ThemeProvider>
