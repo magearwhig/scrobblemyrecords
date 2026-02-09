@@ -1,15 +1,16 @@
-import axios from 'axios';
-
 import { AuthService } from '../../src/backend/services/authService';
 import { DiscogsService } from '../../src/backend/services/discogsService';
+import { getDiscogsAxios } from '../../src/backend/utils/discogsAxios';
 import { FileStorage } from '../../src/backend/utils/fileStorage';
 
 // Mock dependencies
-jest.mock('axios');
+jest.mock('../../src/backend/utils/discogsAxios');
 jest.mock('../../src/backend/services/authService');
 jest.mock('../../src/backend/utils/fileStorage');
 
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+const mockedGetDiscogsAxios = getDiscogsAxios as jest.MockedFunction<
+  typeof getDiscogsAxios
+>;
 const MockedAuthService = AuthService as jest.MockedClass<typeof AuthService>;
 const MockedFileStorage = FileStorage as jest.MockedClass<typeof FileStorage>;
 
@@ -47,7 +48,7 @@ describe('DiscogsService', () => {
       },
     };
 
-    mockedAxios.create.mockReturnValue(mockAxiosInstance);
+    mockedGetDiscogsAxios.mockReturnValue(mockAxiosInstance);
 
     // Create service instance
     discogsService = new DiscogsService(mockFileStorage, mockAuthService);

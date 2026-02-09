@@ -3,6 +3,7 @@ import axios from 'axios';
 import { AuthService } from '../../src/backend/services/authService';
 import { SellerMonitoringService } from '../../src/backend/services/sellerMonitoringService';
 import { WishlistService } from '../../src/backend/services/wishlistService';
+import { getDiscogsAxios } from '../../src/backend/utils/discogsAxios';
 import { FileStorage } from '../../src/backend/utils/fileStorage';
 import {
   MonitoredSellersStore,
@@ -36,11 +37,15 @@ function createMatch(partial: Partial<SellerMatch>): SellerMatch {
 
 // Mock dependencies
 jest.mock('axios');
+jest.mock('../../src/backend/utils/discogsAxios');
 jest.mock('../../src/backend/utils/fileStorage');
 jest.mock('../../src/backend/services/authService');
 jest.mock('../../src/backend/services/wishlistService');
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
+const mockedGetDiscogsAxios = getDiscogsAxios as jest.MockedFunction<
+  typeof getDiscogsAxios
+>;
 
 describe('SellerMonitoringService', () => {
   let sellerMonitoringService: SellerMonitoringService;
@@ -86,7 +91,7 @@ describe('SellerMonitoringService', () => {
       },
     };
 
-    mockedAxios.create.mockReturnValue(mockAxiosInstance);
+    mockedGetDiscogsAxios.mockReturnValue(mockAxiosInstance);
     mockedAxios.isAxiosError.mockReturnValue(false);
 
     // Create service instance
@@ -98,20 +103,8 @@ describe('SellerMonitoringService', () => {
   });
 
   describe('constructor', () => {
-    it('should create axios instance with correct configuration', () => {
-      expect(mockedAxios.create).toHaveBeenCalledWith({
-        baseURL: 'https://api.discogs.com',
-        timeout: 30000,
-        headers: {
-          'User-Agent': 'RecordScrobbles/1.0',
-        },
-      });
-    });
-
-    it('should set up rate limiting interceptor', () => {
-      expect(mockAxiosInstance.interceptors.request.use).toHaveBeenCalledWith(
-        expect.any(Function)
-      );
+    it('should obtain shared axios instance via getDiscogsAxios', () => {
+      expect(mockedGetDiscogsAxios).toHaveBeenCalled();
     });
   });
 
@@ -950,23 +943,9 @@ describe('SellerMonitoringService', () => {
   });
 
   describe('rate limiting', () => {
-    it('should apply rate limiting to requests', async () => {
-      jest.useFakeTimers();
-
-      const interceptor =
-        mockAxiosInstance.interceptors.request.use.mock.calls[0][0];
-      const mockConfig = { url: '/test' };
-
-      const promise = interceptor(mockConfig);
-
-      // Fast-forward time
-      jest.advanceTimersByTime(1000);
-
-      const result = await promise;
-
-      expect(result).toBe(mockConfig);
-
-      jest.useRealTimers();
+    it('should use shared rate-limited axios instance', () => {
+      // Rate limiting is handled by getDiscogsAxios() utility
+      expect(mockedGetDiscogsAxios).toHaveBeenCalled();
     });
   });
 
