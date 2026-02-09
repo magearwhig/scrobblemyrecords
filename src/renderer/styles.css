@@ -761,6 +761,16 @@ body {
   margin-top: 1rem;
 }
 
+.virtualized-collection-grid {
+  height: calc(100vh - 200px);
+  overflow-y: auto;
+  margin-top: 1rem;
+}
+
+.virtualized-collection-grid .collection-grid {
+  margin-top: 0;
+}
+
 .album-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);

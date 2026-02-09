@@ -38,6 +38,7 @@
   },
   "homepage": "https://github.com/user/recordscrobbles",
   "dependencies": {
+    "@tanstack/react-virtual": "^3.13.18",
     "axios": "^1.10.0",
     "cors": "^2.8.5",
     "dotenv": "^17.0.1",

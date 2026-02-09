@@ -10,6 +10,7 @@ import {
 } from '../../shared/types';
 import AlbumCard from '../components/AlbumCard';
 import SearchBar from '../components/SearchBar';
+import VirtualizedCollectionGrid from '../components/VirtualizedCollectionGrid';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
@@ -101,12 +102,7 @@ const CollectionPage: React.FC = () => {
   const scrollBatchSize = 100; // Load more items per scroll for smoother experience
 
   // Infinite scroll for browse mode (not search mode)
-  const {
-    sentinelRef,
-    hasMore,
-    visibleCount,
-    reset: resetInfiniteScroll,
-  } = useInfiniteScroll({
+  const { reset: resetInfiniteScroll } = useInfiniteScroll({
     enabled: !isSearchMode && !loading && viewMode === 'grid',
     totalItems: entireCollection.length,
     loadedItems: filteredCollection.length,
@@ -997,15 +993,9 @@ const CollectionPage: React.FC = () => {
     return sorted;
   };
 
-  // Get visible items - uses infinite scroll for browse mode, pagination for search mode
+  // Get visible items for search mode (browse mode uses VirtualizedCollectionGrid)
   const getVisibleItems = (): CollectionItem[] => {
-    if (isSearchMode) {
-      // Search mode still uses pagination
-      return filteredCollection;
-    }
-
-    // Browse mode uses infinite scroll - show items up to visibleCount
-    return filteredCollection.slice(0, visibleCount);
+    return filteredCollection;
   };
 
   if (!authStatus.discogs.authenticated) {
@@ -1394,10 +1384,9 @@ const CollectionPage: React.FC = () => {
                 </button>
               </>
             ) : (
-              // Browse mode: show count with infinite scroll
+              // Browse mode: show total count
               <span className='collection-pagination-info'>
-                Showing {Math.min(visibleCount, filteredCollection.length)} of{' '}
-                {filteredCollection.length}
+                {filteredCollection.length} items
               </span>
             )}
           </div>
@@ -1427,50 +1416,50 @@ const CollectionPage: React.FC = () => {
         </div>
       )}
 
-      {!loading && filteredCollection.length > 0 && viewMode === 'grid' && (
-        <div className='collection-grid'>
-          {getVisibleItems().map((item, index) => (
-            <AlbumCard
-              key={`${item.id}-${item.date_added || index}`}
-              item={item}
-              selected={selectedAlbums.has(item.release.id)}
-              onSelect={() => handleAlbumSelect(item.release.id)}
-              onViewDetails={release => {
-                // Store release and collection item ID for details view
-                localStorage.setItem(
-                  'selectedRelease',
-                  JSON.stringify(release)
-                );
-                localStorage.setItem(
-                  'selectedCollectionItemId',
-                  item.id.toString()
-                );
-                window.location.hash = '#release-details';
-              }}
-              isInDiscardPile={discardPileIds.has(item.id)}
-              onAddToDiscardPile={handleOpenDiscardModal}
-            />
-          ))}
-
-          {/* Infinite scroll sentinel - invisible trigger zone */}
-          {!isSearchMode && hasMore && (
-            <div
-              ref={sentinelRef}
-              className='infinite-scroll-sentinel collection-scroll-sentinel'
-              aria-hidden='true'
-            />
-          )}
-
-          {/* End of collection indicator */}
-          {!isSearchMode &&
-            !hasMore &&
-            filteredCollection.length > scrollBatchSize && (
-              <div className='collection-end-message'>
-                <span className='collection-end-text'>End of collection</span>
-              </div>
-            )}
-        </div>
-      )}
+      {!loading &&
+        filteredCollection.length > 0 &&
+        viewMode === 'grid' &&
+        (isSearchMode ? (
+          <div className='collection-grid'>
+            {getVisibleItems().map((item, index) => (
+              <AlbumCard
+                key={`${item.id}-${item.date_added || index}`}
+                item={item}
+                selected={selectedAlbums.has(item.release.id)}
+                onSelect={() => handleAlbumSelect(item.release.id)}
+                onViewDetails={release => {
+                  localStorage.setItem(
+                    'selectedRelease',
+                    JSON.stringify(release)
+                  );
+                  localStorage.setItem(
+                    'selectedCollectionItemId',
+                    item.id.toString()
+                  );
+                  window.location.hash = '#release-details';
+                }}
+                isInDiscardPile={discardPileIds.has(item.id)}
+                onAddToDiscardPile={handleOpenDiscardModal}
+              />
+            ))}
+          </div>
+        ) : (
+          <VirtualizedCollectionGrid
+            items={filteredCollection}
+            selectedAlbums={selectedAlbums}
+            discardPileIds={discardPileIds}
+            onAlbumSelect={handleAlbumSelect}
+            onViewDetails={(release, item) => {
+              localStorage.setItem('selectedRelease', JSON.stringify(release));
+              localStorage.setItem(
+                'selectedCollectionItemId',
+                item.id.toString()
+              );
+              window.location.hash = '#release-details';
+            }}
+            onAddToDiscardPile={handleOpenDiscardModal}
+          />
+        ))}
 
       {/* Single Record View */}
       {!loading && filteredCollection.length > 0 && viewMode === 'single' && (

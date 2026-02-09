@@ -15,6 +15,13 @@ Object.defineProperty(window, 'localStorage', {
   value: localStorageMock,
 });
 
+// Mock ResizeObserver (not available in jsdom)
+global.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof globalThis.ResizeObserver;
+
 // Mock console methods to reduce noise in tests
 global.console = {
   ...console,

@@ -81,6 +81,37 @@ jest.mock('../../../src/renderer/components/SearchBar', () => {
   };
 });
 
+// Mock VirtualizedCollectionGrid to render items directly (virtualizer needs real DOM dimensions)
+jest.mock('../../../src/renderer/components/VirtualizedCollectionGrid', () => {
+  return function MockVirtualizedCollectionGrid({
+    items,
+    selectedAlbums,
+    onAlbumSelect,
+    onViewDetails,
+  }: any) {
+    return (
+      <div className='collection-grid'>
+        {items.map((item: any, index: number) => (
+          <div
+            key={`${item.id}-${item.date_added || index}`}
+            data-testid={`album-card-${item.id}`}
+          >
+            <div>
+              {item.release.artist} - {item.release.title}
+            </div>
+            <button onClick={() => onAlbumSelect(item.release.id)}>
+              {selectedAlbums.has(item.release.id) ? 'Deselect' : 'Select'}
+            </button>
+            <button onClick={() => onViewDetails(item.release, item)}>
+              View Details
+            </button>
+          </div>
+        ))}
+      </div>
+    );
+  };
+});
+
 // Mock IntersectionObserver for useInfiniteScroll hook
 const mockIntersectionObserver = jest.fn();
 mockIntersectionObserver.mockReturnValue({
@@ -595,9 +626,9 @@ describe('CollectionPage', () => {
 
       renderWithProviders(<CollectionPage />);
 
-      // Browse mode uses infinite scroll, should show "Showing X of Y" format
+      // Browse mode uses virtualization, should show item count
       await waitFor(() => {
-        expect(screen.getByText(/Showing.*of.*50/)).toBeInTheDocument();
+        expect(screen.getByText(/50 items/)).toBeInTheDocument();
       });
     });
 
@@ -623,9 +654,9 @@ describe('CollectionPage', () => {
 
       renderWithProviders(<CollectionPage />);
 
-      // Should show "Showing X of 150" format in browse mode
+      // Browse mode uses virtualization, should show item count
       await waitFor(() => {
-        expect(screen.getByText(/of 150/)).toBeInTheDocument();
+        expect(screen.getByText(/150 items/)).toBeInTheDocument();
       });
     });
   });

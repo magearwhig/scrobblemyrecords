@@ -152,18 +152,16 @@ scrobbleHistorySyncService
 
 ---
 
-### M9. No virtualization for large lists
+### ~~M9. No virtualization for large lists~~ DONE
 
-**Severity**: Medium | **Effort**: Deeper (UI refactor)
+**Completed:** February 2026. Added `@tanstack/react-virtual` row virtualization to the collection browse grid:
+- Created `VirtualizedCollectionGrid.tsx` component using `useVirtualizer` with `ResizeObserver`-based dynamic column calculation (min card width 280px, 24px gap).
+- Browse mode renders only visible rows (overscan: 3) within a fixed-height scroll container. Search mode retains the non-virtualized grid.
+- Removed `sentinelRef`/`hasMore`/`visibleCount` from `useInfiniteScroll` destructuring (browse mode no longer needs them; `resetInfiniteScroll` still used for filter/sort resets).
+- Added `ResizeObserver` to ESLint globals and jsdom test setup mock.
+- Updated CollectionPage tests with VirtualizedCollectionGrid mock and adjusted item-count assertions.
 
-Collection pages render all items in the DOM. Users with 1000+ records experience sluggish scrolling and high memory usage.
-
-**Action:**
-- [ ] Implement `react-window` or `@tanstack/virtual` for collection grid
-- [ ] Only render visible items
-- [ ] Maintain scroll position on navigation
-
-**Files:** `src/renderer/pages/CollectionPage.tsx`
+**Files:** `src/renderer/components/VirtualizedCollectionGrid.tsx` (new), `src/renderer/pages/CollectionPage.tsx`, `src/renderer/styles.css`, `eslint.config.js`, `tests/setupReact.ts`, `tests/frontend/pages/CollectionPage.test.tsx`
 
 ---
 
@@ -363,7 +361,7 @@ Large inline JSX blocks in page files that should be their own components. Level
 | M6 | fireEvent vs userEvent test inconsistency | Medium | Partial |
 | M7 | ~~Accessibility gaps on form controls/buttons~~ | ~~Medium~~ | ~~DONE~~ |
 | M8 | ~~E2E tests not in CI~~ | ~~Medium~~ | ~~DONE~~ |
-| M9 | No virtualization for large lists | Medium | No |
+| M9 | ~~No virtualization for large lists~~ | ~~Medium~~ | ~~DONE~~ |
 | M10 | ~~No toast notification system~~ | ~~Medium~~ | ~~DONE~~ |
 | M11 | ~~No React.memo on list components~~ | ~~Medium~~ | ~~DONE~~ |
 | M12 | ~~Seller monitoring lacks rate limiting~~ | ~~Medium~~ | ~~DONE~~ |
@@ -387,7 +385,7 @@ Large inline JSX blocks in page files that should be their own components. Level
 | L11 | ~~Centralize route identifiers~~ | ~~Low~~ | ~~DONE~~ |
 | L12 | ~~Sidebar reorganization~~ | ~~Low~~ | ~~DONE~~ |
 
-**Total open**: 9 items (1 critical, 2 high, 1 medium, 5 low) -- 29 completed (10 Phase 0 + 11 Phase 1 + 3 Phase 2 + 5 Phase 3, February 2026)
+**Total open**: 8 items (1 critical, 2 high, 0 medium, 5 low) -- 30 completed (10 Phase 0 + 11 Phase 1 + 3 Phase 2 + 6 Phase 3, February 2026)
 
 ---
 

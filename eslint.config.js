@@ -58,6 +58,7 @@ module.exports = [
         FileReader: 'readonly',
         requestAnimationFrame: 'readonly',
         confirm: 'readonly',
+        ResizeObserver: 'readonly',
 
         // Timer functions
         setTimeout: 'readonly',
