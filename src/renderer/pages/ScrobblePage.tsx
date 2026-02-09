@@ -262,7 +262,7 @@ const ScrobblePage: React.FC = () => {
         <p>
           Please authenticate with both Discogs and Last.fm to scrobble tracks.
         </p>
-        <div style={{ marginTop: '1rem' }}>
+        <div className='scrobble-margin-top'>
           <a href='#settings?tab=connections' className='btn'>
             Connect Accounts
           </a>
@@ -279,7 +279,7 @@ const ScrobblePage: React.FC = () => {
           No albums selected for scrobbling. Please go to the collection page
           and select some albums first.
         </p>
-        <div style={{ marginTop: '1rem' }}>
+        <div className='scrobble-margin-top'>
           <a href='#collection' className='btn'>
             Browse Collection
           </a>
@@ -293,98 +293,40 @@ const ScrobblePage: React.FC = () => {
       {/* Disambiguation Warning Modal */}
       {showDisambiguationWarning && (
         <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 1000,
-          }}
+          className='scrobble-modal-overlay'
           onClick={() => setShowDisambiguationWarning(false)}
         >
           <div
-            style={{
-              backgroundColor: 'var(--bg-primary)',
-              borderRadius: '8px',
-              padding: '1.5rem',
-              maxWidth: '500px',
-              width: '90%',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
-              border: '1px solid var(--border-color)',
-            }}
+            className='scrobble-modal-content'
             onClick={e => e.stopPropagation()}
           >
-            <h3
-              style={{
-                margin: '0 0 1rem 0',
-                color: 'var(--warning-color)',
-              }}
-            >
+            <h3 className='scrobble-modal-title'>
               Artist Name Contains Disambiguation
             </h3>
-            <p
-              style={{
-                margin: '0 0 1rem 0',
-                color: 'var(--text-secondary)',
-                fontSize: '0.95rem',
-              }}
-            >
+            <p className='scrobble-modal-description'>
               The following artist(s) have Discogs disambiguation suffixes
               (numbers in parentheses) that may not match Last.fm:
             </p>
-            <ul
-              style={{
-                margin: '0 0 1.5rem 0',
-                paddingLeft: '1.5rem',
-              }}
-            >
+            <ul className='scrobble-modal-list'>
               {disambiguationArtists.map(artist => (
-                <li
-                  key={artist}
-                  style={{
-                    marginBottom: '0.5rem',
-                    color: 'var(--text-primary)',
-                  }}
-                >
+                <li key={artist} className='scrobble-modal-list-item'>
                   <strong>{artist}</strong>
                   <a
                     href={`https://www.discogs.com/search/?q=${encodeURIComponent(artist)}&type=artist`}
                     target='_blank'
                     rel='noopener noreferrer'
-                    style={{
-                      marginLeft: '0.75rem',
-                      fontSize: '0.85rem',
-                      color: 'var(--accent-color)',
-                    }}
+                    className='scrobble-modal-link'
                   >
                     View on Discogs
                   </a>
                 </li>
               ))}
             </ul>
-            <p
-              style={{
-                margin: '0 0 1rem 0',
-                fontSize: '0.9rem',
-                color: 'var(--text-muted)',
-              }}
-            >
+            <p className='scrobble-modal-note'>
               You can create an artist mapping to scrobble with a different name
               on Last.fm.
             </p>
-            <div
-              style={{
-                display: 'flex',
-                gap: '0.75rem',
-                justifyContent: 'flex-end',
-                flexWrap: 'wrap',
-              }}
-            >
+            <div className='scrobble-modal-actions'>
               <button
                 className='btn btn-outline'
                 onClick={() => setShowDisambiguationWarning(false)}
@@ -412,33 +354,21 @@ const ScrobblePage: React.FC = () => {
 
         {error && <div className='error-message'>{error}</div>}
 
-        <div style={{ marginBottom: '1.5rem' }}>
+        <div className='scrobble-section'>
           <h3>Selected Albums ({selectedAlbums.length})</h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div className='scrobble-album-badges'>
             {selectedAlbums.map((album, index) => (
-              <div
-                key={index}
-                style={{
-                  background: '#f0f0f0',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '20px',
-                  fontSize: '0.85rem',
-                }}
-              >
+              <div key={index} className='scrobble-album-badge'>
                 {album.release.artist} - {album.release.title}
               </div>
             ))}
           </div>
         </div>
 
-        <div style={{ marginBottom: '1.5rem' }}>
+        <div className='scrobble-section'>
           <h3>Timestamp Settings</h3>
-          <div
-            style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
-          >
-            <label
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-            >
+          <div className='scrobble-timestamp-settings'>
+            <label className='scrobble-radio-label'>
               <input
                 type='radio'
                 checked={useCurrentTime}
@@ -447,9 +377,7 @@ const ScrobblePage: React.FC = () => {
               Use current time
             </label>
 
-            <label
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-            >
+            <label className='scrobble-radio-label'>
               <input
                 type='radio'
                 checked={!useCurrentTime}
@@ -461,14 +389,13 @@ const ScrobblePage: React.FC = () => {
             {!useCurrentTime && (
               <input
                 type='datetime-local'
-                className='form-input'
+                className='form-input scrobble-datetime-input'
                 value={customTimestamp}
                 onChange={e => setCustomTimestamp(e.target.value)}
-                style={{ maxWidth: '300px' }}
               />
             )}
 
-            <div style={{ fontSize: '0.9rem', color: '#666' }}>
+            <div className='scrobble-timestamp-display'>
               Scrobble time: {formatTimestamp()}
             </div>
           </div>
@@ -476,16 +403,9 @@ const ScrobblePage: React.FC = () => {
 
         {preparedTracks.length > 0 && (
           <div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '1rem',
-              }}
-            >
+            <div className='scrobble-tracks-header'>
               <h3>Tracks ({preparedTracks.length})</h3>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div className='scrobble-tracks-controls'>
                 <button
                   className='btn btn-small'
                   onClick={handleSelectAll}
@@ -495,41 +415,25 @@ const ScrobblePage: React.FC = () => {
                     ? 'Deselect All'
                     : 'Select All'}
                 </button>
-                <span
-                  style={{
-                    fontSize: '0.9rem',
-                    color: '#666',
-                    lineHeight: '2rem',
-                  }}
-                >
+                <span className='scrobble-selected-count'>
                   {selectedTracks.size} selected
                 </span>
               </div>
             </div>
 
-            <div
-              style={{
-                maxHeight: '400px',
-                overflowY: 'auto',
-                border: '1px solid #e0e0e0',
-                borderRadius: '8px',
-                marginBottom: '1.5rem',
-              }}
-            >
+            <div className='scrobble-track-list'>
               {preparedTracks.map((track, index) => (
                 <div
                   key={index}
+                  className='scrobble-track-item'
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '0.75rem',
                     borderBottom:
                       index < preparedTracks.length - 1
-                        ? '1px solid #f0f0f0'
+                        ? '1px solid var(--bg-tertiary)'
                         : 'none',
                     backgroundColor: selectedTracks.has(index)
-                      ? '#f0fff4'
-                      : 'white',
+                      ? 'var(--bg-hover)'
+                      : 'var(--bg-secondary)',
                   }}
                 >
                   <input
@@ -537,13 +441,11 @@ const ScrobblePage: React.FC = () => {
                     checked={selectedTracks.has(index)}
                     onChange={() => handleTrackSelection(index)}
                     disabled={scrobbling}
-                    style={{ marginRight: '1rem' }}
+                    className='scrobble-track-checkbox'
                   />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 500, fontSize: '0.9rem' }}>
-                      {track.track}
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: '#666' }}>
+                  <div className='scrobble-track-info'>
+                    <div className='scrobble-track-title'>{track.track}</div>
+                    <div className='scrobble-track-details'>
                       {track.artist} • {track.album}
                     </div>
                   </div>
@@ -554,31 +456,22 @@ const ScrobblePage: React.FC = () => {
         )}
 
         {progress && (
-          <div
-            className='card'
-            style={{ backgroundColor: '#f8f9fa', margin: '1rem 0' }}
-          >
+          <div className='card scrobble-progress-card'>
             <h4>Scrobbling Progress</h4>
-            <div style={{ marginBottom: '1rem' }}>
-              <div
-                style={{
-                  background: '#e0e0e0',
-                  borderRadius: '10px',
-                  height: '20px',
-                  overflow: 'hidden',
-                }}
-              >
+            <div className='scrobble-progress-section'>
+              <div className='scrobble-progress-bar-bg'>
                 <div
+                  className='scrobble-progress-bar-fill'
                   style={{
                     background:
-                      progress.status === 'error' ? '#dc3545' : '#1db954',
-                    height: '100%',
+                      progress.status === 'error'
+                        ? 'var(--error-color)'
+                        : 'var(--accent-color)',
                     width: `${(progress.current / progress.total) * 100}%`,
-                    transition: 'width 0.3s ease',
                   }}
                 />
               </div>
-              <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+              <div className='scrobble-progress-text'>
                 {progress.current} of {progress.total} tracks •{' '}
                 {progress.status}
               </div>
@@ -587,10 +480,7 @@ const ScrobblePage: React.FC = () => {
         )}
 
         {results && (
-          <div
-            className='card'
-            style={{ backgroundColor: '#d4edda', marginBottom: '1rem' }}
-          >
+          <div className='card scrobble-results-card'>
             <h4>Scrobbling Results</h4>
             <div>
               <div>✅ Successfully scrobbled: {results.success} tracks</div>
@@ -598,14 +488,11 @@ const ScrobblePage: React.FC = () => {
                 <div>❌ Failed to scrobble: {results.failed} tracks</div>
               )}
               {results.errors && results.errors.length > 0 && (
-                <details style={{ marginTop: '1rem' }}>
+                <details className='scrobble-error-details'>
                   <summary>View Errors</summary>
-                  <ul style={{ marginTop: '0.5rem' }}>
+                  <ul className='scrobble-error-list'>
                     {results.errors.map((error: string, index: number) => (
-                      <li
-                        key={index}
-                        style={{ fontSize: '0.85rem', color: '#721c24' }}
-                      >
+                      <li key={index} className='scrobble-error-item'>
                         {error}
                       </li>
                     ))}
@@ -616,7 +503,7 @@ const ScrobblePage: React.FC = () => {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div className='scrobble-actions'>
           <button
             className='btn'
             onClick={handleScrobble}

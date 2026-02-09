@@ -1009,7 +1009,7 @@ const CollectionPage: React.FC = () => {
       <div className='card'>
         <h2>Browse Collection</h2>
         <p>Please authenticate with Discogs first to browse your collection.</p>
-        <div style={{ marginTop: '1rem' }}>
+        <div className='collection-not-authenticated'>
           <a href='#settings?tab=connections' className='btn'>
             Connect Discogs
           </a>
@@ -1022,25 +1022,10 @@ const CollectionPage: React.FC = () => {
     <div>
       <div className='card'>
         {/* Header */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: '1rem',
-          }}
-        >
-          <div>
-            <h2 style={{ margin: '0 0 0.5rem 0' }}>Browse Collection</h2>
-            <div
-              style={{
-                display: 'flex',
-                gap: '1rem',
-                alignItems: 'center',
-                fontSize: '0.9rem',
-                color: 'var(--text-secondary)',
-              }}
-            >
+        <div className='collection-header'>
+          <div className='collection-title-section'>
+            <h2>Browse Collection</h2>
+            <div className='collection-header-stats'>
               <span>{selectedAlbums.size} selected</span>
               {entireCollection.length > 0 && (
                 <span>{entireCollection.length} total items</span>
@@ -1049,55 +1034,16 @@ const CollectionPage: React.FC = () => {
           </div>
 
           {/* Cache Management */}
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.5rem',
-              alignItems: 'flex-end',
-            }}
-          >
+          <div className='collection-cache-management'>
             {/* Status Indicators */}
-            <div
-              style={{
-                display: 'flex',
-                gap: '0.5rem',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                justifyContent: 'flex-end',
-              }}
-            >
+            <div className='collection-status-indicators'>
               {preloading && (
-                <div
-                  style={{
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    padding: '0.25rem 0.5rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: '4px',
-                  }}
-                >
-                  Preloading...
-                </div>
+                <div className='collection-status-badge'>Preloading...</div>
               )}
 
               {cacheProgress && cacheProgress.status === 'loading' && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    padding: '0.25rem 0.5rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: '4px',
-                  }}
-                >
-                  <div
-                    className='spinner'
-                    style={{ width: '12px', height: '12px' }}
-                  ></div>
+                <div className='collection-status-loading'>
+                  <div className='spinner collection-spinner-small'></div>
                   Caching: {cacheProgress.currentPage}/
                   {cacheProgress.totalPages} pages (
                   {Math.round(
@@ -1108,128 +1054,52 @@ const CollectionPage: React.FC = () => {
               )}
 
               {cacheProgress && cacheProgress.status === 'completed' && (
-                <div
-                  style={{
-                    fontSize: '0.8rem',
-                    color: 'var(--success-color)',
-                    padding: '0.25rem 0.5rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: '4px',
-                  }}
-                >
+                <div className='collection-status-success'>
                   ✓ Cache complete ({cacheProgress.totalPages} pages)
                 </div>
               )}
 
               {usingCache && !cacheRefreshing && cacheStatus === 'valid' && (
-                <div
-                  style={{
-                    fontSize: '0.8rem',
-                    color: 'var(--success-color)',
-                    padding: '0.25rem 0.5rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: '4px',
-                  }}
-                >
+                <div className='collection-status-success'>
                   ⚡ Using cached data
                 </div>
               )}
 
               {cacheStatus === 'expired' && cacheRefreshing && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    fontSize: '0.8rem',
-                    color: 'var(--warning-color)',
-                    padding: '0.25rem 0.5rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: '4px',
-                  }}
-                >
-                  <div
-                    className='spinner'
-                    style={{ width: '12px', height: '12px' }}
-                  ></div>
-                  ⏰ Cache expired - Refreshing...
+                <div className='collection-status-warning'>
+                  <div className='spinner collection-spinner-small'></div>⏰
+                  Cache expired - Refreshing...
                 </div>
               )}
 
               {cacheStatus === 'partially_expired' && cacheRefreshing && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    fontSize: '0.8rem',
-                    color: 'var(--warning-color)',
-                    padding: '0.25rem 0.5rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: '4px',
-                  }}
-                >
-                  <div
-                    className='spinner'
-                    style={{ width: '12px', height: '12px' }}
-                  ></div>
+                <div className='collection-status-warning'>
+                  <div className='spinner collection-spinner-small'></div>
                   ⚠️ Some cache expired - Refreshing...
                 </div>
               )}
 
               {checkingForNewItems && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    padding: '0.25rem 0.5rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: '4px',
-                  }}
-                >
-                  <div
-                    className='spinner'
-                    style={{ width: '12px', height: '12px' }}
-                  ></div>
+                <div className='collection-status-loading'>
+                  <div className='spinner collection-spinner-small'></div>
                   Checking for new items...
                 </div>
               )}
 
               {updatingWithNewItems && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    padding: '0.25rem 0.5rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: '4px',
-                  }}
-                >
-                  <div
-                    className='spinner'
-                    style={{ width: '12px', height: '12px' }}
-                  ></div>
+                <div className='collection-status-loading'>
+                  <div className='spinner collection-spinner-small'></div>
                   Adding new items to cache...
                 </div>
               )}
 
               {infoMessage && (
                 <div
+                  className='collection-status-info'
                   style={{
-                    fontSize: '0.8rem',
                     color: newItemsResult?.newItemsCount
                       ? 'var(--warning-color)'
                       : 'var(--success-color)',
-                    padding: '0.25rem 0.5rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: '4px',
-                    maxWidth: '300px',
                   }}
                 >
                   {newItemsResult?.newItemsCount ? '⚠️' : 'ℹ️'} {infoMessage}
@@ -1238,7 +1108,7 @@ const CollectionPage: React.FC = () => {
             </div>
 
             {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div className='collection-cache-actions'>
               <button
                 className='btn btn-small btn-secondary'
                 onClick={handleCheckForNewItems}
@@ -1299,33 +1169,19 @@ const CollectionPage: React.FC = () => {
         {entireCollection.length > 0 &&
           entireCollection.length < 100 &&
           !cacheProgress && (
-            <div
-              className='card'
-              style={{
-                backgroundColor: '#fff3cd',
-                border: '1px solid #ffeaa7',
-                marginBottom: '1rem',
-              }}
-            >
-              <h4 style={{ color: '#856404', margin: '0 0 0.5rem 0' }}>
+            <div className='card collection-warning-card'>
+              <h4 className='collection-warning-title'>
                 ⚠️ Incomplete Collection Cache
               </h4>
-              <p
-                style={{
-                  color: '#856404',
-                  margin: '0 0 1rem 0',
-                  fontSize: '0.9rem',
-                }}
-              >
+              <p className='collection-warning-text'>
                 Only {entireCollection.length} items are currently cached. Your
                 full collection may not be displayed. The system is
                 automatically preloading your complete collection in the
                 background.
               </p>
               <button
-                className='btn btn-small'
+                className='btn btn-small collection-warning-button'
                 onClick={startPreloadingCollection}
-                style={{ backgroundColor: '#856404', color: 'white' }}
               >
                 Start Preloading Now
               </button>
@@ -1339,49 +1195,19 @@ const CollectionPage: React.FC = () => {
         />
 
         {/* Filters Section */}
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '1rem',
-            alignItems: 'center',
-            margin: '1rem 0',
-            padding: '0.75rem',
-            backgroundColor: 'var(--bg-tertiary)',
-            borderRadius: '8px',
-            border: '1px solid var(--border-color)',
-          }}
-        >
-          <span
-            style={{
-              fontSize: '0.9rem',
-              color: 'var(--text-secondary)',
-              fontWeight: 500,
-            }}
-          >
-            Filters:
-          </span>
+        <div className='collection-filters'>
+          <span className='collection-filters-label'>Filters:</span>
 
           {/* Format Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label
-              htmlFor='filter-format'
-              style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}
-            >
+          <div className='collection-filter-group'>
+            <label htmlFor='filter-format' className='collection-filter-label'>
               Format:
             </label>
             <select
               id='filter-format'
               value={filterFormat}
               onChange={e => setFilterFormat(e.target.value)}
-              style={{
-                padding: '0.25rem 0.5rem',
-                borderRadius: '4px',
-                border: '1px solid var(--border-color)',
-                backgroundColor: 'var(--bg-primary)',
-                color: 'var(--text-primary)',
-                fontSize: '0.85rem',
-              }}
+              className='collection-filter-select'
             >
               <option value=''>All Formats</option>
               {filterOptions.formats.map(format => (
@@ -1393,12 +1219,8 @@ const CollectionPage: React.FC = () => {
           </div>
 
           {/* Year Range Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label
-              style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}
-            >
-              Year:
-            </label>
+          <div className='collection-filter-group'>
+            <label className='collection-filter-label'>Year:</label>
             <input
               type='number'
               placeholder={String(filterOptions.years.min)}
@@ -1406,17 +1228,9 @@ const CollectionPage: React.FC = () => {
               onChange={e => setFilterYearFrom(e.target.value)}
               min={filterOptions.years.min}
               max={filterOptions.years.max}
-              style={{
-                width: '70px',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '4px',
-                border: '1px solid var(--border-color)',
-                backgroundColor: 'var(--bg-primary)',
-                color: 'var(--text-primary)',
-                fontSize: '0.85rem',
-              }}
+              className='collection-filter-input'
             />
-            <span style={{ color: 'var(--text-secondary)' }}>-</span>
+            <span className='collection-filter-separator'>-</span>
             <input
               type='number'
               placeholder={String(filterOptions.years.max)}
@@ -1424,23 +1238,15 @@ const CollectionPage: React.FC = () => {
               onChange={e => setFilterYearTo(e.target.value)}
               min={filterOptions.years.min}
               max={filterOptions.years.max}
-              style={{
-                width: '70px',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '4px',
-                border: '1px solid var(--border-color)',
-                backgroundColor: 'var(--bg-primary)',
-                color: 'var(--text-primary)',
-                fontSize: '0.85rem',
-              }}
+              className='collection-filter-input'
             />
           </div>
 
           {/* Date Added Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div className='collection-filter-group'>
             <label
               htmlFor='filter-date-added'
-              style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}
+              className='collection-filter-label'
             >
               Added:
             </label>
@@ -1448,14 +1254,7 @@ const CollectionPage: React.FC = () => {
               id='filter-date-added'
               value={filterDateAdded}
               onChange={e => setFilterDateAdded(e.target.value)}
-              style={{
-                padding: '0.25rem 0.5rem',
-                borderRadius: '4px',
-                border: '1px solid var(--border-color)',
-                backgroundColor: 'var(--bg-primary)',
-                color: 'var(--text-primary)',
-                fontSize: '0.85rem',
-              }}
+              className='collection-filter-select'
             >
               <option value=''>Any Time</option>
               <option value='week'>Last Week</option>
@@ -1478,56 +1277,26 @@ const CollectionPage: React.FC = () => {
 
           {/* Filter Results Count */}
           {hasActiveFilters && (
-            <span
-              style={{
-                fontSize: '0.85rem',
-                color: 'var(--text-secondary)',
-                marginLeft: 'auto',
-              }}
-            >
+            <span className='collection-filter-results'>
               Showing {filteredCollection.length} of {entireCollection.length}{' '}
               items
             </span>
           )}
         </div>
 
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            margin: '1rem 0',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              gap: '1rem',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-            }}
-          >
-            <div
-              style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}
-            >
-              <label
-                style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}
-              >
-                View:
-              </label>
+        <div className='collection-controls'>
+          <div className='collection-controls-group'>
+            <div className='collection-view-toggle'>
+              <label className='collection-view-label'>View:</label>
               <button
                 onClick={() => setViewMode('grid')}
+                className='collection-view-button'
                 style={{
-                  padding: '0.25rem 0.5rem',
-                  borderRadius: '4px',
-                  border: '1px solid var(--border-color)',
                   backgroundColor:
                     viewMode === 'grid'
                       ? 'var(--primary-color)'
                       : 'var(--bg-primary)',
                   color: viewMode === 'grid' ? 'white' : 'var(--text-primary)',
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
                 }}
                 title='Grid view'
               >
@@ -1535,18 +1304,14 @@ const CollectionPage: React.FC = () => {
               </button>
               <button
                 onClick={() => setViewMode('single')}
+                className='collection-view-button'
                 style={{
-                  padding: '0.25rem 0.5rem',
-                  borderRadius: '4px',
-                  border: '1px solid var(--border-color)',
                   backgroundColor:
                     viewMode === 'single'
                       ? 'var(--primary-color)'
                       : 'var(--bg-primary)',
                   color:
                     viewMode === 'single' ? 'white' : 'var(--text-primary)',
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
                 }}
                 title='Single record view'
               >
@@ -1554,22 +1319,11 @@ const CollectionPage: React.FC = () => {
               </button>
             </div>
 
-            <label
-              style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}
-            >
-              Sort by:
-            </label>
+            <label className='collection-sort-label'>Sort by:</label>
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value as any)}
-              style={{
-                padding: '0.25rem 0.5rem',
-                borderRadius: '4px',
-                border: '1px solid var(--border-color)',
-                backgroundColor: 'var(--bg-primary)',
-                color: 'var(--text-primary)',
-                fontSize: '0.9rem',
-              }}
+              className='collection-sort-select'
             >
               <option value='artist'>Artist</option>
               <option value='title'>Title</option>
@@ -1578,27 +1332,13 @@ const CollectionPage: React.FC = () => {
               <option value='scrobbles'>Scrobbles (Most Played)</option>
             </select>
             {sortBy === 'scrobbles' && loadingPlayCounts && (
-              <span
-                style={{
-                  fontSize: '0.8rem',
-                  color: 'var(--text-secondary)',
-                  marginLeft: '0.5rem',
-                }}
-              >
+              <span className='collection-sort-loading'>
                 Loading play counts...
               </span>
             )}
             <button
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              style={{
-                padding: '0.25rem 0.5rem',
-                borderRadius: '4px',
-                border: '1px solid var(--border-color)',
-                backgroundColor: 'var(--bg-primary)',
-                color: 'var(--text-primary)',
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-              }}
+              className='collection-sort-order-button'
               title={sortOrder === 'asc' ? 'Sort ascending' : 'Sort descending'}
             >
               {sortOrder === 'asc' ? '↑' : '↓'}
@@ -1606,15 +1346,8 @@ const CollectionPage: React.FC = () => {
           </div>
         </div>
 
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            margin: '1rem 0',
-          }}
-        >
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div className='collection-selection-controls'>
+          <div className='collection-selection-group'>
             <button
               className='btn btn-small'
               onClick={handleSelectAll}
@@ -1625,15 +1358,13 @@ const CollectionPage: React.FC = () => {
                 : 'Select All'}
             </button>
             {selectedAlbums.size > 0 && (
-              <span
-                style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}
-              >
+              <span className='collection-selection-count'>
                 {selectedAlbums.size} selected
               </span>
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div className='collection-pagination'>
             {isSearchMode ? (
               // Search mode: keep pagination
               <>
@@ -1644,9 +1375,7 @@ const CollectionPage: React.FC = () => {
                 >
                   Previous
                 </button>
-                <span
-                  style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}
-                >
+                <span className='collection-pagination-info'>
                   Page {searchPage} of {searchTotalPages} ({searchTotal}{' '}
                   results)
                 </span>
@@ -1662,9 +1391,7 @@ const CollectionPage: React.FC = () => {
               </>
             ) : (
               // Browse mode: show count with infinite scroll
-              <span
-                style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}
-              >
+              <span className='collection-pagination-info'>
                 Showing {Math.min(visibleCount, filteredCollection.length)} of{' '}
                 {filteredCollection.length}
               </span>
@@ -1684,19 +1411,12 @@ const CollectionPage: React.FC = () => {
 
       {!loading && filteredCollection.length === 0 && !error && (
         <div className='card'>
-          <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+          <div className='collection-empty'>
             {searchQuery
               ? `No results found for "${searchQuery}"`
               : 'No items in your collection'}
           </div>
-          <div
-            style={{
-              fontSize: '0.8rem',
-              color: '#999',
-              textAlign: 'center',
-              marginTop: '1rem',
-            }}
-          >
+          <div className='collection-debug-info'>
             Debug: entireCollection={entireCollection.length}, filtered=
             {filteredCollection.length}, searchMode={isSearchMode.toString()}
           </div>
@@ -1732,12 +1452,7 @@ const CollectionPage: React.FC = () => {
           {!isSearchMode && hasMore && (
             <div
               ref={sentinelRef}
-              className='infinite-scroll-sentinel'
-              style={{
-                gridColumn: '1 / -1',
-                height: '1px',
-                visibility: 'hidden',
-              }}
+              className='infinite-scroll-sentinel collection-scroll-sentinel'
               aria-hidden='true'
             />
           )}
@@ -1746,20 +1461,8 @@ const CollectionPage: React.FC = () => {
           {!isSearchMode &&
             !hasMore &&
             filteredCollection.length > scrollBatchSize && (
-              <div
-                style={{
-                  gridColumn: '1 / -1',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  padding: '1.5rem',
-                }}
-              >
-                <span
-                  style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}
-                >
-                  End of collection
-                </span>
+              <div className='collection-end-message'>
+                <span className='collection-end-text'>End of collection</span>
               </div>
             )}
         </div>
@@ -1767,54 +1470,22 @@ const CollectionPage: React.FC = () => {
 
       {/* Single Record View */}
       {!loading && filteredCollection.length > 0 && viewMode === 'single' && (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '2rem',
-            padding: '2rem 0',
-          }}
-        >
+        <div className='collection-single-view'>
           {/* Navigation Controls */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '2rem',
-              width: '100%',
-              maxWidth: '600px',
-            }}
-          >
+          <div className='collection-single-nav'>
             <button
               onClick={() =>
                 setCurrentRecordIndex(prev =>
                   prev > 0 ? prev - 1 : filteredCollection.length - 1
                 )
               }
-              style={{
-                padding: '1rem 1.5rem',
-                borderRadius: '8px',
-                border: '2px solid var(--border-color)',
-                backgroundColor: 'var(--bg-secondary)',
-                color: 'var(--text-primary)',
-                fontSize: '1.5rem',
-                cursor: 'pointer',
-                minWidth: '80px',
-              }}
+              className='collection-single-nav-button'
               title='Previous record (←)'
             >
               ←
             </button>
 
-            <div
-              style={{
-                flex: 1,
-                textAlign: 'center',
-                fontSize: '0.9rem',
-                color: 'var(--text-secondary)',
-              }}
-            >
+            <div className='collection-single-position'>
               {currentRecordIndex + 1} of {filteredCollection.length}
             </div>
 
@@ -1824,16 +1495,7 @@ const CollectionPage: React.FC = () => {
                   prev < filteredCollection.length - 1 ? prev + 1 : 0
                 )
               }
-              style={{
-                padding: '1rem 1.5rem',
-                borderRadius: '8px',
-                border: '2px solid var(--border-color)',
-                backgroundColor: 'var(--bg-secondary)',
-                color: 'var(--text-primary)',
-                fontSize: '1.5rem',
-                cursor: 'pointer',
-                minWidth: '80px',
-              }}
+              className='collection-single-nav-button'
               title='Next record (→)'
             >
               →
@@ -1841,7 +1503,7 @@ const CollectionPage: React.FC = () => {
           </div>
 
           {/* Single Album Card */}
-          <div style={{ width: '100%', maxWidth: '600px' }}>
+          <div className='collection-single-card'>
             <AlbumCard
               key={`single-${filteredCollection[currentRecordIndex].id}`}
               item={filteredCollection[currentRecordIndex]}
@@ -1872,13 +1534,7 @@ const CollectionPage: React.FC = () => {
           </div>
 
           {/* Keyboard hint */}
-          <div
-            style={{
-              fontSize: '0.8rem',
-              color: 'var(--text-muted)',
-              textAlign: 'center',
-            }}
-          >
+          <div className='collection-single-hint'>
             Use ← → arrow keys to navigate
           </div>
         </div>

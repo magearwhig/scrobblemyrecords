@@ -716,9 +716,8 @@ const ReleaseDetailsPage: React.FC = () => {
         <div className='error-message'>
           {error}
           <button
-            className='btn btn-small'
+            className='btn btn-small release-details-button-margin-left'
             onClick={() => (window.location.hash = '#collection')}
-            style={{ marginLeft: '1rem' }}
           >
             Back to Collection
           </button>
@@ -733,9 +732,8 @@ const ReleaseDetailsPage: React.FC = () => {
         <div className='error-message'>
           No release data available
           <button
-            className='btn btn-small'
+            className='btn btn-small release-details-button-margin-left'
             onClick={() => (window.location.hash = '#collection')}
-            style={{ marginLeft: '1rem' }}
           >
             Back to Collection
           </button>
@@ -749,98 +747,40 @@ const ReleaseDetailsPage: React.FC = () => {
       {/* Disambiguation Warning Modal */}
       {showDisambiguationWarning && (
         <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 1000,
-          }}
+          className='release-details-modal-overlay'
           onClick={() => setShowDisambiguationWarning(false)}
         >
           <div
-            style={{
-              backgroundColor: 'var(--bg-primary)',
-              borderRadius: '8px',
-              padding: '1.5rem',
-              maxWidth: '500px',
-              width: '90%',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
-              border: '1px solid var(--border-color)',
-            }}
+            className='release-details-modal-container'
             onClick={e => e.stopPropagation()}
           >
-            <h3
-              style={{
-                margin: '0 0 1rem 0',
-                color: 'var(--warning-color)',
-              }}
-            >
+            <h3 className='release-details-warning-heading'>
               Artist Name Contains Disambiguation
             </h3>
-            <p
-              style={{
-                margin: '0 0 1rem 0',
-                color: 'var(--text-secondary)',
-                fontSize: '0.95rem',
-              }}
-            >
+            <p className='release-details-modal-description'>
               The following artist(s) have Discogs disambiguation suffixes
               (numbers in parentheses) that may not match Last.fm:
             </p>
-            <ul
-              style={{
-                margin: '0 0 1.5rem 0',
-                paddingLeft: '1.5rem',
-              }}
-            >
+            <ul className='release-details-modal-list'>
               {disambiguationArtists.map(artist => (
-                <li
-                  key={artist}
-                  style={{
-                    marginBottom: '0.5rem',
-                    color: 'var(--text-primary)',
-                  }}
-                >
+                <li key={artist} className='release-details-modal-list-item'>
                   <strong>{artist}</strong>
                   <a
                     href={`https://www.discogs.com/search/?q=${encodeURIComponent(artist)}&type=artist`}
                     target='_blank'
                     rel='noopener noreferrer'
-                    style={{
-                      marginLeft: '0.75rem',
-                      fontSize: '0.85rem',
-                      color: 'var(--accent-color)',
-                    }}
+                    className='release-details-modal-link'
                   >
                     View on Discogs
                   </a>
                 </li>
               ))}
             </ul>
-            <p
-              style={{
-                margin: '0 0 1rem 0',
-                fontSize: '0.9rem',
-                color: 'var(--text-muted)',
-              }}
-            >
+            <p className='release-details-modal-muted-text'>
               You can create an artist mapping to scrobble with a different name
               on Last.fm.
             </p>
-            <div
-              style={{
-                display: 'flex',
-                gap: '0.75rem',
-                justifyContent: 'flex-end',
-                flexWrap: 'wrap',
-              }}
-            >
+            <div className='release-details-modal-button-container'>
               <button
                 className='btn btn-outline'
                 onClick={() => setShowDisambiguationWarning(false)}
@@ -864,14 +804,7 @@ const ReleaseDetailsPage: React.FC = () => {
       )}
 
       <div className='card'>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '1rem',
-          }}
-        >
+        <div className='release-details-header-container'>
           <h2>Release Details</h2>
           <button
             className='btn btn-small btn-secondary'
@@ -881,79 +814,50 @@ const ReleaseDetailsPage: React.FC = () => {
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem' }}>
-          <div style={{ flexShrink: 0 }}>
+        <div className='release-details-main-content'>
+          <div className='release-details-image-container'>
             <img
               src={release.cover_image}
               alt={release.title}
-              style={{
-                width: '200px',
-                height: '200px',
-                objectFit: 'cover',
-                borderRadius: '8px',
-                border: '1px solid var(--border-color)',
-              }}
+              className='release-details-cover-image'
             />
           </div>
 
-          <div style={{ flex: 1 }}>
-            <h3
-              style={{
-                margin: '0 0 0.5rem 0',
-                fontSize: '1.5rem',
-                color: 'var(--text-primary)',
-              }}
-            >
-              {release.title}
-            </h3>
-            <p
-              style={{
-                margin: '0 0 0.5rem 0',
-                fontSize: '1.1rem',
-                color: 'var(--text-secondary)',
-              }}
-            >
+          <div className='release-details-content'>
+            <h3 className='release-details-title'>{release.title}</h3>
+            <p className='release-details-artist'>
               {release.artist}
               {artistMapping && artistMapping.hasMapping && (
                 <span
-                  style={{
-                    marginLeft: '0.75rem',
-                    fontSize: '0.9rem',
-                    padding: '0.2rem 0.5rem',
-                    backgroundColor: 'var(--accent-color)',
-                    color: 'white',
-                    borderRadius: '12px',
-                    fontWeight: '500',
-                  }}
+                  className='release-details-artist-mapping-badge'
                   title={`This artist will be scrobbled as "${artistMapping.lastfmName}" on Last.fm`}
                 >
                   → {artistMapping.lastfmName}
                 </span>
               )}
             </p>
-            <p style={{ margin: '0 0 0.5rem 0', color: 'var(--text-muted)' }}>
+            <p className='release-details-metadata'>
               {release.year} • {release.format.join(', ')}
             </p>
             {release.label && release.label.length > 0 && (
-              <p style={{ margin: '0 0 0.5rem 0', color: 'var(--text-muted)' }}>
+              <p className='release-details-metadata'>
                 {release.label.join(', ')}
               </p>
             )}
             {release.catalog_number && (
-              <p style={{ margin: '0 0 0.5rem 0', color: 'var(--text-muted)' }}>
+              <p className='release-details-metadata'>
                 Catalog: {release.catalog_number}
               </p>
             )}
 
             {/* Play on Spotify button */}
-            <div style={{ marginTop: '1rem' }}>
+            <div className='release-details-button-container'>
               <button
-                className='btn btn-small btn-icon'
+                className='btn btn-small btn-icon release-details-button-margin-right'
                 onClick={() =>
                   playAlbumOnSpotify(release.artist, release.title)
                 }
                 title='Play on Spotify'
-                style={{ marginRight: '0.5rem' }}
               >
                 ▶️ Play on Spotify
               </button>
@@ -961,28 +865,15 @@ const ReleaseDetailsPage: React.FC = () => {
 
             {/* Discard pile button */}
             {collectionItemId && (
-              <div style={{ marginTop: '1rem' }}>
+              <div className='release-details-button-container'>
                 {isInDiscardPile ? (
-                  <span
-                    className='discard-pile-indicator'
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.9rem',
-                      color: 'var(--accent-warning, #f59e0b)',
-                      padding: '0.4rem 0.75rem',
-                      backgroundColor: 'var(--bg-tertiary)',
-                      borderRadius: '6px',
-                    }}
-                  >
+                  <span className='release-details-discard-indicator'>
                     📦 In Discard Pile
                   </span>
                 ) : (
                   <button
-                    className='btn btn-small btn-outline-warning'
+                    className='btn btn-small btn-outline-warning release-details-discard-button'
                     onClick={handleOpenDiscardModal}
-                    style={{ fontSize: '0.85rem', padding: '0.4rem 0.75rem' }}
                   >
                     📦 Add to Discard Pile
                   </button>
@@ -994,7 +885,7 @@ const ReleaseDetailsPage: React.FC = () => {
 
         {/* Discard success message */}
         {discardSuccess && (
-          <div className='message success' style={{ marginBottom: '1rem' }}>
+          <div className='message success release-details-message-margin'>
             {discardSuccess}
           </div>
         )}
@@ -1003,40 +894,22 @@ const ReleaseDetailsPage: React.FC = () => {
         <AlbumScrobbleHistory artist={release.artist} album={release.title} />
 
         {scrobbleProgress && (
-          <div className='message info' style={{ marginBottom: '1rem' }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '0.5rem',
-              }}
-            >
+          <div className='message info release-details-message-margin'>
+            <div className='release-details-progress-header'>
               <strong>Scrobbling Progress:</strong>
               <span>
                 {scrobbleProgress.current} / {scrobbleProgress.total}
               </span>
             </div>
-            <div
-              style={{
-                width: '100%',
-                height: '8px',
-                backgroundColor: 'var(--border-color)',
-                borderRadius: '4px',
-                overflow: 'hidden',
-                marginBottom: '0.5rem',
-              }}
-            >
+            <div className='release-details-progress-bar-container'>
               <div
+                className='release-details-progress-bar-fill'
                 style={{
                   width: `${(scrobbleProgress.current / scrobbleProgress.total) * 100}%`,
-                  height: '100%',
-                  backgroundColor: 'var(--accent-color)',
-                  transition: 'width 0.3s ease',
                 }}
               />
             </div>
-            <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+            <div className='release-details-progress-stats'>
               ✅ {scrobbleProgress.success} successful • ⚠️{' '}
               {scrobbleProgress.ignored} ignored • ❌ {scrobbleProgress.failed}{' '}
               failed
@@ -1046,8 +919,7 @@ const ReleaseDetailsPage: React.FC = () => {
 
         {scrobbleResult && (
           <div
-            className={`message ${scrobbleResult.failed === 0 && scrobbleResult.ignored === 0 ? 'success' : scrobbleResult.failed > 0 ? 'error' : 'warning'}`}
-            style={{ marginBottom: '1rem' }}
+            className={`message ${scrobbleResult.failed === 0 && scrobbleResult.ignored === 0 ? 'success' : scrobbleResult.failed > 0 ? 'error' : 'warning'} release-details-message-margin`}
           >
             <strong>Scrobble Results:</strong>
             {scrobbleResult.success > 0 && (
@@ -1070,9 +942,9 @@ const ReleaseDetailsPage: React.FC = () => {
             )}
 
             {scrobbleResult.errors.length > 0 && (
-              <div style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+              <div className='release-details-error-details'>
                 <strong>Details:</strong>
-                <ul style={{ margin: '0.25rem 0', paddingLeft: '1.5rem' }}>
+                <ul className='release-details-error-list'>
                   {scrobbleResult.errors.map((error, index) => (
                     <li key={index}>{error}</li>
                   ))}
@@ -1081,20 +953,14 @@ const ReleaseDetailsPage: React.FC = () => {
             )}
 
             {scrobbleResult.ignored > 0 && (
-              <div
-                style={{
-                  marginTop: '0.5rem',
-                  fontSize: '0.9rem',
-                  color: 'var(--warning-color)',
-                }}
-              >
+              <div className='release-details-ignored-note'>
                 <strong>Note:</strong> Ignored scrobbles usually mean the track
                 was scrobbled too recently or is a duplicate.
               </div>
             )}
 
             {getLastfmProfileUrl() && (
-              <div style={{ marginTop: '0.5rem' }}>
+              <div className='release-details-profile-link'>
                 <a
                   href={getLastfmProfileUrl()}
                   target='_blank'
@@ -1108,21 +974,12 @@ const ReleaseDetailsPage: React.FC = () => {
           </div>
         )}
 
-        <div style={{ marginBottom: '1rem' }}>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '0.5rem',
-            }}
-          >
-            <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>
+        <div className='release-details-tracks-section'>
+          <div className='release-details-tracks-header'>
+            <h4 className='release-details-tracks-heading'>
               Tracks ({selectedTracks.size} selected)
             </h4>
-            <div
-              style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}
-            >
+            <div className='release-details-tracks-buttons'>
               <button
                 className='btn btn-small'
                 onClick={handleSelectAllTracks}
@@ -1154,45 +1011,18 @@ const ReleaseDetailsPage: React.FC = () => {
             const { sides, discs } = parseSides();
             if (sides.length > 1) {
               return (
-                <div
-                  style={{
-                    marginBottom: '1rem',
-                    padding: '1rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-color)',
-                  }}
-                >
-                  <h5
-                    style={{
-                      margin: '0 0 0.75rem 0',
-                      fontSize: '0.95rem',
-                      fontWeight: '600',
-                      color: 'var(--text-primary)',
-                    }}
-                  >
+                <div className='release-details-side-selection'>
+                  <h5 className='release-details-side-heading'>
                     Select by Side
                   </h5>
 
                   {/* Disc-level buttons for multi-disc albums */}
                   {Object.keys(discs).length > 1 && (
-                    <div style={{ marginBottom: '0.75rem' }}>
-                      <div
-                        style={{
-                          fontSize: '0.85rem',
-                          color: 'var(--text-secondary)',
-                          marginBottom: '0.5rem',
-                        }}
-                      >
+                    <div className='release-details-disc-group'>
+                      <div className='release-details-selection-label'>
                         By Disc:
                       </div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          gap: '0.5rem',
-                          flexWrap: 'wrap',
-                        }}
-                      >
+                      <div className='release-details-selection-buttons'>
                         {Object.entries(discs).map(([discName, discSides]) => (
                           <button
                             key={discName}
@@ -1211,22 +1041,10 @@ const ReleaseDetailsPage: React.FC = () => {
 
                   {/* Individual side buttons */}
                   <div>
-                    <div
-                      style={{
-                        fontSize: '0.85rem',
-                        color: 'var(--text-secondary)',
-                        marginBottom: '0.5rem',
-                      }}
-                    >
+                    <div className='release-details-selection-label'>
                       By Side:
                     </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: '0.5rem',
-                        flexWrap: 'wrap',
-                      }}
-                    >
+                    <div className='release-details-selection-buttons'>
                       {sides.map(side => {
                         const sideTrackCount = getSideTrackIndices(side).length;
                         return (
@@ -1251,54 +1069,34 @@ const ReleaseDetailsPage: React.FC = () => {
           })()}
 
           {selectedTracks.size > 0 && (
-            <div
-              style={{
-                marginBottom: '1rem',
-                padding: '1rem',
-                backgroundColor: 'var(--bg-tertiary)',
-                borderRadius: '8px',
-                border: '1px solid var(--border-color)',
-              }}
-            >
-              <h5
-                style={{ margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}
-              >
+            <div className='release-details-timing-container'>
+              <h5 className='release-details-timing-heading'>
                 Scrobble Timing
               </h5>
-              <p
-                style={{
-                  margin: '0 0 0.5rem 0',
-                  fontSize: '0.9rem',
-                  color: 'var(--text-secondary)',
-                }}
-              >
+              <p className='release-details-timing-description'>
                 Set when you started listening to the first track, or leave
                 empty to use realistic timing.
               </p>
-              <div
-                style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}
-              >
-                <div className='form-group' style={{ margin: 0, flex: 1 }}>
+              <div className='release-details-timing-inputs'>
+                <div className='form-group release-details-form-group'>
                   <label
                     htmlFor='start-time-input'
-                    className='form-label'
-                    style={{ fontSize: '0.9rem' }}
+                    className='form-label release-details-label-small'
                   >
                     Start Time:
                   </label>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div className='release-details-input-container'>
                     <input
                       id='start-time-input'
                       type='datetime-local'
-                      className='form-input'
+                      className='form-input release-details-input-small'
                       value={startTime}
                       onChange={e => setStartTime(e.target.value)}
-                      style={{ fontSize: '0.9rem', flex: 1 }}
                     />
                     {startTime && (
                       <>
                         <button
-                          className='btn btn-small btn-outline'
+                          className='btn btn-small btn-outline release-details-time-adjust-button'
                           onClick={() => {
                             // Parse the datetime-local value and adjust in local time
                             const [datePart, timePart] = startTime.split('T');
@@ -1322,12 +1120,11 @@ const ReleaseDetailsPage: React.FC = () => {
                             setStartTime(newValue);
                           }}
                           title='Move back 5 minutes'
-                          style={{ padding: '0.5rem 0.75rem' }}
                         >
                           ← 5m
                         </button>
                         <button
-                          className='btn btn-small btn-outline'
+                          className='btn btn-small btn-outline release-details-time-adjust-button'
                           onClick={() => {
                             // Parse the datetime-local value and adjust in local time
                             const [datePart, timePart] = startTime.split('T');
@@ -1351,7 +1148,6 @@ const ReleaseDetailsPage: React.FC = () => {
                             setStartTime(newValue);
                           }}
                           title='Move forward 5 minutes'
-                          style={{ padding: '0.5rem 0.75rem' }}
                         >
                           5m →
                         </button>
@@ -1359,13 +1155,7 @@ const ReleaseDetailsPage: React.FC = () => {
                     )}
                   </div>
                 </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                    marginTop: '1.5rem',
-                  }}
-                >
+                <div className='release-details-auto-timing-buttons'>
                   <button
                     className='btn btn-small btn-secondary'
                     onClick={handleAutoTiming}
@@ -1390,37 +1180,19 @@ const ReleaseDetailsPage: React.FC = () => {
                 </div>
               </div>
               {startTime && (
-                <div
-                  style={{
-                    marginTop: '0.5rem',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-muted)',
-                  }}
-                >
+                <div className='release-details-timing-display'>
                   Tracks will be scrobbled starting from:{' '}
                   {formatLocalTimeClean(new Date(startTime))}
                 </div>
               )}
               {!startTime && selectedTracks.size > 0 && (
-                <div
-                  style={{
-                    marginTop: '0.5rem',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-muted)',
-                  }}
-                >
+                <div className='release-details-timing-display'>
                   Tracks will be scrobbled with realistic timing (as if you just
                   finished listening)
                 </div>
               )}
               {startTime && selectedTracks.size > 0 && (
-                <div
-                  style={{
-                    marginTop: '0.5rem',
-                    fontSize: '0.8rem',
-                    color: 'var(--success-color)',
-                  }}
-                >
+                <div className='release-details-timing-success'>
                   Auto timing: Tracks will end at current time (as if you just
                   finished listening)
                 </div>
@@ -1429,14 +1201,13 @@ const ReleaseDetailsPage: React.FC = () => {
           )}
 
           {!authStatus.lastfm.authenticated && (
-            <div className='warning-message' style={{ marginBottom: '1rem' }}>
+            <div className='warning-message release-details-message-margin'>
               Please authenticate with Last.fm to scrobble tracks.
               <button
-                className='btn btn-small'
+                className='btn btn-small release-details-button-margin-left'
                 onClick={() =>
                   (window.location.hash = '#settings?tab=connections')
                 }
-                style={{ marginLeft: '1rem' }}
               >
                 Connect Last.fm
               </button>
@@ -1444,18 +1215,16 @@ const ReleaseDetailsPage: React.FC = () => {
           )}
 
           {authStatus.lastfm.authenticated && (
-            <div style={{ marginBottom: '1rem' }}>
+            <div className='release-details-tracks-section'>
               <button
-                className='btn btn-small btn-secondary'
+                className='btn btn-small btn-secondary release-details-button-margin-right'
                 onClick={testLastfmConnection}
-                style={{ marginRight: '0.5rem' }}
               >
                 Test Last.fm Connection
               </button>
               <button
-                className='btn btn-small btn-secondary'
+                className='btn btn-small btn-secondary release-details-button-margin-right'
                 onClick={getSessionKey}
-                style={{ marginRight: '0.5rem' }}
               >
                 Get Session Key
               </button>
@@ -1467,10 +1236,7 @@ const ReleaseDetailsPage: React.FC = () => {
                 </div>
               )}
               {sessionKey && (
-                <div
-                  className='message info'
-                  style={{ marginTop: '0.5rem', fontSize: '0.8rem' }}
-                >
+                <div className='message info release-details-session-key'>
                   <strong>Session Key:</strong> {sessionKey}
                   <br />
                   <small>Use this in the debug script to test scrobbling</small>
@@ -1480,14 +1246,7 @@ const ReleaseDetailsPage: React.FC = () => {
           )}
         </div>
 
-        <div
-          style={{
-            maxHeight: '400px',
-            overflowY: 'auto',
-            border: '1px solid var(--border-color)',
-            borderRadius: '4px',
-          }}
-        >
+        <div className='release-details-tracklist'>
           {release.tracklist?.map((track, index) => {
             const isSectionHeader =
               !track.position || track.position.trim() === '';
@@ -1495,24 +1254,8 @@ const ReleaseDetailsPage: React.FC = () => {
             if (isSectionHeader) {
               // Render section header as non-selectable informational item
               return (
-                <div
-                  key={index}
-                  style={{
-                    padding: '0.75rem',
-                    borderBottom: '1px solid var(--border-color)',
-                    backgroundColor: 'var(--bg-primary)',
-                    borderLeft: '4px solid var(--accent-color)',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontWeight: '600',
-                      color: 'var(--accent-color)',
-                      fontSize: '0.9rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                    }}
-                  >
+                <div key={index} className='release-details-section-header'>
+                  <div className='release-details-section-header-text'>
                     {track.title}
                   </div>
                 </div>
@@ -1525,10 +1268,8 @@ const ReleaseDetailsPage: React.FC = () => {
             return (
               <div
                 key={index}
+                className='release-details-track-item'
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '0.75rem',
                   borderBottom:
                     index < (release.tracklist?.length || 0) - 1
                       ? '1px solid var(--border-color)'
@@ -1536,7 +1277,6 @@ const ReleaseDetailsPage: React.FC = () => {
                   backgroundColor: selectedTracks.has(index)
                     ? 'var(--bg-tertiary)'
                     : 'var(--bg-secondary)',
-                  cursor: 'pointer',
                 }}
                 onClick={() => handleTrackToggle(index)}
               >
@@ -1544,29 +1284,20 @@ const ReleaseDetailsPage: React.FC = () => {
                   type='checkbox'
                   checked={selectedTracks.has(index)}
                   onChange={() => handleTrackToggle(index)}
-                  style={{ marginRight: '1rem' }}
+                  className='release-details-track-checkbox'
                 />
 
-                <div style={{ flex: 1 }}>
-                  <div
-                    style={{ fontWeight: '500', color: 'var(--text-primary)' }}
-                  >
+                <div className='release-details-track-content'>
+                  <div className='release-details-track-title'>
                     {track.position} {track.title}
                   </div>
                   {track.artist && track.artist !== release.artist && (
-                    <div
-                      style={{
-                        fontSize: '0.9rem',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
+                    <div className='release-details-track-artist'>
                       {track.artist}
                     </div>
                   )}
                   {track.duration && (
-                    <div
-                      style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}
-                    >
+                    <div className='release-details-track-duration'>
                       {track.duration}
                     </div>
                   )}
@@ -1574,7 +1305,7 @@ const ReleaseDetailsPage: React.FC = () => {
 
                 {/* Spotify play button */}
                 <button
-                  className='btn btn-small btn-icon'
+                  className='btn btn-small btn-icon release-details-spotify-button-margin'
                   onClick={e => {
                     e.stopPropagation();
                     playTrackOnSpotify(
@@ -1584,39 +1315,20 @@ const ReleaseDetailsPage: React.FC = () => {
                     );
                   }}
                   title='Play on Spotify'
-                  style={{ marginLeft: '0.5rem' }}
                 >
                   ▶️
                 </button>
 
                 {/* Track scrobble stats */}
                 {trackStats && trackStats.count > 0 && (
-                  <div
-                    className='track-scrobble-stats'
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-end',
-                      marginLeft: '1rem',
-                      minWidth: '80px',
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: '0.85rem',
-                        fontWeight: '500',
-                        color: 'var(--accent-color)',
-                      }}
-                    >
+                  <div className='release-details-track-stats'>
+                    <span className='release-details-play-count'>
                       {trackStats.count}{' '}
                       {trackStats.count === 1 ? 'play' : 'plays'}
                     </span>
                     {trackStats.lastPlayed && (
                       <span
-                        style={{
-                          fontSize: '0.75rem',
-                          color: 'var(--text-muted)',
-                        }}
+                        className='release-details-last-played'
                         title={formatLocalTimeClean(
                           trackStats.lastPlayed * 1000
                         )}
