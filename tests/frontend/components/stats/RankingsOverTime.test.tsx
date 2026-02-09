@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 
 import '@testing-library/jest-dom';
@@ -11,8 +12,11 @@ jest.mock('../../../../src/renderer/services/statsApi');
 const mockedStatsApi = statsApi as jest.Mocked<typeof statsApi>;
 
 describe('RankingsOverTime', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
   });
 
   const mockRankingsData = {
@@ -107,7 +111,7 @@ describe('RankingsOverTime', () => {
       render(<RankingsOverTime />);
 
       const albumsTab = screen.getByText('Top Albums');
-      fireEvent.click(albumsTab);
+      await user.click(albumsTab);
 
       await waitFor(() => {
         expect(mockedStatsApi.getRankingsOverTime).toHaveBeenCalledWith(
@@ -159,7 +163,7 @@ describe('RankingsOverTime', () => {
       });
 
       const timeRangeSelect = screen.getByLabelText('Time period:');
-      fireEvent.change(timeRangeSelect, { target: { value: 'all' } });
+      await user.selectOptions(timeRangeSelect, 'all');
 
       await waitFor(() => {
         expect(mockedStatsApi.getRankingsOverTime).toHaveBeenCalledTimes(2);
@@ -179,7 +183,7 @@ describe('RankingsOverTime', () => {
       });
 
       const topNSelect = screen.getByLabelText('Show top:');
-      fireEvent.change(topNSelect, { target: { value: '20' } });
+      await user.selectOptions(topNSelect, '20');
 
       await waitFor(() => {
         expect(mockedStatsApi.getRankingsOverTime).toHaveBeenCalledTimes(2);
@@ -238,7 +242,7 @@ describe('RankingsOverTime', () => {
       });
 
       const retryButton = screen.getByText('Retry');
-      fireEvent.click(retryButton);
+      await user.click(retryButton);
 
       await waitFor(() => {
         expect(mockedStatsApi.getRankingsOverTime).toHaveBeenCalledTimes(2);

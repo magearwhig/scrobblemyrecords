@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import '@testing-library/jest-dom';
 
@@ -6,6 +7,7 @@ import AISuggestionCard from '../../../src/renderer/components/AISuggestionCard'
 import { AISuggestion } from '../../../src/shared/types';
 
 describe('AISuggestionCard', () => {
+  let user: ReturnType<typeof userEvent.setup>;
   const mockRelease = {
     id: 789,
     title: 'Test Album',
@@ -36,6 +38,7 @@ describe('AISuggestionCard', () => {
     localStorage.clear();
     // Reset hash
     window.location.hash = '';
+    user = userEvent.setup();
   });
 
   describe('loading state', () => {
@@ -84,7 +87,7 @@ describe('AISuggestionCard', () => {
       ).toBeInTheDocument();
     });
 
-    it('should show Try Again button when onRefresh is provided in empty state', () => {
+    it('should show Try Again button when onRefresh is provided in empty state', async () => {
       const onRefresh = jest.fn();
       const emptySuggestion = { ...mockSuggestion, album: null as any };
       render(
@@ -94,7 +97,7 @@ describe('AISuggestionCard', () => {
       const button = screen.getByRole('button', { name: 'Try Again' });
       expect(button).toBeInTheDocument();
 
-      fireEvent.click(button);
+      await user.click(button);
       expect(onRefresh).toHaveBeenCalled();
     });
 
@@ -213,24 +216,24 @@ describe('AISuggestionCard', () => {
       expect(screen.getByText('Why did AI pick this?')).toBeInTheDocument();
     });
 
-    it('should show reasoning when toggle is clicked', () => {
+    it('should show reasoning when toggle is clicked', async () => {
       render(<AISuggestionCard suggestion={mockSuggestion} />);
 
-      fireEvent.click(screen.getByText('Why did AI pick this?'));
+      await user.click(screen.getByText('Why did AI pick this?'));
 
       expect(screen.getByText(mockSuggestion.reasoning)).toBeInTheDocument();
       expect(screen.getByText('Hide AI reasoning')).toBeInTheDocument();
     });
 
-    it('should hide reasoning when toggle is clicked again', () => {
+    it('should hide reasoning when toggle is clicked again', async () => {
       render(<AISuggestionCard suggestion={mockSuggestion} />);
 
       // Show reasoning
-      fireEvent.click(screen.getByText('Why did AI pick this?'));
+      await user.click(screen.getByText('Why did AI pick this?'));
       expect(screen.getByText(mockSuggestion.reasoning)).toBeInTheDocument();
 
       // Hide reasoning
-      fireEvent.click(screen.getByText('Hide AI reasoning'));
+      await user.click(screen.getByText('Hide AI reasoning'));
       expect(
         screen.queryByText(mockSuggestion.reasoning)
       ).not.toBeInTheDocument();
@@ -238,33 +241,33 @@ describe('AISuggestionCard', () => {
   });
 
   describe('actions', () => {
-    it('should navigate to collection when View in Collection is clicked', () => {
+    it('should navigate to collection when View in Collection is clicked', async () => {
       render(<AISuggestionCard suggestion={mockSuggestion} />);
 
-      fireEvent.click(
+      await user.click(
         screen.getByRole('button', { name: 'View in Collection' })
       );
 
       expect(window.location.hash).toBe('#collection?highlight=123');
     });
 
-    it('should navigate to release details when Details is clicked', () => {
+    it('should navigate to release details when Details is clicked', async () => {
       render(<AISuggestionCard suggestion={mockSuggestion} />);
 
-      fireEvent.click(screen.getByRole('button', { name: 'Details' }));
+      await user.click(screen.getByRole('button', { name: 'Details' }));
 
       expect(window.location.hash).toBe('#release-details');
     });
 
-    it('should navigate to release details when cover is clicked', () => {
+    it('should navigate to release details when cover is clicked', async () => {
       render(<AISuggestionCard suggestion={mockSuggestion} />);
 
-      fireEvent.click(screen.getByTitle('View album details'));
+      await user.click(screen.getByTitle('View album details'));
 
       expect(window.location.hash).toBe('#release-details');
     });
 
-    it('should not navigate when album id is falsy', () => {
+    it('should not navigate when album id is falsy', async () => {
       const noIdSuggestion = {
         album: {
           id: 0, // Use falsy id
@@ -278,7 +281,7 @@ describe('AISuggestionCard', () => {
       } as unknown as AISuggestion;
       render(<AISuggestionCard suggestion={noIdSuggestion} />);
 
-      fireEvent.click(
+      await user.click(
         screen.getByRole('button', { name: 'View in Collection' })
       );
 
@@ -286,7 +289,7 @@ describe('AISuggestionCard', () => {
       expect(window.location.hash).toBe('');
     });
 
-    it('should show refresh button when onRefresh is provided', () => {
+    it('should show refresh button when onRefresh is provided', async () => {
       const onRefresh = jest.fn();
       render(
         <AISuggestionCard suggestion={mockSuggestion} onRefresh={onRefresh} />
@@ -295,7 +298,7 @@ describe('AISuggestionCard', () => {
       const refreshButton = screen.getByTitle('Get another AI suggestion');
       expect(refreshButton).toBeInTheDocument();
 
-      fireEvent.click(refreshButton);
+      await user.click(refreshButton);
       expect(onRefresh).toHaveBeenCalled();
     });
 

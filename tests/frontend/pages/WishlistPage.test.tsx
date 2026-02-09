@@ -1,4 +1,5 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import '@testing-library/jest-dom';
 
@@ -157,6 +158,8 @@ const renderWishlistPage = (authStatus: AuthStatus = defaultAuthStatus) => {
 };
 
 describe('WishlistPage', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetWishlist.mockResolvedValue(mockWishlistItems);
@@ -167,6 +170,7 @@ describe('WishlistPage', () => {
     mockGetMasterVersions.mockResolvedValue([]);
     mockCheckLocalWantListForVinyl.mockResolvedValue([]);
     mockRemoveFromLocalWantList.mockResolvedValue(true);
+    user = userEvent.setup();
   });
 
   it('renders loading state initially', async () => {
@@ -221,7 +225,7 @@ describe('WishlistPage', () => {
 
     // Click the "Has Vinyl" tab
     const hasVinylTab = screen.getByText(/Has Vinyl \(/);
-    fireEvent.click(hasVinylTab);
+    await user.click(hasVinylTab);
 
     // Should show Radiohead (has vinyl) but not Beatles (cd_only)
     await waitFor(() => {
@@ -238,7 +242,7 @@ describe('WishlistPage', () => {
 
     // Click the "CD Only" tab
     const cdOnlyTab = screen.getByText(/CD Only \(/);
-    fireEvent.click(cdOnlyTab);
+    await user.click(cdOnlyTab);
 
     // Should show Beatles (cd_only)
     await waitFor(() => {
@@ -255,7 +259,7 @@ describe('WishlistPage', () => {
 
     // Click the "Monitoring" tab
     const monitoringTab = screen.getByText(/Monitoring \(/);
-    fireEvent.click(monitoringTab);
+    await user.click(monitoringTab);
 
     // Should show local want list item
     await waitFor(() => {
@@ -272,7 +276,7 @@ describe('WishlistPage', () => {
     });
 
     const syncButton = screen.getByText('Sync Wishlist');
-    fireEvent.click(syncButton);
+    await user.click(syncButton);
 
     expect(mockStartWishlistSync).toHaveBeenCalled();
   });
@@ -287,7 +291,7 @@ describe('WishlistPage', () => {
     });
 
     const syncButton = screen.getByText('Sync Wishlist');
-    fireEvent.click(syncButton);
+    await user.click(syncButton);
 
     await waitFor(() => {
       expect(screen.getByText('Sync failed')).toBeInTheDocument();
@@ -345,7 +349,7 @@ describe('WishlistPage', () => {
     });
 
     const sortSelect = screen.getByDisplayValue('Date Added');
-    fireEvent.change(sortSelect, { target: { value: 'artist' } });
+    await user.selectOptions(sortSelect, 'artist');
 
     expect(screen.getByDisplayValue('Artist')).toBeInTheDocument();
   });
@@ -358,7 +362,7 @@ describe('WishlistPage', () => {
     });
 
     const monitoringTab = screen.getByText(/Monitoring \(/);
-    fireEvent.click(monitoringTab);
+    await user.click(monitoringTab);
 
     await waitFor(() => {
       expect(screen.getByText('Check for Vinyl')).toBeInTheDocument();
@@ -373,14 +377,14 @@ describe('WishlistPage', () => {
     });
 
     const monitoringTab = screen.getByText(/Monitoring \(/);
-    fireEvent.click(monitoringTab);
+    await user.click(monitoringTab);
 
     await waitFor(() => {
       expect(screen.getByText('Check for Vinyl')).toBeInTheDocument();
     });
 
     const checkButton = screen.getByText('Check for Vinyl');
-    fireEvent.click(checkButton);
+    await user.click(checkButton);
 
     expect(mockCheckLocalWantListForVinyl).toHaveBeenCalled();
   });

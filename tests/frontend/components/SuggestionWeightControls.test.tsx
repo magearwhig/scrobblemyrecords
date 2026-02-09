@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import '@testing-library/jest-dom';
 
@@ -21,9 +22,11 @@ describe('SuggestionWeightControls', () => {
   const mockOnChange = jest.fn();
   const mockOnReset = jest.fn();
   const mockOnToggleCollapsed = jest.fn();
+  let user: ReturnType<typeof userEvent.setup>;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
   });
 
   describe('collapsed state', () => {
@@ -41,7 +44,7 @@ describe('SuggestionWeightControls', () => {
       expect(screen.getByText('Show Weight Controls')).toBeInTheDocument();
     });
 
-    it('should call onToggleCollapsed when button is clicked in collapsed state', () => {
+    it('should call onToggleCollapsed when button is clicked in collapsed state', async () => {
       render(
         <SuggestionWeightControls
           weights={defaultWeights}
@@ -52,7 +55,7 @@ describe('SuggestionWeightControls', () => {
         />
       );
 
-      fireEvent.click(screen.getByText('Show Weight Controls'));
+      await user.click(screen.getByText('Show Weight Controls'));
       expect(mockOnToggleCollapsed).toHaveBeenCalled();
     });
 
@@ -107,7 +110,7 @@ describe('SuggestionWeightControls', () => {
       expect(screen.getByText('0.8')).toBeInTheDocument(); // recentAddition
     });
 
-    it('should call onChange when slider is changed', () => {
+    it('should call onChange when slider is changed', async () => {
       render(
         <SuggestionWeightControls
           weights={defaultWeights}
@@ -128,7 +131,7 @@ describe('SuggestionWeightControls', () => {
       });
     });
 
-    it('should call onReset when Reset button is clicked', () => {
+    it('should call onReset when Reset button is clicked', async () => {
       render(
         <SuggestionWeightControls
           weights={defaultWeights}
@@ -137,7 +140,7 @@ describe('SuggestionWeightControls', () => {
         />
       );
 
-      fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+      await user.click(screen.getByRole('button', { name: 'Reset' }));
       expect(mockOnReset).toHaveBeenCalled();
     });
 
@@ -168,7 +171,7 @@ describe('SuggestionWeightControls', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('should call onToggleCollapsed when Hide button is clicked', () => {
+    it('should call onToggleCollapsed when Hide button is clicked', async () => {
       render(
         <SuggestionWeightControls
           weights={defaultWeights}
@@ -178,7 +181,7 @@ describe('SuggestionWeightControls', () => {
         />
       );
 
-      fireEvent.click(screen.getByRole('button', { name: 'Hide' }));
+      await user.click(screen.getByRole('button', { name: 'Hide' }));
       expect(mockOnToggleCollapsed).toHaveBeenCalled();
     });
 

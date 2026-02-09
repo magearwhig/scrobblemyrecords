@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 
 import '@testing-library/jest-dom';
@@ -159,8 +160,11 @@ beforeAll(() => {
 });
 
 describe('ReleaseDetailsPage Auto Timing', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
 
     // Ensure localStorage mock is set up for this test
     Object.defineProperty(window, 'localStorage', {
@@ -190,7 +194,7 @@ describe('ReleaseDetailsPage Auto Timing', () => {
 
     // First deselect all tracks, then select specific ones
     const deselectAllButton = screen.getByText('Deselect All');
-    fireEvent.click(deselectAllButton);
+    await user.click(deselectAllButton);
 
     await waitFor(() => {
       expect(screen.getByText('Tracks (0 selected)')).toBeInTheDocument();
@@ -198,8 +202,8 @@ describe('ReleaseDetailsPage Auto Timing', () => {
 
     // Select some tracks by clicking their containers
     const trackContainers = screen.getAllByRole('checkbox');
-    fireEvent.click(trackContainers[0]); // Track 1
-    fireEvent.click(trackContainers[1]); // Track 2
+    await user.click(trackContainers[0]); // Track 1
+    await user.click(trackContainers[1]); // Track 2
 
     await waitFor(() => {
       expect(screen.getByText('Tracks (2 selected)')).toBeInTheDocument();
@@ -207,7 +211,7 @@ describe('ReleaseDetailsPage Auto Timing', () => {
 
     // Click auto timing button
     const autoTimingButton = screen.getByText('Auto Timing (Just Finished)');
-    fireEvent.click(autoTimingButton);
+    await user.click(autoTimingButton);
 
     // Check if the datetime-local input has been populated with any value (timing calculation should have worked)
     await waitFor(() => {
@@ -234,7 +238,7 @@ describe('ReleaseDetailsPage Auto Timing', () => {
 
     // First deselect all tracks
     const deselectAllButton = screen.getByText('Deselect All');
-    fireEvent.click(deselectAllButton);
+    await user.click(deselectAllButton);
 
     await waitFor(() => {
       expect(screen.getByText('Tracks (0 selected)')).toBeInTheDocument();
@@ -256,21 +260,21 @@ describe('ReleaseDetailsPage Auto Timing', () => {
 
     // First deselect all tracks, then select one track
     const deselectAllButton = screen.getByText('Deselect All');
-    fireEvent.click(deselectAllButton);
+    await user.click(deselectAllButton);
 
     // Select one track
     const trackContainers = screen.getAllByRole('checkbox');
-    fireEvent.click(trackContainers[0]); // Track 1
+    await user.click(trackContainers[0]); // Track 1
 
     const autoTimingButton = screen.getByText('Auto Timing (Just Finished)');
-    fireEvent.click(autoTimingButton);
+    await user.click(autoTimingButton);
 
     // Clear button should appear
     const clearButton = screen.getByText('Clear');
     expect(clearButton).toBeInTheDocument();
 
     // Click clear button
-    fireEvent.click(clearButton);
+    await user.click(clearButton);
 
     // Start time should be cleared
     const startTimeInputs = screen.getAllByDisplayValue('');
@@ -289,11 +293,11 @@ describe('ReleaseDetailsPage Auto Timing', () => {
 
     // First deselect all tracks, then select one track
     const deselectAllButton = screen.getByText('Deselect All');
-    fireEvent.click(deselectAllButton);
+    await user.click(deselectAllButton);
 
     // Select a track
     const trackContainers = screen.getAllByRole('checkbox');
-    fireEvent.click(trackContainers[0]); // Track 1
+    await user.click(trackContainers[0]); // Track 1
 
     // Initially should show default timing message
     expect(
@@ -302,7 +306,7 @@ describe('ReleaseDetailsPage Auto Timing', () => {
 
     // Use auto timing
     const autoTimingButton = screen.getByText('Auto Timing (Just Finished)');
-    fireEvent.click(autoTimingButton);
+    await user.click(autoTimingButton);
 
     // Should show auto timing message
     expect(
@@ -312,8 +316,11 @@ describe('ReleaseDetailsPage Auto Timing', () => {
 });
 
 describe('ReleaseDetailsPage Side Selection', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
 
     // Ensure localStorage mock is set up for this test
     Object.defineProperty(window, 'localStorage', {
@@ -392,7 +399,7 @@ describe('ReleaseDetailsPage Side Selection', () => {
 
     // Click "Side A" button to deselect side A
     const sideAButton = screen.getByText('Side A (2)');
-    fireEvent.click(sideAButton);
+    await user.click(sideAButton);
 
     // Should now have 6 tracks selected (8 - 2 from side A)
     await waitFor(() => {
@@ -400,7 +407,7 @@ describe('ReleaseDetailsPage Side Selection', () => {
     });
 
     // Click "Side A" button again to select side A
-    fireEvent.click(sideAButton);
+    await user.click(sideAButton);
 
     // Should be back to 8 tracks selected
     await waitFor(() => {
@@ -427,7 +434,7 @@ describe('ReleaseDetailsPage Side Selection', () => {
 
     // Click "Disc 1" button to deselect disc 1 (sides A & B)
     const disc1Button = screen.getByText('Disc 1 (A/B)');
-    fireEvent.click(disc1Button);
+    await user.click(disc1Button);
 
     // Should now have 4 tracks selected (8 - 4 from disc 1)
     await waitFor(() => {
@@ -435,7 +442,7 @@ describe('ReleaseDetailsPage Side Selection', () => {
     });
 
     // Click "Disc 1" button again to select disc 1
-    fireEvent.click(disc1Button);
+    await user.click(disc1Button);
 
     // Should be back to 8 tracks selected
     await waitFor(() => {
@@ -471,7 +478,7 @@ describe('ReleaseDetailsPage Side Selection', () => {
     expect(sideAButton).toHaveClass('btn-primary');
 
     // Click to deselect
-    fireEvent.click(sideAButton);
+    await user.click(sideAButton);
 
     // Should now have outline styling
     await waitFor(() => {
@@ -574,8 +581,11 @@ describe('ReleaseDetailsPage Error Handling and Loading States', () => {
 });
 
 describe('ReleaseDetailsPage Scrobble Progress and Results', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
     mockLocalStorage.clear();
     mockLocalStorage.setItem('selectedRelease', JSON.stringify(mockRelease));
     mockApiService.getReleaseDetails.mockResolvedValue(mockRelease);
@@ -625,7 +635,7 @@ describe('ReleaseDetailsPage Scrobble Progress and Results', () => {
 
     // Select tracks and start scrobbling
     const scrobbleButton = screen.getByText('Scrobble 3 Tracks');
-    fireEvent.click(scrobbleButton);
+    await user.click(scrobbleButton);
 
     // Wait for progress to be displayed
     await waitFor(() => {
@@ -665,7 +675,7 @@ describe('ReleaseDetailsPage Scrobble Progress and Results', () => {
 
     // Select tracks and start scrobbling
     const scrobbleButton = screen.getByText('Scrobble 3 Tracks');
-    fireEvent.click(scrobbleButton);
+    await user.click(scrobbleButton);
 
     // Wait for results to be displayed
     await waitFor(() => {
@@ -709,7 +719,7 @@ describe('ReleaseDetailsPage Scrobble Progress and Results', () => {
 
     // Select tracks and start scrobbling
     const scrobbleButton = screen.getByText('Scrobble 3 Tracks');
-    fireEvent.click(scrobbleButton);
+    await user.click(scrobbleButton);
 
     // Wait for results to be displayed
     await waitFor(() => {
@@ -758,7 +768,7 @@ describe('ReleaseDetailsPage Scrobble Progress and Results', () => {
 
     // Select tracks and start scrobbling
     const scrobbleButton = screen.getByText('Scrobble 3 Tracks');
-    fireEvent.click(scrobbleButton);
+    await user.click(scrobbleButton);
 
     // Wait for results to be displayed
     await waitFor(() => {
@@ -777,8 +787,11 @@ describe('ReleaseDetailsPage Scrobble Progress and Results', () => {
 });
 
 describe('ReleaseDetailsPage Last.fm Connection Testing', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
     mockLocalStorage.clear();
     mockLocalStorage.setItem('selectedRelease', JSON.stringify(mockRelease));
     mockApiService.getReleaseDetails.mockResolvedValue(mockRelease);
@@ -802,7 +815,7 @@ describe('ReleaseDetailsPage Last.fm Connection Testing', () => {
     });
 
     const testButton = screen.getByText('Test Last.fm Connection');
-    fireEvent.click(testButton);
+    await user.click(testButton);
 
     await waitFor(() => {
       expect(screen.getByText('Connection successful')).toBeInTheDocument();
@@ -826,7 +839,7 @@ describe('ReleaseDetailsPage Last.fm Connection Testing', () => {
     );
 
     const testButton = screen.getByText('Test Last.fm Connection');
-    fireEvent.click(testButton);
+    await user.click(testButton);
 
     await waitFor(() => {
       expect(screen.getByText('Connection failed')).toBeInTheDocument();
@@ -850,7 +863,7 @@ describe('ReleaseDetailsPage Last.fm Connection Testing', () => {
     });
 
     const sessionKeyButton = screen.getByText('Get Session Key');
-    fireEvent.click(sessionKeyButton);
+    await user.click(sessionKeyButton);
 
     await waitFor(() => {
       expect(screen.getByText('Session Key:')).toBeInTheDocument();
@@ -873,7 +886,7 @@ describe('ReleaseDetailsPage Last.fm Connection Testing', () => {
     );
 
     const sessionKeyButton = screen.getByText('Get Session Key');
-    fireEvent.click(sessionKeyButton);
+    await user.click(sessionKeyButton);
 
     await waitFor(() => {
       expect(screen.getByText('Error: Session key error')).toBeInTheDocument();
@@ -890,7 +903,7 @@ describe('ReleaseDetailsPage Last.fm Connection Testing', () => {
     mockApiService.getLastfmSessionKey.mockRejectedValue('String error');
 
     const sessionKeyButton = screen.getByText('Get Session Key');
-    fireEvent.click(sessionKeyButton);
+    await user.click(sessionKeyButton);
 
     await waitFor(() => {
       expect(screen.getByText('Error: Unknown error')).toBeInTheDocument();
@@ -918,8 +931,11 @@ describe('ReleaseDetailsPage Last.fm Connection Testing', () => {
 });
 
 describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
     mockLocalStorage.clear();
     mockLocalStorage.setItem(
       'selectedRelease',
@@ -959,7 +975,7 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
 
     // Deselect all tracks first
     const deselectAllButton = screen.getByText('Deselect All');
-    fireEvent.click(deselectAllButton);
+    await user.click(deselectAllButton);
 
     await waitFor(() => {
       expect(screen.getByText('Tracks (0 selected)')).toBeInTheDocument();
@@ -969,19 +985,19 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
     const checkboxes = screen.getAllByRole('checkbox');
 
     // Select first track
-    fireEvent.click(checkboxes[0]);
+    await user.click(checkboxes[0]);
     await waitFor(() => {
       expect(screen.getByText('Tracks (1 selected)')).toBeInTheDocument();
     });
 
     // Select second track
-    fireEvent.click(checkboxes[1]);
+    await user.click(checkboxes[1]);
     await waitFor(() => {
       expect(screen.getByText('Tracks (2 selected)')).toBeInTheDocument();
     });
 
     // Deselect first track
-    fireEvent.click(checkboxes[0]);
+    await user.click(checkboxes[0]);
     await waitFor(() => {
       expect(screen.getByText('Tracks (1 selected)')).toBeInTheDocument();
     });
@@ -1013,7 +1029,7 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
 
     // Deselect all tracks first
     const deselectAllButton = screen.getByText('Deselect All');
-    fireEvent.click(deselectAllButton);
+    await user.click(deselectAllButton);
 
     await waitFor(() => {
       expect(screen.getByText('Tracks (0 selected)')).toBeInTheDocument();
@@ -1023,13 +1039,13 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
     const trackContainers = screen.getAllByText(/Track \d/);
 
     // Click on first track container
-    fireEvent.click(trackContainers[0]);
+    await user.click(trackContainers[0]);
     await waitFor(() => {
       expect(screen.getByText('Tracks (1 selected)')).toBeInTheDocument();
     });
 
     // Click on second track container
-    fireEvent.click(trackContainers[1]);
+    await user.click(trackContainers[1]);
     await waitFor(() => {
       expect(screen.getByText('Tracks (2 selected)')).toBeInTheDocument();
     });
@@ -1048,7 +1064,7 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
 
     // Deselect all
     const deselectAllButton = screen.getByText('Deselect All');
-    fireEvent.click(deselectAllButton);
+    await user.click(deselectAllButton);
 
     await waitFor(() => {
       expect(screen.getByText('Tracks (0 selected)')).toBeInTheDocument();
@@ -1057,7 +1073,7 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
 
     // Select all
     const selectAllButton = screen.getByText('Select All');
-    fireEvent.click(selectAllButton);
+    await user.click(selectAllButton);
 
     await waitFor(() => {
       expect(screen.getByText('Tracks (3 selected)')).toBeInTheDocument();
@@ -1078,7 +1094,7 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
 
     // Deselect all tracks
     const deselectAllButton = screen.getByText('Deselect All');
-    fireEvent.click(deselectAllButton);
+    await user.click(deselectAllButton);
 
     await waitFor(() => {
       expect(screen.getByText('Tracks (0 selected)')).toBeInTheDocument();
@@ -1098,10 +1114,10 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
 
     // Deselect all tracks, then select one
     const deselectAllButton = screen.getByText('Deselect All');
-    fireEvent.click(deselectAllButton);
+    await user.click(deselectAllButton);
 
     const checkboxes = screen.getAllByRole('checkbox');
-    fireEvent.click(checkboxes[0]);
+    await user.click(checkboxes[0]);
 
     await waitFor(() => {
       expect(screen.getByText('Tracks (1 selected)')).toBeInTheDocument();
@@ -1113,7 +1129,8 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
 
     // Set a custom start time
     const customTime = '2023-12-01T14:30';
-    fireEvent.change(startTimeInput, { target: { value: customTime } });
+    await user.clear(startTimeInput);
+    await user.type(startTimeInput, customTime);
 
     await waitFor(() => {
       expect(startTimeInput.value).toBe(customTime);

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 
 import {
@@ -9,9 +10,11 @@ import {
 
 describe('Modal', () => {
   const mockOnClose = jest.fn();
+  let user: ReturnType<typeof userEvent.setup>;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
   });
 
   it('renders nothing when not open', () => {
@@ -60,45 +63,45 @@ describe('Modal', () => {
     expect(screen.queryByLabelText('Close modal')).not.toBeInTheDocument();
   });
 
-  it('calls onClose when close button is clicked', () => {
+  it('calls onClose when close button is clicked', async () => {
     render(
       <Modal isOpen={true} onClose={mockOnClose}>
         Content
       </Modal>
     );
-    fireEvent.click(screen.getByLabelText('Close modal'));
+    await user.click(screen.getByLabelText('Close modal'));
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClose when overlay is clicked', () => {
+  it('calls onClose when overlay is clicked', async () => {
     render(
       <Modal isOpen={true} onClose={mockOnClose}>
         Content
       </Modal>
     );
     const overlay = document.querySelector('.modal-overlay');
-    fireEvent.click(overlay!);
+    await user.click(overlay!);
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
-  it('does not close when clicking inside modal', () => {
+  it('does not close when clicking inside modal', async () => {
     render(
       <Modal isOpen={true} onClose={mockOnClose}>
         Content
       </Modal>
     );
-    fireEvent.click(screen.getByRole('dialog'));
+    await user.click(screen.getByRole('dialog'));
     expect(mockOnClose).not.toHaveBeenCalled();
   });
 
-  it('does not close on overlay click when closeOnOverlayClick is false', () => {
+  it('does not close on overlay click when closeOnOverlayClick is false', async () => {
     render(
       <Modal isOpen={true} onClose={mockOnClose} closeOnOverlayClick={false}>
         Content
       </Modal>
     );
     const overlay = document.querySelector('.modal-overlay');
-    fireEvent.click(overlay!);
+    await user.click(overlay!);
     expect(mockOnClose).not.toHaveBeenCalled();
   });
 
@@ -108,6 +111,7 @@ describe('Modal', () => {
         Content
       </Modal>
     );
+    // Keep fireEvent for keyDown on document - no direct userEvent equivalent
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
@@ -118,6 +122,7 @@ describe('Modal', () => {
         Content
       </Modal>
     );
+    // Keep fireEvent for keyDown on document - no direct userEvent equivalent
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(mockOnClose).not.toHaveBeenCalled();
   });

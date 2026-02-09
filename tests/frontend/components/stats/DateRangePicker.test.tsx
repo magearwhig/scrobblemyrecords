@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 
 import '@testing-library/jest-dom';
@@ -7,9 +8,11 @@ import { DateRangePicker } from '../../../../src/renderer/components/stats/DateR
 describe('DateRangePicker', () => {
   const mockOnClose = jest.fn();
   const mockOnApply = jest.fn();
+  let user: ReturnType<typeof userEvent.setup>;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
   });
 
   it('should not render when isOpen is false', () => {
@@ -52,7 +55,7 @@ describe('DateRangePicker', () => {
     expect(screen.getByText(currentYear.toString())).toBeInTheDocument();
   });
 
-  it('should navigate to previous year when clicking left arrow', () => {
+  it('should navigate to previous year when clicking left arrow', async () => {
     const currentYear = new Date().getFullYear();
     render(
       <DateRangePicker
@@ -63,7 +66,7 @@ describe('DateRangePicker', () => {
     );
 
     const prevButton = screen.getByRole('button', { name: /previous year/i });
-    fireEvent.click(prevButton);
+    await user.click(prevButton);
 
     expect(screen.getByText((currentYear - 1).toString())).toBeInTheDocument();
   });
@@ -82,7 +85,7 @@ describe('DateRangePicker', () => {
     expect(screen.getByText('This Year')).toBeInTheDocument();
   });
 
-  it('should select a month when clicked', () => {
+  it('should select a month when clicked', async () => {
     render(
       <DateRangePicker
         isOpen={true}
@@ -93,15 +96,15 @@ describe('DateRangePicker', () => {
 
     // Navigate to previous year where all months are available
     const prevButton = screen.getByRole('button', { name: /previous year/i });
-    fireEvent.click(prevButton);
+    await user.click(prevButton);
 
-    fireEvent.click(screen.getByText('Mar'));
+    await user.click(screen.getByText('Mar'));
 
     // Should show selection message
     expect(screen.getByText(/Selected:/)).toBeInTheDocument();
   });
 
-  it('should allow selecting a date range by clicking two months', () => {
+  it('should allow selecting a date range by clicking two months', async () => {
     render(
       <DateRangePicker
         isOpen={true}
@@ -112,16 +115,16 @@ describe('DateRangePicker', () => {
 
     // Navigate to previous year where all months are available
     const prevButton = screen.getByRole('button', { name: /previous year/i });
-    fireEvent.click(prevButton);
+    await user.click(prevButton);
 
-    fireEvent.click(screen.getByText('Jan'));
-    fireEvent.click(screen.getByText('Mar'));
+    await user.click(screen.getByText('Jan'));
+    await user.click(screen.getByText('Mar'));
 
     // Should show range selection
     expect(screen.getByText(/Selected:/)).toBeInTheDocument();
   });
 
-  it('should call onApply with date range when Apply is clicked', () => {
+  it('should call onApply with date range when Apply is clicked', async () => {
     render(
       <DateRangePicker
         isOpen={true}
@@ -132,19 +135,19 @@ describe('DateRangePicker', () => {
 
     // Navigate to previous year where all months are available
     const prevButton = screen.getByRole('button', { name: /previous year/i });
-    fireEvent.click(prevButton);
+    await user.click(prevButton);
 
     // Select January
-    fireEvent.click(screen.getByText('Jan'));
+    await user.click(screen.getByText('Jan'));
 
     // Click Apply
-    fireEvent.click(screen.getByText('Apply'));
+    await user.click(screen.getByText('Apply'));
 
     expect(mockOnApply).toHaveBeenCalled();
     expect(mockOnClose).toHaveBeenCalled();
   });
 
-  it('should call onClose when Cancel is clicked', () => {
+  it('should call onClose when Cancel is clicked', async () => {
     render(
       <DateRangePicker
         isOpen={true}
@@ -153,7 +156,7 @@ describe('DateRangePicker', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('Cancel'));
+    await user.click(screen.getByText('Cancel'));
 
     expect(mockOnClose).toHaveBeenCalled();
     expect(mockOnApply).not.toHaveBeenCalled();
@@ -178,7 +181,7 @@ describe('DateRangePicker', () => {
     expect(screen.getByText(/Selected:/)).toBeInTheDocument();
   });
 
-  it('should use quick select "Last 3 Mo" button', () => {
+  it('should use quick select "Last 3 Mo" button', async () => {
     render(
       <DateRangePicker
         isOpen={true}
@@ -187,13 +190,13 @@ describe('DateRangePicker', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('Last 3 Mo'));
+    await user.click(screen.getByText('Last 3 Mo'));
 
     // Should update selection
     expect(screen.getByText(/Selected:/)).toBeInTheDocument();
   });
 
-  it('should use quick select "This Year" button', () => {
+  it('should use quick select "This Year" button', async () => {
     render(
       <DateRangePicker
         isOpen={true}
@@ -202,7 +205,7 @@ describe('DateRangePicker', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('This Year'));
+    await user.click(screen.getByText('This Year'));
 
     // Should update selection
     expect(screen.getByText(/Selected:/)).toBeInTheDocument();
@@ -221,7 +224,7 @@ describe('DateRangePicker', () => {
     expect(applyButton).toBeDisabled();
   });
 
-  it('should swap dates if end is before start', () => {
+  it('should swap dates if end is before start', async () => {
     render(
       <DateRangePicker
         isOpen={true}
@@ -232,14 +235,14 @@ describe('DateRangePicker', () => {
 
     // Navigate to previous year where all months are available
     const prevButton = screen.getByRole('button', { name: /previous year/i });
-    fireEvent.click(prevButton);
+    await user.click(prevButton);
 
     // Click March first, then January (backwards)
-    fireEvent.click(screen.getByText('Mar'));
-    fireEvent.click(screen.getByText('Jan'));
+    await user.click(screen.getByText('Mar'));
+    await user.click(screen.getByText('Jan'));
 
     // Click Apply and verify the result is properly ordered
-    fireEvent.click(screen.getByText('Apply'));
+    await user.click(screen.getByText('Apply'));
 
     expect(mockOnApply).toHaveBeenCalled();
     const calledWith = mockOnApply.mock.calls[0][0];

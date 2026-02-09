@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 
 import {
@@ -7,6 +8,11 @@ import {
 } from '../../../../src/renderer/components/ui/Button';
 
 describe('Button', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
+  beforeEach(() => {
+    user = userEvent.setup();
+  });
   it('renders with default props', () => {
     render(<Button>Click me</Button>);
     const button = screen.getByRole('button', { name: 'Click me' });
@@ -57,32 +63,32 @@ describe('Button', () => {
     expect(screen.getByRole('button')).toBeDisabled();
   });
 
-  it('calls onClick when clicked', () => {
+  it('calls onClick when clicked', async () => {
     const handleClick = jest.fn();
     render(<Button onClick={handleClick}>Click me</Button>);
-    fireEvent.click(screen.getByRole('button'));
+    await user.click(screen.getByRole('button'));
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
-  it('does not call onClick when disabled', () => {
+  it('does not call onClick when disabled', async () => {
     const handleClick = jest.fn();
     render(
       <Button onClick={handleClick} disabled>
         Click me
       </Button>
     );
-    fireEvent.click(screen.getByRole('button'));
+    await user.click(screen.getByRole('button'));
     expect(handleClick).not.toHaveBeenCalled();
   });
 
-  it('does not call onClick when loading', () => {
+  it('does not call onClick when loading', async () => {
     const handleClick = jest.fn();
     render(
       <Button onClick={handleClick} loading>
         Click me
       </Button>
     );
-    fireEvent.click(screen.getByRole('button'));
+    await user.click(screen.getByRole('button'));
     expect(handleClick).not.toHaveBeenCalled();
   });
 

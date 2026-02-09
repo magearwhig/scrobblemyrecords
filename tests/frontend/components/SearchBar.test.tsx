@@ -1,10 +1,12 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 
 import SearchBar from '../../../src/renderer/components/SearchBar';
 
 describe('SearchBar', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
   const defaultProps = {
     onSearch: jest.fn(),
     placeholder: 'Search...',
@@ -15,6 +17,7 @@ describe('SearchBar', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
   });
 
   afterEach(() => {
@@ -74,7 +77,6 @@ describe('SearchBar', () => {
   });
 
   it('updates input value when user types', async () => {
-    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     render(<SearchBar {...defaultProps} />);
 
     const input = screen.getByPlaceholderText('Search...');
@@ -88,7 +90,8 @@ describe('SearchBar', () => {
     render(<SearchBar {...defaultProps} onSearch={onSearch} />);
 
     const input = screen.getByPlaceholderText('Search...');
-    fireEvent.change(input, { target: { value: 'test' } });
+    await user.clear(input);
+    await user.type(input, 'test');
 
     // Should not call immediately
     expect(onSearch).not.toHaveBeenCalled();
@@ -106,10 +109,8 @@ describe('SearchBar', () => {
 
     const input = screen.getByPlaceholderText('Search...');
 
-    fireEvent.change(input, { target: { value: 't' } });
-    fireEvent.change(input, { target: { value: 'te' } });
-    fireEvent.change(input, { target: { value: 'tes' } });
-    fireEvent.change(input, { target: { value: 'test' } });
+    await user.clear(input);
+    await user.type(input, 'test');
 
     // Should not call during rapid changes
     jest.advanceTimersByTime(400);
@@ -145,7 +146,7 @@ describe('SearchBar', () => {
     const input = screen.getByDisplayValue('test');
     const clearButton = screen.getByTitle('Clear search');
 
-    fireEvent.click(clearButton);
+    await user.click(clearButton);
 
     expect(input).toHaveValue('');
     expect(onSearch).toHaveBeenCalledWith('');
@@ -170,14 +171,15 @@ describe('SearchBar', () => {
     expect(onSearch).toHaveBeenCalledWith('initial');
   });
 
-  it('cleans up timeout on unmount', () => {
+  it('cleans up timeout on unmount', async () => {
     const onSearch = jest.fn();
     const { unmount } = render(
       <SearchBar {...defaultProps} onSearch={onSearch} />
     );
 
     const input = screen.getByPlaceholderText('Search...');
-    fireEvent.change(input, { target: { value: 'test' } });
+    await user.clear(input);
+    await user.type(input, 'test');
 
     // Unmount before timeout fires
     unmount();
@@ -209,18 +211,20 @@ describe('SearchBar', () => {
     });
   });
 
-  it('cancels previous timeout when new input is received', () => {
+  it('cancels previous timeout when new input is received', async () => {
     const onSearch = jest.fn();
     render(<SearchBar {...defaultProps} onSearch={onSearch} />);
 
     const input = screen.getByPlaceholderText('Search...');
 
     // Type first query
-    fireEvent.change(input, { target: { value: 'first' } });
+    await user.clear(input);
+    await user.type(input, 'first');
     jest.advanceTimersByTime(400);
 
     // Type second query before first timeout fires
-    fireEvent.change(input, { target: { value: 'second' } });
+    await user.clear(input);
+    await user.type(input, 'second');
     jest.advanceTimersByTime(500);
 
     // Should only call with the latest query

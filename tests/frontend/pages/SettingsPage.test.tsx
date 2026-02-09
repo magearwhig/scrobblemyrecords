@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import React from 'react';
 
@@ -23,6 +24,11 @@ const renderWithProviders = (ui: React.ReactElement) => {
 };
 
 describe('SettingsPage', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
+  beforeEach(() => {
+    user = userEvent.setup();
+  });
   it('renders the settings page title', () => {
     renderWithProviders(<SettingsPage />);
 
@@ -87,43 +93,43 @@ describe('SettingsPage', () => {
     expect(screen.getByText('Account Connections')).toBeInTheDocument();
   });
 
-  it('can switch to Integrations tab', () => {
+  it('can switch to Integrations tab', async () => {
     renderWithProviders(<SettingsPage />);
 
     const integrationsTab = screen.getByRole('button', {
       name: /Integrations/i,
     });
-    fireEvent.click(integrationsTab);
+    await user.click(integrationsTab);
 
     expect(integrationsTab).toHaveClass('active');
     expect(screen.getByText('Last.fm Sync')).toBeInTheDocument();
   });
 
-  it('can switch to Mappings tab', () => {
+  it('can switch to Mappings tab', async () => {
     renderWithProviders(<SettingsPage />);
 
     const mappingsTab = screen.getByRole('button', { name: /Mappings/i });
-    fireEvent.click(mappingsTab);
+    await user.click(mappingsTab);
 
     expect(mappingsTab).toHaveClass('active');
     expect(screen.getByText('Artist Name Mappings')).toBeInTheDocument();
   });
 
-  it('can switch to Filters tab', () => {
+  it('can switch to Filters tab', async () => {
     renderWithProviders(<SettingsPage />);
 
     const filtersTab = screen.getByRole('button', { name: /Filters/i });
-    fireEvent.click(filtersTab);
+    await user.click(filtersTab);
 
     expect(filtersTab).toHaveClass('active');
     expect(screen.getByText('Hidden Discovery Items')).toBeInTheDocument();
   });
 
-  it('can switch to Wishlist tab', () => {
+  it('can switch to Wishlist tab', async () => {
     renderWithProviders(<SettingsPage />);
 
     const wishlistTab = screen.getByRole('button', { name: /Wishlist/i });
-    fireEvent.click(wishlistTab);
+    await user.click(wishlistTab);
 
     expect(wishlistTab).toHaveClass('active');
     expect(screen.getByText('Wishlist Settings')).toBeInTheDocument();

@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import '@testing-library/jest-dom';
 
@@ -20,8 +21,11 @@ jest.mock('../../../src/renderer/services/api', () => ({
 import SyncStatusBar from '../../../src/renderer/components/SyncStatusBar';
 
 describe('SyncStatusBar', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
   });
 
   const createSyncResponse = (
@@ -96,7 +100,7 @@ describe('SyncStatusBar', () => {
       const callsBefore = mockGetHistorySyncStatus.mock.calls.length;
 
       // Click Retry - this should call fetchStatus again
-      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+      await user.click(screen.getByRole('button', { name: 'Retry' }));
 
       // Should call getHistorySyncStatus again after clicking
       await waitFor(() => {
@@ -163,7 +167,7 @@ describe('SyncStatusBar', () => {
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Start Full Sync' }));
+      await user.click(screen.getByRole('button', { name: 'Start Full Sync' }));
 
       await waitFor(() => {
         expect(mockStartHistorySync).toHaveBeenCalledWith(false);
@@ -184,7 +188,7 @@ describe('SyncStatusBar', () => {
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Sync New' }));
+      await user.click(screen.getByRole('button', { name: 'Sync New' }));
 
       await waitFor(() => {
         expect(mockStartHistorySync).toHaveBeenCalledWith(true);
@@ -280,7 +284,7 @@ describe('SyncStatusBar', () => {
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+      await user.click(screen.getByRole('button', { name: 'Pause' }));
 
       await waitFor(() => {
         expect(mockPauseHistorySync).toHaveBeenCalled();
@@ -329,7 +333,7 @@ describe('SyncStatusBar', () => {
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Resume' }));
+      await user.click(screen.getByRole('button', { name: 'Resume' }));
 
       await waitFor(() => {
         expect(mockResumeHistorySync).toHaveBeenCalled();
@@ -378,7 +382,7 @@ describe('SyncStatusBar', () => {
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+      await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
       await waitFor(() => {
         expect(mockStartHistorySync).toHaveBeenCalledWith(true);
@@ -424,7 +428,7 @@ describe('SyncStatusBar', () => {
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+      await user.click(screen.getByRole('button', { name: 'Retry' }));
 
       await waitFor(() => {
         expect(mockStartHistorySync).toHaveBeenCalledWith(false);
@@ -500,7 +504,7 @@ describe('SyncStatusBar', () => {
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Sync history to enable suggestions'));
+      await user.click(screen.getByText('Sync history to enable suggestions'));
 
       await waitFor(() => {
         expect(mockStartHistorySync).toHaveBeenCalledWith(false);
@@ -633,7 +637,7 @@ describe('SyncStatusBar', () => {
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+      await user.click(screen.getByRole('button', { name: 'Pause' }));
 
       await waitFor(() => {
         expect(screen.getByText('Failed to pause')).toBeInTheDocument();
@@ -658,7 +662,7 @@ describe('SyncStatusBar', () => {
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+      await user.click(screen.getByRole('button', { name: 'Pause' }));
 
       await waitFor(() => {
         expect(screen.getByText('Failed to pause sync')).toBeInTheDocument();
@@ -683,7 +687,7 @@ describe('SyncStatusBar', () => {
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Resume' }));
+      await user.click(screen.getByRole('button', { name: 'Resume' }));
 
       await waitFor(() => {
         expect(screen.getByText('Failed to resume')).toBeInTheDocument();
@@ -708,7 +712,7 @@ describe('SyncStatusBar', () => {
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Resume' }));
+      await user.click(screen.getByRole('button', { name: 'Resume' }));
 
       await waitFor(() => {
         expect(screen.getByText('Failed to resume sync')).toBeInTheDocument();

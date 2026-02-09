@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import React from 'react';
 
@@ -51,8 +52,11 @@ const renderWithProviders = (
 };
 
 describe('SettingsConnectionsSection', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
   });
 
   describe('Rendering', () => {
@@ -113,22 +117,24 @@ describe('SettingsConnectionsSection', () => {
       ).toBeInTheDocument();
     });
 
-    it('allows entering Discogs personal token', () => {
+    it('allows entering Discogs personal token', async () => {
       renderWithProviders();
 
       const tokenInput = screen.getByPlaceholderText('your_token_here');
-      fireEvent.change(tokenInput, { target: { value: 'test_token' } });
+      await user.clear(tokenInput);
+      await user.type(tokenInput, 'test_token');
 
       expect(tokenInput).toHaveValue('test_token');
     });
 
-    it('allows entering Discogs username', () => {
+    it('allows entering Discogs username', async () => {
       renderWithProviders();
 
       const usernameInput = screen.getByPlaceholderText(
         'your_discogs_username'
       );
-      fireEvent.change(usernameInput, { target: { value: 'test_user' } });
+      await user.clear(usernameInput);
+      await user.type(usernameInput, 'test_user');
 
       expect(usernameInput).toHaveValue('test_user');
     });
@@ -140,7 +146,7 @@ describe('SettingsConnectionsSection', () => {
       expect(submitButton).toBeDisabled();
     });
 
-    it('enables Submit Personal Token button when both fields are filled', () => {
+    it('enables Submit Personal Token button when both fields are filled', async () => {
       renderWithProviders();
 
       const tokenInput = screen.getByPlaceholderText('your_token_here');
@@ -148,8 +154,10 @@ describe('SettingsConnectionsSection', () => {
         'your_discogs_username'
       );
 
-      fireEvent.change(tokenInput, { target: { value: 'test_token' } });
-      fireEvent.change(usernameInput, { target: { value: 'test_user' } });
+      await user.clear(tokenInput);
+      await user.type(tokenInput, 'test_token');
+      await user.clear(usernameInput);
+      await user.type(usernameInput, 'test_user');
 
       const submitButton = screen.getByText('Submit Personal Token');
       expect(submitButton).not.toBeDisabled();
@@ -169,11 +177,13 @@ describe('SettingsConnectionsSection', () => {
         'your_discogs_username'
       );
 
-      fireEvent.change(tokenInput, { target: { value: 'test_token' } });
-      fireEvent.change(usernameInput, { target: { value: 'test_user' } });
+      await user.clear(tokenInput);
+      await user.type(tokenInput, 'test_token');
+      await user.clear(usernameInput);
+      await user.type(usernameInput, 'test_user');
 
       const submitButton = screen.getByText('Submit Personal Token');
-      fireEvent.click(submitButton);
+      await user.click(submitButton);
 
       await waitFor(() => {
         expect(mockApi.saveDiscogsToken).toHaveBeenCalledWith(
@@ -201,11 +211,13 @@ describe('SettingsConnectionsSection', () => {
         'your_discogs_username'
       );
 
-      fireEvent.change(tokenInput, { target: { value: 'bad_token' } });
-      fireEvent.change(usernameInput, { target: { value: 'test_user' } });
+      await user.clear(tokenInput);
+      await user.type(tokenInput, 'bad_token');
+      await user.clear(usernameInput);
+      await user.type(usernameInput, 'test_user');
 
       const submitButton = screen.getByText('Submit Personal Token');
-      fireEvent.click(submitButton);
+      await user.click(submitButton);
 
       await waitFor(() => {
         expect(screen.getByText('Invalid token')).toBeInTheDocument();
@@ -223,11 +235,12 @@ describe('SettingsConnectionsSection', () => {
       ).toBeInTheDocument();
     });
 
-    it('allows entering Last.fm token', () => {
+    it('allows entering Last.fm token', async () => {
       renderWithProviders();
 
       const tokenInput = screen.getByPlaceholderText('token value from URL');
-      fireEvent.change(tokenInput, { target: { value: 'lastfm_token' } });
+      await user.clear(tokenInput);
+      await user.type(tokenInput, 'lastfm_token');
 
       expect(tokenInput).toHaveValue('lastfm_token');
     });
@@ -239,11 +252,12 @@ describe('SettingsConnectionsSection', () => {
       expect(submitButton).toBeDisabled();
     });
 
-    it('enables Submit Last.fm Token button when field is filled', () => {
+    it('enables Submit Last.fm Token button when field is filled', async () => {
       renderWithProviders();
 
       const tokenInput = screen.getByPlaceholderText('token value from URL');
-      fireEvent.change(tokenInput, { target: { value: 'lastfm_token' } });
+      await user.clear(tokenInput);
+      await user.type(tokenInput, 'lastfm_token');
 
       const submitButton = screen.getByText('Submit Last.fm Token');
       expect(submitButton).not.toBeDisabled();
@@ -261,10 +275,11 @@ describe('SettingsConnectionsSection', () => {
       renderWithProviders();
 
       const tokenInput = screen.getByPlaceholderText('token value from URL');
-      fireEvent.change(tokenInput, { target: { value: 'valid_token' } });
+      await user.clear(tokenInput);
+      await user.type(tokenInput, 'valid_token');
 
       const submitButton = screen.getByText('Submit Last.fm Token');
-      fireEvent.click(submitButton);
+      await user.click(submitButton);
 
       await waitFor(() => {
         expect(mockApi.handleLastfmCallback).toHaveBeenCalledWith(
@@ -287,10 +302,11 @@ describe('SettingsConnectionsSection', () => {
       renderWithProviders();
 
       const tokenInput = screen.getByPlaceholderText('token value from URL');
-      fireEvent.change(tokenInput, { target: { value: 'expired_token' } });
+      await user.clear(tokenInput);
+      await user.type(tokenInput, 'expired_token');
 
       const submitButton = screen.getByText('Submit Last.fm Token');
-      fireEvent.click(submitButton);
+      await user.click(submitButton);
 
       await waitFor(() => {
         expect(screen.getByText('Token expired')).toBeInTheDocument();
@@ -309,7 +325,7 @@ describe('SettingsConnectionsSection', () => {
       renderWithProviders({ discogs: true, lastfm: true });
 
       const clearButton = screen.getByText('Clear All Authentication');
-      fireEvent.click(clearButton);
+      await user.click(clearButton);
 
       await waitFor(() => {
         expect(mockApi.clearAuth).toHaveBeenCalled();
@@ -330,7 +346,7 @@ describe('SettingsConnectionsSection', () => {
       renderWithProviders({ discogs: true, lastfm: true });
 
       const clearButton = screen.getByText('Clear All Authentication');
-      fireEvent.click(clearButton);
+      await user.click(clearButton);
 
       await waitFor(() => {
         expect(screen.getByText('Failed to clear')).toBeInTheDocument();

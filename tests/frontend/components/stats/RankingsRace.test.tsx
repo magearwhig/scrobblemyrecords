@@ -1,10 +1,16 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 
 import '@testing-library/jest-dom';
 import { RankingsRace } from '../../../../src/renderer/components/stats/RankingsRace';
 
 describe('RankingsRace', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
+  beforeEach(() => {
+    user = userEvent.setup();
+  });
   const mockSnapshotsArtists = [
     {
       period: '2024-01',
@@ -60,7 +66,7 @@ describe('RankingsRace', () => {
       expect(playButton).toHaveTextContent('▶');
     });
 
-    it('should toggle between play and pause', () => {
+    it('should toggle between play and pause', async () => {
       render(
         <RankingsRace
           snapshots={mockSnapshotsArtists}
@@ -75,7 +81,7 @@ describe('RankingsRace', () => {
       expect(playButton).toHaveTextContent('▶');
 
       // Click to start playing
-      fireEvent.click(playButton);
+      await user.click(playButton);
 
       // Should now show pause
       expect(playButton).toHaveTextContent('⏸');
@@ -187,7 +193,7 @@ describe('RankingsRace', () => {
   });
 
   describe('Speed control', () => {
-    it('should change animation speed when speed selector is changed', () => {
+    it('should change animation speed when speed selector is changed', async () => {
       render(
         <RankingsRace
           snapshots={mockSnapshotsArtists}
@@ -197,7 +203,7 @@ describe('RankingsRace', () => {
       );
 
       const speedSelect = screen.getByLabelText(/Animation speed/i);
-      fireEvent.change(speedSelect, { target: { value: '150' } });
+      await user.selectOptions(speedSelect, '150');
 
       // Speed should be updated (2x speed)
       expect(speedSelect).toHaveValue('150');
@@ -205,7 +211,7 @@ describe('RankingsRace', () => {
   });
 
   describe('Slider control', () => {
-    it('should change current snapshot when slider is moved', () => {
+    it('should change current snapshot when slider is moved', async () => {
       render(
         <RankingsRace
           snapshots={mockSnapshotsArtists}
@@ -300,7 +306,7 @@ describe('RankingsRace', () => {
       expect(screen.queryByText('Artist 3')).not.toBeInTheDocument();
     });
 
-    it('should restart animation when reaching the end', () => {
+    it('should restart animation when reaching the end', async () => {
       render(
         <RankingsRace
           snapshots={mockSnapshotsChanging}
@@ -316,7 +322,7 @@ describe('RankingsRace', () => {
       fireEvent.change(slider, { target: { value: '1' } });
 
       // Click play - should restart from beginning
-      fireEvent.click(playButton);
+      await user.click(playButton);
 
       // Should now be playing
       expect(playButton).toHaveTextContent('⏸');

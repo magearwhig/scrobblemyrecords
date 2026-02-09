@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 
 import '@testing-library/jest-dom';
@@ -31,8 +32,11 @@ const defaultProps = {
 };
 
 describe('AlbumCard', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
   });
 
   it('renders album information correctly', () => {
@@ -107,20 +111,20 @@ describe('AlbumCard', () => {
     expect(card).not.toHaveClass('selected');
   });
 
-  it('calls onSelect when select button is clicked', () => {
+  it('calls onSelect when select button is clicked', async () => {
     const onSelect = jest.fn();
     render(<AlbumCard {...defaultProps} onSelect={onSelect} />);
 
-    fireEvent.click(screen.getByText('Select'));
+    await user.click(screen.getByText('Select'));
 
     expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onViewDetails when view details button is clicked', () => {
+  it('calls onViewDetails when view details button is clicked', async () => {
     const onViewDetails = jest.fn();
     render(<AlbumCard {...defaultProps} onViewDetails={onViewDetails} />);
 
-    fireEvent.click(screen.getByText('View Details'));
+    await user.click(screen.getByText('View Details'));
 
     expect(onViewDetails).toHaveBeenCalledTimes(1);
     expect(onViewDetails).toHaveBeenCalledWith(mockRelease);

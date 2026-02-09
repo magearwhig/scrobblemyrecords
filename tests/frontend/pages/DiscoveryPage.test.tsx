@@ -1,4 +1,5 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import '@testing-library/jest-dom';
 
@@ -160,8 +161,11 @@ const renderDiscoveryPage = (authStatus: AuthStatus = defaultAuthStatus) => {
 };
 
 describe('DiscoveryPage', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
     mockGetMissingAlbums.mockResolvedValue(mockMissingAlbums);
     mockGetMissingArtists.mockResolvedValue(mockMissingArtists);
     mockGetLocalWantList.mockResolvedValue([]);
@@ -233,7 +237,7 @@ describe('DiscoveryPage', () => {
       expect(screen.getByText('Missing Artists (2)')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Missing Artists (2)'));
+    await user.click(screen.getByText('Missing Artists (2)'));
 
     await waitFor(() => {
       expect(screen.getByText('Pink Floyd')).toBeInTheDocument();
@@ -257,7 +261,7 @@ describe('DiscoveryPage', () => {
       expect(screen.getByText('Missing Artists (2)')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Missing Artists (2)'));
+    await user.click(screen.getByText('Missing Artists (2)'));
 
     await waitFor(() => {
       expect(screen.getByText('500 plays')).toBeInTheDocument();
@@ -325,7 +329,7 @@ describe('DiscoveryPage', () => {
 
     // Find the Monitor button for the first album (Radiohead)
     const monitorButtons = screen.getAllByText('Monitor');
-    fireEvent.click(monitorButtons[0]);
+    await user.click(monitorButtons[0]);
 
     await waitFor(() => {
       expect(mockAddToLocalWantList).toHaveBeenCalledWith({
@@ -345,7 +349,7 @@ describe('DiscoveryPage', () => {
     });
 
     const monitorButtons = screen.getAllByRole('button', { name: 'Monitor' });
-    fireEvent.click(monitorButtons[0]);
+    await user.click(monitorButtons[0]);
 
     await waitFor(() => {
       // After clicking, button should show "Monitoring" and be disabled
@@ -377,7 +381,7 @@ describe('DiscoveryPage', () => {
     });
 
     const sortSelect = screen.getByLabelText('Sort by:');
-    fireEvent.change(sortSelect, { target: { value: 'artist' } });
+    await user.selectOptions(sortSelect, 'artist');
 
     expect(sortSelect).toHaveValue('artist');
   });
@@ -427,7 +431,7 @@ describe('DiscoveryPage', () => {
     });
 
     const hideButtons = screen.getAllByText('Hide');
-    fireEvent.click(hideButtons[0]);
+    await user.click(hideButtons[0]);
 
     await waitFor(() => {
       expect(mockHideAlbum).toHaveBeenCalledWith('Radiohead', 'OK Computer');
@@ -447,7 +451,7 @@ describe('DiscoveryPage', () => {
     });
 
     const mapButtons = screen.getAllByText('Map');
-    fireEvent.click(mapButtons[0]);
+    await user.click(mapButtons[0]);
 
     await waitFor(() => {
       expect(screen.getByText('Map Album to Collection')).toBeInTheDocument();
@@ -473,7 +477,7 @@ describe('DiscoveryPage', () => {
       expect(screen.getByText('Missing Artists (0)')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Missing Artists (0)'));
+    await user.click(screen.getByText('Missing Artists (0)'));
 
     await waitFor(() => {
       expect(screen.getByText(/No missing artists found/)).toBeInTheDocument();
@@ -510,7 +514,7 @@ describe('DiscoveryPage', () => {
       expect(screen.getByText('Retry')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Retry'));
+    await user.click(screen.getByText('Retry'));
 
     await waitFor(() => {
       expect(screen.getByText('Radiohead')).toBeInTheDocument();
@@ -532,7 +536,7 @@ describe('DiscoveryPage', () => {
       expect(screen.getByText('Missing Artists (2)')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Missing Artists (2)'));
+    await user.click(screen.getByText('Missing Artists (2)'));
 
     await waitFor(() => {
       expect(screen.getByText('5 albums in history')).toBeInTheDocument();
@@ -546,14 +550,14 @@ describe('DiscoveryPage', () => {
       expect(screen.getByText('Missing Artists (2)')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText('Missing Artists (2)'));
+    await user.click(screen.getByText('Missing Artists (2)'));
 
     await waitFor(() => {
       expect(screen.getByText('Pink Floyd')).toBeInTheDocument();
     });
 
     const hideButtons = screen.getAllByText('Hide');
-    fireEvent.click(hideButtons[0]);
+    await user.click(hideButtons[0]);
 
     await waitFor(() => {
       expect(mockHideArtist).toHaveBeenCalledWith('Pink Floyd');
@@ -824,7 +828,7 @@ describe('DiscoveryPage', () => {
 
     // Check the Hide wishlisted & monitored toggle
     const toggle = screen.getByLabelText('Hide wishlisted & monitored');
-    fireEvent.click(toggle);
+    await user.click(toggle);
 
     // Clem Snide should now be hidden
     expect(screen.queryByText('Clem Snide')).not.toBeInTheDocument();
@@ -862,7 +866,7 @@ describe('DiscoveryPage', () => {
 
     // Check the Hide wishlisted & monitored toggle
     const toggle = screen.getByLabelText('Hide wishlisted & monitored');
-    fireEvent.click(toggle);
+    await user.click(toggle);
 
     // Radiohead should now be hidden
     expect(screen.queryByText('Radiohead')).not.toBeInTheDocument();
@@ -887,7 +891,7 @@ describe('DiscoveryPage', () => {
 
     // Check the Hide wishlisted & monitored toggle
     const toggle = screen.getByLabelText('Hide wishlisted & monitored');
-    fireEvent.click(toggle);
+    await user.click(toggle);
 
     // Should show "2/3" format (2 visible out of 3 total)
     expect(screen.getByText(/Missing Albums.*2\/3.*/)).toBeInTheDocument();
@@ -914,7 +918,7 @@ describe('DiscoveryPage', () => {
 
     // Check the Hide wishlisted & monitored toggle
     const toggle = screen.getByLabelText('Hide wishlisted & monitored');
-    fireEvent.click(toggle);
+    await user.click(toggle);
 
     // Should show special message about all albums being in wishlist or monitored
     expect(
@@ -955,8 +959,11 @@ const mockForgottenTracks: ForgottenTrack[] = [
 ];
 
 describe('DiscoveryPage - Forgotten Favorites', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
     mockGetMissingAlbums.mockResolvedValue([]);
     mockGetMissingArtists.mockResolvedValue([]);
     mockGetLocalWantList.mockResolvedValue([]);
@@ -1019,7 +1026,7 @@ describe('DiscoveryPage - Forgotten Favorites', () => {
 
     // Click on Forgotten Favorites tab
     const forgottenTab = screen.getByText(/Forgotten Favorites/);
-    fireEvent.click(forgottenTab);
+    await user.click(forgottenTab);
 
     // Should show loading state then content
     await waitFor(() => {
@@ -1055,7 +1062,7 @@ describe('DiscoveryPage - Forgotten Favorites', () => {
 
     // Click on Forgotten Favorites tab
     const forgottenTab = screen.getByText(/Forgotten Favorites/);
-    fireEvent.click(forgottenTab);
+    await user.click(forgottenTab);
 
     await waitFor(() => {
       expect(screen.getByText('Single Track')).toBeInTheDocument();
@@ -1087,7 +1094,7 @@ describe('DiscoveryPage - Forgotten Favorites', () => {
 
     // Click on Forgotten Favorites tab
     const forgottenTab = screen.getByText(/Forgotten Favorites/);
-    fireEvent.click(forgottenTab);
+    await user.click(forgottenTab);
 
     await waitFor(() => {
       expect(screen.getByText(/Showing 3 of 25 tracks/)).toBeInTheDocument();
@@ -1127,7 +1134,7 @@ describe('DiscoveryPage - Forgotten Favorites', () => {
 
     // Click on Forgotten Favorites tab
     const forgottenTab = screen.getByText(/Forgotten Favorites/);
-    fireEvent.click(forgottenTab);
+    await user.click(forgottenTab);
 
     await waitFor(() => {
       expect(
@@ -1160,7 +1167,7 @@ describe('DiscoveryPage - Forgotten Favorites', () => {
 
     // Click on Forgotten Favorites tab
     const forgottenTab = screen.getByText(/Forgotten Favorites/);
-    fireEvent.click(forgottenTab);
+    await user.click(forgottenTab);
 
     await waitFor(() => {
       expect(screen.getByText(/API Error/)).toBeInTheDocument();
@@ -1192,7 +1199,7 @@ describe('DiscoveryPage - Forgotten Favorites', () => {
 
     // Click on Forgotten Favorites tab
     const forgottenTab = screen.getByText(/Forgotten Favorites/);
-    fireEvent.click(forgottenTab);
+    await user.click(forgottenTab);
 
     // Wait for initial data to load
     await waitFor(() => {
@@ -1203,7 +1210,7 @@ describe('DiscoveryPage - Forgotten Favorites', () => {
 
     // Change dormant period to 6 months (180 days)
     const dormantSelect = screen.getByLabelText('Dormant for:');
-    fireEvent.change(dormantSelect, { target: { value: '180' } });
+    await user.selectOptions(dormantSelect, '180');
 
     // Should reload with new parameter
     await waitFor(() => {
@@ -1235,7 +1242,7 @@ describe('DiscoveryPage - Forgotten Favorites', () => {
 
     // Click on Forgotten Favorites tab
     const forgottenTab = screen.getByText(/Forgotten Favorites/);
-    fireEvent.click(forgottenTab);
+    await user.click(forgottenTab);
 
     await waitFor(() => {
       expect(screen.getByText('50 plays')).toBeInTheDocument();
@@ -1268,7 +1275,7 @@ describe('DiscoveryPage - Forgotten Favorites', () => {
 
     // Click on Forgotten Favorites tab
     const forgottenTab = screen.getByText(/Forgotten Favorites/);
-    fireEvent.click(forgottenTab);
+    await user.click(forgottenTab);
 
     await waitFor(() => {
       expect(screen.getByText('Copy All')).toBeInTheDocument();
@@ -1303,7 +1310,7 @@ describe('DiscoveryPage - Forgotten Favorites', () => {
 
     // Click on Forgotten Favorites tab
     const forgottenTab = screen.getByText(/Forgotten Favorites/);
-    fireEvent.click(forgottenTab);
+    await user.click(forgottenTab);
 
     // Should show loading message
     expect(

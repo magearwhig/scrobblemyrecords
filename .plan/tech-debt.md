@@ -146,16 +146,9 @@ scrobbleHistorySyncService
 
 ---
 
-### M6. `fireEvent` vs `userEvent` test inconsistency
+### ~~M6. `fireEvent` vs `userEvent` test inconsistency~~ DONE
 
-**Severity**: Medium | **Effort**: Medium (mechanical, 20 files)
-
-`TEST_STYLE_GUIDE.md` mandates `userEvent.setup()`, but 20 test files still use `fireEvent` (~194 instances) while only 8 use `userEvent` (~76 instances).
-
-**Worst offenders:** `ReleaseDetailsPage.test.tsx` (39), `DiscoveryPage.test.tsx` (26), `SettingsConnectionsSection.test.tsx` (18), `DateRangePicker.test.tsx` (16), `SuggestionCard.test.tsx` (13), and 15 more.
-
-**Action:**
-- [ ] Migrate remaining `fireEvent` calls to `userEvent.setup()` per the style guide
+**Completed:** February 2026. Migrated ~220 `fireEvent` calls across 19 test files to `userEvent.setup()` pattern. Each file now uses `let user = userEvent.setup()` in `beforeEach`, with `await user.click()`, `await user.type()`, `await user.selectOptions()` replacing `fireEvent.click()`, `fireEvent.change()`. Intentional exceptions retained: `Modal.test.tsx` (keyDown on document -- no userEvent equivalent), `AlbumCard.test.tsx` (custom DOM event dispatch), and range/slider inputs (userEvent doesn't support `clear()` on non-editable elements). All 857 frontend tests pass.
 
 ---
 

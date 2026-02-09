@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 
 import SuggestionCard from '../../../src/renderer/components/SuggestionCard';
@@ -48,8 +49,11 @@ const mockSuggestion: SuggestionResult = {
 };
 
 describe('SuggestionCard', () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
     // Set up localStorage mock before each test
     Object.defineProperty(window, 'localStorage', {
       value: localStorageMock,
@@ -86,7 +90,7 @@ describe('SuggestionCard', () => {
     expect(screen.queryByText('Score: 0.85')).not.toBeInTheDocument();
   });
 
-  it('toggles factor details when "Why this suggestion?" button is clicked', () => {
+  it('toggles factor details when "Why this suggestion?" button is clicked', async () => {
     render(<SuggestionCard suggestion={mockSuggestion} />);
 
     // Factors should not be visible initially (factor labels have colon suffix)
@@ -94,18 +98,18 @@ describe('SuggestionCard', () => {
 
     // Click "Why this suggestion?" button
     const whyButton = screen.getByText('Why this suggestion?');
-    fireEvent.click(whyButton);
+    await user.click(whyButton);
 
     // Factors should now be visible
     expect(screen.getByText('Last Played:')).toBeInTheDocument();
     expect(screen.getByText('Artist Affinity:')).toBeInTheDocument();
 
     // Click again to hide
-    fireEvent.click(screen.getByText('Hide details'));
+    await user.click(screen.getByText('Hide details'));
     expect(screen.queryByText('Last Played:')).not.toBeInTheDocument();
   });
 
-  it('calls onDismiss when dismiss button is clicked', () => {
+  it('calls onDismiss when dismiss button is clicked', async () => {
     const onDismiss = jest.fn();
     render(
       <SuggestionCard suggestion={mockSuggestion} onDismiss={onDismiss} />
@@ -113,7 +117,7 @@ describe('SuggestionCard', () => {
 
     // Find and click dismiss button (title is "Dismiss this suggestion")
     const dismissButton = screen.getByTitle('Dismiss this suggestion');
-    fireEvent.click(dismissButton);
+    await user.click(dismissButton);
 
     expect(onDismiss).toHaveBeenCalledWith(123);
   });
@@ -126,91 +130,91 @@ describe('SuggestionCard', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('formats recency gap correctly for years', () => {
+  it('formats recency gap correctly for years', async () => {
     const suggestionWithYears = {
       ...mockSuggestion,
       factors: { ...mockFactors, recencyGap: 400 },
     };
     render(<SuggestionCard suggestion={suggestionWithYears} />);
 
-    fireEvent.click(screen.getByText('Why this suggestion?'));
+    await user.click(screen.getByText('Why this suggestion?'));
     expect(screen.getByText('1+ years')).toBeInTheDocument();
   });
 
-  it('formats recency gap correctly for months', () => {
+  it('formats recency gap correctly for months', async () => {
     const suggestionWithMonths = {
       ...mockSuggestion,
       factors: { ...mockFactors, recencyGap: 60 },
     };
     render(<SuggestionCard suggestion={suggestionWithMonths} />);
 
-    fireEvent.click(screen.getByText('Why this suggestion?'));
+    await user.click(screen.getByText('Why this suggestion?'));
     expect(screen.getByText('2 months')).toBeInTheDocument();
   });
 
-  it('formats recent addition correctly for weeks', () => {
+  it('formats recent addition correctly for weeks', async () => {
     const suggestionRecentWeeks = {
       ...mockSuggestion,
       factors: { ...mockFactors, recentAddition: 14 },
     };
     render(<SuggestionCard suggestion={suggestionRecentWeeks} />);
 
-    fireEvent.click(screen.getByText('Why this suggestion?'));
+    await user.click(screen.getByText('Why this suggestion?'));
     expect(screen.getByText('2 weeks ago')).toBeInTheDocument();
   });
 
-  it('formats recent addition correctly for months', () => {
+  it('formats recent addition correctly for months', async () => {
     const suggestionRecentMonths = {
       ...mockSuggestion,
       factors: { ...mockFactors, recentAddition: 60 },
     };
     render(<SuggestionCard suggestion={suggestionRecentMonths} />);
 
-    fireEvent.click(screen.getByText('Why this suggestion?'));
+    await user.click(screen.getByText('Why this suggestion?'));
     expect(screen.getByText('2 months ago')).toBeInTheDocument();
   });
 
-  it('formats recent addition correctly for years', () => {
+  it('formats recent addition correctly for years', async () => {
     const suggestionRecentYears = {
       ...mockSuggestion,
       factors: { ...mockFactors, recentAddition: 400 },
     };
     render(<SuggestionCard suggestion={suggestionRecentYears} />);
 
-    fireEvent.click(screen.getByText('Why this suggestion?'));
+    await user.click(screen.getByText('Why this suggestion?'));
     expect(screen.getByText('1 years ago')).toBeInTheDocument();
   });
 
-  it('formats user rating correctly when not rated', () => {
+  it('formats user rating correctly when not rated', async () => {
     const suggestionNotRated = {
       ...mockSuggestion,
       factors: { ...mockFactors, userRating: 0 },
     };
     render(<SuggestionCard suggestion={suggestionNotRated} />);
 
-    fireEvent.click(screen.getByText('Why this suggestion?'));
+    await user.click(screen.getByText('Why this suggestion?'));
     expect(screen.getByText('Not rated')).toBeInTheDocument();
   });
 
-  it('formats diversity penalty correctly when none', () => {
+  it('formats diversity penalty correctly when none', async () => {
     const suggestionNoPenalty = {
       ...mockSuggestion,
       factors: { ...mockFactors, diversityPenalty: 0 },
     };
     render(<SuggestionCard suggestion={suggestionNoPenalty} />);
 
-    fireEvent.click(screen.getByText('Why this suggestion?'));
+    await user.click(screen.getByText('Why this suggestion?'));
     expect(screen.getByText('None')).toBeInTheDocument();
   });
 
-  it('formats neverPlayed boolean correctly', () => {
+  it('formats neverPlayed boolean correctly', async () => {
     const suggestionNeverPlayed = {
       ...mockSuggestion,
       factors: { ...mockFactors, neverPlayed: true },
     };
     render(<SuggestionCard suggestion={suggestionNeverPlayed} />);
 
-    fireEvent.click(screen.getByText('Why this suggestion?'));
+    await user.click(screen.getByText('Why this suggestion?'));
     expect(screen.getByText('Yes')).toBeInTheDocument();
   });
 
@@ -221,20 +225,20 @@ describe('SuggestionCard', () => {
     expect(screen.getByText(/2020.*•.*Vinyl/)).toBeInTheDocument();
   });
 
-  it('navigates to collection when View in Collection is clicked', () => {
+  it('navigates to collection when View in Collection is clicked', async () => {
     render(<SuggestionCard suggestion={mockSuggestion} />);
 
     const viewButton = screen.getByText('View in Collection');
-    fireEvent.click(viewButton);
+    await user.click(viewButton);
 
     expect(window.location.hash).toBe('#collection?highlight=123');
   });
 
-  it('stores release data and navigates when Details button is clicked', () => {
+  it('stores release data and navigates when Details button is clicked', async () => {
     render(<SuggestionCard suggestion={mockSuggestion} />);
 
     const detailsButton = screen.getByText('Details');
-    fireEvent.click(detailsButton);
+    await user.click(detailsButton);
 
     expect(localStorageMock.setItem).toHaveBeenCalled();
     // Component navigates to release-details (without the ID in hash)

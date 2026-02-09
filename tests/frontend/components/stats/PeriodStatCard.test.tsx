@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 
 import '@testing-library/jest-dom';
@@ -6,6 +7,7 @@ import { PeriodStatCard } from '../../../../src/renderer/components/stats/Period
 
 describe('PeriodStatCard', () => {
   const mockOnPeriodChange = jest.fn();
+  let user: ReturnType<typeof userEvent.setup>;
 
   const mockValues = {
     month: { value: '67%', subValue: '100 of 150 albums this month' },
@@ -18,6 +20,7 @@ describe('PeriodStatCard', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
   });
 
   it('should render icon, value, and label', () => {
@@ -66,7 +69,7 @@ describe('PeriodStatCard', () => {
     expect(screen.getByRole('combobox')).toBeInTheDocument();
   });
 
-  it('should call onPeriodChange when dropdown selection changes', () => {
+  it('should call onPeriodChange when dropdown selection changes', async () => {
     render(
       <PeriodStatCard
         icon='📀'
@@ -78,7 +81,7 @@ describe('PeriodStatCard', () => {
     );
 
     const select = screen.getByRole('combobox');
-    fireEvent.change(select, { target: { value: 'year' } });
+    await user.selectOptions(select, 'year');
 
     expect(mockOnPeriodChange).toHaveBeenCalledWith('year');
   });

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import React from 'react';
@@ -84,12 +84,14 @@ const createMockArtistHistory = (count: number) => ({
 
 describe('LastFmHistoryTab', () => {
   let mockApi: ReturnType<typeof createMockApiInstance>;
+  let user: ReturnType<typeof userEvent.setup>;
 
   beforeEach(() => {
     mockApi = createMockApiInstance();
     mockApiService.getApiService.mockReturnValue(mockApi as any);
     jest.clearAllMocks();
     jest.useFakeTimers();
+    user = userEvent.setup({ delay: null });
   });
 
   afterEach(() => {
@@ -240,7 +242,8 @@ describe('LastFmHistoryTab', () => {
       const searchInput = screen.getByPlaceholderText(
         'Search artists or albums...'
       );
-      fireEvent.change(searchInput, { target: { value: 'test' } });
+      await user.clear(searchInput);
+      await user.type(searchInput, 'test');
 
       // Should not call immediately
       expect(mockApi.getAlbumHistoryPaginated).toHaveBeenCalledTimes(1);
@@ -274,7 +277,8 @@ describe('LastFmHistoryTab', () => {
       const searchInput = screen.getByPlaceholderText(
         'Search artists or albums...'
       );
-      fireEvent.change(searchInput, { target: { value: 'test' } });
+      await user.clear(searchInput);
+      await user.type(searchInput, 'test');
 
       expect(screen.getByLabelText('Clear search')).toBeInTheDocument();
     });
@@ -300,7 +304,8 @@ describe('LastFmHistoryTab', () => {
       const searchInput = screen.getByPlaceholderText(
         'Search artists or albums...'
       );
-      fireEvent.change(searchInput, { target: { value: 'nonexistent' } });
+      await user.clear(searchInput);
+      await user.type(searchInput, 'nonexistent');
 
       jest.advanceTimersByTime(300);
 
@@ -342,7 +347,7 @@ describe('LastFmHistoryTab', () => {
       });
 
       const sortSelect = screen.getByRole('combobox');
-      fireEvent.change(sortSelect, { target: { value: 'lastPlayed-desc' } });
+      await user.selectOptions(sortSelect, 'lastPlayed-desc');
 
       await waitFor(() => {
         expect(mockApi.getAlbumHistoryPaginated).toHaveBeenCalledWith(
@@ -365,7 +370,7 @@ describe('LastFmHistoryTab', () => {
       });
 
       // Click Artist header to sort by artist
-      fireEvent.click(screen.getByText('Artist'));
+      await user.click(screen.getByText('Artist'));
 
       await waitFor(() => {
         expect(mockApi.getAlbumHistoryPaginated).toHaveBeenCalledWith(
@@ -433,7 +438,7 @@ describe('LastFmHistoryTab', () => {
         expect(screen.getByText('Next')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Next'));
+      await user.click(screen.getByText('Next'));
 
       await waitFor(() => {
         expect(mockApi.getAlbumHistoryPaginated).toHaveBeenCalledWith(
@@ -481,7 +486,7 @@ describe('LastFmHistoryTab', () => {
       });
 
       // Trigger sync complete via mock SyncStatusBar
-      fireEvent.click(screen.getByText('Trigger Sync Complete'));
+      await user.click(screen.getByText('Trigger Sync Complete'));
 
       await waitFor(() => {
         expect(mockApi.getAlbumHistoryPaginated).toHaveBeenCalledTimes(2);
@@ -569,7 +574,7 @@ describe('LastFmHistoryTab', () => {
         expect(screen.getByText('Artist 1')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Tracks' }));
+      await user.click(screen.getByRole('button', { name: 'Tracks' }));
 
       jest.advanceTimersByTime(300);
 
@@ -588,7 +593,7 @@ describe('LastFmHistoryTab', () => {
         expect(screen.getByText('Artist 1')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Tracks' }));
+      await user.click(screen.getByRole('button', { name: 'Tracks' }));
 
       jest.advanceTimersByTime(300);
 
@@ -608,7 +613,7 @@ describe('LastFmHistoryTab', () => {
         expect(screen.getByText(/Showing 3 of 3 albums/)).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Tracks' }));
+      await user.click(screen.getByRole('button', { name: 'Tracks' }));
 
       jest.advanceTimersByTime(300);
 
@@ -628,7 +633,7 @@ describe('LastFmHistoryTab', () => {
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Tracks' }));
+      await user.click(screen.getByRole('button', { name: 'Tracks' }));
 
       jest.advanceTimersByTime(300);
 
@@ -671,7 +676,7 @@ describe('LastFmHistoryTab', () => {
         expect(screen.getByText('Artist 1')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Artists' }));
+      await user.click(screen.getByRole('button', { name: 'Artists' }));
 
       jest.advanceTimersByTime(300);
 
@@ -691,7 +696,7 @@ describe('LastFmHistoryTab', () => {
         expect(screen.getByText('Artist 1')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Artists' }));
+      await user.click(screen.getByRole('button', { name: 'Artists' }));
 
       jest.advanceTimersByTime(300);
 
@@ -716,7 +721,7 @@ describe('LastFmHistoryTab', () => {
         expect(screen.getByText(/Showing 3 of 3 albums/)).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Artists' }));
+      await user.click(screen.getByRole('button', { name: 'Artists' }));
 
       jest.advanceTimersByTime(300);
 
@@ -736,7 +741,7 @@ describe('LastFmHistoryTab', () => {
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Artists' }));
+      await user.click(screen.getByRole('button', { name: 'Artists' }));
 
       jest.advanceTimersByTime(300);
 
@@ -756,7 +761,7 @@ describe('LastFmHistoryTab', () => {
         expect(screen.getByText('Artist 1')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Artists' }));
+      await user.click(screen.getByRole('button', { name: 'Artists' }));
 
       jest.advanceTimersByTime(300);
 
@@ -765,9 +770,7 @@ describe('LastFmHistoryTab', () => {
       });
 
       const sortSelect = screen.getByRole('combobox');
-      fireEvent.change(sortSelect, {
-        target: { value: 'albumCount-desc' },
-      });
+      await user.selectOptions(sortSelect, 'albumCount-desc');
 
       await waitFor(() => {
         expect(mockApi.getArtistHistoryPaginated).toHaveBeenCalledWith(
@@ -789,7 +792,7 @@ describe('LastFmHistoryTab', () => {
         expect(screen.getByText('Artist 1')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Artists' }));
+      await user.click(screen.getByRole('button', { name: 'Artists' }));
 
       jest.advanceTimersByTime(300);
 
@@ -798,7 +801,7 @@ describe('LastFmHistoryTab', () => {
       });
 
       // Click Plays header to toggle sort order (already sorted by playCount desc)
-      fireEvent.click(screen.getByText(/^Plays/));
+      await user.click(screen.getByText(/^Plays/));
 
       await waitFor(() => {
         expect(mockApi.getArtistHistoryPaginated).toHaveBeenCalledWith(
@@ -820,7 +823,7 @@ describe('LastFmHistoryTab', () => {
         expect(screen.getByText('Artist 1')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Artists' }));
+      await user.click(screen.getByRole('button', { name: 'Artists' }));
 
       jest.advanceTimersByTime(300);
 
@@ -828,7 +831,7 @@ describe('LastFmHistoryTab', () => {
         expect(mockApi.getArtistHistoryPaginated).toHaveBeenCalledTimes(1);
       });
 
-      fireEvent.click(screen.getByText('Trigger Sync Complete'));
+      await user.click(screen.getByText('Trigger Sync Complete'));
 
       await waitFor(() => {
         expect(mockApi.getArtistHistoryPaginated).toHaveBeenCalledTimes(2);
@@ -851,7 +854,7 @@ describe('LastFmHistoryTab', () => {
         expect(screen.getByText('Artist 1')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Artists' }));
+      await user.click(screen.getByRole('button', { name: 'Artists' }));
 
       jest.advanceTimersByTime(300);
 

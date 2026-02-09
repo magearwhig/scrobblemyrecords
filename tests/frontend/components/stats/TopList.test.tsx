@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 
 import '@testing-library/jest-dom';
@@ -7,6 +8,7 @@ import { ArtistPlayCount, AlbumPlayCount } from '../../../../src/shared/types';
 
 describe('TopList', () => {
   const mockOnPeriodChange = jest.fn();
+  let user: ReturnType<typeof userEvent.setup>;
 
   const mockArtists: ArtistPlayCount[] = [
     {
@@ -42,6 +44,7 @@ describe('TopList', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
   });
 
   describe('Artists list', () => {
@@ -223,7 +226,7 @@ describe('TopList', () => {
       expect(monthButton).toHaveClass('active');
     });
 
-    it('should call onPeriodChange when period is clicked', () => {
+    it('should call onPeriodChange when period is clicked', async () => {
       render(
         <TopList
           title='Top Artists'
@@ -234,7 +237,7 @@ describe('TopList', () => {
         />
       );
 
-      fireEvent.click(screen.getByText('Year'));
+      await user.click(screen.getByText('Year'));
 
       expect(mockOnPeriodChange).toHaveBeenCalledWith('year');
     });
@@ -278,7 +281,7 @@ describe('TopList', () => {
       expect(customButton).toHaveClass('active');
     });
 
-    it('should open date picker when Custom is clicked', () => {
+    it('should open date picker when Custom is clicked', async () => {
       render(
         <TopList
           title='Top Artists'
@@ -289,7 +292,7 @@ describe('TopList', () => {
         />
       );
 
-      fireEvent.click(screen.getByText('Custom'));
+      await user.click(screen.getByText('Custom'));
 
       // DateRangePicker should appear
       expect(screen.getByText('Last 3 Mo')).toBeInTheDocument();

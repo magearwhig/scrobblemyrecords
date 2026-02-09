@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 
 import '@testing-library/jest-dom';
@@ -8,6 +9,7 @@ import { CalendarHeatmapData } from '../../../../src/shared/types';
 describe('CalendarHeatmap', () => {
   const mockOnYearChange = jest.fn();
   const currentYear = new Date().getFullYear();
+  let user: ReturnType<typeof userEvent.setup>;
 
   const mockData: CalendarHeatmapData[] = [
     { date: `${currentYear}-01-01`, count: 5 },
@@ -18,6 +20,7 @@ describe('CalendarHeatmap', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    user = userEvent.setup();
   });
 
   it('should render the heatmap title', () => {
@@ -62,7 +65,7 @@ describe('CalendarHeatmap', () => {
     expect(options.length).toBe(3);
   });
 
-  it('should call onYearChange when a different year is selected', () => {
+  it('should call onYearChange when a different year is selected', async () => {
     render(
       <CalendarHeatmap
         data={mockData}
@@ -72,7 +75,7 @@ describe('CalendarHeatmap', () => {
     );
 
     const select = screen.getByRole('combobox');
-    fireEvent.change(select, { target: { value: String(currentYear - 1) } });
+    await user.selectOptions(select, String(currentYear - 1));
 
     expect(mockOnYearChange).toHaveBeenCalledWith(currentYear - 1);
   });
