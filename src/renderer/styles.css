@@ -2890,6 +2890,22 @@ body {
   text-transform: capitalize;
 }
 
+.history-session-status-text--completed {
+  color: #28a745;
+}
+
+.history-session-status-text--failed {
+  color: #dc3545;
+}
+
+.history-session-status-text--pending {
+  color: #ffc107;
+}
+
+.history-session-status-text--default {
+  color: #6c757d;
+}
+
 .history-session-timestamp {
   font-size: 0.9rem;
   color: var(--text-secondary);
@@ -2971,6 +2987,11 @@ body {
 
 .history-session-track {
   padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.history-session-track:last-child {
+  border-bottom: none;
 }
 
 .history-session-track-title {
@@ -8381,6 +8402,14 @@ body {
   max-width: 300px;
 }
 
+.collection-status-info--warning {
+  color: var(--warning-color);
+}
+
+.collection-status-info--success {
+  color: var(--success-color);
+}
+
 /* Warning card */
 .collection-warning-card {
   background-color: #fff3cd;
@@ -8455,6 +8484,10 @@ body {
 
 .collection-filter-separator {
   color: var(--text-secondary);
+}
+
+.collection-filter-clear-btn {
+  font-size: 0.85rem;
 }
 
 .collection-filter-results {

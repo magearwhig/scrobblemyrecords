@@ -12,6 +12,7 @@ import {
 } from '../../shared/types';
 import { Modal } from '../components/ui';
 import { NewReleasesTab } from '../components/wishlist/NewReleasesTab';
+import WishlistItemCard from '../components/WishlistItemCard';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -804,73 +805,20 @@ const WishlistPage: React.FC = () => {
           ) : (
             <div className='wishlist-grid'>
               {filteredItems.map(item => (
-                <div key={item.id} className='wishlist-card'>
-                  <div className='wishlist-card-image'>
-                    {item.coverImage ? (
-                      <img src={item.coverImage} alt={item.title} />
-                    ) : (
-                      <div className='wishlist-card-placeholder'>No Image</div>
-                    )}
-                    {getStatusBadge(item.vinylStatus)}
-                    {isItemMonitored(item.artist, item.title) && (
-                      <span className='wishlist-badge wishlist-badge-monitored'>
-                        Monitored
-                      </span>
-                    )}
-                  </div>
-                  <div className='wishlist-card-content'>
-                    <h4 className='wishlist-card-title'>{item.title}</h4>
-                    <p className='wishlist-card-artist'>{item.artist}</p>
-                    {item.year && (
-                      <p className='wishlist-card-year'>{item.year}</p>
-                    )}
-                    <div className='wishlist-card-meta'>
-                      <span className='wishlist-card-date'>
-                        Added: {formatDate(item.dateAdded)}
-                      </span>
-                      {item.lowestVinylPrice !== undefined && (
-                        <span className='wishlist-card-price'>
-                          From:{' '}
-                          {formatPrice(
-                            item.lowestVinylPrice,
-                            item.priceCurrency
-                          )}
-                        </span>
-                      )}
-                      {sortBy === 'scrobbles' &&
-                        (playCounts.get(
-                          getPlayCountKey(item.artist, item.title)
-                        )?.playCount ?? 0) > 0 && (
-                          <span className='wishlist-card-plays'>
-                            {
-                              playCounts.get(
-                                getPlayCountKey(item.artist, item.title)
-                              )?.playCount
-                            }{' '}
-                            plays
-                          </span>
-                        )}
-                    </div>
-                  </div>
-                  <div className='wishlist-card-actions'>
-                    <button
-                      className='btn btn-small btn-secondary'
-                      onClick={() => openVersionsModal(item)}
-                      title='View all versions/pressings'
-                    >
-                      Versions
-                    </button>
-                    {item.vinylStatus === 'has_vinyl' && (
-                      <button
-                        className='btn btn-small btn-primary'
-                        onClick={() => openDiscogsMarketplace(item)}
-                        title='Browse vinyl on Discogs Marketplace'
-                      >
-                        Shop
-                      </button>
-                    )}
-                  </div>
-                </div>
+                <WishlistItemCard
+                  key={item.id}
+                  item={item}
+                  isMonitored={isItemMonitored(item.artist, item.title)}
+                  getStatusBadge={getStatusBadge}
+                  formatDate={formatDate}
+                  formatPrice={formatPrice}
+                  showPlayCounts={sortBy === 'scrobbles'}
+                  playCount={playCounts.get(
+                    getPlayCountKey(item.artist, item.title)
+                  )}
+                  onOpenVersions={openVersionsModal}
+                  onOpenMarketplace={openDiscogsMarketplace}
+                />
               ))}
             </div>
           )}

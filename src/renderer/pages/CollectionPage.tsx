@@ -9,6 +9,8 @@ import {
   MarketplaceStats,
 } from '../../shared/types';
 import AlbumCard from '../components/AlbumCard';
+import CacheStatusIndicator from '../components/CacheStatusIndicator';
+import CollectionFilterControls from '../components/CollectionFilterControls';
 import SearchBar from '../components/SearchBar';
 import VirtualizedCollectionGrid from '../components/VirtualizedCollectionGrid';
 import { useApp } from '../context/AppContext';
@@ -240,8 +242,12 @@ const CollectionPage: React.FC = () => {
   };
 
   // Check if any filters are active
-  const hasActiveFilters =
-    filterFormat || filterYearFrom || filterYearTo || filterDateAdded;
+  const hasActiveFilters = !!(
+    filterFormat ||
+    filterYearFrom ||
+    filterYearTo ||
+    filterDateAdded
+  );
 
   // Clear all filters
   const clearFilters = () => {
@@ -1028,123 +1034,22 @@ const CollectionPage: React.FC = () => {
           </div>
 
           {/* Cache Management */}
-          <div className='collection-cache-management'>
-            {/* Status Indicators */}
-            <div className='collection-status-indicators'>
-              {preloading && (
-                <div className='collection-status-badge'>Preloading...</div>
-              )}
-
-              {cacheProgress && cacheProgress.status === 'loading' && (
-                <div className='collection-status-loading'>
-                  <div className='spinner collection-spinner-small'></div>
-                  Caching: {cacheProgress.currentPage}/
-                  {cacheProgress.totalPages} pages (
-                  {Math.round(
-                    (cacheProgress.currentPage / cacheProgress.totalPages) * 100
-                  )}
-                  %)
-                </div>
-              )}
-
-              {cacheProgress && cacheProgress.status === 'completed' && (
-                <div className='collection-status-success'>
-                  ✓ Cache complete ({cacheProgress.totalPages} pages)
-                </div>
-              )}
-
-              {usingCache && !cacheRefreshing && cacheStatus === 'valid' && (
-                <div className='collection-status-success'>
-                  ⚡ Using cached data
-                </div>
-              )}
-
-              {cacheStatus === 'expired' && cacheRefreshing && (
-                <div className='collection-status-warning'>
-                  <div className='spinner collection-spinner-small'></div>⏰
-                  Cache expired - Refreshing...
-                </div>
-              )}
-
-              {cacheStatus === 'partially_expired' && cacheRefreshing && (
-                <div className='collection-status-warning'>
-                  <div className='spinner collection-spinner-small'></div>
-                  ⚠️ Some cache expired - Refreshing...
-                </div>
-              )}
-
-              {checkingForNewItems && (
-                <div className='collection-status-loading'>
-                  <div className='spinner collection-spinner-small'></div>
-                  Checking for new items...
-                </div>
-              )}
-
-              {updatingWithNewItems && (
-                <div className='collection-status-loading'>
-                  <div className='spinner collection-spinner-small'></div>
-                  Adding new items to cache...
-                </div>
-              )}
-
-              {infoMessage && (
-                <div
-                  className='collection-status-info'
-                  style={{
-                    color: newItemsResult?.newItemsCount
-                      ? 'var(--warning-color)'
-                      : 'var(--success-color)',
-                  }}
-                >
-                  {newItemsResult?.newItemsCount ? '⚠️' : 'ℹ️'} {infoMessage}
-                </div>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div className='collection-cache-actions'>
-              <button
-                className='btn btn-small btn-secondary'
-                onClick={handleCheckForNewItems}
-                disabled={
-                  loading || checkingForNewItems || updatingWithNewItems
-                }
-                title='Check if new items have been added to your Discogs collection'
-              >
-                {checkingForNewItems ? 'Checking...' : 'Check for New Items'}
-              </button>
-              {newItemsResult && newItemsResult.newItemsCount > 0 && (
-                <button
-                  className='btn btn-small btn-primary'
-                  onClick={handleUpdateWithNewItems}
-                  disabled={
-                    loading || checkingForNewItems || updatingWithNewItems
-                  }
-                  title='Add only the new items to your cache without refreshing everything'
-                >
-                  {updatingWithNewItems
-                    ? 'Adding...'
-                    : `Update with New Items (${newItemsResult.newItemsCount})`}
-                </button>
-              )}
-              <button
-                className='btn btn-small btn-secondary'
-                onClick={handleForceReloadCache}
-                disabled={loading || updatingWithNewItems}
-                title='Force reload the entire cache from Discogs'
-              >
-                Force Reload
-              </button>
-              <button
-                className='btn btn-small btn-secondary'
-                onClick={handleClearCache}
-                disabled={loading || updatingWithNewItems}
-                title='Clear the local cache'
-              >
-                Clear Cache
-              </button>
-            </div>
-          </div>
+          <CacheStatusIndicator
+            preloading={preloading}
+            cacheProgress={cacheProgress}
+            cacheStatus={cacheStatus}
+            cacheRefreshing={cacheRefreshing}
+            usingCache={usingCache}
+            checkingForNewItems={checkingForNewItems}
+            updatingWithNewItems={updatingWithNewItems}
+            infoMessage={infoMessage}
+            newItemsResult={newItemsResult}
+            loading={loading}
+            onCheckForNewItems={handleCheckForNewItems}
+            onUpdateWithNewItems={handleUpdateWithNewItems}
+            onForceReload={handleForceReloadCache}
+            onClearCache={handleClearCache}
+          />
         </div>
 
         {error && (
@@ -1189,94 +1094,21 @@ const CollectionPage: React.FC = () => {
         />
 
         {/* Filters Section */}
-        <div className='collection-filters'>
-          <span className='collection-filters-label'>Filters:</span>
-
-          {/* Format Filter */}
-          <div className='collection-filter-group'>
-            <label htmlFor='filter-format' className='collection-filter-label'>
-              Format:
-            </label>
-            <select
-              id='filter-format'
-              value={filterFormat}
-              onChange={e => setFilterFormat(e.target.value)}
-              className='collection-filter-select'
-            >
-              <option value=''>All Formats</option>
-              {filterOptions.formats.map(format => (
-                <option key={format} value={format}>
-                  {format}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Year Range Filter */}
-          <div className='collection-filter-group'>
-            <label className='collection-filter-label'>Year:</label>
-            <input
-              type='number'
-              placeholder={String(filterOptions.years.min)}
-              value={filterYearFrom}
-              onChange={e => setFilterYearFrom(e.target.value)}
-              min={filterOptions.years.min}
-              max={filterOptions.years.max}
-              className='collection-filter-input'
-            />
-            <span className='collection-filter-separator'>-</span>
-            <input
-              type='number'
-              placeholder={String(filterOptions.years.max)}
-              value={filterYearTo}
-              onChange={e => setFilterYearTo(e.target.value)}
-              min={filterOptions.years.min}
-              max={filterOptions.years.max}
-              className='collection-filter-input'
-            />
-          </div>
-
-          {/* Date Added Filter */}
-          <div className='collection-filter-group'>
-            <label
-              htmlFor='filter-date-added'
-              className='collection-filter-label'
-            >
-              Added:
-            </label>
-            <select
-              id='filter-date-added'
-              value={filterDateAdded}
-              onChange={e => setFilterDateAdded(e.target.value)}
-              className='collection-filter-select'
-            >
-              <option value=''>Any Time</option>
-              <option value='week'>Last Week</option>
-              <option value='month'>Last Month</option>
-              <option value='3months'>Last 3 Months</option>
-              <option value='year'>Last Year</option>
-            </select>
-          </div>
-
-          {/* Clear Filters Button */}
-          {hasActiveFilters && (
-            <button
-              className='btn btn-small btn-outline'
-              onClick={clearFilters}
-              style={{ fontSize: '0.85rem' }}
-            >
-              Clear Filters
-            </button>
-          )}
-
-          {/* Filter Results Count */}
-          {hasActiveFilters && (
-            <span className='collection-filter-results'>
-              Showing {filteredCollection.length} of {entireCollection.length}{' '}
-              items
-            </span>
-          )}
-        </div>
+        <CollectionFilterControls
+          filterFormat={filterFormat}
+          onFilterFormatChange={setFilterFormat}
+          filterYearFrom={filterYearFrom}
+          onFilterYearFromChange={setFilterYearFrom}
+          filterYearTo={filterYearTo}
+          onFilterYearToChange={setFilterYearTo}
+          filterDateAdded={filterDateAdded}
+          onFilterDateAddedChange={setFilterDateAdded}
+          hasActiveFilters={hasActiveFilters}
+          onClearFilters={clearFilters}
+          filteredCount={filteredCollection.length}
+          totalCount={entireCollection.length}
+          filterOptions={filterOptions}
+        />
 
         <div className='collection-controls'>
           <div className='collection-controls-group'>

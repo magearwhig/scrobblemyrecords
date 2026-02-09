@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
 import { MonitoredSeller, SellerScanStatus } from '../../shared/types';
+import SellerCard from '../components/SellerCard';
 import { Modal, ModalFooter } from '../components/ui';
 import { useApp } from '../context/AppContext';
 import {
@@ -543,46 +544,13 @@ const SellersPage: React.FC = () => {
       ) : (
         <div className='sellers-list'>
           {sellers.map(seller => (
-            <div key={seller.username} className='seller-card'>
-              <div className='seller-card-header'>
-                <div className='seller-card-info'>
-                  <div className='seller-card-name'>{seller.displayName}</div>
-                  <div className='seller-card-username'>@{seller.username}</div>
-                </div>
-                <div className='seller-card-stats'>
-                  <span>
-                    Inventory: {seller.inventorySize?.toLocaleString() || '?'}
-                  </span>
-                  <span>Matches: {seller.matchCount || 0}</span>
-                </div>
-              </div>
-              <div className='seller-card-meta'>
-                {seller.lastScanned
-                  ? `Last scanned: ${formatRelativeTime(seller.lastScanned)}`
-                  : 'Not yet scanned'}
-              </div>
-              <div className='seller-card-actions'>
-                {(seller.matchCount || 0) > 0 && (
-                  <button
-                    className='btn btn-small'
-                    onClick={() => {
-                      window.location.hash = `seller-matches?seller=${encodeURIComponent(seller.username)}`;
-                    }}
-                  >
-                    View Matches
-                  </button>
-                )}
-                <button
-                  className='btn btn-small btn-danger'
-                  onClick={() => handleRemoveSeller(seller.username)}
-                  disabled={removingUsername === seller.username}
-                >
-                  {removingUsername === seller.username
-                    ? 'Removing...'
-                    : 'Remove'}
-                </button>
-              </div>
-            </div>
+            <SellerCard
+              key={seller.username}
+              seller={seller}
+              formatRelativeTime={formatRelativeTime}
+              onRemove={handleRemoveSeller}
+              removing={removingUsername === seller.username}
+            />
           ))}
         </div>
       )}

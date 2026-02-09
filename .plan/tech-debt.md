@@ -226,22 +226,24 @@ Migration of existing `alert()` and inline message patterns to use toasts is def
 
 ---
 
-### M19. Component extraction -- Level 3 & 4
+### ~~M19. Component extraction -- Level 3 & 4~~ DONE
 
-**Severity**: Medium | **Effort**: Medium
-
-Large inline JSX blocks in page files that should be their own components. Level 1 (Button, Badge, ProgressBar) and Level 2 (Modal) are complete.
+**Completed:** February 2026. Extracted 7 components from 6 page files (DiscoveryItemCard already extracted to tab components):
 
 **Level 3 -- Feature-specific cards:**
-- [ ] `DiscoveryItemCard` from `DiscoveryPage.tsx` (~100+ lines per card type)
-- [ ] `WishlistItemCard` from `WishlistPage.tsx` (~130 lines)
-- [ ] `ReleaseCard` from `NewReleasesPage.tsx` (~115 lines)
-- [ ] `SellerCard` & `MatchCard` from `SellersPage.tsx` / `SellerMatchesPage.tsx`
-- [ ] `ScrobbleSessionCard` from `HistoryPage.tsx` (~230 lines)
+- `WishlistItemCard.tsx` from `WishlistPage.tsx` -- card image, metadata, vinyl status badges, play counts, actions
+- `ReleaseCard.tsx` from `NewReleasesPage.tsx` -- cover, info, vinyl status, marketplace links, hide/exclude actions
+- `SellerCard.tsx` from `SellersPage.tsx` -- seller info, stats, scan status, view matches/remove actions
+- `MatchCard.tsx` from `SellerMatchesPage.tsx` -- cover, match info, price, status badges, verify/mark seen actions
+- `ScrobbleSessionCard.tsx` from `HistoryPage.tsx` -- session header, status, track list, album covers, expand/collapse details
 
 **Level 4 -- Complex logic blocks:**
-- [ ] `CollectionFilterControls` from `CollectionPage.tsx` (~150 lines)
-- [ ] `CacheStatusIndicator` from `CollectionPage.tsx` (~185 lines)
+- `CollectionFilterControls.tsx` from `CollectionPage.tsx` -- format, year range, date added filters with clear and results count
+- `CacheStatusIndicator.tsx` from `CollectionPage.tsx` -- cache status badges, progress indicators, action buttons
+
+All components wrapped with `React.memo`. Inline styles replaced with CSS classes: session status colors, track borders, cache info colors, filter clear button. Updated HistoryPage test assertions to check CSS classes instead of inline styles.
+
+**Files:** 7 new components in `src/renderer/components/`, 6 updated pages, `styles.css`, `tests/frontend/pages/HistoryPage.test.tsx`
 
 ---
 
@@ -371,7 +373,7 @@ Large inline JSX blocks in page files that should be their own components. Level
 | M16 | README architecture out of date | Medium | Yes |
 | M17 | ~~No contributor development guide~~ | ~~Medium~~ | ~~DONE~~ |
 | M18 | ~~Documentation gaps (gitignored docs)~~ | ~~Medium~~ | ~~DONE~~ |
-| M19 | Component extraction Level 3 & 4 | Medium | No |
+| M19 | ~~Component extraction Level 3 & 4~~ | ~~Medium~~ | ~~DONE~~ |
 | L1 | License metadata mismatch (ISC vs MIT) | Low | Yes |
 | L2 | Legacy auth endpoints likely unused | Low | Yes |
 | L3 | Security audit doesn't fail CI | Low | Yes |
@@ -385,7 +387,7 @@ Large inline JSX blocks in page files that should be their own components. Level
 | L11 | ~~Centralize route identifiers~~ | ~~Low~~ | ~~DONE~~ |
 | L12 | ~~Sidebar reorganization~~ | ~~Low~~ | ~~DONE~~ |
 
-**Total open**: 8 items (1 critical, 2 high, 0 medium, 5 low) -- 30 completed (10 Phase 0 + 11 Phase 1 + 3 Phase 2 + 6 Phase 3, February 2026)
+**Total open**: 7 items (1 critical, 1 high, 3 medium, 2 low) -- 31 completed (10 Phase 0 + 11 Phase 1 + 3 Phase 2 + 7 Phase 3, February 2026)
 
 ---
 

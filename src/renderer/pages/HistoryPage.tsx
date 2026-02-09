@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 import { ScrobbleSession, ScrobbleTrack } from '../../shared/types';
 import LastFmHistoryTab from '../components/LastFmHistoryTab';
+import ScrobbleSessionCard from '../components/ScrobbleSessionCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { SessionCardSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
@@ -162,19 +163,6 @@ const HistoryPage: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return '#28a745';
-      case 'failed':
-        return '#dc3545';
-      case 'pending':
-        return '#ffc107';
-      default:
-        return '#6c757d';
-    }
-  };
-
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
@@ -323,156 +311,23 @@ const HistoryPage: React.FC = () => {
           {sessions.length > 0 && (
             <div className='history-sessions-grid'>
               {sessions.map(session => (
-                <div key={session.id} className='card'>
-                  <div className='history-session-header'>
-                    <div className='history-session-info'>
-                      <div className='history-session-status'>
-                        <span className='history-session-status-icon'>
-                          {getStatusIcon(session.status)}
-                        </span>
-                        <span
-                          className='history-session-status-text'
-                          style={{ color: getStatusColor(session.status) }}
-                        >
-                          {session.status}
-                        </span>
-                      </div>
-
-                      <div className='history-session-timestamp'>
-                        {formatDate(session.timestamp)}
-                      </div>
-
-                      <div className='history-session-tracks'>
-                        <strong>{session.tracks.length}</strong> tracks
-                        {session.status === 'completed' && (
-                          <span className='history-session-success'>
-                            • Successfully scrobbled
-                          </span>
-                        )}
-                        {session.status === 'failed' && session.error && (
-                          <span className='history-session-error'>
-                            • {session.error}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Album cover thumbnails */}
-                      {(() => {
-                        const uniqueAlbums = getUniqueAlbumCovers(
-                          session.tracks
-                        );
-                        if (uniqueAlbums.length > 0) {
-                          return (
-                            <div className='history-session-covers'>
-                              {uniqueAlbums.slice(0, 5).map((album, idx) => (
-                                <div
-                                  key={idx}
-                                  title={`${album.album} by ${album.artist}`}
-                                  className='history-session-cover-thumbnail'
-                                  style={{
-                                    backgroundImage: `url(${album.cover})`,
-                                  }}
-                                />
-                              ))}
-                              {uniqueAlbums.length > 5 && (
-                                <div className='history-session-covers-more'>
-                                  +{uniqueAlbums.length - 5} more
-                                </div>
-                              )}
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
-
-                    <div className='history-session-actions'>
-                      <button
-                        className='btn btn-small btn-secondary'
-                        onClick={() =>
-                          setSelectedSession(
-                            selectedSession?.id === session.id ? null : session
-                          )
-                        }
-                      >
-                        {selectedSession?.id === session.id
-                          ? 'Hide Details'
-                          : 'View Details'}
-                      </button>
-
-                      {/* Action buttons for pending and failed sessions */}
-                      {(session.status === 'pending' ||
-                        session.status === 'failed') && (
-                        <>
-                          <button
-                            className='btn btn-small btn-danger'
-                            onClick={() => handleDeleteSession(session.id)}
-                            disabled={actionLoading === `delete-${session.id}`}
-                          >
-                            {actionLoading === `delete-${session.id}`
-                              ? 'Deleting...'
-                              : 'Delete'}
-                          </button>
-                          <button
-                            className='btn btn-small'
-                            onClick={() => handleResubmitSession(session.id)}
-                            disabled={
-                              actionLoading === `resubmit-${session.id}`
-                            }
-                          >
-                            {actionLoading === `resubmit-${session.id}`
-                              ? 'Resubmitting...'
-                              : 'Resubmit'}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {selectedSession?.id === session.id && (
-                    <div className='history-session-details'>
-                      <h4 className='history-session-details-header'>
-                        Session Details
-                      </h4>
-
-                      <div className='history-session-details-row'>
-                        <strong>Session ID:</strong> {session.id}
-                      </div>
-
-                      <div className='history-session-details-row'>
-                        <strong>Tracks ({session.tracks.length}):</strong>
-                      </div>
-
-                      <div className='history-session-tracklist'>
-                        {session.tracks.map((track, index) => (
-                          <div
-                            key={index}
-                            className='history-session-track'
-                            style={{
-                              borderBottom:
-                                index < session.tracks.length - 1
-                                  ? '1px solid var(--border-color)'
-                                  : 'none',
-                            }}
-                          >
-                            <div className='history-session-track-title'>
-                              {track.track}
-                            </div>
-                            <div className='history-session-track-meta'>
-                              {track.artist} • {track.album}
-                            </div>
-                            {track.timestamp && (
-                              <div className='history-session-track-timestamp'>
-                                Scrobbled:{' '}
-                                {formatLocalTimeClean(track.timestamp * 1000)}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <ScrobbleSessionCard
+                  key={session.id}
+                  session={session}
+                  isExpanded={selectedSession?.id === session.id}
+                  onToggleDetails={() =>
+                    setSelectedSession(
+                      selectedSession?.id === session.id ? null : session
+                    )
+                  }
+                  getStatusIcon={getStatusIcon}
+                  formatDate={formatDate}
+                  formatTrackTimestamp={formatLocalTimeClean}
+                  onDelete={handleDeleteSession}
+                  onResubmit={handleResubmitSession}
+                  actionLoading={actionLoading}
+                  getUniqueAlbumCovers={getUniqueAlbumCovers}
+                />
               ))}
             </div>
           )}

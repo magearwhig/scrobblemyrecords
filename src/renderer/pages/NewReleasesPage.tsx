@@ -7,6 +7,7 @@ import {
   ReleaseTrackingSyncStatus,
   HiddenRelease,
 } from '../../shared/types';
+import ReleaseCard from '../components/ReleaseCard';
 import { Modal, ModalFooter } from '../components/ui';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -680,119 +681,16 @@ const NewReleasesPage: React.FC = () => {
       {!loading && !error && filteredReleases.length > 0 && (
         <div className='releases-grid'>
           {filteredReleases.map(release => (
-            <div
+            <ReleaseCard
               key={release.mbid}
-              className={`release-card ${release.isUpcoming ? 'upcoming' : ''}`}
-            >
-              <div className='release-cover'>
-                {release.coverArtUrl ? (
-                  <img
-                    src={release.coverArtUrl}
-                    alt={release.title}
-                    loading='lazy'
-                  />
-                ) : (
-                  <div className='no-cover'>
-                    <span>No Cover</span>
-                  </div>
-                )}
-                {release.isUpcoming && (
-                  <div className='upcoming-badge'>Upcoming</div>
-                )}
-              </div>
-
-              <div className='release-info'>
-                <h3 className='release-title' title={release.title}>
-                  {release.title}
-                </h3>
-                <p className='release-artist' title={release.artistName}>
-                  {release.artistName}
-                </p>
-                <p className='release-date'>
-                  {formatReleaseDate(release.releaseDate)}
-                </p>
-                <div className='release-type'>
-                  <span className='badge badge-type'>
-                    {release.releaseType}
-                  </span>
-                  {getVinylBadge(release.vinylStatus)}
-                </div>
-
-                {release.vinylPriceRange && (
-                  <p className='price-range'>
-                    ${release.vinylPriceRange.min.toFixed(2)} - $
-                    {release.vinylPriceRange.max.toFixed(2)}{' '}
-                    {release.vinylPriceRange.currency}
-                  </p>
-                )}
-
-                <div className='release-actions'>
-                  {/* Check vinyl button for unchecked releases */}
-                  {(release.vinylStatus === 'unknown' ||
-                    release.vinylStatus === 'not-found') && (
-                    <button
-                      className='btn btn-secondary btn-sm'
-                      onClick={() =>
-                        handleCheckVinyl(release.mbid, release.title)
-                      }
-                    >
-                      Check Vinyl
-                    </button>
-                  )}
-                  {release.vinylStatus === 'checking' && (
-                    <span className='checking-status'>Checking...</span>
-                  )}
-                  {release.discogsUrl && (
-                    <a
-                      href={release.discogsUrl}
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      className='btn btn-secondary btn-sm'
-                    >
-                      View on Discogs
-                    </a>
-                  )}
-                  {release.vinylStatus === 'available' &&
-                    !release.inWishlist &&
-                    release.discogsMasterId && (
-                      <button
-                        className='btn btn-primary btn-sm'
-                        onClick={() =>
-                          handleAddToWishlist(release.mbid, release.title)
-                        }
-                      >
-                        Add to Wishlist
-                      </button>
-                    )}
-                  {release.inWishlist && (
-                    <span className='in-wishlist'>✓ In Wishlist</span>
-                  )}
-                </div>
-
-                {/* Hide/Exclude actions */}
-                <div className='release-hide-actions'>
-                  <button
-                    className='btn-icon btn-hide'
-                    onClick={() => handleHideRelease(release)}
-                    title='Hide this release'
-                  >
-                    ✕
-                  </button>
-                  <button
-                    className='btn-icon btn-exclude'
-                    onClick={() =>
-                      handleExcludeArtist(
-                        release.artistName,
-                        release.artistMbid
-                      )
-                    }
-                    title={`Exclude ${release.artistName} from release tracking`}
-                  >
-                    🚫
-                  </button>
-                </div>
-              </div>
-            </div>
+              release={release}
+              formatReleaseDate={formatReleaseDate}
+              getVinylBadge={getVinylBadge}
+              onCheckVinyl={handleCheckVinyl}
+              onAddToWishlist={handleAddToWishlist}
+              onHide={handleHideRelease}
+              onExcludeArtist={handleExcludeArtist}
+            />
           ))}
         </div>
       )}

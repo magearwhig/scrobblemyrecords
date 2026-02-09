@@ -499,9 +499,13 @@ describe('HistoryPage', () => {
         const failedStatus = screen.getByText('failed');
         const pendingStatus = screen.getByText('pending');
 
-        expect(completedStatus).toHaveStyle('color: #28a745'); // Green
-        expect(failedStatus).toHaveStyle('color: #dc3545'); // Red
-        expect(pendingStatus).toHaveStyle('color: #ffc107'); // Yellow
+        expect(completedStatus).toHaveClass(
+          'history-session-status-text--completed'
+        );
+        expect(failedStatus).toHaveClass('history-session-status-text--failed');
+        expect(pendingStatus).toHaveClass(
+          'history-session-status-text--pending'
+        );
       });
     });
   });
