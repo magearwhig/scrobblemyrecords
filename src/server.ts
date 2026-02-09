@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import morgan from 'morgan';
 
 // Load environment variables before any other imports
 dotenv.config();
@@ -240,6 +241,19 @@ const apiLimiter = rateLimit({
   },
 });
 app.use('/api/', apiLimiter);
+
+// HTTP request logging via morgan, piped through the secure logger.
+// Uses 'dev' format in development (colored, concise) and 'combined' in production.
+// Skips health-check noise.
+if (process.env.NODE_ENV !== 'test') {
+  const requestLog = createLogger('HTTP');
+  app.use(
+    morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev', {
+      stream: { write: (msg: string) => requestLog.info(msg.trimEnd()) },
+      skip: req => req.url === '/health',
+    })
+  );
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {

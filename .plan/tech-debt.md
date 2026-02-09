@@ -298,17 +298,11 @@ Large inline JSX blocks in page files that should be their own components. Level
 
 ---
 
-### L9. No request logging middleware / observability
+### ~~L9. No request logging middleware / observability~~ DONE
 
-**Effort**: Quick win (morgan) / Medium (structured logging)
+**Completed:** February 2026. Added `morgan` middleware to `src/server.ts`, piped through the existing `SecureLogger` via a custom stream. Uses `dev` format in development, `combined` in production. Skips `/health` endpoint noise. Disabled in test environment. Structured logging with `pino` deferred as separate future work.
 
-No HTTP request/response logging. Debugging API issues requires manually adding log statements.
-
-**Action:**
-- [ ] Add `morgan` for dev-mode request logging
-- [ ] Consider structured JSON logging with `pino` longer-term
-
-**Files:** `src/server.ts`
+**Files:** `src/server.ts`, `package.json`
 
 ---
 
@@ -406,12 +400,12 @@ Current flat list of nav items lacks visual hierarchy.
 | L6 | Config drift: deprecated PORT + HOST risk | Low | Yes |
 | L7 | Unused dependency: wait-on | Low | Yes |
 | L8 | CI doesn't test Node 22 | Low | Yes |
-| L9 | No request logging / observability | Low | Quick+ |
+| L9 | ~~No request logging / observability~~ | ~~Low~~ | ~~DONE~~ |
 | L10 | No focus trap in modals + dead state | Low | Yes |
 | L11 | Centralize route identifiers | Low | Yes |
 | L12 | Sidebar reorganization | Low | No |
 
-**Total open**: 14 items (1 critical, 2 high, 2 medium, 9 low) -- 24 completed (10 Phase 0 + 11 Phase 1 + 3 Phase 2, February 2026)
+**Total open**: 13 items (1 critical, 2 high, 2 medium, 8 low) -- 25 completed (10 Phase 0 + 11 Phase 1 + 3 Phase 2 + 1 Phase 3, February 2026)
 
 ---
 
