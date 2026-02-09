@@ -1,4 +1,5 @@
 import { DiscogsService } from '../../src/backend/services/discogsService';
+import { HiddenReleasesService } from '../../src/backend/services/hiddenReleasesService';
 import { MusicBrainzService } from '../../src/backend/services/musicbrainzService';
 import { ReleaseTrackingService } from '../../src/backend/services/releaseTrackingService';
 import { WishlistService } from '../../src/backend/services/wishlistService';
@@ -14,9 +15,23 @@ import {
 
 // Mock dependencies
 jest.mock('../../src/backend/services/discogsService');
+jest.mock('../../src/backend/services/hiddenReleasesService');
 jest.mock('../../src/backend/services/musicbrainzService');
 jest.mock('../../src/backend/services/wishlistService');
 jest.mock('../../src/backend/utils/fileStorage');
+jest.mock('../../src/backend/utils/logger', () => ({
+  createLogger: () => ({
+    info: jest.fn(),
+    debug: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  }),
+}));
+jest.mock('../../src/backend/services/artistMappingService', () => ({
+  artistMappingService: {
+    getLastfmName: jest.fn((name: string) => name),
+  },
+}));
 
 describe('ReleaseTrackingService', () => {
   let service: ReleaseTrackingService;
@@ -1015,6 +1030,303 @@ describe('ReleaseTrackingService', () => {
       // Assert
       expect(releases).toHaveLength(5);
     });
+
+    it('should filter by artistMbid', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Album A',
+            artistName: 'Artist A',
+            artistMbid: 'mbid-a',
+            releaseDate: '2024-01-15',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+          {
+            mbid: 'rg-2',
+            title: 'Album B',
+            artistName: 'Artist B',
+            artistMbid: 'mbid-b',
+            releaseDate: '2024-02-15',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      // Act
+      const releases = await service.getFilteredReleases({
+        artistMbid: 'mbid-a',
+      });
+
+      // Assert
+      expect(releases).toHaveLength(1);
+      expect(releases[0].artistMbid).toBe('mbid-a');
+    });
+
+    it('should sort by artistName', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Album',
+            artistName: 'Zappa',
+            artistMbid: 'mbid-z',
+            releaseDate: '2024-01-15',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+          {
+            mbid: 'rg-2',
+            title: 'Album',
+            artistName: 'Aphex Twin',
+            artistMbid: 'mbid-a',
+            releaseDate: '2024-01-15',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      // Act
+      const releases = await service.getFilteredReleases({
+        sortBy: 'artistName',
+        sortOrder: 'asc',
+      });
+
+      // Assert
+      expect(releases[0].artistName).toBe('Aphex Twin');
+      expect(releases[1].artistName).toBe('Zappa');
+    });
+
+    it('should sort by title', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Zebra',
+            artistName: 'Artist',
+            artistMbid: 'mbid',
+            releaseDate: '2024-01-15',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+          {
+            mbid: 'rg-2',
+            title: 'Alpha',
+            artistName: 'Artist',
+            artistMbid: 'mbid',
+            releaseDate: '2024-01-15',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      // Act
+      const releases = await service.getFilteredReleases({
+        sortBy: 'title',
+        sortOrder: 'asc',
+      });
+
+      // Assert
+      expect(releases[0].title).toBe('Alpha');
+      expect(releases[1].title).toBe('Zebra');
+    });
+
+    it('should sort by firstSeen', async () => {
+      // Arrange
+      const earlier = Date.now() - 86400000;
+      const later = Date.now();
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Old Discovery',
+            artistName: 'Artist',
+            artistMbid: 'mbid',
+            releaseDate: '2024-01-15',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: earlier,
+            isUpcoming: false,
+            inWishlist: false,
+          },
+          {
+            mbid: 'rg-2',
+            title: 'New Discovery',
+            artistName: 'Artist',
+            artistMbid: 'mbid',
+            releaseDate: '2024-01-15',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: later,
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      // Act
+      const releases = await service.getFilteredReleases({
+        sortBy: 'firstSeen',
+        sortOrder: 'desc',
+      });
+
+      // Assert - newest first for desc
+      expect(releases[0].title).toBe('New Discovery');
+      expect(releases[1].title).toBe('Old Discovery');
+    });
+
+    it('should filter out excluded artists when hiddenReleasesService is provided', async () => {
+      // Arrange
+      const mockHiddenReleasesService = {
+        getAllExcludedArtists: jest.fn().mockResolvedValue([
+          {
+            artistName: 'Excluded Band',
+            normalizedName: 'excluded band',
+            excludedAt: Date.now(),
+          },
+        ]),
+      } as unknown as jest.Mocked<HiddenReleasesService>;
+
+      const serviceWithHidden = new ReleaseTrackingService(
+        mockFileStorage,
+        mockDiscogsService,
+        mockMusicBrainzService,
+        mockWishlistService,
+        mockHiddenReleasesService
+      );
+
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Good Album',
+            artistName: 'Kept Artist',
+            artistMbid: 'mbid-1',
+            releaseDate: '2024-01-15',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+          {
+            mbid: 'rg-2',
+            title: 'Bad Album',
+            artistName: 'Excluded Band',
+            artistMbid: 'mbid-2',
+            releaseDate: '2024-02-15',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      // Act
+      const releases = await serviceWithHidden.getFilteredReleases({});
+
+      // Assert
+      expect(releases).toHaveLength(1);
+      expect(releases[0].artistName).toBe('Kept Artist');
+      expect(
+        mockHiddenReleasesService.getAllExcludedArtists
+      ).toHaveBeenCalled();
+    });
+
+    it('should not filter when excludedArtists list is empty', async () => {
+      // Arrange
+      const mockHiddenReleasesService = {
+        getAllExcludedArtists: jest.fn().mockResolvedValue([]),
+      } as unknown as jest.Mocked<HiddenReleasesService>;
+
+      const serviceWithHidden = new ReleaseTrackingService(
+        mockFileStorage,
+        mockDiscogsService,
+        mockMusicBrainzService,
+        mockWishlistService,
+        mockHiddenReleasesService
+      );
+
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Album 1',
+            artistName: 'Artist 1',
+            artistMbid: 'mbid-1',
+            releaseDate: '2024-01-15',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+          {
+            mbid: 'rg-2',
+            title: 'Album 2',
+            artistName: 'Artist 2',
+            artistMbid: 'mbid-2',
+            releaseDate: '2024-02-15',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      // Act
+      const releases = await serviceWithHidden.getFilteredReleases({});
+
+      // Assert - both kept since excluded list is empty
+      expect(releases).toHaveLength(2);
+    });
   });
 
   describe('searchArtist', () => {
@@ -1034,6 +1346,97 @@ describe('ReleaseTrackingService', () => {
       expect(mockMusicBrainzService.searchArtist).toHaveBeenCalledWith(
         'Artist'
       );
+    });
+
+    it('should use Last.fm name mapping when available', async () => {
+      // Arrange
+      const { artistMappingService } = jest.requireMock(
+        '../../src/backend/services/artistMappingService'
+      );
+      artistMappingService.getLastfmName.mockReturnValue('Clean Name');
+      mockMusicBrainzService.searchArtist.mockResolvedValue([]);
+
+      // Act
+      await service.searchArtist('Dirty Name (2)');
+
+      // Assert - should search with the mapped name
+      expect(mockMusicBrainzService.searchArtist).toHaveBeenCalledWith(
+        'Clean Name'
+      );
+
+      // Cleanup
+      artistMappingService.getLastfmName.mockImplementation(
+        (name: string) => name
+      );
+    });
+  });
+
+  describe('isTrackedReleasesCacheStale', () => {
+    it('should return true when no store exists', async () => {
+      // Arrange
+      mockFileStorage.readJSON.mockResolvedValue(null);
+
+      // Act
+      const result = await service.isTrackedReleasesCacheStale();
+
+      // Assert
+      expect(result).toBe(true);
+    });
+
+    it('should return true when store has wrong schema version', async () => {
+      // Arrange
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 999,
+        lastUpdated: Date.now(),
+        releases: [],
+      });
+
+      // Act
+      const result = await service.isTrackedReleasesCacheStale();
+
+      // Assert
+      expect(result).toBe(true);
+    });
+
+    it('should return false when cache is fresh', async () => {
+      // Arrange
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        lastUpdated: Date.now() - 1000, // 1 second ago
+        releases: [],
+      });
+
+      // Act
+      const result = await service.isTrackedReleasesCacheStale();
+
+      // Assert
+      expect(result).toBe(false);
+    });
+
+    it('should return true when cache is old', async () => {
+      // Arrange
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        lastUpdated: Date.now() - 100 * 24 * 60 * 60 * 1000, // 100 days ago
+        releases: [],
+      });
+
+      // Act
+      const result = await service.isTrackedReleasesCacheStale();
+
+      // Assert
+      expect(result).toBe(true);
+    });
+
+    it('should return true on read error', async () => {
+      // Arrange
+      mockFileStorage.readJSON.mockRejectedValue(new Error('Read error'));
+
+      // Act
+      const result = await service.isTrackedReleasesCacheStale();
+
+      // Assert
+      expect(result).toBe(true);
     });
   });
 
@@ -1086,6 +1489,243 @@ describe('ReleaseTrackingService', () => {
         'Artist',
         'Album'
       );
+    });
+
+    it('should add to wishlist with best match and save release', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'OK Computer',
+            artistName: 'Radiohead',
+            artistMbid: 'artist-mbid',
+            releaseDate: '1997-05-21',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      mockWishlistService.searchForRelease.mockResolvedValue([
+        {
+          masterId: 100,
+          releaseId: 200,
+          title: 'OK Computer',
+          artist: 'Radiohead',
+          year: 1997,
+          formats: ['Vinyl'],
+        },
+      ]);
+      mockWishlistService.addToDiscogsWantlist.mockResolvedValue(true);
+
+      // Act
+      const result = await service.addToWishlist('rg-1');
+
+      // Assert
+      expect(result).toBe(true);
+      expect(mockWishlistService.addToDiscogsWantlist).toHaveBeenCalledWith(
+        200,
+        'Added from New Releases tracking'
+      );
+      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+    });
+
+    it('should prefer exact artist and title match', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'In Rainbows',
+            artistName: 'Radiohead',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2007-10-10',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      mockWishlistService.searchForRelease.mockResolvedValue([
+        {
+          masterId: 999,
+          releaseId: 1000,
+          title: 'Wrong Album',
+          artist: 'Wrong Artist',
+          formats: [],
+        },
+        {
+          masterId: 555,
+          releaseId: 600,
+          title: 'In Rainbows',
+          artist: 'Radiohead',
+          year: 2007,
+          formats: ['Vinyl'],
+        },
+      ]);
+      mockWishlistService.addToDiscogsWantlist.mockResolvedValue(true);
+
+      // Act
+      const result = await service.addToWishlist('rg-1');
+
+      // Assert
+      expect(result).toBe(true);
+      // Should use the exact-match result (releaseId 600), not the first result
+      expect(mockWishlistService.addToDiscogsWantlist).toHaveBeenCalledWith(
+        600,
+        'Added from New Releases tracking'
+      );
+    });
+
+    it('should prefer artist match over first result when no title match', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Rare Album',
+            artistName: 'Radiohead',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-01',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      mockWishlistService.searchForRelease.mockResolvedValue([
+        {
+          masterId: 111,
+          releaseId: 222,
+          title: 'Different Title',
+          artist: 'Different Artist',
+          formats: [],
+        },
+        {
+          masterId: 333,
+          releaseId: 444,
+          title: 'Also Different Title',
+          artist: 'Radiohead',
+          formats: [],
+        },
+      ]);
+      mockWishlistService.addToDiscogsWantlist.mockResolvedValue(true);
+
+      // Act
+      await service.addToWishlist('rg-1');
+
+      // Assert - should pick the artist match (releaseId 444) over the first result
+      expect(mockWishlistService.addToDiscogsWantlist).toHaveBeenCalledWith(
+        444,
+        'Added from New Releases tracking'
+      );
+    });
+
+    it('should set discogsMasterId when not already set', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Album',
+            artistName: 'Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-01',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      mockWishlistService.searchForRelease.mockResolvedValue([
+        {
+          masterId: 42,
+          releaseId: 100,
+          title: 'Album',
+          artist: 'Artist',
+          formats: [],
+        },
+      ]);
+      mockWishlistService.addToDiscogsWantlist.mockResolvedValue(true);
+
+      // Act
+      await service.addToWishlist('rg-1');
+
+      // Assert - verify the saved release has discogsMasterId set
+      const savedStore = mockFileStorage.writeJSON.mock
+        .calls[0][1] as TrackedReleasesStore;
+      expect(savedStore.releases[0].inWishlist).toBe(true);
+      expect(savedStore.releases[0].discogsMasterId).toBe(42);
+      expect(savedStore.releases[0].discogsUrl).toBe(
+        'https://www.discogs.com/master/42'
+      );
+    });
+
+    it('should return false when addToDiscogsWantlist throws', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Album',
+            artistName: 'Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-01',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      mockWishlistService.searchForRelease.mockResolvedValue([
+        {
+          masterId: 1,
+          releaseId: 2,
+          title: 'Album',
+          artist: 'Artist',
+          formats: [],
+        },
+      ]);
+      mockWishlistService.addToDiscogsWantlist.mockRejectedValue(
+        new Error('API error')
+      );
+
+      // Act
+      const result = await service.addToWishlist('rg-1');
+
+      // Assert
+      expect(result).toBe(false);
     });
   });
 
