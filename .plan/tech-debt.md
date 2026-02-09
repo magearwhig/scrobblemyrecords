@@ -64,26 +64,14 @@ README and `dev_prompt.md` specify 90% coverage target but Jest config enforces 
 
 ---
 
-### H4. Massive inline styling + monolithic stylesheet
+### ~~H4. Massive inline styling + monolithic stylesheet~~ DONE
 
-**Severity**: High | **Effort**: Deeper (phased)
+**Completed:** February 2026. Extracted 236 static inline styles to CSS classes across 12 files in 3 batches:
+- Batch 1: AlbumCard (8), SearchBar (6) — 14 extracted
+- Batch 2: SettingsConnectionsSection (8), AlbumScrobbleHistory (5), Header (3), RankingsRace (1), HistoryPage (26) — 41 extracted (+ 2 components had no extractable styles)
+- Batch 3: ScrobblePage (34), CollectionPage (64), ReleaseDetailsPage (82) — 181 extracted
 
-The repo's `CLAUDE.md` and `.cursor/rules` explicitly forbid inline styles, yet every major page uses them. Combined with a single `styles.css`, CSS maintenance is fragile.
-
-Worst offenders by inline `style=` count:
-- `ReleaseDetailsPage.tsx` -- 100+
-- `CollectionPage.tsx` -- 80+
-- `ScrobblePage.tsx` -- 40+
-- `HistoryPage.tsx` -- 28+
-- `SearchBar.tsx`, `AlbumCard.tsx` -- 15+
-
-**Action:**
-- [ ] Phase 1: Extract static inline styles to CSS classes (start with `AlbumCard`, `SearchBar`)
-- [ ] Phase 2: Split `styles.css` into CSS modules per component/page
-- [ ] Or adopt CSS modules globally
-- [ ] Document exceptions (dynamic values only)
-
-**Files:** `src/renderer/styles.css`, all page/component files listed above
+Total reduction: 275 → 39 inline styles (86%). All 39 remaining are dynamic (computed widths, conditional colors, backgroundImage URLs) that must stay inline. Hardcoded colors replaced with CSS variables. All new CSS classes appended to `styles.css` with component-specific prefixes. Phase 2 (CSS module splitting) deferred as separate work.
 
 ---
 
