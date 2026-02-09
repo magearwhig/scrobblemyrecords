@@ -2848,6 +2848,154 @@ body {
   gap: 0.5rem;
 }
 
+/* History Page Session Styles */
+.history-sessions-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.history-session-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.history-session-info {
+  flex: 1;
+}
+
+.history-session-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.history-session-status-icon {
+  font-size: 1.2rem;
+}
+
+.history-session-status-text {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.history-session-timestamp {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.history-session-tracks {
+  font-size: 0.9rem;
+}
+
+.history-session-success {
+  color: var(--success-color);
+  margin-left: 0.5rem;
+}
+
+.history-session-error {
+  color: var(--error-color);
+  margin-left: 0.5rem;
+}
+
+.history-session-covers {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.history-session-cover-thumbnail {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+}
+
+.history-session-covers-more {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-left: 0.5rem;
+}
+
+.history-session-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.history-session-details {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.history-session-details-header {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.history-session-details-row {
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.history-session-tracklist {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-secondary);
+}
+
+.history-session-track {
+  padding: 0.75rem;
+}
+
+.history-session-track-title {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.history-session-track-meta {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.history-session-track-timestamp {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.history-auth-link-container {
+  margin-top: 1rem;
+}
+
+.history-error-retry {
+  margin-left: 1rem;
+}
+
+.history-footer {
+  text-align: center;
+  padding: 1rem;
+}
+
+.history-footer-text {
+  color: var(--text-secondary);
+}
+
 /* Last.fm History Tab Styles */
 .lastfm-history-tab {
   display: flex;
@@ -7803,4 +7951,124 @@ body {
   color: var(--text-muted);
   font-size: 0.8rem;
   font-style: italic;
+}
+
+/* Extracted inline styles - code cleanup */
+
+/* Status indicator spacing */
+.status-margin-bottom {
+  margin-bottom: 1rem;
+}
+
+/* Alternative method sections */
+.alternative-method-section {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+/* Instructions box */
+.instructions-box {
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background-color: var(--bg-secondary);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.instructions-box ol {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+/* Form helper text */
+.form-helper-text {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+/* Header version text */
+.header-version {
+  opacity: 0.8;
+}
+
+/* Header username display */
+.header-username {
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+/* Album mapping button */
+.album-mapping-button {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.album-mapping-button:hover {
+  background-color: var(--bg-tertiary);
+}
+
+/* Add mapping button in header */
+.add-mapping-button {
+  margin-left: auto;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.add-mapping-button:hover {
+  background-color: var(--bg-tertiary);
+}
+
+/* Mapping result badge */
+.mapping-badge-mapped {
+  margin-left: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  background-color: var(--color-success);
+  color: white;
+  border-radius: 4px;
+}
+
+/* Mapping result item states */
+.mapping-result-item-pointer {
+  cursor: pointer;
+}
+
+.mapping-result-item-disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Rankings race bar positioning - dynamic transforms handled inline */
+.rankings-race-bar-positioned {
+  opacity: 1;
+}
+
+/* Sync progress inline bar */
+.sync-progress-inline {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background-color: var(--bg-tertiary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sync-progress-bar {
+  height: 100%;
+  background-color: var(--accent-color);
+  transition: width 0.3s ease;
 }

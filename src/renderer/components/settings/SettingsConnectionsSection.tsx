@@ -376,7 +376,7 @@ const SettingsConnectionsSection: React.FC<SettingsConnectionsSectionProps> = ({
       {/* Discogs Setup */}
       <div className='card'>
         <h3>Discogs</h3>
-        <div style={{ marginBottom: '1rem' }}>
+        <div className='status-margin-bottom'>
           <div
             className={`status ${authStatus.discogs.authenticated ? 'connected' : 'disconnected'}`}
           >
@@ -401,29 +401,13 @@ const SettingsConnectionsSection: React.FC<SettingsConnectionsSectionProps> = ({
         </button>
 
         {/* Manual Token Entry */}
-        <div
-          style={{
-            marginTop: '1.5rem',
-            padding: '1rem',
-            backgroundColor: 'var(--bg-tertiary)',
-            borderRadius: '8px',
-            border: '1px solid var(--border-color)',
-          }}
-        >
+        <div className='alternative-method-section'>
           <h4>Alternative: Personal Access Token</h4>
           <p>
             If OAuth isn't working, you can use a Personal Access Token instead:
           </p>
 
-          <div
-            style={{
-              marginBottom: '1rem',
-              padding: '0.5rem',
-              backgroundColor: 'var(--bg-secondary)',
-              borderRadius: '4px',
-              border: '1px solid var(--border-color)',
-            }}
-          >
+          <div className='instructions-box'>
             <strong>How to get a Personal Access Token:</strong>
             <ol style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
               <li>
@@ -452,9 +436,7 @@ const SettingsConnectionsSection: React.FC<SettingsConnectionsSectionProps> = ({
               onChange={e => setDiscogsToken(e.target.value)}
               placeholder='your_token_here'
             />
-            <small
-              style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}
-            >
+            <small className='form-helper-text'>
               Just paste the token value (without the "Discogs token=" prefix)
             </small>
           </div>
@@ -468,9 +450,7 @@ const SettingsConnectionsSection: React.FC<SettingsConnectionsSectionProps> = ({
               onChange={e => setDiscogsUsername(e.target.value)}
               placeholder='your_discogs_username'
             />
-            <small
-              style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}
-            >
+            <small className='form-helper-text'>
               Your Discogs username (needed to access your collection)
             </small>
           </div>
@@ -497,7 +477,7 @@ const SettingsConnectionsSection: React.FC<SettingsConnectionsSectionProps> = ({
       {/* Last.fm Setup */}
       <div className='card'>
         <h3>Last.fm</h3>
-        <div style={{ marginBottom: '1rem' }}>
+        <div className='status-margin-bottom'>
           <div
             className={`status ${authStatus.lastfm.authenticated ? 'connected' : 'disconnected'}`}
           >
@@ -522,15 +502,7 @@ const SettingsConnectionsSection: React.FC<SettingsConnectionsSectionProps> = ({
         </button>
 
         {/* Manual Token Entry */}
-        <div
-          style={{
-            marginTop: '1.5rem',
-            padding: '1rem',
-            backgroundColor: 'var(--bg-tertiary)',
-            borderRadius: '8px',
-            border: '1px solid var(--border-color)',
-          }}
-        >
+        <div className='alternative-method-section'>
           <h4>Manual Token Entry:</h4>
           <p>
             If the automatic flow doesn't work, get the authorization URL above,

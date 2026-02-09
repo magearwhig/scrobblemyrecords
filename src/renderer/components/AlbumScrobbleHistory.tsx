@@ -243,19 +243,7 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
               If you've scrobbled this album under a different name on Last.fm,
               you can create a mapping to link them together.
             </p>
-            <button
-              onClick={openMappingModal}
-              style={{
-                marginTop: '1rem',
-                padding: '0.5rem 1rem',
-                borderRadius: '4px',
-                border: '1px solid var(--border-color)',
-                backgroundColor: 'var(--bg-secondary)',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-              }}
-            >
+            <button onClick={openMappingModal} className='album-mapping-button'>
               🔗 Map to Last.fm Album
             </button>
           </div>
@@ -317,11 +305,10 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
                 {searchResults.map((item, index) => (
                   <div
                     key={`${item.artist}-${item.album}-${index}`}
-                    className='mapping-result-item'
+                    className='mapping-result-item mapping-result-item-pointer'
                     onClick={() =>
                       !mappingInProgress && handleSelectMapping(item)
                     }
-                    style={{ cursor: 'pointer' }}
                   >
                     <div className='mapping-result-info'>
                       <div className='mapping-result-title'>{item.album}</div>
@@ -372,19 +359,7 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
       <div className='album-history'>
         <div className='album-history-header'>
           <h3>Scrobble History</h3>
-          <button
-            onClick={openMappingModal}
-            style={{
-              marginLeft: 'auto',
-              padding: '0.5rem 1rem',
-              borderRadius: '4px',
-              border: '1px solid var(--border-color)',
-              backgroundColor: 'var(--bg-secondary)',
-              color: 'var(--text-primary)',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-            }}
-          >
+          <button onClick={openMappingModal} className='add-mapping-button'>
             🔗 Add Mapping
           </button>
         </div>
@@ -511,33 +486,18 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
                 return (
                   <div
                     key={`${item.artist}-${item.album}-${index}`}
-                    className={`mapping-result-item ${isAlreadyMapped ? 'mapping-result-item-disabled' : ''}`}
+                    className={`mapping-result-item ${isAlreadyMapped ? 'mapping-result-item-disabled' : 'mapping-result-item-pointer'}`}
                     onClick={() =>
                       !mappingInProgress &&
                       !isAlreadyMapped &&
                       handleSelectMapping(item)
                     }
-                    style={{
-                      cursor: isAlreadyMapped ? 'not-allowed' : 'pointer',
-                      opacity: isAlreadyMapped ? 0.6 : 1,
-                    }}
                   >
                     <div className='mapping-result-info'>
                       <div className='mapping-result-title'>
                         {item.album}
                         {isAlreadyMapped && (
-                          <span
-                            style={{
-                              marginLeft: '0.5rem',
-                              padding: '0.2rem 0.5rem',
-                              fontSize: '0.75rem',
-                              backgroundColor: 'var(--color-success)',
-                              color: 'white',
-                              borderRadius: '4px',
-                            }}
-                          >
-                            ✓ Mapped
-                          </span>
+                          <span className='mapping-badge-mapped'>✓ Mapped</span>
                         )}
                       </div>
                       <div className='mapping-result-artist'>{item.artist}</div>

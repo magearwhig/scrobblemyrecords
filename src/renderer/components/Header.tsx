@@ -38,7 +38,7 @@ const Header: React.FC = () => {
     <header className='header'>
       <div>
         <h1>Discogs to Last.fm Scrobbler</h1>
-        {appVersion && <small style={{ opacity: 0.8 }}>v{appVersion}</small>}
+        {appVersion && <small className='header-version'>v{appVersion}</small>}
       </div>
 
       <div className='header-actions'>
@@ -72,13 +72,13 @@ const Header: React.FC = () => {
         </div>
 
         {authStatus.discogs.username && (
-          <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>
+          <div className='header-username'>
             <strong>Discogs:</strong> {authStatus.discogs.username}
           </div>
         )}
 
         {authStatus.lastfm.username && (
-          <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>
+          <div className='header-username'>
             <strong>Last.fm:</strong> {authStatus.lastfm.username}
           </div>
         )}

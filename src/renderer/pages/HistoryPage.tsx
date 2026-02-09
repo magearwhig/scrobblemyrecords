@@ -210,7 +210,7 @@ const HistoryPage: React.FC = () => {
           Please authenticate with Last.fm first to view your scrobbling
           history.
         </p>
-        <div style={{ marginTop: '1rem' }}>
+        <div className='history-auth-link-container'>
           <a href='#settings?tab=connections' className='btn'>
             Connect Last.fm
           </a>
@@ -286,9 +286,8 @@ const HistoryPage: React.FC = () => {
               <div className='error-message'>
                 {error}
                 <button
-                  className='btn btn-small'
+                  className='btn btn-small history-error-retry'
                   onClick={loadHistory}
-                  style={{ marginLeft: '1rem' }}
                 >
                   Retry
                 </button>
@@ -297,7 +296,7 @@ const HistoryPage: React.FC = () => {
           </div>
 
           {loading && !sessions.length && (
-            <div style={{ display: 'grid', gap: '1rem' }}>
+            <div className='history-sessions-grid'>
               <SessionCardSkeleton count={3} />
             </div>
           )}
@@ -322,62 +321,36 @@ const HistoryPage: React.FC = () => {
           )}
 
           {sessions.length > 0 && (
-            <div style={{ display: 'grid', gap: '1rem' }}>
+            <div className='history-sessions-grid'>
               {sessions.map(session => (
                 <div key={session.id} className='card'>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
-                    }}
-                  >
-                    <div style={{ flex: 1 }}>
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          marginBottom: '0.5rem',
-                        }}
-                      >
-                        <span style={{ fontSize: '1.2rem' }}>
+                  <div className='history-session-header'>
+                    <div className='history-session-info'>
+                      <div className='history-session-status'>
+                        <span className='history-session-status-icon'>
                           {getStatusIcon(session.status)}
                         </span>
                         <span
-                          style={{
-                            color: getStatusColor(session.status),
-                            fontWeight: 600,
-                            textTransform: 'capitalize',
-                          }}
+                          className='history-session-status-text'
+                          style={{ color: getStatusColor(session.status) }}
                         >
                           {session.status}
                         </span>
                       </div>
 
-                      <div
-                        style={{
-                          fontSize: '0.9rem',
-                          color: '#666',
-                          marginBottom: '0.5rem',
-                        }}
-                      >
+                      <div className='history-session-timestamp'>
                         {formatDate(session.timestamp)}
                       </div>
 
-                      <div style={{ fontSize: '0.9rem' }}>
+                      <div className='history-session-tracks'>
                         <strong>{session.tracks.length}</strong> tracks
                         {session.status === 'completed' && (
-                          <span
-                            style={{ color: '#28a745', marginLeft: '0.5rem' }}
-                          >
+                          <span className='history-session-success'>
                             • Successfully scrobbled
                           </span>
                         )}
                         {session.status === 'failed' && session.error && (
-                          <span
-                            style={{ color: '#dc3545', marginLeft: '0.5rem' }}
-                          >
+                          <span className='history-session-error'>
                             • {session.error}
                           </span>
                         )}
@@ -390,40 +363,19 @@ const HistoryPage: React.FC = () => {
                         );
                         if (uniqueAlbums.length > 0) {
                           return (
-                            <div
-                              style={{
-                                display: 'flex',
-                                gap: '0.5rem',
-                                marginTop: '0.75rem',
-                                alignItems: 'center',
-                                flexWrap: 'wrap',
-                              }}
-                            >
+                            <div className='history-session-covers'>
                               {uniqueAlbums.slice(0, 5).map((album, idx) => (
                                 <div
                                   key={idx}
                                   title={`${album.album} by ${album.artist}`}
+                                  className='history-session-cover-thumbnail'
                                   style={{
-                                    width: '40px',
-                                    height: '40px',
-                                    borderRadius: '4px',
                                     backgroundImage: `url(${album.cover})`,
-                                    backgroundSize: 'cover',
-                                    backgroundPosition: 'center',
-                                    backgroundColor: '#f0f0f0',
-                                    border: '1px solid #e0e0e0',
-                                    cursor: 'pointer',
                                   }}
                                 />
                               ))}
                               {uniqueAlbums.length > 5 && (
-                                <div
-                                  style={{
-                                    fontSize: '0.8rem',
-                                    color: '#666',
-                                    marginLeft: '0.5rem',
-                                  }}
-                                >
+                                <div className='history-session-covers-more'>
                                   +{uniqueAlbums.length - 5} more
                                 </div>
                               )}
@@ -434,13 +386,7 @@ const HistoryPage: React.FC = () => {
                       })()}
                     </div>
 
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: '0.5rem',
-                        alignItems: 'center',
-                      }}
-                    >
+                    <div className='history-session-actions'>
                       <button
                         className='btn btn-small btn-secondary'
                         onClick={() =>
@@ -484,70 +430,39 @@ const HistoryPage: React.FC = () => {
                   </div>
 
                   {selectedSession?.id === session.id && (
-                    <div
-                      style={{
-                        marginTop: '1rem',
-                        padding: '1rem',
-                        backgroundColor: '#f8f9fa',
-                        borderRadius: '8px',
-                        border: '1px solid #e9ecef',
-                        color: '#333',
-                      }}
-                    >
-                      <h4
-                        style={{
-                          marginTop: 0,
-                          marginBottom: '1rem',
-                          color: '#333',
-                        }}
-                      >
+                    <div className='history-session-details'>
+                      <h4 className='history-session-details-header'>
                         Session Details
                       </h4>
 
-                      <div style={{ marginBottom: '1rem', color: '#333' }}>
+                      <div className='history-session-details-row'>
                         <strong>Session ID:</strong> {session.id}
                       </div>
 
-                      <div style={{ marginBottom: '1rem', color: '#333' }}>
+                      <div className='history-session-details-row'>
                         <strong>Tracks ({session.tracks.length}):</strong>
                       </div>
 
-                      <div
-                        style={{
-                          maxHeight: '300px',
-                          overflowY: 'auto',
-                          border: '1px solid #e0e0e0',
-                          borderRadius: '6px',
-                          backgroundColor: 'white',
-                        }}
-                      >
+                      <div className='history-session-tracklist'>
                         {session.tracks.map((track, index) => (
                           <div
                             key={index}
+                            className='history-session-track'
                             style={{
-                              padding: '0.75rem',
                               borderBottom:
                                 index < session.tracks.length - 1
-                                  ? '1px solid #f0f0f0'
+                                  ? '1px solid var(--border-color)'
                                   : 'none',
                             }}
                           >
-                            <div
-                              style={{
-                                fontWeight: 500,
-                                fontSize: '0.9rem',
-                                color: '#333',
-                              }}
-                            >
+                            <div className='history-session-track-title'>
                               {track.track}
                             </div>
-                            <div style={{ fontSize: '0.8rem', color: '#666' }}>
+                            <div className='history-session-track-meta'>
                               {track.artist} • {track.album}
                             </div>
                             {track.timestamp && (
-                              <div
-                                style={{ fontSize: '0.75rem', color: '#999' }}
-                              >
+                              <div className='history-session-track-timestamp'>
                                 Scrobbled:{' '}
                                 {formatLocalTimeClean(track.timestamp * 1000)}
                               </div>
@@ -563,11 +478,8 @@ const HistoryPage: React.FC = () => {
           )}
 
           {sessions.length > 10 && (
-            <div
-              className='card'
-              style={{ textAlign: 'center', padding: '1rem' }}
-            >
-              <div style={{ color: '#666' }}>
+            <div className='card history-footer'>
+              <div className='history-footer-text'>
                 Showing recent sessions. Older sessions may be automatically
                 cleaned up.
               </div>

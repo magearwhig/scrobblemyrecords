@@ -188,10 +188,9 @@ export const RankingsRace: React.FC<RankingsRaceProps> = ({
             return (
               <div
                 key={item.name}
-                className='rankings-race-bar'
+                className='rankings-race-bar rankings-race-bar-positioned'
                 style={{
                   transform: `translateY(${position}px)`,
-                  opacity: 1,
                 }}
               >
                 <div className='rankings-race-rank'>{item.rank}</div>
