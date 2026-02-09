@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 
 import { useAuth } from '../context/AuthContext';
+import { ROUTES } from '../routes';
 
 interface SidebarProps {
   currentPage: string;
@@ -50,7 +51,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: 'Dashboard',
       items: [
         {
-          id: 'home',
+          id: ROUTES.HOME,
           label: 'Home',
           icon: '🏠',
           enabled: true,
@@ -61,19 +62,19 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: 'Library',
       items: [
         {
-          id: 'collection',
+          id: ROUTES.COLLECTION,
           label: 'Browse Collection',
           icon: '💿',
           enabled: authStatus.discogs.authenticated,
         },
         {
-          id: 'wishlist',
+          id: ROUTES.WISHLIST,
           label: 'Wishlist',
           icon: '❤️',
           enabled: authStatus.discogs.authenticated,
         },
         {
-          id: 'discard-pile',
+          id: ROUTES.DISCARD_PILE,
           label: 'Discard Pile',
           icon: '📦',
           enabled: authStatus.discogs.authenticated,
@@ -84,20 +85,20 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: 'Listening',
       items: [
         {
-          id: 'suggestions',
+          id: ROUTES.SUGGESTIONS,
           label: 'Play Suggestions',
           icon: '🎲',
           enabled:
             authStatus.discogs.authenticated && authStatus.lastfm.authenticated,
         },
         {
-          id: 'history',
+          id: ROUTES.HISTORY,
           label: 'Scrobble History',
           icon: '📝',
           enabled: authStatus.lastfm.authenticated,
         },
         {
-          id: 'stats',
+          id: ROUTES.STATS,
           label: 'Stats Dashboard',
           icon: '📊',
           enabled: authStatus.lastfm.authenticated,
@@ -108,19 +109,19 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: 'Explore',
       items: [
         {
-          id: 'discovery',
+          id: ROUTES.DISCOVERY,
           label: 'Discovery',
           icon: '🔍',
           enabled: authStatus.lastfm.authenticated,
         },
         {
-          id: 'releases',
+          id: ROUTES.RELEASES,
           label: 'New Releases',
           icon: '📢',
           enabled: authStatus.discogs.authenticated,
         },
         {
-          id: 'sellers',
+          id: ROUTES.SELLERS,
           label: 'Local Sellers',
           icon: '🏪',
           enabled: authStatus.discogs.authenticated,
@@ -131,7 +132,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: 'System',
       items: [
         {
-          id: 'settings',
+          id: ROUTES.SETTINGS,
           label: 'Settings',
           icon: '⚙️',
           enabled: true,

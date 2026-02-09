@@ -314,17 +314,11 @@ Large inline JSX blocks in page files that should be their own components. Level
 
 ---
 
-### L11. Centralize route identifiers
+### ~~L11. Centralize route identifiers~~ DONE
 
-**Effort**: Low
+**Completed:** February 2026. Created `src/renderer/routes.ts` with `ROUTES` constant object, `RouteId` type, and `DEFAULT_ROUTE`. Replaced all route string literals in `App.tsx` (2), `MainContent.tsx` (16), and `Sidebar.tsx` (11). Other component files still use string literals for navigation but the route registry is now the single source of truth.
 
-String literals for routing in `App.tsx`, `MainContent.tsx`, and `Sidebar.tsx` can drift out of sync.
-
-**Action:**
-- [ ] Create `routes.ts` constants file
-- [ ] Replace string literals with constants
-
-**Files:** `src/renderer/App.tsx`, `MainContent.tsx`, `Sidebar.tsx`
+**Files:** `src/renderer/routes.ts`, `src/renderer/App.tsx`, `MainContent.tsx`, `Sidebar.tsx`
 
 ---
 
@@ -398,10 +392,10 @@ Current flat list of nav items lacks visual hierarchy.
 | L8 | CI doesn't test Node 22 | Low | Yes |
 | L9 | ~~No request logging / observability~~ | ~~Low~~ | ~~DONE~~ |
 | L10 | ~~No focus trap in modals + dead state~~ | ~~Low~~ | ~~DONE~~ |
-| L11 | Centralize route identifiers | Low | Yes |
+| L11 | ~~Centralize route identifiers~~ | ~~Low~~ | ~~DONE~~ |
 | L12 | Sidebar reorganization | Low | No |
 
-**Total open**: 12 items (1 critical, 2 high, 2 medium, 7 low) -- 26 completed (10 Phase 0 + 11 Phase 1 + 3 Phase 2 + 2 Phase 3, February 2026)
+**Total open**: 11 items (1 critical, 2 high, 2 medium, 6 low) -- 27 completed (10 Phase 0 + 11 Phase 1 + 3 Phase 2 + 3 Phase 3, February 2026)
 
 ---
 

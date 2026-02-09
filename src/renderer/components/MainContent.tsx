@@ -14,6 +14,7 @@ import SettingsPage from '../pages/SettingsPage';
 import StatsPage from '../pages/StatsPage';
 import SuggestionsPage from '../pages/SuggestionsPage';
 import WishlistPage from '../pages/WishlistPage';
+import { ROUTES } from '../routes';
 
 interface MainContentProps {
   currentPage: string;
@@ -26,41 +27,41 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
   useEffect(() => {
     // When navigating to release-details, generate a new key to force remount
     // Use timestamp to always get a fresh key, ensuring the page reloads
-    if (currentPage === 'release-details') {
+    if (currentPage === ROUTES.RELEASE_DETAILS) {
       setReleaseKey(`release-${Date.now()}`);
     }
   }, [currentPage]);
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'home':
+      case ROUTES.HOME:
         return <HomePage />;
-      case 'collection':
+      case ROUTES.COLLECTION:
         return <CollectionPage />;
-      case 'scrobble':
+      case ROUTES.SCROBBLE:
         return <ScrobblePage />;
-      case 'history':
+      case ROUTES.HISTORY:
         return <HistoryPage />;
-      case 'settings':
+      case ROUTES.SETTINGS:
         return <SettingsPage />;
-      case 'release-details':
+      case ROUTES.RELEASE_DETAILS:
         // Use key to force remount when a different release is selected
         return <ReleaseDetailsPage key={releaseKey} />;
-      case 'suggestions':
+      case ROUTES.SUGGESTIONS:
         return <SuggestionsPage />;
-      case 'discovery':
+      case ROUTES.DISCOVERY:
         return <DiscoveryPage />;
-      case 'stats':
+      case ROUTES.STATS:
         return <StatsPage />;
-      case 'wishlist':
+      case ROUTES.WISHLIST:
         return <WishlistPage />;
-      case 'releases':
+      case ROUTES.RELEASES:
         return <NewReleasesPage />;
-      case 'sellers':
+      case ROUTES.SELLERS:
         return <SellersPage />;
-      case 'seller-matches':
+      case ROUTES.SELLER_MATCHES:
         return <SellerMatchesPage />;
-      case 'discard-pile':
+      case ROUTES.DISCARD_PILE:
         return <DiscardPilePage />;
       default:
         return <HomePage />;

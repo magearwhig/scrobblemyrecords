@@ -9,11 +9,12 @@ import Sidebar from './components/Sidebar';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { DEFAULT_ROUTE } from './routes';
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
 
 const App: React.FC = () => {
-  const [currentPage, setCurrentPage] = useState<string>('home');
+  const [currentPage, setCurrentPage] = useState<string>(DEFAULT_ROUTE);
   const [authStatus, setAuthStatus] = useState<AuthStatus>({
     discogs: { authenticated: false },
     lastfm: { authenticated: false },
@@ -31,7 +32,7 @@ const App: React.FC = () => {
   useEffect(() => {
     // Handle hash-based routing
     const handleHashChange = () => {
-      const fullHash = window.location.hash.replace('#', '') || 'home';
+      const fullHash = window.location.hash.replace('#', '') || DEFAULT_ROUTE;
       // Extract page name before any query params (e.g., 'seller-matches?seller=foo' -> 'seller-matches')
       const hash = fullHash.split('?')[0];
       setCurrentPage(hash);
