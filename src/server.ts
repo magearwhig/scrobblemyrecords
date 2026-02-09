@@ -470,8 +470,8 @@ async function startServer() {
       );
     }
 
-    // Cleanup and backup are best-effort -- fire and forget
-    cleanupService
+    // Cleanup and backup are best-effort -- don't block server startup
+    const cleanupPromise = cleanupService
       .runCleanup()
       .then(cleanupReport => {
         if (cleanupReport && cleanupReport.errors.length > 0) {
@@ -484,9 +484,14 @@ async function startServer() {
         log.error('Startup cleanup failed:', err);
       });
 
-    backupService.checkAndRunAutoBackup().catch(err => {
+    const backupPromise = backupService.checkAndRunAutoBackup().catch(err => {
       log.error('Startup auto-backup check failed:', err);
     });
+
+    // In test environment, await startup tasks to prevent async leaks
+    if (process.env.NODE_ENV === 'test') {
+      await Promise.allSettled([cleanupPromise, backupPromise]);
+    }
 
     // Only start server if not in test environment
     if (process.env.NODE_ENV !== 'test') {
@@ -539,6 +544,8 @@ process.on('exit', () => {
 });
 
 // Initialize the server
-startServer();
+// Store the startup promise so tests can await full initialization
+// (prevents fire-and-forget cleanup/backup from leaking across test boundaries)
+export const serverStartup = startServer();
 
 export default app;

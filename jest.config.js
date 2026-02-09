@@ -1,4 +1,5 @@
 module.exports = {
+  maxWorkers: '50%',
   projects: [
     // Backend tests (Node.js environment)
     {
@@ -18,7 +19,8 @@ module.exports = {
         '!src/**/*.test.ts',
         '!src/**/*.spec.ts'
       ],
-      setupFilesAfterEnv: ['<rootDir>/tests/setup.ts']
+      setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+      testTimeout: 10000
     },
     // Frontend tests (jsdom environment for React)
     {

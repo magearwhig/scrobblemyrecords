@@ -21,12 +21,16 @@ jest.mock('../../src/backend/services/lastfmService', () => {
   return require('./__mocks__/lastfmService');
 });
 
-import app from '../../src/server';
+import app, { serverStartup } from '../../src/server';
 
 describe('API Integration Tests', () => {
   const testDataDir = './test-data-integration';
   const originalDataDir = './data';
   const backupDataDir = './data-backup-integration';
+
+  beforeAll(async () => {
+    await serverStartup;
+  });
 
   // Ensure proper test isolation with mock cleanup and data cleanup
   beforeEach(async () => {
