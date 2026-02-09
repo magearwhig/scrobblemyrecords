@@ -306,15 +306,11 @@ Large inline JSX blocks in page files that should be their own components. Level
 
 ---
 
-### L10. No focus trap in modals + possibly dead state
+### ~~L10. No focus trap in modals + possibly dead state~~ PARTIALLY DONE
 
-**Effort**: Quick win
+**Completed:** February 2026. Added `focus-trap-react` to `Modal.tsx` wrapping the modal overlay. FocusTrap handles Escape key deactivation and focus containment. Uses `fallbackFocus` for modals without tabbable children and `tabbableOptions: { displayCheck: 'none' }` for jsdom compatibility. Removed manual keydown listener (FocusTrap handles Escape natively). All 26 Modal tests pass.
 
-Tab key escapes modals. `connectionTest` state in `ReleaseDetailsPage.tsx` may be unused.
-
-**Action:**
-- [ ] Add `focus-trap-react` to `Modal.tsx`
-- [ ] Verify and remove `connectionTest` state if unused
+**Note:** `connectionTest` state in `ReleaseDetailsPage.tsx` was verified as actively used (set by `testLastfmConnection()`, displayed in the connection test message UI). Not dead state.
 
 ---
 
@@ -401,11 +397,11 @@ Current flat list of nav items lacks visual hierarchy.
 | L7 | Unused dependency: wait-on | Low | Yes |
 | L8 | CI doesn't test Node 22 | Low | Yes |
 | L9 | ~~No request logging / observability~~ | ~~Low~~ | ~~DONE~~ |
-| L10 | No focus trap in modals + dead state | Low | Yes |
+| L10 | ~~No focus trap in modals + dead state~~ | ~~Low~~ | ~~DONE~~ |
 | L11 | Centralize route identifiers | Low | Yes |
 | L12 | Sidebar reorganization | Low | No |
 
-**Total open**: 13 items (1 critical, 2 high, 2 medium, 8 low) -- 25 completed (10 Phase 0 + 11 Phase 1 + 3 Phase 2 + 1 Phase 3, February 2026)
+**Total open**: 12 items (1 critical, 2 high, 2 medium, 7 low) -- 26 completed (10 Phase 0 + 11 Phase 1 + 3 Phase 2 + 2 Phase 3, February 2026)
 
 ---
 

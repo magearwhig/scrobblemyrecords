@@ -1,4 +1,5 @@
-import React, { useEffect, useCallback } from 'react';
+import FocusTrap from 'focus-trap-react';
+import React, { useEffect } from 'react';
 
 import './Modal.css';
 
@@ -62,28 +63,16 @@ export const Modal: React.FC<ModalProps> = ({
   className = '',
   children,
 }) => {
-  // Handle Escape key
-  const handleKeyDown = useCallback(
-    (event: globalThis.KeyboardEvent) => {
-      if (closeOnEscape && event.key === 'Escape') {
-        onClose();
-      }
-    },
-    [closeOnEscape, onClose]
-  );
-
   useEffect(() => {
     if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown);
       // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
     }
 
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
     };
-  }, [isOpen, handleKeyDown]);
+  }, [isOpen]);
 
   if (!isOpen) {
     return null;
@@ -105,40 +94,51 @@ export const Modal: React.FC<ModalProps> = ({
     .join(' ');
 
   return (
-    <div className='modal-overlay' onClick={handleOverlayClick}>
-      <div
-        className={modalClassNames}
-        onClick={e => e.stopPropagation()}
-        role='dialog'
-        aria-modal='true'
-        aria-labelledby={title ? 'modal-title' : undefined}
-      >
-        {(title || showCloseButton) && (
-          <div className='modal-header'>
-            {title && (
-              <h2 id='modal-title' className='modal-title'>
-                {title}
-              </h2>
-            )}
-            {showCloseButton && (
-              <button
-                className='modal-close'
-                onClick={onClose}
-                aria-label='Close modal'
-              >
-                &times;
-              </button>
-            )}
-          </div>
-        )}
-        <div className='modal-body'>{children}</div>
-        {loading && (
-          <div className='modal-loading-overlay'>
-            <div className='modal-spinner' />
-          </div>
-        )}
+    <FocusTrap
+      focusTrapOptions={{
+        escapeDeactivates: closeOnEscape,
+        onDeactivate: onClose,
+        allowOutsideClick: true,
+        tabbableOptions: { displayCheck: 'none' },
+        fallbackFocus: '[role="dialog"]',
+      }}
+    >
+      <div className='modal-overlay' onClick={handleOverlayClick}>
+        <div
+          className={modalClassNames}
+          onClick={e => e.stopPropagation()}
+          role='dialog'
+          aria-modal='true'
+          aria-labelledby={title ? 'modal-title' : undefined}
+          tabIndex={-1}
+        >
+          {(title || showCloseButton) && (
+            <div className='modal-header'>
+              {title && (
+                <h2 id='modal-title' className='modal-title'>
+                  {title}
+                </h2>
+              )}
+              {showCloseButton && (
+                <button
+                  className='modal-close'
+                  onClick={onClose}
+                  aria-label='Close modal'
+                >
+                  &times;
+                </button>
+              )}
+            </div>
+          )}
+          <div className='modal-body'>{children}</div>
+          {loading && (
+            <div className='modal-loading-overlay'>
+              <div className='modal-spinner' />
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </FocusTrap>
   );
 };
 
