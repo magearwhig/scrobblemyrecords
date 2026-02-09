@@ -490,8 +490,8 @@ body {
 }
 
 .btn-small {
-  padding: 0.5rem 1rem;
-  font-size: 0.8rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
 }
 
 .btn-outline {
@@ -838,6 +838,19 @@ body {
 
 .album-metadata {
   color: var(--text-muted);
+  font-size: 0.7rem;
+  margin-top: 0.25rem;
+}
+
+.album-card-info {
+  flex: 1;
+}
+
+.album-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
 }
 
 /* Album Card - Discard Pile Integration */
@@ -875,6 +888,9 @@ body {
 .discard-pile-indicator {
   display: block;
   padding: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--accent-warning, #f59e0b);
+  text-align: center;
 }
 
 /* Search bar enhancements */
@@ -899,6 +915,10 @@ body {
   box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.2);
 }
 
+.search-input-wrapper {
+  position: relative;
+}
+
 .search-icon {
   position: absolute;
   left: 0.75rem;
@@ -906,6 +926,7 @@ body {
   transform: translateY(-50%);
   color: var(--text-muted);
   pointer-events: none;
+  font-size: 1rem;
 }
 
 .search-clear {
@@ -918,14 +939,38 @@ body {
   color: var(--text-muted);
   cursor: pointer;
   padding: 0.25rem;
-  border-radius: 4px;
-  font-size: 1.2rem;
+  border-radius: 50%;
+  font-size: 1rem;
   line-height: 1;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .search-clear:hover {
   background: var(--bg-tertiary);
   color: var(--text-primary);
+}
+
+.form-input.search-padded {
+  padding-left: 2.5rem;
+}
+
+.form-input.search-has-clear {
+  padding-right: 2.5rem;
+}
+
+.search-disabled-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.7);
+  border-radius: 6px;
+  pointer-events: none;
 }
 
 /* Pagination */

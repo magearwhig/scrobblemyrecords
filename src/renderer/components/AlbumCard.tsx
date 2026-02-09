@@ -54,7 +54,7 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
         )}
       </div>
 
-      <div style={{ flex: 1 }}>
+      <div className='album-card-info'>
         <div className='album-title' title={release.title}>
           {release.title}
         </div>
@@ -65,38 +65,20 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
 
         <div className='album-year'>{release.year || 'Unknown Year'}</div>
 
-        <div
-          className='album-metadata'
-          style={{ fontSize: '0.7rem', marginTop: '0.25rem' }}
-        >
-          {formatArray(release.format)}
-        </div>
+        <div className='album-metadata'>{formatArray(release.format)}</div>
 
         {release.label && release.label.length > 0 && (
-          <div
-            className='album-metadata'
-            style={{ fontSize: '0.7rem', marginTop: '0.25rem' }}
-          >
-            {formatArray(release.label)}
-          </div>
+          <div className='album-metadata'>{formatArray(release.label)}</div>
         )}
       </div>
 
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.5rem',
-          marginTop: '0.75rem',
-        }}
-      >
+      <div className='album-card-actions'>
         <button
           className={`btn btn-small ${selected ? 'btn-secondary' : ''}`}
           onClick={e => {
             e.stopPropagation();
             onSelect();
           }}
-          style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}
         >
           {selected ? '✓ Selected' : 'Select'}
         </button>
@@ -107,7 +89,6 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
             e.stopPropagation();
             onViewDetails(release);
           }}
-          style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}
         >
           View Details
         </button>
@@ -121,7 +102,6 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
               e.stopPropagation();
               onAddToDiscardPile(item);
             }}
-            style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}
             title='Add to discard pile'
           >
             📦 Discard
@@ -129,16 +109,7 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
         )}
 
         {isInDiscardPile && (
-          <span
-            className='discard-pile-indicator'
-            style={{
-              fontSize: '0.7rem',
-              color: 'var(--accent-warning, #f59e0b)',
-              textAlign: 'center',
-            }}
-          >
-            In Discard Pile
-          </span>
+          <span className='discard-pile-indicator'>In Discard Pile</span>
         )}
       </div>
     </div>

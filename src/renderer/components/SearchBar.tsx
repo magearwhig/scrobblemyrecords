@@ -155,12 +155,12 @@ const SearchBar: React.FC<SearchBarProps> = ({
   };
 
   return (
-    <div style={{ position: 'relative', marginBottom: '1rem' }}>
-      <div style={{ position: 'relative' }}>
+    <div className='search-container'>
+      <div className='search-input-wrapper'>
         <input
           ref={inputRef}
           type='text'
-          className='form-input'
+          className={`form-input search-padded ${query ? 'search-has-clear' : ''}`}
           value={query}
           onChange={handleInputChange}
           onFocus={handleFocus}
@@ -169,26 +169,10 @@ const SearchBar: React.FC<SearchBarProps> = ({
           placeholder={placeholder}
           disabled={disabled}
           autoFocus
-          style={{
-            paddingLeft: '2.5rem',
-            paddingRight: query ? '2.5rem' : '1rem',
-          }}
         />
 
         {/* Search icon */}
-        <div
-          style={{
-            position: 'absolute',
-            left: '0.75rem',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            color: '#666',
-            fontSize: '1rem',
-            pointerEvents: 'none',
-          }}
-        >
-          🔍
-        </div>
+        <div className='search-icon'>🔍</div>
 
         {/* Clear button */}
         {query && (
@@ -196,24 +180,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
             type='button'
             onClick={handleClear}
             disabled={disabled}
-            style={{
-              position: 'absolute',
-              right: '0.75rem',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              background: 'none',
-              border: 'none',
-              color: '#666',
-              fontSize: '1rem',
-              cursor: 'pointer',
-              padding: '0.25rem',
-              borderRadius: '50%',
-              width: '1.5rem',
-              height: '1.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+            className='search-clear'
             title='Clear search'
             aria-label='Clear search'
           >
@@ -222,20 +189,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
         )}
       </div>
 
-      {disabled && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(255, 255, 255, 0.7)',
-            borderRadius: '6px',
-            pointerEvents: 'none',
-          }}
-        />
-      )}
+      {disabled && <div className='search-disabled-overlay' />}
     </div>
   );
 };

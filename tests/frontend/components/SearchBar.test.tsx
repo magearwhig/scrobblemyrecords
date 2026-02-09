@@ -61,18 +61,14 @@ describe('SearchBar', () => {
   it('shows overlay when disabled', () => {
     render(<SearchBar {...defaultProps} disabled={true} />);
 
-    const overlay = document.querySelector(
-      'div[style*="rgba(255, 255, 255, 0.7)"]'
-    );
+    const overlay = document.querySelector('.search-disabled-overlay');
     expect(overlay).toBeInTheDocument();
   });
 
   it('does not show overlay when enabled', () => {
     render(<SearchBar {...defaultProps} disabled={false} />);
 
-    const overlay = document.querySelector(
-      'div[style*="rgba(255, 255, 255, 0.7)"]'
-    );
+    const overlay = document.querySelector('.search-disabled-overlay');
     expect(overlay).not.toBeInTheDocument();
   });
 
@@ -195,20 +191,19 @@ describe('SearchBar', () => {
     render(<SearchBar {...defaultProps} defaultValue='test' />);
 
     const input = screen.getByDisplayValue('test');
-    expect(input).toHaveStyle({
-      paddingLeft: '2.5rem',
-      paddingRight: '2.5rem',
-    });
+    expect(input).toHaveClass(
+      'form-input',
+      'search-padded',
+      'search-has-clear'
+    );
   });
 
   it('applies correct styling to input without clear button', () => {
     render(<SearchBar {...defaultProps} />);
 
     const input = screen.getByPlaceholderText('Search...');
-    expect(input).toHaveStyle({
-      paddingLeft: '2.5rem',
-      paddingRight: '1rem',
-    });
+    expect(input).toHaveClass('form-input', 'search-padded');
+    expect(input).not.toHaveClass('search-has-clear');
   });
 
   it('cancels previous timeout when new input is received', async () => {
