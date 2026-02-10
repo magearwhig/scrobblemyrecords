@@ -17,16 +17,17 @@ Consolidated from multiple audits (January–February 2026). Items completed in 
 
 ## CRITICAL
 
-### C1. Test coverage thresholds (48–60%) vs stated 90% baseline
+### C1. Test coverage thresholds vs stated 90% baseline
 
 **Severity**: Critical | **Effort**: Deeper (ongoing) | **Quick Win**: No (documenting the gap is)
 
-README and `dev_prompt.md` specify 90% coverage target but Jest config enforces only 48–60%. This is a known gap being addressed incrementally.
+README and `dev_prompt.md` specify 90% coverage target but Jest config enforces lower thresholds. This is a known gap being addressed incrementally.
 
 **Current State:**
-- `jest.config.js` thresholds: branches 48%, functions 55%, lines/statements 60%
+- `jest.config.js` thresholds: branches 50%, functions 57%, lines 63%, statements 63%
+- Actual coverage: branches 52.72%, functions 59.06%, lines 65.52%, statements 65.15%
 - Target: 90%
-- `hiddenItemService.ts` and `trackMappingService.ts` have no dedicated test files
+- All 94 test suites pass (2671 tests), zero flaky failures
 
 **Improvement Plan:**
 1. Current baseline prevents regression
@@ -34,9 +35,13 @@ README and `dev_prompt.md` specify 90% coverage target but Jest config enforces 
 3. Do NOT change `jest.config.js` until tests exist to support higher thresholds
 
 **Action:**
-- [ ] Write tests for services with low coverage: `wishlistService`, `imageService`, `hiddenItemService`, `trackMappingService`
-- [ ] Prioritize coverage for critical paths: `authService`, `lastfmService`, `discogsService`, scrobble routes
-- [ ] After coverage improves, raise `jest.config.js` thresholds incrementally
+- [x] Write tests for services with low coverage: `wishlistService`, `hiddenItemService`, `trackMappingService`
+- [x] Fix broken test mocks for `discogsService` and `sellerMonitoringService` (getDiscogsAxios singleton)
+- [x] Raise `jest.config.js` thresholds from 48–60% to 50/57/63/63%
+- [x] Fix flaky test timeouts (async leak in server.ts, maxWorkers, testTimeout)
+- [ ] Continue adding tests for `imageService` and other low-coverage services
+- [ ] Prioritize coverage for critical paths: `authService`, `lastfmService`, scrobble routes
+- [ ] Continue raising `jest.config.js` thresholds incrementally toward 90%
 - [ ] Add coverage report to CI output for visibility
 - [ ] Consider separate thresholds for backend vs frontend
 
@@ -75,22 +80,9 @@ Total reduction: 275 → 39 inline styles (86%). All 39 remaining are dynamic (c
 
 ---
 
-### H5. Background operations fail silently
+### ~~H5. Background operations fail silently~~ DONE
 
-**Severity**: High | **Effort**: Deeper
-
-Routes kick off background sync/scrobble operations with `.catch()` that only logs. Users never learn if their operation failed.
-
-```ts
-scrobbleHistorySyncService
-  .startIncrementalSync()
-  .catch(err => console.error('Failed to auto-sync after scrobble:', err));
-```
-
-**Action:**
-- [x] Implement lightweight job-status mechanism (in-memory map of `jobId -> {status, error}`)
-- [x] Let the frontend poll for completion
-- [x] Pairs well with M10 (toast system)
+**Completed:** February 2026. Implemented lightweight job-status mechanism (in-memory map of `jobId -> {status, error}`) with frontend polling and toast notifications for completion/failure.
 
 **Files:** `src/backend/routes/scrobble.ts`, `src/backend/routes/suggestions.ts`
 
@@ -348,46 +340,46 @@ All components wrapped with `React.memo`. Inline styles replaced with CSS classe
 
 | # | Finding | Severity | Quick Win? |
 |---|---------|----------|------------|
-| C1 | Coverage thresholds (48–60%) vs 90% target | **Critical** | No |
-| H1 | No React Error Boundary | **High** | Yes |
-| H2 | Empty-string fallbacks for API secrets | **High** | Yes |
-| H3 | Lock file TOCTOU race condition | **High** | Yes |
-| H4 | Massive inline styling + monolithic stylesheet | **High** | No |
-| H5 | ~~Background operations fail silently~~ | ~~**High**~~ | ~~DONE~~ |
-| H6 | ~~Missing request size limits and rate limiting~~ | ~~**High**~~ | ~~DONE~~ |
-| M1 | ~~Direct console.* bypasses secure logger (24 files)~~ | ~~Medium~~ | ~~DONE~~ |
-| M2 | ~~CryptoJS deprecated library~~ | ~~Medium~~ | ~~DONE~~ |
-| M3 | ~~Startup migrations not awaited~~ | ~~Medium~~ | ~~DONE~~ |
-| M4 | ~~Unguarded JSON.parse calls~~ | ~~Medium~~ | ~~DONE~~ |
-| M5 | ~~Standardize API error responses~~ | ~~Medium~~ | ~~DONE~~ |
-| M6 | fireEvent vs userEvent test inconsistency | Medium | Partial |
-| M7 | ~~Accessibility gaps on form controls/buttons~~ | ~~Medium~~ | ~~DONE~~ |
-| M8 | ~~E2E tests not in CI~~ | ~~Medium~~ | ~~DONE~~ |
-| M9 | ~~No virtualization for large lists~~ | ~~Medium~~ | ~~DONE~~ |
-| M10 | ~~No toast notification system~~ | ~~Medium~~ | ~~DONE~~ |
-| M11 | ~~No React.memo on list components~~ | ~~Medium~~ | ~~DONE~~ |
-| M12 | ~~Seller monitoring lacks rate limiting~~ | ~~Medium~~ | ~~DONE~~ |
-| M13 | ~~Fixed 10s timeout + unconditional 1s delay~~ | ~~Medium~~ | ~~DONE~~ |
-| M14 | ~~decrypt() returns empty string on failure~~ | ~~Medium~~ | ~~DONE~~ |
-| M15 | data/ directory not auto-created | Medium | Yes |
-| M16 | README architecture out of date | Medium | Yes |
-| M17 | ~~No contributor development guide~~ | ~~Medium~~ | ~~DONE~~ |
-| M18 | ~~Documentation gaps (gitignored docs)~~ | ~~Medium~~ | ~~DONE~~ |
-| M19 | ~~Component extraction Level 3 & 4~~ | ~~Medium~~ | ~~DONE~~ |
-| L1 | License metadata mismatch (ISC vs MIT) | Low | Yes |
-| L2 | Legacy auth endpoints likely unused | Low | Yes |
-| L3 | Security audit doesn't fail CI | Low | Yes |
-| L4 | Remaining useState\<any\> (3 left) | Low | Yes |
-| L5 | No Node.js version enforcement | Low | Yes |
-| L6 | Config drift: deprecated PORT + HOST risk | Low | Yes |
-| L7 | Unused dependency: wait-on | Low | Yes |
-| L8 | CI doesn't test Node 22 | Low | Yes |
-| L9 | ~~No request logging / observability~~ | ~~Low~~ | ~~DONE~~ |
-| L10 | ~~No focus trap in modals + dead state~~ | ~~Low~~ | ~~DONE~~ |
-| L11 | ~~Centralize route identifiers~~ | ~~Low~~ | ~~DONE~~ |
-| L12 | ~~Sidebar reorganization~~ | ~~Low~~ | ~~DONE~~ |
+| C1 | Coverage thresholds (50–63%) vs 90% target | **Critical** | No (ongoing) |
+| ~~H1~~ | ~~No React Error Boundary~~ | ~~**High**~~ | ~~DONE~~ |
+| ~~H2~~ | ~~Empty-string fallbacks for API secrets~~ | ~~**High**~~ | ~~DONE~~ |
+| ~~H3~~ | ~~Lock file TOCTOU race condition~~ | ~~**High**~~ | ~~DONE~~ |
+| ~~H4~~ | ~~Massive inline styling + monolithic stylesheet~~ | ~~**High**~~ | ~~DONE~~ |
+| ~~H5~~ | ~~Background operations fail silently~~ | ~~**High**~~ | ~~DONE~~ |
+| ~~H6~~ | ~~Missing request size limits and rate limiting~~ | ~~**High**~~ | ~~DONE~~ |
+| ~~M1~~ | ~~Direct console.* bypasses secure logger (24 files)~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M2~~ | ~~CryptoJS deprecated library~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M3~~ | ~~Startup migrations not awaited~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M4~~ | ~~Unguarded JSON.parse calls~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M5~~ | ~~Standardize API error responses~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M6~~ | ~~fireEvent vs userEvent test inconsistency~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M7~~ | ~~Accessibility gaps on form controls/buttons~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M8~~ | ~~E2E tests not in CI~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M9~~ | ~~No virtualization for large lists~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M10~~ | ~~No toast notification system~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M11~~ | ~~No React.memo on list components~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M12~~ | ~~Seller monitoring lacks rate limiting~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M13~~ | ~~Fixed 10s timeout + unconditional 1s delay~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M14~~ | ~~decrypt() returns empty string on failure~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M15~~ | ~~data/ directory not auto-created~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M16~~ | ~~README architecture out of date~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M17~~ | ~~No contributor development guide~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M18~~ | ~~Documentation gaps (gitignored docs)~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~M19~~ | ~~Component extraction Level 3 & 4~~ | ~~Medium~~ | ~~DONE~~ |
+| ~~L1~~ | ~~License metadata mismatch (ISC vs MIT)~~ | ~~Low~~ | ~~DONE~~ |
+| ~~L2~~ | ~~Legacy auth endpoints likely unused~~ | ~~Low~~ | ~~N/A~~ |
+| ~~L3~~ | ~~Security audit doesn't fail CI~~ | ~~Low~~ | ~~DONE~~ |
+| ~~L4~~ | ~~Remaining useState\<any\> (3 left)~~ | ~~Low~~ | ~~DONE~~ |
+| ~~L5~~ | ~~No Node.js version enforcement~~ | ~~Low~~ | ~~DONE~~ |
+| ~~L6~~ | ~~Config drift: deprecated PORT + HOST risk~~ | ~~Low~~ | ~~DONE~~ |
+| ~~L7~~ | ~~Unused dependency: wait-on~~ | ~~Low~~ | ~~DONE~~ |
+| ~~L8~~ | ~~CI doesn't test Node 22~~ | ~~Low~~ | ~~DONE~~ |
+| ~~L9~~ | ~~No request logging / observability~~ | ~~Low~~ | ~~DONE~~ |
+| ~~L10~~ | ~~No focus trap in modals + dead state~~ | ~~Low~~ | ~~DONE~~ |
+| ~~L11~~ | ~~Centralize route identifiers~~ | ~~Low~~ | ~~DONE~~ |
+| ~~L12~~ | ~~Sidebar reorganization~~ | ~~Low~~ | ~~DONE~~ |
 
-**Total open**: 7 items (1 critical, 1 high, 3 medium, 2 low) -- 31 completed (10 Phase 0 + 11 Phase 1 + 3 Phase 2 + 7 Phase 3, February 2026)
+**Total open**: 1 item (C1 — ongoing coverage improvement) -- 37 completed/resolved (February 2026)
 
 ---
 
@@ -412,29 +404,29 @@ All 10 items completed: H1, H3, H2, H6 (size limit), M15, L1, L5, M1 (ESLint + b
 | ~~9~~ | ~~Share rate-limited Axios instance with seller service~~ | ~~M12~~ DONE |
 | ~~10~~ | ~~Publish sanitized security + testing guides~~ | ~~M17, M18~~ DONE |
 
-### Phase 2 -- Systematic Refactors (2–4 weeks)
+### Phase 2 -- Systematic Refactors (2–4 weeks) -- COMPLETE
 
 | # | Action | Findings |
 |---|--------|----------|
-| 1 | Inline styles to CSS modules (start with list components) | H4 |
-| 2 | Split `styles.css` into per-component modules | H4 |
-| 3 | Migrate `fireEvent` to `userEvent` in 20 test files | M6 |
-| 4 | Add test coverage for untested services + raise thresholds | C1 |
+| ~~1~~ | ~~Inline styles to CSS modules (start with list components)~~ | ~~H4~~ DONE |
+| ~~2~~ | ~~Split `styles.css` into per-component modules~~ | ~~H4~~ DONE |
+| ~~3~~ | ~~Migrate `fireEvent` to `userEvent` in 20 test files~~ | ~~M6~~ DONE |
+| ~~4~~ | ~~Add test coverage for untested services + raise thresholds~~ | ~~C1~~ DONE (partial — ongoing) |
 | ~~5~~ | ~~Implement token-bucket rate limiter for Discogs~~ | ~~M13~~ DONE |
 | ~~6~~ | ~~Migrate CryptoJS to native `crypto`~~ | ~~M2~~ DONE |
 | ~~7~~ | ~~Standardize API error responses~~ | ~~M5~~ DONE |
 
-### Phase 3 -- Strategic Improvements (ongoing)
+### Phase 3 -- Strategic Improvements (ongoing) -- COMPLETE
 
 | # | Action | Findings |
 |---|--------|----------|
-| 1 | Add `react-window` virtualization to collection grid | M9 |
-| 2 | Implement toast notification system | M10 |
-| 3 | ~~Add background job status tracking~~ | ~~H5~~ |
-| 4 | Component extraction Level 3 & 4 | M19 |
-| 5 | Remove legacy auth endpoints after verification | L2 |
-| 6 | Add structured logging + request metrics | L9 |
-| 7 | Continue raising coverage toward 90% | C1 |
+| ~~1~~ | ~~Add `@tanstack/react-virtual` virtualization to collection grid~~ | ~~M9~~ DONE |
+| ~~2~~ | ~~Implement toast notification system~~ | ~~M10~~ DONE |
+| ~~3~~ | ~~Add background job status tracking~~ | ~~H5~~ DONE |
+| ~~4~~ | ~~Component extraction Level 3 & 4~~ | ~~M19~~ DONE |
+| ~~5~~ | ~~Legacy auth endpoints — verified as actively used~~ | ~~L2~~ N/A |
+| ~~6~~ | ~~Add structured logging + request metrics~~ | ~~L9~~ DONE |
+| 7 | Continue raising coverage toward 90% | C1 (ongoing) |
 
 ---
 
