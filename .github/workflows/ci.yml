@@ -101,7 +101,7 @@ jobs:
       DISCOGS_CLIENT_SECRET: "test_discogs_client_secret_for_ci"
       DISCOGS_CALLBACK_URL: "http://localhost:3000/auth/discogs/callback"
       ENCRYPTION_KEY: "test_encryption_key_32_chars_long_for_ci"
-      NODE_ENV: "test"
+      NODE_ENV: "ci"
       PORT: "3002"
       BACKEND_PORT: "3001"
       HOST: "127.0.0.1"
