@@ -69,10 +69,25 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'npm run dev:app',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
+  webServer: process.env.CI
+    ? [
+        {
+          command: 'node dist/server.js',
+          url: 'http://localhost:3001/health',
+          reuseExistingServer: false,
+          timeout: 30 * 1000,
+        },
+        {
+          command: 'npx serve dist/web -l 3000 -s',
+          url: 'http://localhost:3000',
+          reuseExistingServer: false,
+          timeout: 30 * 1000,
+        },
+      ]
+    : {
+        command: 'npm run dev:app',
+        url: 'http://localhost:3000',
+        reuseExistingServer: true,
+        timeout: 120 * 1000,
+      },
 });

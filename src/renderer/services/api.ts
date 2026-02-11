@@ -1755,6 +1755,17 @@ class ApiService {
     return response.data.data;
   }
 
+  /**
+   * Bulk refresh estimated values from Discogs marketplace data.
+   */
+  async refreshDiscardPileValues(): Promise<{
+    jobId?: string;
+    updated?: number;
+  }> {
+    const response = await this.api.post('/discard-pile/refresh-values');
+    return response.data;
+  }
+
   // Job status tracking
   async getJobStatuses(): Promise<
     {

@@ -1,6 +1,8 @@
 import express, { Request, Response } from 'express';
 
 import { DiscardPileService } from '../services/discardPileService';
+import { jobStatusService } from '../services/jobStatusService';
+import { WishlistService } from '../services/wishlistService';
 import { createLogger } from '../utils/logger';
 import { validateIdentifier, validateNumericId } from '../utils/validation';
 
@@ -11,7 +13,8 @@ import { validateIdentifier, validateNumericId } from '../utils/validation';
  * Static routes must be defined BEFORE parameterized routes.
  */
 export default function createDiscardPileRouter(
-  discardPileService: DiscardPileService
+  discardPileService: DiscardPileService,
+  wishlistService: WishlistService
 ) {
   const router = express.Router();
   const logger = createLogger('DiscardPileRoutes');
@@ -309,6 +312,70 @@ export default function createDiscardPileRouter(
       });
     } catch (error) {
       logger.error('Error bulk removing from discard pile', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * POST /api/v1/discard-pile/refresh-values
+   * Bulk refresh estimated values from Discogs marketplace data
+   */
+  router.post('/refresh-values', async (_req: Request, res: Response) => {
+    try {
+      const items = await discardPileService.getDiscardPile();
+      const eligible = items.filter(item => !item.actualSalePrice);
+
+      if (eligible.length === 0) {
+        return res.json({
+          success: true,
+          message: 'No items to refresh',
+          updated: 0,
+        });
+      }
+
+      const jobId = jobStatusService.startJob(
+        'refresh-values',
+        `Refreshing marketplace values for ${eligible.length} items...`
+      );
+
+      res.json({ success: true, jobId });
+
+      // Process in background sequentially (respects Discogs rate limits)
+      let updated = 0;
+      for (const item of eligible) {
+        try {
+          const stats = await wishlistService.getMarketplaceStats(
+            item.releaseId
+          );
+          if (stats) {
+            const autoValue =
+              stats.priceSuggestions?.veryGoodPlus?.value ??
+              stats.medianPrice ??
+              stats.lowestPrice;
+            if (autoValue != null) {
+              await discardPileService.updateDiscardPileItem(item.id, {
+                estimatedValue: parseFloat(autoValue.toFixed(2)),
+              });
+              updated++;
+            }
+          }
+        } catch (err) {
+          logger.warn(
+            `Failed to refresh value for ${item.artist} - ${item.title}`,
+            err
+          );
+        }
+      }
+
+      jobStatusService.completeJob(
+        jobId,
+        `Updated marketplace values for ${updated} of ${eligible.length} items`
+      );
+    } catch (error) {
+      logger.error('Error refreshing marketplace values', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

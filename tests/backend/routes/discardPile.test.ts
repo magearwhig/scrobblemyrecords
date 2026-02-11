@@ -5,15 +5,20 @@ import request from 'supertest';
 
 import createDiscardPileRouter from '../../../src/backend/routes/discardPile';
 import { DiscardPileService } from '../../../src/backend/services/discardPileService';
+import { WishlistService } from '../../../src/backend/services/wishlistService';
 import { FileStorage } from '../../../src/backend/utils/fileStorage';
 import { DiscardPileItem } from '../../../src/shared/types';
 
 // Mock dependencies
 jest.mock('../../../src/backend/services/discardPileService');
+jest.mock('../../../src/backend/services/wishlistService');
 jest.mock('../../../src/backend/utils/fileStorage');
 
 const MockedDiscardPileService = DiscardPileService as jest.MockedClass<
   typeof DiscardPileService
+>;
+const MockedWishlistService = WishlistService as jest.MockedClass<
+  typeof WishlistService
 >;
 const MockedFileStorage = FileStorage as jest.MockedClass<typeof FileStorage>;
 
@@ -21,6 +26,7 @@ describe('Discard Pile Routes', () => {
   let app: express.Application;
   let mockFileStorage: jest.Mocked<FileStorage>;
   let mockDiscardPileService: jest.Mocked<DiscardPileService>;
+  let mockWishlistService: jest.Mocked<WishlistService>;
 
   const mockItem: DiscardPileItem = {
     id: 'abc123def456',
@@ -44,6 +50,10 @@ describe('Discard Pile Routes', () => {
     mockDiscardPileService = new MockedDiscardPileService(
       mockFileStorage
     ) as jest.Mocked<DiscardPileService>;
+    mockWishlistService = new MockedWishlistService(
+      mockFileStorage,
+      {} as any
+    ) as jest.Mocked<WishlistService>;
 
     // Setup default mocks
     mockDiscardPileService.getDiscardPile = jest
@@ -101,7 +111,7 @@ describe('Discard Pile Routes', () => {
     app.use(express.json());
     app.use(
       '/api/v1/discard-pile',
-      createDiscardPileRouter(mockDiscardPileService)
+      createDiscardPileRouter(mockDiscardPileService, mockWishlistService)
     );
   });
 

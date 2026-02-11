@@ -263,6 +263,16 @@ const ReleaseDetailsPage: React.FC = () => {
     try {
       const stats = await api.getMarketplaceStats(release.id);
       setMarketplaceStats(stats);
+      // Auto-populate estimated value from marketplace data
+      if (stats) {
+        const autoValue =
+          stats.priceSuggestions?.veryGoodPlus?.value ??
+          stats.medianPrice ??
+          stats.lowestPrice;
+        if (autoValue != null) {
+          setDiscardEstimatedValue(autoValue.toFixed(2));
+        }
+      }
     } catch (err) {
       logger.error('Failed to fetch marketplace stats', err);
     } finally {

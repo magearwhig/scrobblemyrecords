@@ -386,7 +386,10 @@ app.use(
   )
 );
 app.use('/api/v1/backup', createBackupRouter(backupService));
-app.use('/api/v1/discard-pile', createDiscardPileRouter(discardPileService));
+app.use(
+  '/api/v1/discard-pile',
+  createDiscardPileRouter(discardPileService, wishlistService)
+);
 app.use('/api/v1/jobs', jobsRouter);
 
 // API info endpoint

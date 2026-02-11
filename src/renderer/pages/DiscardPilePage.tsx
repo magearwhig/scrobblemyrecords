@@ -293,6 +293,19 @@ const DiscardPilePage: React.FC = () => {
     try {
       const stats = await api.getMarketplaceStats(item.releaseId);
       setEditMarketplaceStats(stats);
+      // Auto-populate estimated value if not already set
+      if (!item.estimatedValue && stats) {
+        const autoValue =
+          stats.priceSuggestions?.veryGoodPlus?.value ??
+          stats.medianPrice ??
+          stats.lowestPrice;
+        if (autoValue != null) {
+          setEditForm(prev => ({
+            ...prev,
+            estimatedValue: autoValue.toFixed(2),
+          }));
+        }
+      }
     } catch (error) {
       logger.error('Failed to fetch marketplace stats', error);
     } finally {
@@ -311,6 +324,41 @@ const DiscardPilePage: React.FC = () => {
       style: 'currency',
       currency,
     }).format(value);
+  };
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefreshValues = async () => {
+    try {
+      setRefreshing(true);
+      const result = await api.refreshDiscardPileValues();
+
+      if (!result.jobId) {
+        // No background job (e.g. no items to refresh)
+        setRefreshing(false);
+        return;
+      }
+
+      // Poll for job completion, then reload data
+      const interval = setInterval(async () => {
+        try {
+          const jobs = await api.getJobStatuses();
+          const job = jobs.find(
+            (j: { id: string; status: string }) => j.id === result.jobId
+          );
+          if (job && (job.status === 'completed' || job.status === 'failed')) {
+            clearInterval(interval);
+            setRefreshing(false);
+            loadData();
+          }
+        } catch {
+          // Ignore polling errors
+        }
+      }, 3000);
+    } catch (err) {
+      setRefreshing(false);
+      setError(err instanceof Error ? err.message : 'Failed to refresh values');
+    }
   };
 
   const formatDate = (timestamp: number) => {
@@ -395,6 +443,17 @@ const DiscardPilePage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Actions */}
+      <div className='discard-pile-actions'>
+        <button
+          className='btn btn-secondary'
+          onClick={handleRefreshValues}
+          disabled={refreshing || items.length === 0}
+        >
+          {refreshing ? 'Refreshing...' : 'Refresh Marketplace Values'}
+        </button>
+      </div>
 
       {/* Filter Bar */}
       <div className='filter-bar'>
