@@ -1347,7 +1347,8 @@ Feature 0C (Data Evolution)
     └── Feature 10 (Backup & Restore) - BLOCKED until 0C complete
 
 Feature 1 (Stats Dashboard) - COMPLETE ✅
-    └── Feature 9 (Homepage Dashboard) - uses stats components/APIs
+    ├── Feature 9 (Homepage Dashboard) - uses stats components/APIs
+    └── Feature 11 (Wrapped) - reuses StatsService + ScrobbleHistoryStorage
 
 Feature 2 (Wishlist) - COMPLETE ✅
     ├── Feature 4 (Seller Monitoring) - COMPLETE ✅ - matches against wishlist
@@ -1416,6 +1417,7 @@ Since this is a desktop app (not a server), background jobs run while the app is
 | Smart Scheduling | 1 per route in `patterns.ts` | Backfill 2 albums with auto-timestamps |
 | Local Sellers | 1 per route in `sellers.ts` | Add seller, scan inventory, view matches |
 | New Releases | 1 per route in `releases.ts` | View releases, disambiguate artist |
+| Wrapped | 1 per route in `wrapped.ts` | Generate wrapped, navigate slides |
 
 **Minimum Requirements:**
 - At least 1 integration test per new route group (test actual HTTP request/response)
@@ -1649,3 +1651,68 @@ Backup **user-generated data** that cannot be recovered from external APIs. Prot
 
 ### Data Files Backed Up
 See `.plan/backup-system-plan.md` for full specification including file paths and merge strategies.
+
+---
+
+## Feature 11: Wrapped (Period In Review)
+
+### Status: COMPLETE ✅
+
+**Completed:**
+- `WrappedService` (`src/backend/services/wrappedService.ts`) aggregating listening + collection data over custom date ranges
+- `GET /api/v1/wrapped?startDate=<ms>&endDate=<ms>` endpoint with validation (numeric, finite, range, future-date checks)
+- `WrappedPage.tsx` with date picker (presets + custom range) and full-screen slideshow presentation
+- 14 slide components: TotalScrobbles, TopArtists, TopAlbums, TopTracks, UniqueCounts, NewArtists, PeakDay, PeakHour, Streak, Heatmap, RecordsAdded, MostPlayedAddition, CollectionCoverage, VinylVsDigital
+- `WrappedSlideshow.tsx` container with keyboard navigation (arrows, space, escape, home, end)
+- `WrappedNav.tsx` with forward/back buttons and progress dots
+- Cross-source insights: collection coverage, vinyl vs digital ratio, most-played new addition with fuzzy matching
+- Image enrichment for top artists and albums via ImageService
+- CSS animations (fade-in, slide-up transitions), no inline styles (CSS custom properties via ref callbacks)
+- Reuses existing `CalendarHeatmap` component for heatmap slide
+- Route registration (`#wrapped`), sidebar nav under Listening group
+- 55 wrapped-specific tests: 20 service, 8 route, 10 WrappedPage, 17 WrappedSlideshow
+- All 2726 tests passing, lint/typecheck/build clean
+- All types defined in `shared/types.ts` (`WrappedData`, `WrappedListeningStats`, `WrappedCollectionStats`, `WrappedCrossSourceStats`, etc.)
+
+**Implementation Details:**
+- Stateless: data generated fresh on each request, no data files or migrations
+- Range-filtered scrobble aggregation from `ScrobbleHistoryStorage` index
+- Delegates to `StatsService` for top artists/albums/tracks with date ranges
+- Collection `date_added` filtering for records added in range
+- Session-file timestamp matching for vinyl vs digital breakdown
+- `trackNormalization.ts` fuzzy matching for most-played new addition and collection coverage
+
+### Implementation Plan
+See `.plan/done/wrapped-plan.md` for full specification.
+
+### Overview
+A Spotify Wrapped-inspired feature that generates a **flashy, slide-by-slide personal recap** of your listening and vinyl collecting activity for any chosen date range. Combines Last.fm scrobble data (listening stats) with Discogs collection data (records added) into a visually rich, story-style presentation.
+
+Unlike Spotify Wrapped (yearly only), this supports **custom date ranges** plus presets (this year, last 6 months, etc.). Data is generated fresh on each request -- not saved to disk.
+
+### Key Features
+
+**Date Range Selection:**
+- Presets: "This Year", "2025", "Last 6 Months", "Last 3 Months", "This Month", "Last Month"
+- Custom: start date + end date pickers
+
+**14 Slides:**
+1. Total scrobbles + listening hours
+2. Top 5 artists with images and play count bars
+3. Top 5 albums with cover art and play count bars
+4. Top 5 tracks with play counts
+5. Unique artists + unique albums
+6. New artists discovered
+7. Peak listening day
+8. Peak listening hour
+9. Longest streak
+10. Calendar heatmap
+11. Records added to collection
+12. Most-played new addition
+13. Collection coverage
+14. Vinyl vs digital ratio
+
+**Presentation:**
+- Full-screen slideshow with animated transitions
+- Keyboard navigation (arrow keys, space, escape, home, end)
+- Progress dots showing current slide position

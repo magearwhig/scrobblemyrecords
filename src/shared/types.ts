@@ -1638,3 +1638,90 @@ export interface AlbumPlayCountResult {
 export interface AlbumPlayCountResponse {
   results: AlbumPlayCountResult[];
 }
+
+// ============================================
+// Wrapped (Period In Review) types
+// ============================================
+
+/**
+ * Complete wrapped data for a date range -- generated fresh, not persisted
+ */
+export interface WrappedData {
+  startDate: number; // milliseconds
+  endDate: number; // milliseconds
+  generatedAt: number; // milliseconds
+
+  listening: WrappedListeningStats;
+  collection: WrappedCollectionStats;
+  crossSource: WrappedCrossSourceStats;
+}
+
+export interface WrappedListeningStats {
+  totalScrobbles: number;
+  estimatedListeningHours: number;
+  uniqueArtists: number;
+  uniqueAlbums: number;
+  topArtists: WrappedTopItem[];
+  topAlbums: WrappedTopItem[];
+  topTracks: WrappedTopItem[];
+  newArtistsDiscovered: number;
+  newArtistsList: WrappedNewArtist[];
+  peakListeningDay: {
+    date: string; // YYYY-MM-DD
+    scrobbleCount: number;
+  } | null;
+  peakListeningHour: {
+    hour: number; // 0-23
+    scrobbleCount: number;
+  } | null;
+  longestStreak: {
+    days: number;
+    startDate: string; // YYYY-MM-DD
+    endDate: string; // YYYY-MM-DD
+  } | null;
+  heatmapData: { date: string; count: number }[];
+}
+
+export interface WrappedTopItem {
+  name: string; // Artist name or "Artist - Album" or track name
+  artist: string;
+  album?: string;
+  playCount: number;
+  imageUrl?: string;
+}
+
+export interface WrappedNewArtist {
+  name: string;
+  playCount: number;
+  firstPlayDate: number; // milliseconds
+  imageUrl?: string;
+}
+
+export interface WrappedCollectionStats {
+  recordsAdded: number;
+  recordsList: WrappedCollectionItem[];
+  mostPlayedNewAddition: {
+    artist: string;
+    title: string;
+    coverUrl?: string;
+    dateAdded: number; // milliseconds
+    playCount: number;
+  } | null;
+}
+
+export interface WrappedCollectionItem {
+  artist: string;
+  title: string;
+  coverUrl?: string;
+  dateAdded: number; // milliseconds
+  year?: number;
+}
+
+export interface WrappedCrossSourceStats {
+  collectionCoverage: number; // 0-100 percentage
+  totalCollectionSize: number;
+  albumsPlayed: number;
+  vinylScrobbles: number; // From RecordScrobbles
+  otherScrobbles: number; // From other sources
+  vinylPercentage: number; // 0-100
+}

@@ -14,6 +14,7 @@ import SettingsPage from '../pages/SettingsPage';
 import StatsPage from '../pages/StatsPage';
 import SuggestionsPage from '../pages/SuggestionsPage';
 import WishlistPage from '../pages/WishlistPage';
+import WrappedPage from '../pages/WrappedPage';
 import { ROUTES } from '../routes';
 
 interface MainContentProps {
@@ -63,6 +64,8 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
         return <SellerMatchesPage />;
       case ROUTES.DISCARD_PILE:
         return <DiscardPilePage />;
+      case ROUTES.WRAPPED:
+        return <WrappedPage />;
       default:
         return <HomePage />;
     }

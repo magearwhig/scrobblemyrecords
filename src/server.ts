@@ -24,6 +24,7 @@ import createSellersRouter from './backend/routes/sellers';
 import createStatsRouter from './backend/routes/stats';
 import createSuggestionsRouter from './backend/routes/suggestions';
 import createWishlistRouter from './backend/routes/wishlist';
+import createWrappedRouter from './backend/routes/wrapped';
 import { AnalyticsService } from './backend/services/analyticsService';
 import { AuthService } from './backend/services/authService';
 import { BackupService } from './backend/services/backupService';
@@ -46,6 +47,7 @@ import { StatsService } from './backend/services/statsService';
 import { SuggestionService } from './backend/services/suggestionService';
 import { TrackMappingService } from './backend/services/trackMappingService';
 import { WishlistService } from './backend/services/wishlistService';
+import { WrappedService } from './backend/services/wrappedService';
 import { sendError } from './backend/utils/apiResponse';
 import { FileStorage } from './backend/utils/fileStorage';
 import { createLogger } from './backend/utils/logger';
@@ -309,6 +311,13 @@ const releaseTrackingService = new ReleaseTrackingService(
 );
 const backupService = new BackupService(fileStorage, 'data');
 const discardPileService = new DiscardPileService(fileStorage);
+const wrappedService = new WrappedService(
+  statsService,
+  historyStorage,
+  discogsService,
+  imageService,
+  fileStorage
+);
 
 // API routes
 app.use(
@@ -390,6 +399,7 @@ app.use(
   '/api/v1/discard-pile',
   createDiscardPileRouter(discardPileService, wishlistService)
 );
+app.use('/api/v1/wrapped', createWrappedRouter(wrappedService));
 app.use('/api/v1/jobs', jobsRouter);
 
 // API info endpoint
@@ -409,6 +419,7 @@ app.get('/api/v1', (req, res) => {
       releases: '/api/v1/releases',
       backup: '/api/v1/backup',
       discardPile: '/api/v1/discard-pile',
+      wrapped: '/api/v1/wrapped',
       jobs: '/api/v1/jobs',
     },
   });

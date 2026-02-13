@@ -17,6 +17,7 @@ export const ROUTES = {
   SELLERS: 'sellers',
   SELLER_MATCHES: 'seller-matches',
   DISCARD_PILE: 'discard-pile',
+  WRAPPED: 'wrapped',
 } as const;
 
 export type RouteId = (typeof ROUTES)[keyof typeof ROUTES];

@@ -55,6 +55,7 @@ import {
   WishlistNewRelease,
   WishlistSettings,
   WishlistSyncStatus,
+  WrappedData,
 } from '../../shared/types';
 import { createLogger } from '../utils/logger';
 
@@ -828,6 +829,23 @@ class ApiService {
   ): Promise<AlbumPlayCountResponse> {
     const response = await this.api.post('/stats/album-play-counts', {
       albums,
+    });
+    return response.data.data;
+  }
+
+  // ============================================
+  // Wrapped (Period In Review)
+  // ============================================
+
+  /**
+   * Generate wrapped data for a date range.
+   * @param startDate Start of range in milliseconds
+   * @param endDate End of range in milliseconds
+   */
+  async getWrapped(startDate: number, endDate: number): Promise<WrappedData> {
+    const response = await this.api.get('/wrapped', {
+      params: { startDate, endDate },
+      timeout: 60000, // Allow up to 60s for data aggregation
     });
     return response.data.data;
   }
