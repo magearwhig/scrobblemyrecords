@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 import MissingAlbumsContainer from '../components/marketplace/MissingAlbumsContainer';
 import { useAuth } from '../context/AuthContext';
+import { useTabKeyNavigation } from '../hooks/useTabKeyNavigation';
 import { getTabFromUrl } from '../utils/tabUtils';
 
 import NewReleasesPage from './NewReleasesPage';
@@ -34,6 +35,7 @@ const TAB_LABELS: Record<MarketplaceTab, string> = {
 
 const MarketplacePage: React.FC = () => {
   const { authStatus } = useAuth();
+  const handleTabKeyDown = useTabKeyNavigation();
   const [activeTab, setActiveTab] = useState<MarketplaceTab>(
     () => getTabFromUrl(VALID_TABS, 'wishlist') as MarketplaceTab
   );
@@ -93,9 +95,11 @@ const MarketplacePage: React.FC = () => {
             role='tab'
             className={`tab ${activeTab === tab ? 'active' : ''}`}
             onClick={() => handleTabChange(tab)}
+            onKeyDown={handleTabKeyDown}
             aria-selected={activeTab === tab}
             aria-controls={`marketplace-panel-${tab}`}
             aria-label={TAB_LABELS[tab]}
+            tabIndex={activeTab === tab ? 0 : -1}
           >
             {TAB_LABELS[tab]}
           </button>

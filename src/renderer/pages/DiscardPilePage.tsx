@@ -8,6 +8,7 @@ import {
   MarketplaceStats,
 } from '../../shared/types';
 import { Modal, ModalFooter } from '../components/ui';
+import { ListItemSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -380,7 +381,7 @@ const DiscardPilePage: React.FC = () => {
     return (
       <div className='discard-pile-page'>
         <h1>Discard Pile</h1>
-        <div className='loading-spinner'>Loading...</div>
+        <ListItemSkeleton count={5} />
       </div>
     );
   }

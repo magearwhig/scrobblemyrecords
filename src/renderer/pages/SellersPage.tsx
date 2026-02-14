@@ -3,7 +3,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { MonitoredSeller, SellerScanStatus } from '../../shared/types';
 import SellerCard from '../components/SellerCard';
 import { Modal, ModalFooter } from '../components/ui';
+import { ProgressBar } from '../components/ui/ProgressBar';
+import { ListItemSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
+import { useToast } from '../context/ToastContext';
+import { useConfirmModal } from '../hooks/useConfirmModal';
 import {
   useNotifications,
   createSuccessNotification,
@@ -18,6 +22,8 @@ interface SellersPageProps {
 const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
   const { state } = useApp();
   const { addNotification } = useNotifications();
+  const { showToast } = useToast();
+  const [confirmAction, ConfirmModal] = useConfirmModal();
   const api = getApiService(state.serverUrl);
 
   // State
@@ -195,11 +201,11 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
 
   // Handle remove seller
   const handleRemoveSeller = async (username: string) => {
-    if (
-      !window.confirm(
-        `Remove ${username} from monitoring? This will also delete all matches for this seller.`
-      )
-    ) {
+    const confirmed = await confirmAction(
+      `Remove ${username} from monitoring? This will also delete all matches for this seller.`,
+      { title: 'Remove Seller', confirmLabel: 'Remove' }
+    );
+    if (!confirmed) {
       return;
     }
 
@@ -208,7 +214,8 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
       await api.removeSeller(username);
       loadSellers();
     } catch (err) {
-      window.alert(
+      showToast(
+        'error',
         err instanceof Error ? err.message : 'Failed to remove seller'
       );
     } finally {
@@ -235,7 +242,10 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
       const status = await api.triggerSellerScan(forceFresh);
       setScanStatus(status);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Failed to start scan');
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to start scan'
+      );
     }
   };
 
@@ -254,7 +264,8 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
       const newStats = await api.getReleaseCacheStats();
       setCacheStats(newStats);
     } catch (err) {
-      window.alert(
+      showToast(
+        'error',
         err instanceof Error ? err.message : 'Failed to refresh cache'
       );
     } finally {
@@ -290,8 +301,7 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
       <div className='sellers-page'>
         {!embedded && <h1>Local Sellers</h1>}
         <div className='loading-container'>
-          <div className='spinner'></div>
-          <p>Loading...</p>
+          <ListItemSkeleton count={4} />
         </div>
       </div>
     );
@@ -340,6 +350,7 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
 
   return (
     <div className='sellers-page'>
+      {ConfirmModal}
       {!embedded && (
         <>
           <h1>Local Sellers</h1>
@@ -479,23 +490,19 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
               </>
             )}
           </div>
-          <div className='sellers-scan-progress-bar'>
-            <div
-              className='sellers-scan-progress-fill'
-              style={{
-                width: `${
-                  scanStatus.status === 'matching' &&
-                  scanStatus.matchingProgress
-                    ? Math.round(
-                        (scanStatus.matchingProgress.itemsProcessed /
-                          scanStatus.matchingProgress.totalItems) *
-                          100
-                      )
-                    : scanStatus.progress
-                }%`,
-              }}
-            ></div>
-          </div>
+          <ProgressBar
+            value={
+              scanStatus.status === 'matching' && scanStatus.matchingProgress
+                ? Math.round(
+                    (scanStatus.matchingProgress.itemsProcessed /
+                      scanStatus.matchingProgress.totalItems) *
+                      100
+                  )
+                : scanStatus.progress
+            }
+            size='small'
+            animated
+          />
           {scanStatus.status === 'matching' && scanStatus.matchingProgress && (
             <div className='sellers-scan-cache-stats'>
               {scanStatus.matchingProgress.cacheHits > 0 && (

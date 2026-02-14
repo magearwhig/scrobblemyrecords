@@ -11,6 +11,12 @@ import {
   VinylStatus,
 } from '../../shared/types';
 import { Modal } from '../components/ui';
+import { ProgressBar } from '../components/ui/ProgressBar';
+import {
+  AlbumCardSkeleton,
+  Skeleton,
+  TableRowSkeleton,
+} from '../components/ui/Skeleton';
 import { NewReleasesTab } from '../components/wishlist/NewReleasesTab';
 import WishlistItemCard from '../components/WishlistItemCard';
 import { useApp } from '../context/AppContext';
@@ -635,21 +641,20 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
           </div>
           {!syncStarting && syncStatus && (
             <>
-              <div className='sync-progress-bar'>
-                <div
-                  className='sync-progress-fill'
-                  style={{ width: `${syncStatus.progress}%` }}
-                />
-              </div>
-              <span className='sync-progress-text'>
-                {Math.round(syncStatus.progress)}%
-              </span>
+              <ProgressBar
+                value={syncStatus.progress}
+                size='small'
+                showLabel
+                animated
+              />
             </>
           )}
           {syncStarting && (
-            <div
-              className='spinner'
-              style={{ width: '20px', height: '20px' }}
+            <Skeleton
+              variant='circular'
+              width={20}
+              height={20}
+              animation='pulse'
             />
           )}
         </div>
@@ -756,7 +761,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
             </span>
           </div>
           {loading ? (
-            <div className='loading-spinner'>Loading monitored albums...</div>
+            <AlbumCardSkeleton count={4} />
           ) : localWantItems.length === 0 ? (
             <div className='empty-state'>
               <p>
@@ -829,7 +834,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
         /* Regular Wishlist Items */
         <>
           {loading ? (
-            <div className='loading-spinner'>Loading wishlist...</div>
+            <AlbumCardSkeleton count={6} />
           ) : filteredItems.length === 0 ? (
             <div className='empty-state'>
               <p>
@@ -870,7 +875,11 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
           loading={versionsModal.loading}
         >
           {versionsModal.loading ? (
-            <div className='loading-spinner'>Loading versions...</div>
+            <table className='versions-table'>
+              <tbody>
+                <TableRowSkeleton count={5} columns={4} />
+              </tbody>
+            </table>
           ) : versionsModal.versions.length === 0 ? (
             <p className='text-secondary'>No versions found.</p>
           ) : (

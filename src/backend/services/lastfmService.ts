@@ -2,7 +2,11 @@ import crypto from 'crypto';
 
 import axios, { AxiosInstance } from 'axios';
 
-import { ScrobbleTrack, ScrobbleSession } from '../../shared/types';
+import {
+  LastFmTopTrack,
+  ScrobbleTrack,
+  ScrobbleSession,
+} from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -587,7 +591,7 @@ export class LastFmService {
   async getTopTracks(
     period: '7day' | '1month' | '3month' | '6month' | '12month' = '7day',
     limit: number = 10
-  ): Promise<any[]> {
+  ): Promise<LastFmTopTrack[]> {
     try {
       const credentials = await this.authService.getLastFmCredentials();
       if (!credentials.apiKey || !credentials.username) {

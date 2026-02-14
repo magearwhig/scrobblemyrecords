@@ -4,6 +4,7 @@ import '@testing-library/jest-dom';
 import React from 'react';
 
 import { AuthProvider } from '../../../src/renderer/context/AuthContext';
+import { ToastProvider } from '../../../src/renderer/context/ToastContext';
 import HistoryPage from '../../../src/renderer/pages/HistoryPage';
 import * as apiService from '../../../src/renderer/services/api';
 import * as dateUtils from '../../../src/renderer/utils/dateUtils';
@@ -77,7 +78,9 @@ const renderHistoryPageWithProviders = (
   return {
     ...render(
       <AuthProvider value={authContextValue}>
-        <HistoryPage />
+        <ToastProvider>
+          <HistoryPage />
+        </ToastProvider>
       </AuthProvider>
     ),
     authContextValue,

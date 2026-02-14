@@ -1,6 +1,11 @@
 import express, { Request, Response } from 'express';
 
-import { ScrobbleTrack, ScrobbleSession, Track } from '../../shared/types';
+import {
+  CollectionItem,
+  ScrobbleTrack,
+  ScrobbleSession,
+  Track,
+} from '../../shared/types';
 import { artistMappingService } from '../services/artistMappingService';
 import { AuthService } from '../services/authService';
 import { jobStatusService } from '../services/jobStatusService';
@@ -19,7 +24,10 @@ export default function createScrobbleRouter(
   authService: AuthService,
   lastfmService: LastFmService,
   discogsService?: {
-    searchCollection: (username: string, album: string) => Promise<any>;
+    searchCollection: (
+      username: string,
+      album: string
+    ) => Promise<CollectionItem[]>;
   },
   scrobbleHistorySyncService?: ScrobbleHistorySyncService,
   mappingService?: MappingService

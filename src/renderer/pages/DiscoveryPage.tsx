@@ -10,6 +10,7 @@ import {
 import { MissingAlbumsTab, MissingArtistsTab } from '../components/discovery';
 import SyncStatusBar from '../components/SyncStatusBar';
 import { Modal, ModalFooter } from '../components/ui';
+import { AlbumCardSkeleton, ListItemSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
@@ -384,8 +385,7 @@ const DiscoveryPage: React.FC = () => {
 
       {loading ? (
         <div className='loading-container'>
-          <div className='loading-spinner' />
-          <p>Analyzing your listening history...</p>
+          <AlbumCardSkeleton count={6} />
         </div>
       ) : (
         <div className='discovery-content'>
@@ -485,7 +485,7 @@ const DiscoveryPage: React.FC = () => {
         <div className='mapping-results'>
           {searchLoading ? (
             <div className='mapping-results-loading'>
-              <div className='loading-spinner' />
+              <ListItemSkeleton count={3} />
             </div>
           ) : searchResults.length === 0 ? (
             <p className='mapping-results-empty'>

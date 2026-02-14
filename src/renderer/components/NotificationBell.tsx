@@ -45,6 +45,23 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     };
   }, [isOpen]);
 
+  // Close dropdown on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
   const handleNotificationClick = useCallback(
     (notification: AppNotification) => {
       if (!notification.read) {
@@ -147,6 +164,14 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                     key={notification.id}
                     className={`notification-item notification-item-${notification.type} ${!notification.read ? 'notification-item-unread' : ''}`}
                     onClick={() => handleNotificationClick(notification)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleNotificationClick(notification);
+                      }
+                    }}
+                    role='button'
+                    tabIndex={0}
                   >
                     <div className='notification-item-icon'>
                       <span

@@ -1,9 +1,9 @@
 import React from 'react';
 
 interface CacheProgress {
-  status: 'loading' | 'completed';
-  currentPage: number;
-  totalPages: number;
+  status: 'loading' | 'completed' | 'failed';
+  currentPage?: number;
+  totalPages?: number;
 }
 
 interface NewItemsResult {
@@ -55,10 +55,12 @@ const CacheStatusIndicator: React.FC<CacheStatusIndicatorProps> = ({
         {cacheProgress && cacheProgress.status === 'loading' && (
           <div className='collection-status-loading'>
             <div className='spinner collection-spinner-small'></div>
-            Caching: {cacheProgress.currentPage}/{cacheProgress.totalPages}{' '}
-            pages (
+            Caching: {cacheProgress.currentPage || 0}/
+            {cacheProgress.totalPages || 0} pages (
             {Math.round(
-              (cacheProgress.currentPage / cacheProgress.totalPages) * 100
+              ((cacheProgress.currentPage || 0) /
+                (cacheProgress.totalPages || 1)) *
+                100
             )}
             %)
           </div>

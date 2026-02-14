@@ -8,6 +8,8 @@ import {
 } from '../../shared/types';
 import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import AlbumScrobbleHistory from '../components/AlbumScrobbleHistory';
+import { Modal } from '../components/ui/Modal';
+import { ProgressBar } from '../components/ui/ProgressBar';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
@@ -691,7 +693,7 @@ const ReleaseDetailsPage: React.FC = () => {
   const testLastfmConnection = async () => {
     try {
       const result = await api.testLastfmConnection();
-      setConnectionTest(result);
+      setConnectionTest({ success: true, message: result.message });
     } catch (error) {
       setConnectionTest({
         success: false,
@@ -758,63 +760,57 @@ const ReleaseDetailsPage: React.FC = () => {
   return (
     <div>
       {/* Disambiguation Warning Modal */}
-      {showDisambiguationWarning && (
-        <div
-          className='release-details-modal-overlay'
-          onClick={() => setShowDisambiguationWarning(false)}
-        >
-          <div
-            className='release-details-modal-container'
-            onClick={e => e.stopPropagation()}
-          >
-            <h3 className='release-details-warning-heading'>
-              Artist Name Contains Disambiguation
-            </h3>
-            <p className='release-details-modal-description'>
-              The following artist(s) have Discogs disambiguation suffixes
-              (numbers in parentheses) that may not match Last.fm:
-            </p>
-            <ul className='release-details-modal-list'>
-              {disambiguationArtists.map(artist => (
-                <li key={artist} className='release-details-modal-list-item'>
-                  <strong>{artist}</strong>
-                  <a
-                    href={`https://www.discogs.com/search/?q=${encodeURIComponent(artist)}&type=artist`}
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    className='release-details-modal-link'
-                  >
-                    View on Discogs
-                  </a>
-                </li>
-              ))}
-            </ul>
-            <p className='release-details-modal-muted-text'>
-              You can create an artist mapping to scrobble with a different name
-              on Last.fm.
-            </p>
-            <div className='release-details-modal-button-container'>
-              <button
-                className='btn btn-outline'
-                onClick={() => setShowDisambiguationWarning(false)}
+      <Modal
+        isOpen={showDisambiguationWarning}
+        onClose={() => setShowDisambiguationWarning(false)}
+        title='Artist Name Contains Disambiguation'
+        size='small'
+        footer={
+          <>
+            <button
+              className='btn btn-outline'
+              onClick={() => setShowDisambiguationWarning(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className='btn btn-secondary'
+              onClick={() =>
+                navigateToMappingWithArtist(disambiguationArtists[0])
+              }
+            >
+              Create Mapping
+            </button>
+            <button className='btn btn-primary' onClick={proceedWithScrobble}>
+              Continue Anyway
+            </button>
+          </>
+        }
+      >
+        <p className='release-details-modal-description'>
+          The following artist(s) have Discogs disambiguation suffixes (numbers
+          in parentheses) that may not match Last.fm:
+        </p>
+        <ul className='release-details-modal-list'>
+          {disambiguationArtists.map(artist => (
+            <li key={artist} className='release-details-modal-list-item'>
+              <strong>{artist}</strong>
+              <a
+                href={`https://www.discogs.com/search/?q=${encodeURIComponent(artist)}&type=artist`}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='release-details-modal-link'
               >
-                Cancel
-              </button>
-              <button
-                className='btn btn-secondary'
-                onClick={() =>
-                  navigateToMappingWithArtist(disambiguationArtists[0])
-                }
-              >
-                Create Mapping
-              </button>
-              <button className='btn btn-primary' onClick={proceedWithScrobble}>
-                Continue Anyway
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                View on Discogs
+              </a>
+            </li>
+          ))}
+        </ul>
+        <p className='release-details-modal-muted-text'>
+          You can create an artist mapping to scrobble with a different name on
+          Last.fm.
+        </p>
+      </Modal>
 
       <div className='card'>
         <div className='release-details-header-container'>
@@ -914,14 +910,12 @@ const ReleaseDetailsPage: React.FC = () => {
                 {scrobbleProgress.current} / {scrobbleProgress.total}
               </span>
             </div>
-            <div className='release-details-progress-bar-container'>
-              <div
-                className='release-details-progress-bar-fill'
-                style={{
-                  width: `${(scrobbleProgress.current / scrobbleProgress.total) * 100}%`,
-                }}
-              />
-            </div>
+            <ProgressBar
+              value={scrobbleProgress.current}
+              max={scrobbleProgress.total}
+              size='small'
+              animated
+            />
             <div className='release-details-progress-stats'>
               ✅ {scrobbleProgress.success} successful • ⚠️{' '}
               {scrobbleProgress.ignored} ignored • ❌ {scrobbleProgress.failed}{' '}
@@ -936,19 +930,19 @@ const ReleaseDetailsPage: React.FC = () => {
           >
             <strong>Scrobble Results:</strong>
             {scrobbleResult.success > 0 && (
-              <span style={{ color: 'var(--success-color)' }}>
+              <span className='text-success'>
                 {' '}
                 {scrobbleResult.success} successful
               </span>
             )}
             {scrobbleResult.ignored > 0 && (
-              <span style={{ color: 'var(--warning-color)' }}>
+              <span className='text-warning'>
                 {' '}
                 {scrobbleResult.ignored} ignored
               </span>
             )}
             {scrobbleResult.failed > 0 && (
-              <span style={{ color: 'var(--error-color)' }}>
+              <span className='text-error'>
                 {' '}
                 {scrobbleResult.failed} failed
               </span>
@@ -1039,9 +1033,8 @@ const ReleaseDetailsPage: React.FC = () => {
                         {Object.entries(discs).map(([discName, discSides]) => (
                           <button
                             key={discName}
-                            className={`btn btn-small btn-filter ${isDiscSelected(discSides) ? 'btn-primary' : 'btn-outline'}`}
+                            className={`btn btn-small btn-filter text-muted-sm ${isDiscSelected(discSides) ? 'btn-primary' : 'btn-outline'}`}
                             onClick={() => handleDiscToggle(discSides)}
-                            style={{ fontSize: '0.85rem' }}
                             aria-pressed={isDiscSelected(discSides)}
                             aria-label={`${isDiscSelected(discSides) ? 'Deselect' : 'Select'} ${discName} with sides ${discSides.join(' and ')}`}
                           >
@@ -1063,9 +1056,8 @@ const ReleaseDetailsPage: React.FC = () => {
                         return (
                           <button
                             key={side}
-                            className={`btn btn-small btn-filter ${isSideSelected(side) ? 'btn-primary' : 'btn-outline'}`}
+                            className={`btn btn-small btn-filter text-muted-sm ${isSideSelected(side) ? 'btn-primary' : 'btn-outline'}`}
                             onClick={() => handleSideToggle(side)}
-                            style={{ fontSize: '0.85rem' }}
                             aria-pressed={isSideSelected(side)}
                             aria-label={`${isSideSelected(side) ? 'Deselect' : 'Select'} side ${side} with ${sideTrackCount} track${sideTrackCount === 1 ? '' : 's'}`}
                           >
@@ -1281,16 +1273,7 @@ const ReleaseDetailsPage: React.FC = () => {
             return (
               <div
                 key={index}
-                className='release-details-track-item'
-                style={{
-                  borderBottom:
-                    index < (release.tracklist?.length || 0) - 1
-                      ? '1px solid var(--border-color)'
-                      : 'none',
-                  backgroundColor: selectedTracks.has(index)
-                    ? 'var(--bg-tertiary)'
-                    : 'var(--bg-secondary)',
-                }}
+                className={`release-details-track-item${selectedTracks.has(index) ? ' release-details-track-item--selected' : ''}`}
                 onClick={() => handleTrackToggle(index)}
               >
                 <input

@@ -1736,3 +1736,268 @@ export interface WrappedCrossSourceStats {
   otherScrobbles: number; // From other sources
   vinylPercentage: number; // 0-100
 }
+
+// ============================================
+// Discogs Raw API Response Types
+// ============================================
+
+/**
+ * Raw artist object from Discogs API responses.
+ * Used in release, collection, and search endpoints.
+ */
+export interface DiscogsRawArtist {
+  name: string;
+  id?: number;
+  resource_url?: string;
+  anv?: string;
+  join?: string;
+  role?: string;
+  tracks?: string;
+}
+
+/**
+ * Raw format object from Discogs API responses.
+ */
+export interface DiscogsRawFormat {
+  name: string;
+  qty?: string;
+  text?: string;
+  descriptions?: string[];
+}
+
+/**
+ * Raw label object from Discogs API responses.
+ */
+export interface DiscogsRawLabel {
+  name: string;
+  id?: number;
+  catno?: string;
+  resource_url?: string;
+  entity_type?: string;
+}
+
+/**
+ * Raw track object from Discogs API release responses.
+ */
+export interface DiscogsRawTrack {
+  position: string;
+  title: string;
+  duration: string;
+  artists?: DiscogsRawArtist[];
+  type_?: string;
+}
+
+/**
+ * Raw image object from Discogs API responses.
+ */
+export interface DiscogsRawImage {
+  uri: string;
+  uri150?: string;
+  type?: string;
+  width?: number;
+  height?: number;
+  resource_url?: string;
+}
+
+/**
+ * Raw basic_information object from Discogs collection item responses.
+ */
+export interface DiscogsRawBasicInformation {
+  id: number;
+  master_id?: number;
+  title: string;
+  year: number;
+  artists?: DiscogsRawArtist[];
+  formats?: DiscogsRawFormat[];
+  labels?: DiscogsRawLabel[];
+  catalog_number?: string;
+  cover_image?: string;
+  resource_url: string;
+  thumb?: string;
+}
+
+/**
+ * Raw collection item from Discogs /collection/folders/{id}/releases endpoint.
+ */
+export interface DiscogsRawCollectionItem {
+  id: number;
+  date_added: string;
+  rating: number;
+  notes?: CollectionNote[];
+  basic_information: DiscogsRawBasicInformation;
+}
+
+/**
+ * Raw release data from Discogs /releases/{id} endpoint.
+ */
+export interface DiscogsRawReleaseResponse {
+  id: number;
+  master_id?: number;
+  title: string;
+  year: number;
+  artists?: DiscogsRawArtist[];
+  formats?: DiscogsRawFormat[];
+  labels?: DiscogsRawLabel[];
+  catalog_number?: string;
+  images?: DiscogsRawImage[];
+  resource_url: string;
+  tracklist?: DiscogsRawTrack[];
+}
+
+/**
+ * Raw user identity from Discogs /oauth/identity endpoint.
+ */
+export interface DiscogsUserIdentity {
+  id: number;
+  username: string;
+  resource_url: string;
+  consumer_name?: string;
+}
+
+/**
+ * OAuth header object returned by oauth-1.0a library.
+ */
+export interface OAuthHeader {
+  [key: string]: string;
+  Authorization: string;
+}
+
+/**
+ * Discogs collection cache progress tracking.
+ */
+export interface DiscogsCollectionProgress {
+  username: string;
+  totalPages?: number;
+  currentPage?: number;
+  completedPages?: number[];
+  startTime?: number;
+  endTime?: number;
+  status: 'loading' | 'completed' | 'failed';
+  error?: string;
+}
+
+/**
+ * Cache entry with a timestamp for validation.
+ */
+export interface TimestampedCache {
+  timestamp?: number;
+}
+
+// ============================================
+// Last.fm Raw API Response Types
+// ============================================
+
+/**
+ * Raw top track from Last.fm user.getTopTracks endpoint.
+ */
+export interface LastFmTopTrack {
+  name: string;
+  playcount: string;
+  url: string;
+  artist: { name: string; mbid?: string; url?: string };
+  image?: Array<{ '#text': string; size: string }>;
+  duration?: string;
+  '@attr'?: { rank: string };
+}
+
+// ============================================
+// Discogs Connection Test Result
+// ============================================
+
+/**
+ * Result of testing Discogs connection (token validation).
+ */
+export interface DiscogsConnectionTestResult {
+  valid: boolean;
+  username?: string;
+}
+
+/**
+ * Last.fm session key response shape.
+ */
+export interface LastFmSessionKeyInfo {
+  sessionKey: string;
+  username?: string;
+}
+
+/**
+ * Extended collection response from /collection/{username}/all endpoint.
+ * Includes cache status metadata beyond the standard ApiResponse.
+ */
+export interface EntireCollectionResponse {
+  success: boolean;
+  data: CollectionItem[];
+  total: number;
+  timestamp: number;
+  cacheStatus?: 'valid' | 'expired' | 'partially_expired' | 'unknown';
+  refreshing?: boolean;
+  message?: string;
+}
+
+/**
+ * Excluded artist from release tracking (as returned by API).
+ */
+export interface ExcludedArtistResponse {
+  artistName: string;
+  normalizedName: string;
+  artistMbid?: string;
+  excludedAt: number;
+}
+
+/**
+ * Sort option type for CollectionPage sort dropdown.
+ */
+export type CollectionSortBy =
+  | 'artist'
+  | 'title'
+  | 'year'
+  | 'date_added'
+  | 'scrobbles';
+
+// ============================================
+// Last.fm API Response Types (for renderer)
+// ============================================
+
+/**
+ * Last.fm user info from user.getInfo API.
+ */
+export interface LastFmUserInfo {
+  name: string;
+  realname?: string;
+  url: string;
+  playcount: string;
+  registered?: { '#text': number; unixtime: string };
+  image?: Array<{ '#text': string; size: string }>;
+}
+
+/**
+ * Last.fm recent track from user.getRecentTracks API.
+ */
+export interface LastFmRecentTrack {
+  name: string;
+  artist: { '#text': string; mbid?: string };
+  album?: { '#text': string; mbid?: string };
+  url: string;
+  date?: { uts: string; '#text': string };
+  image?: Array<{ '#text': string; size: string }>;
+  '@attr'?: { nowplaying: string };
+}
+
+/**
+ * Last.fm top artist from user.getTopArtists API.
+ */
+export interface LastFmTopArtist {
+  name: string;
+  playcount: string;
+  url: string;
+  mbid?: string;
+  image?: Array<{ '#text': string; size: string }>;
+}
+
+/**
+ * Result of testing Last.fm connection.
+ */
+export interface LastFmConnectionTestResult {
+  message: string;
+  userInfo?: LastFmUserInfo;
+}

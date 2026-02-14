@@ -176,10 +176,12 @@ describe('WishlistPage', () => {
   it('renders loading state initially', async () => {
     renderWishlistPage();
 
-    expect(screen.getByText('Loading wishlist...')).toBeInTheDocument();
+    expect(document.querySelector('.skeleton-album-card')).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.queryByText('Loading wishlist...')).not.toBeInTheDocument();
+      expect(
+        document.querySelector('.skeleton-album-card')
+      ).not.toBeInTheDocument();
     });
   });
 

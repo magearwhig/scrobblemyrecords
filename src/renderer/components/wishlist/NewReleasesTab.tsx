@@ -6,6 +6,7 @@ import {
 } from '../../../shared/types';
 import { useApp } from '../../context/AppContext';
 import { getApiService } from '../../services/api';
+import { ProgressBar } from '../ui/ProgressBar';
 
 import { NewReleaseCard } from './NewReleaseCard';
 
@@ -287,12 +288,7 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
                 <span className='sync-auto-continue-badge'>Auto-continue</span>
               )}
             </div>
-            <div className='sync-progress-bar-container'>
-              <div
-                className='sync-progress-bar'
-                style={{ width: `${overallProgress}%` }}
-              />
-            </div>
+            <ProgressBar value={overallProgress} size='small' animated />
             <div className='sync-progress-actions'>
               <span className='sync-percent'>{overallProgress}%</span>
               {autoContinue && (

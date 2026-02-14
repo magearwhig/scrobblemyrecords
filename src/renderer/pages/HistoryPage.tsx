@@ -7,6 +7,9 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { SessionCardSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useConfirmModal } from '../hooks/useConfirmModal';
+import { useTabKeyNavigation } from '../hooks/useTabKeyNavigation';
 import { getApiService } from '../services/api';
 import { formatLocalTimeClean, getTimezoneOffset } from '../utils/dateUtils';
 import { createLogger } from '../utils/logger';
@@ -30,6 +33,9 @@ const getInitialTab = (): HistoryTab => {
 const HistoryPage: React.FC = () => {
   const { authStatus, setAuthStatus } = useAuth();
   const { state } = useApp();
+  const { showToast } = useToast();
+  const [confirmAction, ConfirmModal] = useConfirmModal();
+  const handleTabKeyDown = useTabKeyNavigation();
   const [activeTab, setActiveTab] = useState<HistoryTab>(getInitialTab);
   const [sessions, setSessions] = useState<ScrobbleSession[]>([]);
   const [loading, setLoading] = useState(false);
@@ -84,11 +90,11 @@ const HistoryPage: React.FC = () => {
   };
 
   const handleDeleteSession = async (sessionId: string) => {
-    if (
-      !window.confirm(
-        'Are you sure you want to delete this session? This action cannot be undone.'
-      )
-    ) {
+    const confirmed = await confirmAction(
+      'Are you sure you want to delete this session? This action cannot be undone.',
+      { title: 'Delete Session', confirmLabel: 'Delete' }
+    );
+    if (!confirmed) {
       return;
     }
 
@@ -127,11 +133,11 @@ const HistoryPage: React.FC = () => {
       return;
     }
 
-    if (
-      !window.confirm(
-        'This will search your Discogs collection to add album covers to existing scrobble sessions. This may take a while for large collections. Continue?'
-      )
-    ) {
+    const confirmed = await confirmAction(
+      'This will search your Discogs collection to add album covers to existing scrobble sessions. This may take a while for large collections. Continue?',
+      { title: 'Backfill Album Covers', confirmLabel: 'Continue' }
+    );
+    if (!confirmed) {
       return;
     }
 
@@ -141,13 +147,9 @@ const HistoryPage: React.FC = () => {
     try {
       const result = await api.backfillAlbumCovers(authStatus.discogs.username);
 
-      // Show success message
-      // eslint-disable-next-line no-undef
-      alert(
-        `Backfill completed!\n\n` +
-          `• Updated ${result.updatedSessions} sessions\n` +
-          `• Added covers to ${result.updatedTracks} tracks\n` +
-          `• Processed ${result.totalSessions} total sessions`
+      showToast(
+        'success',
+        `Backfill completed: updated ${result.updatedSessions} sessions, added covers to ${result.updatedTracks} tracks (${result.totalSessions} total processed)`
       );
 
       // Reload history to show the new covers
@@ -209,6 +211,7 @@ const HistoryPage: React.FC = () => {
 
   return (
     <div>
+      {ConfirmModal}
       {/* Page Header */}
       <div className='card'>
         <h2>History</h2>
@@ -219,16 +222,28 @@ const HistoryPage: React.FC = () => {
       </div>
 
       {/* Tab Navigation */}
-      <div className='history-tabs'>
+      <div
+        className='history-tabs'
+        role='tablist'
+        aria-label='History sections'
+      >
         <button
+          role='tab'
           className={`history-tab ${activeTab === 'sessions' ? 'active' : ''}`}
           onClick={() => setActiveTab('sessions')}
+          onKeyDown={handleTabKeyDown}
+          aria-selected={activeTab === 'sessions'}
+          tabIndex={activeTab === 'sessions' ? 0 : -1}
         >
           App Scrobble Sessions
         </button>
         <button
+          role='tab'
           className={`history-tab ${activeTab === 'lastfm' ? 'active' : ''}`}
           onClick={() => setActiveTab('lastfm')}
+          onKeyDown={handleTabKeyDown}
+          aria-selected={activeTab === 'lastfm'}
+          tabIndex={activeTab === 'lastfm' ? 0 : -1}
         >
           Last.fm Listening History
         </button>

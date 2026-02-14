@@ -178,13 +178,11 @@ describe('DiscoveryPage', () => {
   it('renders loading state initially', async () => {
     renderDiscoveryPage();
 
-    expect(
-      screen.getByText('Analyzing your listening history...')
-    ).toBeInTheDocument();
+    expect(document.querySelector('.skeleton-album-card')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(
-        screen.queryByText('Analyzing your listening history...')
+        document.querySelector('.skeleton-album-card')
       ).not.toBeInTheDocument();
     });
   });

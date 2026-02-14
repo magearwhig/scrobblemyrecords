@@ -4,6 +4,7 @@ import '@testing-library/jest-dom';
 import React from 'react';
 
 import { AuthProvider } from '../../../src/renderer/context/AuthContext';
+import { ToastProvider } from '../../../src/renderer/context/ToastContext';
 import CollectionPage from '../../../src/renderer/pages/CollectionPage';
 import * as apiService from '../../../src/renderer/services/api';
 import { AuthStatus, CollectionItem } from '../../../src/shared/types';
@@ -237,7 +238,9 @@ const mockAuthContext = {
 
 const renderWithProviders = (component: React.ReactElement) => {
   return render(
-    <AuthProvider value={mockAuthContext}>{component}</AuthProvider>
+    <AuthProvider value={mockAuthContext}>
+      <ToastProvider>{component}</ToastProvider>
+    </AuthProvider>
   );
 };
 
@@ -295,7 +298,9 @@ describe('CollectionPage', () => {
 
       render(
         <AuthProvider value={unauthenticatedContext}>
-          <CollectionPage />
+          <ToastProvider>
+            <CollectionPage />
+          </ToastProvider>
         </AuthProvider>
       );
 
@@ -964,23 +969,6 @@ describe('CollectionPage', () => {
           );
         });
         expect(elements.length).toBeGreaterThan(0);
-      });
-    });
-
-    it('shows debug information in empty state', async () => {
-      mockApiServiceInstance.getEntireCollection.mockResolvedValue({
-        success: true,
-        data: [],
-      });
-
-      renderWithProviders(<CollectionPage />);
-
-      await waitFor(() => {
-        expect(
-          screen.getByText(
-            /Debug: entireCollection=0, filtered=0, searchMode=false/
-          )
-        ).toBeInTheDocument();
       });
     });
   });

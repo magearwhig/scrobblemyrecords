@@ -12,6 +12,7 @@ import {
 import { StatType } from '../components/dashboard/StatDetailsModal';
 import { CalendarHeatmap } from '../components/stats/CalendarHeatmap';
 import { MilestoneProgress } from '../components/stats/MilestoneProgress';
+import { StatCardSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
@@ -220,9 +221,8 @@ const HomePage: React.FC = () => {
   if (dashboardLoading) {
     return (
       <div className='dashboard'>
-        <div className='dashboard-loading'>
-          <div className='dashboard-loading-spinner' />
-          <p>Loading your dashboard...</p>
+        <div className='dashboard-stats-row'>
+          <StatCardSkeleton count={5} />
         </div>
       </div>
     );

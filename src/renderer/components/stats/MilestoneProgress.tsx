@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { MilestoneInfo } from '../../../shared/types';
+import { ProgressBar } from '../ui/ProgressBar';
 
 interface MilestoneProgressProps {
   milestones: MilestoneInfo;
@@ -42,12 +43,11 @@ export const MilestoneProgress: React.FC<MilestoneProgressProps> = ({
           <span>{formatNumber(milestones.total)}</span>
           <span>{formatNumber(milestones.nextMilestone)}</span>
         </div>
-        <div className='milestone-progress-bar'>
-          <div
-            className='milestone-progress-bar-fill'
-            style={{ width: `${milestones.progressPercent}%` }}
-          />
-        </div>
+        <ProgressBar
+          value={milestones.progressPercent}
+          size='medium'
+          variant='primary'
+        />
         <div className='milestone-progress-remaining'>
           {milestones.scrobblesToNext.toLocaleString()} scrobbles to reach{' '}
           {formatNumber(milestones.nextMilestone)}

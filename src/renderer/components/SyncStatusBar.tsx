@@ -3,6 +3,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SyncStatus } from '../../shared/types';
 import { getApiService } from '../services/api';
 
+import { ProgressBar } from './ui/ProgressBar';
+
 interface SyncStatusBarProps {
   onSyncComplete?: () => void;
   compact?: boolean;
@@ -171,12 +173,7 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
     if (syncStatus.status === 'syncing') {
       return (
         <div className='sync-status-compact'>
-          <div className='sync-progress-inline'>
-            <div
-              className='sync-progress-bar'
-              style={{ width: `${syncStatus.progress}%` }}
-            />
-          </div>
+          <ProgressBar value={syncStatus.progress} size='small' animated />
           <span className='sync-text'>Syncing: {syncStatus.progress}%</span>
         </div>
       );
@@ -224,12 +221,7 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
                 </span>
               )}
             </div>
-            <div className='sync-progress-track'>
-              <div
-                className='sync-progress-bar'
-                style={{ width: `${syncStatus.progress}%` }}
-              />
-            </div>
+            <ProgressBar value={syncStatus.progress} size='small' animated />
           </div>
           <button
             className='btn btn-small btn-secondary'

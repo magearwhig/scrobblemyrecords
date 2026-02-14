@@ -5,8 +5,17 @@ import OAuth from 'oauth-1.0a';
 
 import {
   CollectionItem,
+  DiscogsCollectionProgress,
+  DiscogsRawArtist,
+  DiscogsRawCollectionItem,
+  DiscogsRawFormat,
+  DiscogsRawLabel,
+  DiscogsRawReleaseResponse,
+  DiscogsRawTrack,
   DiscogsRelease,
+  DiscogsUserIdentity,
   ApiResponse,
+  TimestampedCache,
 } from '../../shared/types';
 import { safeJsonParse } from '../../shared/utils/safeJsonParse';
 import { getDiscogsAxios } from '../utils/discogsAxios';
@@ -70,7 +79,7 @@ export class DiscogsService {
 
     try {
       const response = await this.axios.get('/oauth/request_token', {
-        headers: authHeader as any,
+        headers: authHeader as unknown as Record<string, string>,
       });
 
       // Parse the response (should be in format: oauth_token=...&oauth_token_secret=...)
@@ -104,13 +113,18 @@ export class DiscogsService {
       this.logger.debug('Callback URL configured', { callbackUrl });
 
       return authUrl;
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error('Discogs OAuth error', error);
-      if (error.response) {
-        this.logger.error('OAuth request failed', {
-          status: error.response.status,
-          statusText: error.response.statusText,
-        });
+      if (error instanceof Error && 'response' in error) {
+        const axiosError = error as {
+          response?: { status: number; statusText: string };
+        };
+        if (axiosError.response) {
+          this.logger.error('OAuth request failed', {
+            status: axiosError.response.status,
+            statusText: axiosError.response.statusText,
+          });
+        }
       }
       throw new Error('Failed to initiate Discogs OAuth flow');
     }
@@ -145,7 +159,7 @@ export class DiscogsService {
       );
 
       const response = await this.axios.post('/oauth/access_token', null, {
-        headers: authHeader as any,
+        headers: authHeader as unknown as Record<string, string>,
         params: {
           oauth_verifier: oauthVerifier,
         },
@@ -188,7 +202,7 @@ export class DiscogsService {
   private async getUserProfileWithToken(token: {
     key: string;
     secret: string;
-  }): Promise<any> {
+  }): Promise<DiscogsUserIdentity> {
     const requestData = {
       url: `${this.baseUrl}/oauth/identity`,
       method: 'GET',
@@ -199,13 +213,13 @@ export class DiscogsService {
     );
 
     const response = await this.axios.get('/oauth/identity', {
-      headers: authHeader as any,
+      headers: authHeader as unknown as Record<string, string>,
     });
 
     return response.data;
   }
 
-  private async getAuthHeaders(): Promise<any> {
+  private async getAuthHeaders(): Promise<Record<string, string>> {
     const token = await this.authService.getDiscogsToken();
 
     if (!token) {
@@ -229,10 +243,12 @@ export class DiscogsService {
     if (!parsed.success) {
       throw new Error(`Corrupted Discogs OAuth token: ${parsed.error.message}`);
     }
-    return this.oauth.toHeader(this.oauth.authorize(requestData, parsed.data));
+    return {
+      ...this.oauth.toHeader(this.oauth.authorize(requestData, parsed.data)),
+    };
   }
 
-  async getUserProfile(): Promise<any> {
+  async getUserProfile(): Promise<DiscogsUserIdentity> {
     try {
       const token = await this.authService.getDiscogsToken();
 
@@ -263,7 +279,8 @@ export class DiscogsService {
         // For now, return a placeholder - in a real app you'd need to get username another way
         return {
           username: 'user', // Placeholder - we'd need to get this from somewhere else
-          id: 'unknown',
+          id: 0,
+          resource_url: '',
         };
       }
 
@@ -271,13 +288,18 @@ export class DiscogsService {
       const headers = await this.getAuthHeaders();
       const response = await this.axios.get('/oauth/identity', { headers });
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error('Error fetching user profile', error);
-      if (error.response) {
-        this.logger.error('Discogs API error', {
-          status: error.response.status,
-          data: error.response.data,
-        });
+      if (error instanceof Error && 'response' in error) {
+        const axiosError = error as {
+          response?: { status: number; data: unknown };
+        };
+        if (axiosError.response) {
+          this.logger.error('Discogs API error', {
+            status: axiosError.response.status,
+            data: axiosError.response.data,
+          });
+        }
       }
       throw error;
     }
@@ -346,7 +368,7 @@ export class DiscogsService {
 
       // Transform the response
       const transformedReleases: CollectionItem[] = response.data.releases.map(
-        (item: any) => ({
+        (item: DiscogsRawCollectionItem) => ({
           id: item.id,
           date_added: item.date_added,
           rating: item.rating,
@@ -357,12 +379,17 @@ export class DiscogsService {
             title: item.basic_information.title,
             artist:
               item.basic_information.artists
-                ?.map((a: any) => a.name)
+                ?.map((a: DiscogsRawArtist) => a.name)
                 .join(', ') || 'Unknown Artist',
             year: item.basic_information.year,
             format:
-              item.basic_information.formats?.map((f: any) => f.name) || [],
-            label: item.basic_information.labels?.map((l: any) => l.name) || [],
+              item.basic_information.formats?.map(
+                (f: DiscogsRawFormat) => f.name
+              ) || [],
+            label:
+              item.basic_information.labels?.map(
+                (l: DiscogsRawLabel) => l.name
+              ) || [],
             catalog_number: item.basic_information.catalog_number,
             cover_image: item.basic_information.cover_image,
             resource_url: item.basic_information.resource_url,
@@ -405,25 +432,28 @@ export class DiscogsService {
         headers,
       });
 
+      const rawRelease: DiscogsRawReleaseResponse = response.data;
       const release: DiscogsRelease = {
-        id: response.data.id,
-        master_id: response.data.master_id,
-        title: response.data.title,
+        id: rawRelease.id,
+        master_id: rawRelease.master_id,
+        title: rawRelease.title,
         artist:
-          response.data.artists?.map((a: any) => a.name).join(', ') ||
+          rawRelease.artists?.map((a: DiscogsRawArtist) => a.name).join(', ') ||
           'Unknown Artist',
-        year: response.data.year,
-        format: response.data.formats?.map((f: any) => f.name) || [],
-        label: response.data.labels?.map((l: any) => l.name) || [],
-        catalog_number: response.data.catalog_number,
-        cover_image: response.data.images?.[0]?.uri,
-        resource_url: response.data.resource_url,
+        year: rawRelease.year,
+        format: rawRelease.formats?.map((f: DiscogsRawFormat) => f.name) || [],
+        label: rawRelease.labels?.map((l: DiscogsRawLabel) => l.name) || [],
+        catalog_number: rawRelease.catalog_number,
+        cover_image: rawRelease.images?.[0]?.uri,
+        resource_url: rawRelease.resource_url,
         tracklist:
-          response.data.tracklist?.map((track: any) => ({
+          rawRelease.tracklist?.map((track: DiscogsRawTrack) => ({
             position: track.position,
             title: track.title,
             duration: track.duration,
-            artist: track.artists?.map((a: any) => a.name).join(', '),
+            artist: track.artists
+              ?.map((a: DiscogsRawArtist) => a.name)
+              .join(', '),
           })) || [],
       };
 
@@ -458,7 +488,7 @@ export class DiscogsService {
 
       // Check if we already have a recent cache
       const existingProgress =
-        await this.fileStorage.readJSON<any>(progressKey);
+        await this.fileStorage.readJSON<DiscogsCollectionProgress>(progressKey);
 
       if (existingProgress && existingProgress.status === 'completed') {
         // Check if the cache is still recent (less than 12 hours old)
@@ -513,7 +543,9 @@ export class DiscogsService {
 
             // Update progress
             const progress =
-              (await this.fileStorage.readJSON<any>(progressKey)) || {};
+              (await this.fileStorage.readJSON<DiscogsCollectionProgress>(
+                progressKey
+              )) || ({} as DiscogsCollectionProgress);
             progress.currentPage = page;
             progress.completedPages = progress.completedPages || [];
             progress.completedPages.push(page);
@@ -546,7 +578,9 @@ export class DiscogsService {
 
       // Mark as failed
       const progress =
-        (await this.fileStorage.readJSON<any>(progressKey)) || {};
+        (await this.fileStorage.readJSON<DiscogsCollectionProgress>(
+          progressKey
+        )) || ({} as DiscogsCollectionProgress);
       progress.status = 'failed';
       progress.error = error instanceof Error ? error.message : 'Unknown error';
       await this.fileStorage.writeJSON(progressKey, progress);
@@ -705,7 +739,7 @@ export class DiscogsService {
     }
   }
 
-  public isCacheValid(cached: any): boolean {
+  public isCacheValid(cached: TimestampedCache): boolean {
     // Cache is valid for 24 hours
     const cacheAge = Date.now() - (cached.timestamp || 0);
     const isValid = cacheAge < 86400000; // 24 hours in milliseconds
@@ -717,10 +751,15 @@ export class DiscogsService {
     return isValid;
   }
 
-  async getCacheProgress(username: string): Promise<any> {
+  async getCacheProgress(
+    username: string
+  ): Promise<DiscogsCollectionProgress | null> {
     try {
       const progressFilePath = `collections/${username}-progress.json`;
-      const progress = await this.fileStorage.readJSON(progressFilePath);
+      const progress =
+        await this.fileStorage.readJSON<DiscogsCollectionProgress>(
+          progressFilePath
+        );
       return progress || null;
     } catch (error) {
       this.logger.error('Error getting cache progress', error);
@@ -771,7 +810,10 @@ export class DiscogsService {
 
       // Get cache timestamp (when cache was last refreshed) instead of scanning all items
       const cacheKey = `collections/${username}-page-1.json`;
-      const cached = await this.fileStorage.readJSON<any>(cacheKey);
+      const cached =
+        await this.fileStorage.readJSON<ApiResponse<CollectionItem[]>>(
+          cacheKey
+        );
 
       if (!cached || !cached.timestamp) {
         this.logger.warn('No cached data found or no timestamp');
@@ -829,11 +871,13 @@ export class DiscogsService {
 
       this.logger.debug(`Discogs API Response Status: ${response.status}`);
       const first3Items =
-        response.data.releases?.slice(0, 3).map((item: any) => ({
-          date_added: item.date_added,
-          title: item.basic_information.title,
-          artist: item.basic_information.artists[0]?.name,
-        })) || 'No releases found';
+        response.data.releases
+          ?.slice(0, 3)
+          .map((item: DiscogsRawCollectionItem) => ({
+            date_added: item.date_added,
+            title: item.basic_information.title,
+            artist: item.basic_information.artists?.[0]?.name,
+          })) || 'No releases found';
       this.logger.debug('First 3 items from Discogs', { items: first3Items });
 
       if (
@@ -851,7 +895,7 @@ export class DiscogsService {
 
       // Transform the response to match our format
       const freshItems: CollectionItem[] = response.data.releases.map(
-        (item: any) => ({
+        (item: DiscogsRawCollectionItem) => ({
           id: item.id,
           date_added: item.date_added,
           rating: item.rating,
@@ -861,12 +905,17 @@ export class DiscogsService {
             title: item.basic_information.title,
             artist:
               item.basic_information.artists
-                ?.map((a: any) => a.name)
+                ?.map((a: DiscogsRawArtist) => a.name)
                 .join(', ') || 'Unknown Artist',
             year: item.basic_information.year,
             format:
-              item.basic_information.formats?.map((f: any) => f.name) || [],
-            label: item.basic_information.labels?.map((l: any) => l.name) || [],
+              item.basic_information.formats?.map(
+                (f: DiscogsRawFormat) => f.name
+              ) || [],
+            label:
+              item.basic_information.labels?.map(
+                (l: DiscogsRawLabel) => l.name
+              ) || [],
             cover_image: item.basic_information.cover_image,
             resource_url: item.basic_information.resource_url,
           },
@@ -924,19 +973,21 @@ export class DiscogsService {
           }
 
           let foundOlderItem = false;
-          pageResponse.data.releases.forEach((item: any) => {
-            const itemTimestamp = new Date(item.date_added);
-            if (itemTimestamp > cacheTimestamp) {
-              newItemsCount++;
-              this.logger.debug('Found new item', {
-                artist: item.basic_information.artists[0]?.name,
-                title: item.basic_information.title,
-                dateAdded: item.date_added,
-              });
-            } else {
-              foundOlderItem = true;
+          pageResponse.data.releases.forEach(
+            (item: DiscogsRawCollectionItem) => {
+              const itemTimestamp = new Date(item.date_added);
+              if (itemTimestamp > cacheTimestamp) {
+                newItemsCount++;
+                this.logger.debug('Found new item', {
+                  artist: item.basic_information.artists?.[0]?.name,
+                  title: item.basic_information.title,
+                  dateAdded: item.date_added,
+                });
+              } else {
+                foundOlderItem = true;
+              }
             }
-          });
+          );
 
           // If we found an older item, we can stop checking (since data is sorted by date desc)
           if (foundOlderItem) {
@@ -990,7 +1041,10 @@ export class DiscogsService {
 
       // Get cache timestamp to know what's already cached
       const cacheKey = `collections/${username}-page-1.json`;
-      const cached = await this.fileStorage.readJSON<any>(cacheKey);
+      const cached =
+        await this.fileStorage.readJSON<ApiResponse<CollectionItem[]>>(
+          cacheKey
+        );
 
       if (!cached || !cached.timestamp) {
         this.logger.warn(
@@ -1047,7 +1101,7 @@ export class DiscogsService {
         }
 
         let foundOlderItem = false;
-        response.data.releases.forEach((item: any) => {
+        response.data.releases.forEach((item: DiscogsRawCollectionItem) => {
           const itemTimestamp = new Date(item.date_added);
           if (itemTimestamp > cacheTimestamp) {
             // Transform and add new item
@@ -1062,13 +1116,17 @@ export class DiscogsService {
                 title: item.basic_information.title,
                 artist:
                   item.basic_information.artists
-                    ?.map((a: any) => a.name)
+                    ?.map((a: DiscogsRawArtist) => a.name)
                     .join(', ') || 'Unknown Artist',
                 year: item.basic_information.year,
                 format:
-                  item.basic_information.formats?.map((f: any) => f.name) || [],
+                  item.basic_information.formats?.map(
+                    (f: DiscogsRawFormat) => f.name
+                  ) || [],
                 label:
-                  item.basic_information.labels?.map((l: any) => l.name) || [],
+                  item.basic_information.labels?.map(
+                    (l: DiscogsRawLabel) => l.name
+                  ) || [],
                 catalog_number: item.basic_information.catalog_number,
                 cover_image: item.basic_information.cover_image,
                 resource_url: item.basic_information.resource_url,
@@ -1114,7 +1172,10 @@ export class DiscogsService {
 
       while (true) {
         const pageKey = `collections/${username}-page-${pageNumber}.json`;
-        const pageCache = await this.fileStorage.readJSON<any>(pageKey);
+        const pageCache =
+          await this.fileStorage.readJSON<ApiResponse<CollectionItem[]>>(
+            pageKey
+          );
 
         if (!pageCache || !pageCache.data) {
           break;

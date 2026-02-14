@@ -5,6 +5,7 @@ import {
   BackupImportOptions,
 } from '../../../shared/types';
 import ApiService from '../../services/api';
+import { Modal } from '../ui/Modal';
 
 interface BackupImportDialogProps {
   api: ApiService;
@@ -103,209 +104,13 @@ const BackupImportDialog: React.FC<BackupImportDialogProps> = ({
     preview.summary.excludedArtists.existing;
 
   return (
-    <div className='modal-overlay' onClick={onClose}>
-      <div className='modal-content' onClick={e => e.stopPropagation()}>
-        <div className='modal-header'>
-          <h2>Import Backup</h2>
-          <button className='modal-close' onClick={onClose}>
-            &times;
-          </button>
-        </div>
-
-        <div className='modal-body'>
-          {/* File info */}
-          <div className='backup-file-info'>
-            <div className='info-row'>
-              <span className='label'>File:</span>
-              <span className='value'>{file.name}</span>
-            </div>
-            <div className='info-row'>
-              <span className='label'>Created:</span>
-              <span className='value'>{formatDate(preview.exportedAt)}</span>
-            </div>
-            <div className='info-row'>
-              <span className='label'>App Version:</span>
-              <span className='value'>{preview.appVersion}</span>
-            </div>
-          </div>
-
-          {/* Validation status */}
-          {!preview.valid && (
-            <div className='error-message'>
-              Invalid backup: {preview.error || 'Unknown error'}
-            </div>
-          )}
-
-          {!preview.checksumValid && preview.valid && (
-            <div className='warning-message'>
-              Warning: Checksum mismatch - backup may be corrupted
-            </div>
-          )}
-
-          {/* Import summary */}
-          {preview.valid && (
-            <div className='import-summary'>
-              <h4>Import Summary</h4>
-              <div className='summary-totals'>
-                <span className='total-new'>+{totalNew} new items</span>
-                <span className='total-existing'>
-                  {totalExisting} existing items
-                </span>
-              </div>
-
-              <ul className='summary-list'>
-                {preview.summary.albumMappings.new > 0 ||
-                preview.summary.albumMappings.existing > 0 ? (
-                  <li>
-                    {formatSummaryLine(
-                      'Album mappings',
-                      preview.summary.albumMappings
-                    )}
-                  </li>
-                ) : null}
-                {preview.summary.artistMappings.new > 0 ||
-                preview.summary.artistMappings.existing > 0 ? (
-                  <li>
-                    {formatSummaryLine(
-                      'Artist mappings',
-                      preview.summary.artistMappings
-                    )}
-                  </li>
-                ) : null}
-                {preview.summary.historyArtistMappings.new > 0 ||
-                preview.summary.historyArtistMappings.existing > 0 ? (
-                  <li>
-                    {formatSummaryLine(
-                      'History-artist mappings',
-                      preview.summary.historyArtistMappings
-                    )}
-                  </li>
-                ) : null}
-                {preview.summary.hiddenAlbums.new > 0 ||
-                preview.summary.hiddenAlbums.existing > 0 ? (
-                  <li>
-                    {formatSummaryLine(
-                      'Hidden albums',
-                      preview.summary.hiddenAlbums
-                    )}
-                  </li>
-                ) : null}
-                {preview.summary.hiddenArtists.new > 0 ||
-                preview.summary.hiddenArtists.existing > 0 ? (
-                  <li>
-                    {formatSummaryLine(
-                      'Hidden artists',
-                      preview.summary.hiddenArtists
-                    )}
-                  </li>
-                ) : null}
-                {preview.summary.localWantList.new > 0 ||
-                preview.summary.localWantList.existing > 0 ? (
-                  <li>
-                    {formatSummaryLine(
-                      'Local want list',
-                      preview.summary.localWantList
-                    )}
-                  </li>
-                ) : null}
-                {preview.summary.monitoredSellers.new > 0 ||
-                preview.summary.monitoredSellers.existing > 0 ? (
-                  <li>
-                    {formatSummaryLine(
-                      'Monitored sellers',
-                      preview.summary.monitoredSellers
-                    )}
-                  </li>
-                ) : null}
-                {preview.summary.artistMbidMappings.new > 0 ||
-                preview.summary.artistMbidMappings.existing > 0 ? (
-                  <li>
-                    {formatSummaryLine(
-                      'MusicBrainz mappings',
-                      preview.summary.artistMbidMappings
-                    )}
-                  </li>
-                ) : null}
-                {preview.summary.hiddenReleases.new > 0 ||
-                preview.summary.hiddenReleases.existing > 0 ? (
-                  <li>
-                    {formatSummaryLine(
-                      'Hidden releases',
-                      preview.summary.hiddenReleases
-                    )}
-                  </li>
-                ) : null}
-                {preview.summary.excludedArtists.new > 0 ||
-                preview.summary.excludedArtists.existing > 0 ? (
-                  <li>
-                    {formatSummaryLine(
-                      'Excluded artists',
-                      preview.summary.excludedArtists
-                    )}
-                  </li>
-                ) : null}
-                {preview.summary.settingsWillMerge && (
-                  <li>Settings will be merged with existing</li>
-                )}
-              </ul>
-            </div>
-          )}
-
-          {/* Import mode */}
-          {preview.valid && (
-            <div className='import-mode'>
-              <h4>Import Mode</h4>
-              <div className='radio-group'>
-                <label className='radio-label'>
-                  <input
-                    type='radio'
-                    name='mode'
-                    value='merge'
-                    checked={mode === 'merge'}
-                    onChange={() => setMode('merge')}
-                  />
-                  <span>
-                    <strong>Merge with existing data</strong>
-                    <small>New items will be added, existing items kept</small>
-                  </span>
-                </label>
-                <label className='radio-label'>
-                  <input
-                    type='radio'
-                    name='mode'
-                    value='replace'
-                    checked={mode === 'replace'}
-                    onChange={() => setMode('replace')}
-                  />
-                  <span>
-                    <strong>Replace existing data</strong>
-                    <small>All existing data will be overwritten</small>
-                  </span>
-                </label>
-              </div>
-            </div>
-          )}
-
-          {/* Password field for encrypted backups */}
-          {preview.includesCredentials && preview.valid && (
-            <div className='import-password'>
-              <h4>This backup contains encrypted credentials</h4>
-              <div className='form-group'>
-                <label>Password:</label>
-                <input
-                  type='password'
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder='Enter backup password'
-                />
-              </div>
-            </div>
-          )}
-
-          {error && <div className='error-message'>{error}</div>}
-        </div>
-
-        <div className='modal-footer'>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title='Import Backup'
+      size='medium'
+      footer={
+        <>
           <button
             className='btn btn-secondary'
             onClick={onClose}
@@ -320,9 +125,200 @@ const BackupImportDialog: React.FC<BackupImportDialogProps> = ({
           >
             {loading ? 'Importing...' : 'Import'}
           </button>
+        </>
+      }
+    >
+      {/* File info */}
+      <div className='backup-file-info'>
+        <div className='info-row'>
+          <span className='label'>File:</span>
+          <span className='value'>{file.name}</span>
+        </div>
+        <div className='info-row'>
+          <span className='label'>Created:</span>
+          <span className='value'>{formatDate(preview.exportedAt)}</span>
+        </div>
+        <div className='info-row'>
+          <span className='label'>App Version:</span>
+          <span className='value'>{preview.appVersion}</span>
         </div>
       </div>
-    </div>
+
+      {/* Validation status */}
+      {!preview.valid && (
+        <div className='error-message'>
+          Invalid backup: {preview.error || 'Unknown error'}
+        </div>
+      )}
+
+      {!preview.checksumValid && preview.valid && (
+        <div className='warning-message'>
+          Warning: Checksum mismatch - backup may be corrupted
+        </div>
+      )}
+
+      {/* Import summary */}
+      {preview.valid && (
+        <div className='import-summary'>
+          <h4>Import Summary</h4>
+          <div className='summary-totals'>
+            <span className='total-new'>+{totalNew} new items</span>
+            <span className='total-existing'>
+              {totalExisting} existing items
+            </span>
+          </div>
+
+          <ul className='summary-list'>
+            {preview.summary.albumMappings.new > 0 ||
+            preview.summary.albumMappings.existing > 0 ? (
+              <li>
+                {formatSummaryLine(
+                  'Album mappings',
+                  preview.summary.albumMappings
+                )}
+              </li>
+            ) : null}
+            {preview.summary.artistMappings.new > 0 ||
+            preview.summary.artistMappings.existing > 0 ? (
+              <li>
+                {formatSummaryLine(
+                  'Artist mappings',
+                  preview.summary.artistMappings
+                )}
+              </li>
+            ) : null}
+            {preview.summary.historyArtistMappings.new > 0 ||
+            preview.summary.historyArtistMappings.existing > 0 ? (
+              <li>
+                {formatSummaryLine(
+                  'History-artist mappings',
+                  preview.summary.historyArtistMappings
+                )}
+              </li>
+            ) : null}
+            {preview.summary.hiddenAlbums.new > 0 ||
+            preview.summary.hiddenAlbums.existing > 0 ? (
+              <li>
+                {formatSummaryLine(
+                  'Hidden albums',
+                  preview.summary.hiddenAlbums
+                )}
+              </li>
+            ) : null}
+            {preview.summary.hiddenArtists.new > 0 ||
+            preview.summary.hiddenArtists.existing > 0 ? (
+              <li>
+                {formatSummaryLine(
+                  'Hidden artists',
+                  preview.summary.hiddenArtists
+                )}
+              </li>
+            ) : null}
+            {preview.summary.localWantList.new > 0 ||
+            preview.summary.localWantList.existing > 0 ? (
+              <li>
+                {formatSummaryLine(
+                  'Local want list',
+                  preview.summary.localWantList
+                )}
+              </li>
+            ) : null}
+            {preview.summary.monitoredSellers.new > 0 ||
+            preview.summary.monitoredSellers.existing > 0 ? (
+              <li>
+                {formatSummaryLine(
+                  'Monitored sellers',
+                  preview.summary.monitoredSellers
+                )}
+              </li>
+            ) : null}
+            {preview.summary.artistMbidMappings.new > 0 ||
+            preview.summary.artistMbidMappings.existing > 0 ? (
+              <li>
+                {formatSummaryLine(
+                  'MusicBrainz mappings',
+                  preview.summary.artistMbidMappings
+                )}
+              </li>
+            ) : null}
+            {preview.summary.hiddenReleases.new > 0 ||
+            preview.summary.hiddenReleases.existing > 0 ? (
+              <li>
+                {formatSummaryLine(
+                  'Hidden releases',
+                  preview.summary.hiddenReleases
+                )}
+              </li>
+            ) : null}
+            {preview.summary.excludedArtists.new > 0 ||
+            preview.summary.excludedArtists.existing > 0 ? (
+              <li>
+                {formatSummaryLine(
+                  'Excluded artists',
+                  preview.summary.excludedArtists
+                )}
+              </li>
+            ) : null}
+            {preview.summary.settingsWillMerge && (
+              <li>Settings will be merged with existing</li>
+            )}
+          </ul>
+        </div>
+      )}
+
+      {/* Import mode */}
+      {preview.valid && (
+        <div className='import-mode'>
+          <h4>Import Mode</h4>
+          <div className='radio-group'>
+            <label className='radio-label'>
+              <input
+                type='radio'
+                name='mode'
+                value='merge'
+                checked={mode === 'merge'}
+                onChange={() => setMode('merge')}
+              />
+              <span>
+                <strong>Merge with existing data</strong>
+                <small>New items will be added, existing items kept</small>
+              </span>
+            </label>
+            <label className='radio-label'>
+              <input
+                type='radio'
+                name='mode'
+                value='replace'
+                checked={mode === 'replace'}
+                onChange={() => setMode('replace')}
+              />
+              <span>
+                <strong>Replace existing data</strong>
+                <small>All existing data will be overwritten</small>
+              </span>
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* Password field for encrypted backups */}
+      {preview.includesCredentials && preview.valid && (
+        <div className='import-password'>
+          <h4>This backup contains encrypted credentials</h4>
+          <div className='form-group'>
+            <label>Password:</label>
+            <input
+              type='password'
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder='Enter backup password'
+            />
+          </div>
+        </div>
+      )}
+
+      {error && <div className='error-message'>{error}</div>}
+    </Modal>
   );
 };
 

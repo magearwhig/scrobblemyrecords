@@ -148,7 +148,7 @@ describe('HomePage Dashboard', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText('Loading your dashboard...')
+          document.querySelector('.skeleton-stat-card')
         ).toBeInTheDocument();
       });
     });

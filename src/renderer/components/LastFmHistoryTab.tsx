@@ -429,7 +429,7 @@ const LastFmHistoryTab: React.FC = () => {
           <div className='error-message'>
             {error}
             <button
-              className='btn btn-small'
+              className='btn btn-small ml-1'
               onClick={
                 viewMode === 'albums'
                   ? loadAlbums
@@ -437,7 +437,6 @@ const LastFmHistoryTab: React.FC = () => {
                     ? loadTracks
                     : loadArtists
               }
-              style={{ marginLeft: '1rem' }}
             >
               Retry
             </button>

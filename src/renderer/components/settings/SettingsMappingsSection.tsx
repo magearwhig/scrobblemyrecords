@@ -8,6 +8,7 @@ import {
   TrackMapping,
 } from '../../../shared/types';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirmModal } from '../../hooks/useConfirmModal';
 import ApiService from '../../services/api';
 import { createLogger } from '../../utils/logger';
 
@@ -21,6 +22,7 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
   api,
 }) => {
   const { authStatus } = useAuth();
+  const [confirmAction, ConfirmModal] = useConfirmModal();
 
   // Artist name mapping state
   const [mappings, setMappings] = useState<ArtistMapping[]>([]);
@@ -165,9 +167,11 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
     historyAlbum: string,
     historyTrack: string
   ) => {
-    if (
-      !window.confirm('Are you sure you want to delete this track mapping?')
-    ) {
+    const confirmed = await confirmAction(
+      'Are you sure you want to delete this track mapping?',
+      { title: 'Delete Track Mapping', confirmLabel: 'Delete' }
+    );
+    if (!confirmed) {
       return;
     }
     try {
@@ -191,11 +195,11 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
   };
 
   const handleDeleteMbidMapping = async (artistName: string) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete the MusicBrainz mapping for "${artistName}"?`
-      )
-    ) {
+    const confirmed = await confirmAction(
+      `Are you sure you want to delete the MusicBrainz mapping for "${artistName}"?`,
+      { title: 'Delete MusicBrainz Mapping', confirmLabel: 'Delete' }
+    );
+    if (!confirmed) {
       return;
     }
     try {
@@ -256,9 +260,11 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
     historyArtist: string,
     historyAlbum: string
   ) => {
-    if (
-      !window.confirm('Are you sure you want to delete this album mapping?')
-    ) {
+    const confirmed = await confirmAction(
+      'Are you sure you want to delete this album mapping?',
+      { title: 'Delete Album Mapping', confirmLabel: 'Delete' }
+    );
+    if (!confirmed) {
       return;
     }
     try {
@@ -281,9 +287,11 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
   };
 
   const handleDeleteDiscoveryArtistMapping = async (historyArtist: string) => {
-    if (
-      !window.confirm('Are you sure you want to delete this artist mapping?')
-    ) {
+    const confirmed = await confirmAction(
+      'Are you sure you want to delete this artist mapping?',
+      { title: 'Delete Artist Mapping', confirmLabel: 'Delete' }
+    );
+    if (!confirmed) {
       return;
     }
     try {
@@ -375,11 +383,11 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
   };
 
   const handleDeleteMapping = async (discogsName: string) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete the mapping for "${discogsName}"?`
-      )
-    ) {
+    const confirmed = await confirmAction(
+      `Are you sure you want to delete the mapping for "${discogsName}"?`,
+      { title: 'Delete Mapping', confirmLabel: 'Delete' }
+    );
+    if (!confirmed) {
       return;
     }
 
@@ -448,11 +456,11 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
   };
 
   const handleClearMappings = async () => {
-    if (
-      !window.confirm(
-        'Are you sure you want to clear ALL artist mappings? This action cannot be undone.'
-      )
-    ) {
+    const confirmed = await confirmAction(
+      'Are you sure you want to clear ALL artist mappings? This action cannot be undone.',
+      { title: 'Clear All Mappings', confirmLabel: 'Clear All' }
+    );
+    if (!confirmed) {
       return;
     }
 
@@ -484,6 +492,7 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
 
   return (
     <div className='settings-mappings-section'>
+      {ConfirmModal}
       {/* Artist Name Mappings */}
       <div className='settings-section-card'>
         <div className='settings-section-header'>

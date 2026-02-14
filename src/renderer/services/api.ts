@@ -20,14 +20,23 @@ import {
   CollectionArtist,
   CollectionItem,
   DashboardData,
+  DiscogsCollectionProgress,
+  DiscogsUserIdentity,
   DiscardPileItem,
   DiscardPileStats,
   DiscogsRelease,
   EnrichedWishlistItem,
+  EntireCollectionResponse,
+  ExcludedArtistResponse,
   ForgottenTrack,
   HiddenAlbum,
   HiddenArtist,
   HiddenRelease,
+  LastFmConnectionTestResult,
+  LastFmRecentTrack,
+  LastFmSessionKeyInfo,
+  LastFmTopArtist,
+  LastFmTopTrack,
   LocalWantItem,
   MarketplaceStats,
   MissingAlbum,
@@ -126,7 +135,7 @@ class ApiService {
     await this.api.post('/auth/discogs/token', { token, username });
   }
 
-  async testDiscogsConnection(): Promise<any> {
+  async testDiscogsConnection(): Promise<DiscogsUserIdentity> {
     const response = await this.api.get('/auth/discogs/test');
     return response.data.data;
   }
@@ -144,17 +153,19 @@ class ApiService {
     return response.data.data;
   }
 
-  async testLastfmConnection(): Promise<any> {
+  async testLastfmConnection(): Promise<LastFmConnectionTestResult> {
     const response = await this.api.get('/auth/lastfm/test');
     return response.data.data;
   }
 
-  async getLastfmSessionKey(): Promise<any> {
+  async getLastfmSessionKey(): Promise<LastFmSessionKeyInfo> {
     const response = await this.api.get('/auth/lastfm/session-key');
     return response.data.data;
   }
 
-  async getLastfmRecentScrobbles(limit: number = 10): Promise<any[]> {
+  async getLastfmRecentScrobbles(
+    limit: number = 10
+  ): Promise<LastFmRecentTrack[]> {
     const response = await this.api.get('/auth/lastfm/recent-scrobbles', {
       params: { limit },
     });
@@ -164,7 +175,7 @@ class ApiService {
   async getLastfmTopTracks(
     period: string = '7day',
     limit: number = 10
-  ): Promise<any[]> {
+  ): Promise<LastFmTopTrack[]> {
     const response = await this.api.get('/auth/lastfm/top-tracks', {
       params: { period, limit },
     });
@@ -174,7 +185,7 @@ class ApiService {
   async getLastfmTopArtists(
     period: string = '7day',
     limit: number = 10
-  ): Promise<any[]> {
+  ): Promise<LastFmTopArtist[]> {
     const response = await this.api.get('/auth/lastfm/top-artists', {
       params: { period, limit },
     });
@@ -207,12 +218,7 @@ class ApiService {
   async getEntireCollection(
     username: string,
     forceReload: boolean = false
-  ): Promise<{
-    success: boolean;
-    data: CollectionItem[];
-    total: number;
-    timestamp: number;
-  }> {
+  ): Promise<EntireCollectionResponse> {
     const response = await this.api.get(`/collection/${username}/all`, {
       params: { force_reload: forceReload },
     });
@@ -265,7 +271,7 @@ class ApiService {
     return response.data.data;
   }
 
-  async getCacheProgress(username: string): Promise<any> {
+  async getCacheProgress(username: string): Promise<DiscogsCollectionProgress> {
     const response = await this.api.get(`/collection/${username}/progress`);
     return response.data.data;
   }
@@ -1552,7 +1558,7 @@ class ApiService {
     await this.api.delete(`/releases/hidden/${mbid}`);
   }
 
-  async getExcludedArtists(): Promise<any[]> {
+  async getExcludedArtists(): Promise<ExcludedArtistResponse[]> {
     const response = await this.api.get('/releases/excluded-artists');
     return response.data.data;
   }

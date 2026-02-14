@@ -9,6 +9,7 @@ import {
 } from '../../shared/types';
 import ReleaseCard from '../components/ReleaseCard';
 import { Modal, ModalFooter } from '../components/ui';
+import { ProgressBar } from '../components/ui/ProgressBar';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -529,12 +530,7 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
               Processing: {syncStatus.currentArtist}
             </div>
           )}
-          <div className='sync-progress-track'>
-            <div
-              className='sync-progress-bar'
-              style={{ width: `${syncStatus.progress}%` }}
-            />
-          </div>
+          <ProgressBar value={syncStatus.progress} size='small' animated />
           <div className='sync-stats'>
             <span>{syncStatus.releasesFound} releases found</span>
             {syncStatus.pendingDisambiguations > 0 && (

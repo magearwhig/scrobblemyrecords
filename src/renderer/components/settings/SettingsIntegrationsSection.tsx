@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 import { SyncStatus, SyncSettings } from '../../../shared/types';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirmModal } from '../../hooks/useConfirmModal';
 import ApiService from '../../services/api';
 import { createLogger } from '../../utils/logger';
 import SyncStatusBar from '../SyncStatusBar';
@@ -16,6 +17,7 @@ const SettingsIntegrationsSection: React.FC<
   SettingsIntegrationsSectionProps
 > = ({ api }) => {
   const { authStatus } = useAuth();
+  const [confirmAction, ConfirmModal] = useConfirmModal();
 
   // Sync settings state
   const [syncData, setSyncData] = useState<{
@@ -99,11 +101,11 @@ const SettingsIntegrationsSection: React.FC<
   };
 
   const handleClearHistoryIndex = async () => {
-    if (
-      !window.confirm(
-        'Are you sure you want to clear the scrobble history index? This will require a full re-sync from Last.fm.'
-      )
-    ) {
+    const confirmed = await confirmAction(
+      'Are you sure you want to clear the scrobble history index? This will require a full re-sync from Last.fm.',
+      { title: 'Clear History Index', confirmLabel: 'Clear' }
+    );
+    if (!confirmed) {
       return;
     }
 
@@ -281,6 +283,7 @@ const SettingsIntegrationsSection: React.FC<
 
   return (
     <div className='settings-integrations-section'>
+      {ConfirmModal}
       {/* Last.fm Sync Section */}
       <div className='settings-section-card'>
         <div className='settings-section-header'>

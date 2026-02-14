@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 import DustyCornersContainer from '../components/whattoplay/DustyCornersContainer';
 import ForgottenFavoritesContainer from '../components/whattoplay/ForgottenFavoritesContainer';
+import { useTabKeyNavigation } from '../hooks/useTabKeyNavigation';
 import { getTabFromUrl } from '../utils/tabUtils';
 
 import SuggestionsPage from './SuggestionsPage';
@@ -17,6 +18,7 @@ const TAB_LABELS: Record<WhatToPlayTab, string> = {
 };
 
 const WhatToPlayPage: React.FC = () => {
+  const handleTabKeyDown = useTabKeyNavigation();
   const [activeTab, setActiveTab] = useState<WhatToPlayTab>(
     () => getTabFromUrl(VALID_TABS, 'suggestions') as WhatToPlayTab
   );
@@ -53,9 +55,11 @@ const WhatToPlayPage: React.FC = () => {
             role='tab'
             className={`tab ${activeTab === tab ? 'active' : ''}`}
             onClick={() => handleTabChange(tab)}
+            onKeyDown={handleTabKeyDown}
             aria-selected={activeTab === tab}
             aria-controls={`what-to-play-panel-${tab}`}
             aria-label={TAB_LABELS[tab]}
+            tabIndex={activeTab === tab ? 0 : -1}
           >
             {TAB_LABELS[tab]}
           </button>

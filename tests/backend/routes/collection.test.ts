@@ -398,7 +398,8 @@ describe('Collection Routes', () => {
   describe('GET /:username/progress', () => {
     it('should get cache progress', async () => {
       const mockProgress = {
-        status: 'loading',
+        status: 'loading' as const,
+        username: 'testuser',
         totalPages: 10,
         currentPage: 5,
         lastUpdated: Date.now(),
@@ -662,6 +663,8 @@ describe('Collection Routes', () => {
   describe('GET /:username/progress', () => {
     it('should return cache progress information', async () => {
       const mockProgress = {
+        username: 'testuser',
+        status: 'loading' as const,
         cachedPages: 5,
         totalPages: 10,
         progress: 50,
@@ -686,6 +689,8 @@ describe('Collection Routes', () => {
 
     it('should handle completed cache progress', async () => {
       const mockProgress = {
+        username: 'testuser',
+        status: 'completed' as const,
         cachedPages: 10,
         totalPages: 10,
         progress: 100,

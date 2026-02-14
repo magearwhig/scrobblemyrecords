@@ -84,7 +84,7 @@ describe('SettingsPage', () => {
     renderWithProviders(<SettingsPage />);
 
     // Connections tab should be active
-    const connectionsTab = screen.getByRole('button', {
+    const connectionsTab = screen.getByRole('tab', {
       name: /Connections/i,
     });
     expect(connectionsTab).toHaveClass('active');
@@ -96,7 +96,7 @@ describe('SettingsPage', () => {
   it('can switch to Integrations tab', async () => {
     renderWithProviders(<SettingsPage />);
 
-    const integrationsTab = screen.getByRole('button', {
+    const integrationsTab = screen.getByRole('tab', {
       name: /Integrations/i,
     });
     await user.click(integrationsTab);
@@ -108,7 +108,7 @@ describe('SettingsPage', () => {
   it('can switch to Mappings tab', async () => {
     renderWithProviders(<SettingsPage />);
 
-    const mappingsTab = screen.getByRole('button', { name: /Mappings/i });
+    const mappingsTab = screen.getByRole('tab', { name: /Mappings/i });
     await user.click(mappingsTab);
 
     expect(mappingsTab).toHaveClass('active');
@@ -118,7 +118,7 @@ describe('SettingsPage', () => {
   it('can switch to Filters tab', async () => {
     renderWithProviders(<SettingsPage />);
 
-    const filtersTab = screen.getByRole('button', { name: /Filters/i });
+    const filtersTab = screen.getByRole('tab', { name: /Filters/i });
     await user.click(filtersTab);
 
     expect(filtersTab).toHaveClass('active');
@@ -128,7 +128,7 @@ describe('SettingsPage', () => {
   it('can switch to Wishlist tab', async () => {
     renderWithProviders(<SettingsPage />);
 
-    const wishlistTab = screen.getByRole('button', { name: /Wishlist/i });
+    const wishlistTab = screen.getByRole('tab', { name: /Wishlist/i });
     await user.click(wishlistTab);
 
     expect(wishlistTab).toHaveClass('active');

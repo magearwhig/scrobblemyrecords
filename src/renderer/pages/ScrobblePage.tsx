@@ -5,6 +5,9 @@ import {
   ScrobbleTrack,
   ScrobbleProgress,
 } from '../../shared/types';
+import { Modal } from '../components/ui/Modal';
+import { ProgressBar } from '../components/ui/ProgressBar';
+import { ListItemSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
@@ -29,6 +32,7 @@ const ScrobblePage: React.FC = () => {
     errors?: string[];
   } | null>(null);
   const [error, setError] = useState<string>('');
+  const [preparingTracks, setPreparingTracks] = useState(false);
   const [showDisambiguationWarning, setShowDisambiguationWarning] =
     useState(false);
   const [disambiguationArtists, setDisambiguationArtists] = useState<string[]>(
@@ -72,6 +76,7 @@ const ScrobblePage: React.FC = () => {
 
     try {
       setError('');
+      setPreparingTracks(true);
       const allTracks: ScrobbleTrack[] = [];
 
       for (const album of albums) {
@@ -105,6 +110,8 @@ const ScrobblePage: React.FC = () => {
       setError(
         _error instanceof Error ? _error.message : 'Failed to prepare tracks'
       );
+    } finally {
+      setPreparingTracks(false);
     }
   };
 
@@ -295,63 +302,57 @@ const ScrobblePage: React.FC = () => {
   return (
     <div>
       {/* Disambiguation Warning Modal */}
-      {showDisambiguationWarning && (
-        <div
-          className='scrobble-modal-overlay'
-          onClick={() => setShowDisambiguationWarning(false)}
-        >
-          <div
-            className='scrobble-modal-content'
-            onClick={e => e.stopPropagation()}
-          >
-            <h3 className='scrobble-modal-title'>
-              Artist Name Contains Disambiguation
-            </h3>
-            <p className='scrobble-modal-description'>
-              The following artist(s) have Discogs disambiguation suffixes
-              (numbers in parentheses) that may not match Last.fm:
-            </p>
-            <ul className='scrobble-modal-list'>
-              {disambiguationArtists.map(artist => (
-                <li key={artist} className='scrobble-modal-list-item'>
-                  <strong>{artist}</strong>
-                  <a
-                    href={`https://www.discogs.com/search/?q=${encodeURIComponent(artist)}&type=artist`}
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    className='scrobble-modal-link'
-                  >
-                    View on Discogs
-                  </a>
-                </li>
-              ))}
-            </ul>
-            <p className='scrobble-modal-note'>
-              You can create an artist mapping to scrobble with a different name
-              on Last.fm.
-            </p>
-            <div className='scrobble-modal-actions'>
-              <button
-                className='btn btn-outline'
-                onClick={() => setShowDisambiguationWarning(false)}
+      <Modal
+        isOpen={showDisambiguationWarning}
+        onClose={() => setShowDisambiguationWarning(false)}
+        title='Artist Name Contains Disambiguation'
+        size='small'
+        footer={
+          <>
+            <button
+              className='btn btn-outline'
+              onClick={() => setShowDisambiguationWarning(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className='btn btn-secondary'
+              onClick={() =>
+                navigateToMappingWithArtist(disambiguationArtists[0])
+              }
+            >
+              Create Mapping
+            </button>
+            <button className='btn btn-primary' onClick={proceedWithScrobble}>
+              Continue Anyway
+            </button>
+          </>
+        }
+      >
+        <p className='scrobble-modal-description'>
+          The following artist(s) have Discogs disambiguation suffixes (numbers
+          in parentheses) that may not match Last.fm:
+        </p>
+        <ul className='scrobble-modal-list'>
+          {disambiguationArtists.map(artist => (
+            <li key={artist} className='scrobble-modal-list-item'>
+              <strong>{artist}</strong>
+              <a
+                href={`https://www.discogs.com/search/?q=${encodeURIComponent(artist)}&type=artist`}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='scrobble-modal-link'
               >
-                Cancel
-              </button>
-              <button
-                className='btn btn-secondary'
-                onClick={() =>
-                  navigateToMappingWithArtist(disambiguationArtists[0])
-                }
-              >
-                Create Mapping
-              </button>
-              <button className='btn btn-primary' onClick={proceedWithScrobble}>
-                Continue Anyway
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                View on Discogs
+              </a>
+            </li>
+          ))}
+        </ul>
+        <p className='scrobble-modal-note'>
+          You can create an artist mapping to scrobble with a different name on
+          Last.fm.
+        </p>
+      </Modal>
 
       <div className='card'>
         <h2>Scrobble Tracks</h2>
@@ -405,7 +406,14 @@ const ScrobblePage: React.FC = () => {
           </div>
         </div>
 
-        {preparedTracks.length > 0 && (
+        {preparingTracks && (
+          <div className='card'>
+            <h3>Preparing tracks...</h3>
+            <ListItemSkeleton count={8} />
+          </div>
+        )}
+
+        {!preparingTracks && preparedTracks.length > 0 && (
           <div>
             <div className='scrobble-tracks-header'>
               <h3>Tracks ({preparedTracks.length})</h3>
@@ -429,16 +437,7 @@ const ScrobblePage: React.FC = () => {
               {preparedTracks.map((track, index) => (
                 <div
                   key={index}
-                  className='scrobble-track-item'
-                  style={{
-                    borderBottom:
-                      index < preparedTracks.length - 1
-                        ? '1px solid var(--bg-tertiary)'
-                        : 'none',
-                    backgroundColor: selectedTracks.has(index)
-                      ? 'var(--bg-hover)'
-                      : 'var(--bg-secondary)',
-                  }}
+                  className={`scrobble-track-item${selectedTracks.has(index) ? ' scrobble-track-item--selected' : ''}`}
                 >
                   <input
                     type='checkbox'
@@ -463,18 +462,13 @@ const ScrobblePage: React.FC = () => {
           <div className='card scrobble-progress-card'>
             <h4>Scrobbling Progress</h4>
             <div className='scrobble-progress-section'>
-              <div className='scrobble-progress-bar-bg'>
-                <div
-                  className='scrobble-progress-bar-fill'
-                  style={{
-                    background:
-                      progress.status === 'error'
-                        ? 'var(--error-color)'
-                        : 'var(--accent-color)',
-                    width: `${(progress.current / progress.total) * 100}%`,
-                  }}
-                />
-              </div>
+              <ProgressBar
+                value={progress.current}
+                max={progress.total}
+                variant={progress.status === 'error' ? 'danger' : 'primary'}
+                size='small'
+                animated
+              />
               <div className='scrobble-progress-text'>
                 {progress.current} of {progress.total} tracks •{' '}
                 {progress.status}

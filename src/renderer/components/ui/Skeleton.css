@@ -71,7 +71,7 @@
 
 /* Album Card Skeleton */
 .skeleton-album-card {
-  background: var(--bg-card);
+  background: var(--card-bg);
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--border-color);
@@ -91,7 +91,7 @@
 
 /* Stat Card Skeleton */
 .skeleton-stat-card {
-  background: var(--bg-card);
+  background: var(--card-bg);
   border-radius: 8px;
   padding: 1.25rem;
   border: 1px solid var(--border-color);
@@ -176,7 +176,7 @@
 
 /* Chart Skeleton */
 .skeleton-chart-card {
-  background: var(--bg-card);
+  background: var(--card-bg);
   border-radius: 8px;
   padding: 1.25rem;
   border: 1px solid var(--border-color);

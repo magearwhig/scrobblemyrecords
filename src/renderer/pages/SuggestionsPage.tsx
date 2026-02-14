@@ -11,6 +11,7 @@ import SuggestionCard from '../components/SuggestionCard';
 import SuggestionWeightControls from '../components/SuggestionWeightControls';
 import SyncStatusBar from '../components/SyncStatusBar';
 import { EmptyState } from '../components/ui/EmptyState';
+import { AlbumCardSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { getApiService } from '../services/api';
 import { createLogger } from '../utils/logger';
@@ -283,8 +284,7 @@ const SuggestionsPage: React.FC<SuggestionsPageProps> = ({
           </div>
           {loading ? (
             <div className='loading-container'>
-              <div className='loading-spinner' />
-              <p>Analyzing your collection and listening history...</p>
+              <AlbumCardSkeleton count={6} />
             </div>
           ) : suggestions.length === 0 ? (
             <EmptyState

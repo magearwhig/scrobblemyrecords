@@ -44,12 +44,21 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
       <div
         className='album-cover'
         onClick={() => onViewDetails(release)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onViewDetails(release);
+          }
+        }}
+        role='button'
+        tabIndex={0}
         style={{
           backgroundImage: getImageUrl(release.cover_image)
             ? `url(${getImageUrl(release.cover_image)})`
             : 'none',
         }}
         title='Click to view details'
+        aria-label={`View details for ${release.title}`}
       >
         {!getImageUrl(release.cover_image) && '🎵'}
         {isInDiscardPile && (

@@ -1177,7 +1177,7 @@ export class SellerMonitoringService {
     }
 
     try {
-      const cache = await this.fileStorage.readJSON<any>(
+      const cache = await this.fileStorage.readJSON<ReleaseMasterCache>(
         this.RELEASE_CACHE_FILE
       );
       if (cache) {

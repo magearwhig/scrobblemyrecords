@@ -1,28 +1,28 @@
 .rankings-race {
   background: var(--card-bg, #ffffff);
-  border-radius: 8px;
-  padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  min-height: 500px;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 2px 0.5rem rgba(0, 0, 0, 0.1);
+  min-height: 31.25rem;
 }
 
 .rankings-race-empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 400px;
+  min-height: 25rem;
   color: var(--text-secondary, #666666);
   text-align: center;
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 /* Controls */
 .rankings-race-controls {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 32px;
-  padding-bottom: 16px;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
   border-bottom: 1px solid var(--border-color, #e0e0e0);
 }
 
@@ -31,9 +31,9 @@
   color: #ffffff;
   border: none;
   border-radius: 50%;
-  width: 48px;
-  height: 48px;
-  font-size: 20px;
+  width: 3rem;
+  height: 3rem;
+  font-size: 1.25rem;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -52,8 +52,8 @@
 
 .rankings-race-slider {
   flex: 1;
-  height: 8px;
-  border-radius: 4px;
+  height: 0.5rem;
+  border-radius: 0.25rem;
   background: var(--slider-bg, #e0e0e0);
   outline: none;
   -webkit-appearance: none;
@@ -63,8 +63,8 @@
 .rankings-race-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 20px;
-  height: 20px;
+  width: 1.25rem;
+  height: 1.25rem;
   border-radius: 50%;
   background: var(--primary-color, #1db954);
   cursor: pointer;
@@ -76,8 +76,8 @@
 }
 
 .rankings-race-slider::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
+  width: 1.25rem;
+  height: 1.25rem;
   border-radius: 50%;
   background: var(--primary-color, #1db954);
   cursor: pointer;
@@ -90,21 +90,21 @@
 }
 
 .rankings-race-period {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
   color: var(--text-primary, #000000);
-  min-width: 150px;
+  min-width: 9.375rem;
   text-align: center;
   flex-shrink: 0;
 }
 
 .rankings-race-speed {
-  padding: 8px 12px;
-  border-radius: 4px;
-  border: 1px solid #e0e0e0;
-  background: #ffffff;
-  color: #000000;
-  font-size: 14px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--border-color, #e0e0e0);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
   cursor: pointer;
   outline: none;
   transition: border-color 0.2s ease;
@@ -122,8 +122,8 @@
 /* Chart container */
 .rankings-race-chart {
   position: relative;
-  min-height: 600px;
-  margin-bottom: 24px;
+  min-height: 37.5rem;
+  margin-bottom: 1.5rem;
 }
 
 /* Individual bar */
@@ -131,11 +131,11 @@
   position: absolute;
   left: 0;
   right: 0;
-  height: 50px;
+  height: 3.125rem;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 8px;
+  gap: 0.75rem;
+  padding: 0 0.5rem;
   /* Smooth animations for position, opacity, and bar width */
   transition:
     transform 0.8s ease-out,
@@ -149,22 +149,22 @@
 }
 
 .rankings-race-rank {
-  font-size: 24px;
+  font-size: 1.5rem;
   font-weight: 700;
   color: var(--text-secondary, #666666);
-  width: 40px;
+  width: 2.5rem;
   text-align: right;
   flex-shrink: 0;
 }
 
 .rankings-race-label {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
   color: var(--text-primary, #000000);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  width: 200px;
+  width: 12.5rem;
   flex-shrink: 0;
 }
 
@@ -176,69 +176,40 @@
 }
 
 .rankings-race-bar-fill {
-  height: 40px;
+  height: 2.5rem;
   background: linear-gradient(
     90deg,
     var(--primary-color, #1db954) 0%,
     var(--primary-color, #1db954) 100%
   );
-  border-radius: 4px;
+  border-radius: 0.25rem;
   /* Smooth width animation */
   transition: width 0.8s ease-out;
   will-change: width;
-  min-width: 10px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-width: 0.625rem;
+  box-shadow: 0 2px 0.25rem rgba(0, 0, 0, 0.1);
 }
 
 .rankings-race-count {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--text-primary, #000000);
-  margin-left: 8px;
-  min-width: 60px;
+  margin-left: 0.5rem;
+  min-width: 3.75rem;
   flex-shrink: 0;
 }
 
 /* Progress indicator */
 .rankings-race-progress {
   text-align: center;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--text-secondary, #666666);
-  margin-top: 16px;
+  margin-top: 1rem;
 }
 
 /* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .rankings-race {
-    background: var(--card-bg, #1a1a1a);
-    color: var(--text-primary, #ffffff);
-  }
-
-  .rankings-race-empty {
-    color: var(--text-secondary, #999999);
-  }
-
-  .rankings-race-period {
-    color: var(--text-primary, #ffffff);
-  }
-
-  .rankings-race-speed {
-    background: var(--input-bg, #2a2a2a);
-    color: var(--text-primary, #ffffff);
-    border-color: var(--border-color, #444444);
-  }
-
-  .rankings-race-label {
-    color: var(--text-primary, #ffffff);
-  }
-
-  .rankings-race-count {
-    color: var(--text-primary, #ffffff);
-  }
-
-  .rankings-race-bar-fill {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  }
+.dark-mode .rankings-race-bar-fill {
+  box-shadow: 0 2px 0.25rem rgba(0, 0, 0, 0.3);
 }
 
 /* Responsive design */
@@ -250,22 +221,22 @@
   .rankings-race-period {
     order: -1;
     width: 100%;
-    margin-bottom: 8px;
+    margin-bottom: 0.5rem;
   }
 
   .rankings-race-label {
-    min-width: 150px;
-    max-width: 200px;
-    font-size: 12px;
+    min-width: 9.375rem;
+    max-width: 12.5rem;
+    font-size: 0.75rem;
   }
 
   .rankings-race-count {
-    font-size: 12px;
-    min-width: 50px;
+    font-size: 0.75rem;
+    min-width: 3.125rem;
   }
 
   .rankings-race-rank {
-    font-size: 20px;
-    width: 30px;
+    font-size: 1.25rem;
+    width: 1.875rem;
   }
 }

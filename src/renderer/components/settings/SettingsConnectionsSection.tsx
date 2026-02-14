@@ -409,7 +409,7 @@ const SettingsConnectionsSection: React.FC<SettingsConnectionsSectionProps> = ({
 
           <div className='instructions-box'>
             <strong>How to get a Personal Access Token:</strong>
-            <ol style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+            <ol className='instructions-list'>
               <li>
                 Go to{' '}
                 <a

@@ -10,6 +10,7 @@ import {
 } from '../components/settings';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { useTabKeyNavigation } from '../hooks/useTabKeyNavigation';
 import { getApiService } from '../services/api';
 import { createLogger } from '../utils/logger';
 
@@ -88,6 +89,7 @@ const getTabFromUrl = (): SettingsTab | null => {
 const SettingsPage: React.FC = () => {
   const { state } = useApp();
   const { authStatus } = useAuth();
+  const handleTabKeyDown = useTabKeyNavigation();
 
   // Initialize with URL tab param or default to 'connections'
   const [activeTab, setActiveTab] = useState<SettingsTab>(() => {
@@ -190,14 +192,22 @@ const SettingsPage: React.FC = () => {
 
       {/* Tab Navigation */}
       <div className='settings-tabs-container'>
-        <div className='settings-tabs'>
+        <div
+          className='settings-tabs'
+          role='tablist'
+          aria-label='Settings sections'
+        >
           {TABS.map(tab => {
             const badgeCount = getBadgeCount(tab.id);
             return (
               <button
                 key={tab.id}
+                role='tab'
                 className={`settings-tab ${activeTab === tab.id ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab.id)}
+                onKeyDown={handleTabKeyDown}
+                aria-selected={activeTab === tab.id}
+                tabIndex={activeTab === tab.id ? 0 : -1}
               >
                 <span className='settings-tab-icon'>{tab.icon}</span>
                 <span className='settings-tab-label'>{tab.label}</span>

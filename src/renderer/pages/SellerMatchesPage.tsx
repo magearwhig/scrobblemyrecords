@@ -7,7 +7,9 @@ import {
   SellerMatch,
 } from '../../shared/types';
 import MatchCard from '../components/MatchCard';
+import { AlbumCardSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
+import { useToast } from '../context/ToastContext';
 import { getApiService } from '../services/api';
 import { createLogger } from '../utils/logger';
 
@@ -29,6 +31,7 @@ const SellerMatchesPage: React.FC<SellerMatchesPageProps> = ({
   embedded = false,
 }) => {
   const { state } = useApp();
+  const { showToast } = useToast();
   const api = getApiService(state.serverUrl);
 
   // State
@@ -140,7 +143,8 @@ const SellerMatchesPage: React.FC<SellerMatchesPageProps> = ({
         prev.map(m => (m.id === matchId ? { ...m, status: 'seen' } : m))
       );
     } catch (err) {
-      window.alert(
+      showToast(
+        'error',
         err instanceof Error ? err.message : 'Failed to mark as seen'
       );
     } finally {
@@ -160,7 +164,7 @@ const SellerMatchesPage: React.FC<SellerMatchesPageProps> = ({
       logger.info('Verify result', result);
 
       if (result.error) {
-        window.alert(`Could not verify: ${result.error}`);
+        showToast('error', `Could not verify: ${result.error}`);
       } else {
         // Reload from server to ensure UI is in sync with backend
         const matchesResponse = await api.getSellerMatchesWithCacheInfo();
@@ -182,7 +186,8 @@ const SellerMatchesPage: React.FC<SellerMatchesPageProps> = ({
         setCacheInfo(matchesResponse.cacheInfo);
 
         if (result.updated) {
-          window.alert(
+          showToast(
+            result.status === 'active' ? 'success' : 'info',
             result.status === 'active'
               ? 'Good news! This item is still available.'
               : 'Confirmed: This item has been sold.'
@@ -191,7 +196,8 @@ const SellerMatchesPage: React.FC<SellerMatchesPageProps> = ({
       }
     } catch (err) {
       logger.error('Verify error', err);
-      window.alert(
+      showToast(
+        'error',
         err instanceof Error ? err.message : 'Failed to verify listing'
       );
     } finally {
@@ -277,8 +283,7 @@ const SellerMatchesPage: React.FC<SellerMatchesPageProps> = ({
       <div className='seller-matches-page'>
         {!embedded && <h1>Wishlist Matches</h1>}
         <div className='loading-container'>
-          <div className='spinner'></div>
-          <p>Loading matches...</p>
+          <AlbumCardSkeleton count={4} />
         </div>
       </div>
     );

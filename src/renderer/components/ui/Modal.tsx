@@ -43,6 +43,10 @@ export interface ModalProps {
    */
   className?: string;
   /**
+   * Footer content rendered outside modal-body (sticky at bottom).
+   */
+  footer?: React.ReactNode;
+  /**
    * Modal content.
    */
   children: React.ReactNode;
@@ -61,6 +65,7 @@ export const Modal: React.FC<ModalProps> = ({
   closeOnEscape = true,
   showCloseButton = true,
   className = '',
+  footer,
   children,
 }) => {
   useEffect(() => {
@@ -131,6 +136,7 @@ export const Modal: React.FC<ModalProps> = ({
             </div>
           )}
           <div className='modal-body'>{children}</div>
+          {footer && <div className='modal-footer'>{footer}</div>}
           {loading && (
             <div className='modal-loading-overlay'>
               <div className='modal-spinner' />
