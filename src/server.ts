@@ -350,7 +350,8 @@ app.use(
     wishlistService,
     sellerMonitoringService,
     analyticsService,
-    rankingsService
+    rankingsService,
+    mappingService
   )
 );
 app.use(

@@ -1358,6 +1358,9 @@ Feature 2 (Wishlist) - COMPLETE ✅
 Feature 5 (New Releases) - COMPLETE ✅
     └── Uses MusicBrainz API + Cover Art Archive integration
 
+Feature 12 (Cross-Feature Data Enrichment) - COMPLETE ✅
+    └── Feature 15 (Artist & Track Deep Dives) - can reuse useCollectionLookup hook
+
 All other features are independent and can be implemented in any order.
 ```
 
@@ -1721,20 +1724,29 @@ Unlike Spotify Wrapped (yearly only), this supports **custom date ranges** plus 
 
 ## Feature 12: Cross-Feature Data Enrichment
 
-### Status: PLANNED
+### Status: COMPLETE ✅
 
-Surface play count data, collection ownership badges, and cross-references throughout the app. Bridges data silos between Collection, Stats, Wishlist, Seller Matches, and Discovery.
+**Completed:**
+- Play count badges and last-played on AlbumCard (Collection view) -- eagerly fetched on load
+- "In Collection" badges on Stats top album lists (`OWNED` badge) and top artist lists (`N owned` count)
+- Prominent play counts on Wishlist cards (always visible, not just when sorting by scrobbles)
+- Play counts on Seller Match cards with "Last listened" and "Never listened" indicators
+- "You Own This" indicators on Forgotten Favorites with "Go to Album" navigation
+- "In Collection" badges on Scrobble History entries with "View in Collection" links
+- Album track completeness indicator ("8/12 tracks played") on release details with progress bar
+- Reusable `useCollectionLookup` hook for fuzzy collection matching across features
+- `GET /api/v1/stats/album-tracks-played` endpoint for track completeness data
+- `POST /api/v1/stats/album-play-counts` enhanced with mapping pipeline (mappingService + artistMappingService) for accurate matching
+- 27 files changed across 7 implementation phases
+- All 2765 tests passing
 
-**Key Deliverables:**
-- Play count badges and last-played on AlbumCard (Collection view)
-- "In Collection" badges on Stats top artist/album lists
-- Prominent play counts on Wishlist and Seller Match cards
-- "You own this" indicators on Forgotten Favorites
-- Scrobble history links to collection items
-- Album track completeness indicator (e.g., "8/12 tracks played")
-- Reusable `useCollectionLookup` hook for fuzzy collection matching
+**Implementation Details:**
+- Batch play count endpoint uses `mappingService.getAllAlbumMappingsForCollection()` and `artistMappingService.getLastfmName()` for accurate Discogs→Last.fm name resolution
+- `useCollectionLookup` hook builds normalized Map for O(1) fuzzy lookups, reusable by Features 13-15
+- All data fetching uses AbortController cleanup to prevent stale state updates
+- Zero-play albums show no badge (clean UI); graceful degradation when no auth/data
 
-**Implementation Plan:** See `.plan/cross-feature-data-enrichment-plan.md`
+**Implementation Plan:** See `.plan/done/cross-feature-data-enrichment-plan.md`
 
 **Dependencies:** None (builds on existing endpoints and data)
 
