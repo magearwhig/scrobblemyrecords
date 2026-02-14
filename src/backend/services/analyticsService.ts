@@ -22,6 +22,7 @@ export class AnalyticsService {
   // Cache for expensive computations
   private topArtistsCache: Map<string, number> | null = null;
   private topArtistsCacheTime = 0;
+  private topArtistsMaxPlayCount = 0;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   constructor(
@@ -76,6 +77,8 @@ export class AnalyticsService {
 
       this.topArtistsCache = artistMap;
       this.topArtistsCacheTime = now;
+      this.topArtistsMaxPlayCount =
+        artistMap.size > 0 ? Math.max(...artistMap.values()) : 0;
 
       return artistMap;
     } catch (error) {
@@ -100,28 +103,18 @@ export class AnalyticsService {
       return 0;
     }
 
-    // Find max play count to normalize
-    const maxPlayCount = Math.max(...topArtists.values());
-    return artistPlayCount / maxPlayCount;
+    return this.topArtistsMaxPlayCount > 0
+      ? artistPlayCount / this.topArtistsMaxPlayCount
+      : 0;
   }
 
   /**
    * Get era/decade preference score (0-1) for a given year
    */
   async getEraPreference(year: number): Promise<number> {
-    // Get decade distribution from listening history
-    const index = await this.historyStorage.getIndex();
-    if (!index) {
-      return 0.5; // Neutral if no history
-    }
-
-    // Calculate release year preferences
-    // This requires cross-referencing with collection data
-    // For now, we'll use listening time patterns as a proxy
     const decade = Math.floor(year / 10) * 10;
 
-    // Simple heuristic: newer releases (2000+) get slight preference
-    // This is a placeholder - ideally we'd analyze actual release years
+    // Heuristic: newer releases get slight preference
     if (decade >= 2010) return 0.7;
     if (decade >= 2000) return 0.6;
     if (decade >= 1990) return 0.55;

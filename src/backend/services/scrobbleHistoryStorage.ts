@@ -19,6 +19,10 @@ export class ScrobbleHistoryStorage {
   // Fuzzy index: maps fuzzy keys to arrays of exact keys for O(1) lookups
   private fuzzyIndex: Map<string, string[]> = new Map();
 
+  // Cached distributions: computed once on index load, cleared on invalidation
+  private cachedHourlyDist: Map<number, number> | null = null;
+  private cachedDayOfWeekDist: Map<number, number> | null = null;
+
   constructor(fileStorage: FileStorage) {
     this.fileStorage = fileStorage;
   }
@@ -107,6 +111,39 @@ export class ScrobbleHistoryStorage {
   }
 
   /**
+   * Build hourly and day-of-week distribution caches in a single pass.
+   * Called on index load to avoid recomputing distributions on every access.
+   */
+  private buildDistributionCaches(): void {
+    this.cachedHourlyDist = new Map();
+    this.cachedDayOfWeekDist = new Map();
+
+    if (!this.cachedIndex) {
+      return;
+    }
+
+    for (const history of Object.values(this.cachedIndex.albums)) {
+      for (const play of history.plays) {
+        const date = new Date(play.timestamp * 1000);
+        const hour = date.getHours();
+        const day = date.getDay();
+        this.cachedHourlyDist.set(
+          hour,
+          (this.cachedHourlyDist.get(hour) || 0) + 1
+        );
+        this.cachedDayOfWeekDist.set(
+          day,
+          (this.cachedDayOfWeekDist.get(day) || 0) + 1
+        );
+      }
+    }
+
+    this.logger.debug(
+      `Built distribution caches from ${this.cachedIndex.totalScrobbles} scrobbles`
+    );
+  }
+
+  /**
    * Get the full history index (with caching)
    */
   async getIndex(): Promise<ScrobbleHistoryIndex | null> {
@@ -125,6 +162,8 @@ export class ScrobbleHistoryStorage {
         this.cacheTimestamp = now;
         // Build fuzzy index for O(1) fuzzy lookups
         this.buildFuzzyIndex();
+        // Build distribution caches to avoid recomputing on every access
+        this.buildDistributionCaches();
       }
       return index;
     } catch {
@@ -140,6 +179,8 @@ export class ScrobbleHistoryStorage {
     this.cachedIndex = null;
     this.cacheTimestamp = 0;
     this.fuzzyIndex.clear();
+    this.cachedHourlyDist = null;
+    this.cachedDayOfWeekDist = null;
   }
 
   /**
@@ -469,13 +510,22 @@ export class ScrobbleHistoryStorage {
    * Get listening patterns by hour of day
    */
   async getHourlyDistribution(): Promise<Map<number, number>> {
+    if (this.cachedHourlyDist) {
+      return this.cachedHourlyDist;
+    }
+
     const index = await this.getIndex();
     if (!index) {
       return new Map();
     }
 
-    const hours = new Map<number, number>();
+    // Fallback: if getIndex() populated the cache, return it
+    if (this.cachedHourlyDist) {
+      return this.cachedHourlyDist;
+    }
 
+    // Manual computation for edge cases where index exists but cache wasn't built
+    const hours = new Map<number, number>();
     for (const history of Object.values(index.albums)) {
       for (const play of history.plays) {
         const hour = new Date(play.timestamp * 1000).getHours();
@@ -490,13 +540,22 @@ export class ScrobbleHistoryStorage {
    * Get listening patterns by day of week (0 = Sunday, 6 = Saturday)
    */
   async getDayOfWeekDistribution(): Promise<Map<number, number>> {
+    if (this.cachedDayOfWeekDist) {
+      return this.cachedDayOfWeekDist;
+    }
+
     const index = await this.getIndex();
     if (!index) {
       return new Map();
     }
 
-    const days = new Map<number, number>();
+    // Fallback: if getIndex() populated the cache, return it
+    if (this.cachedDayOfWeekDist) {
+      return this.cachedDayOfWeekDist;
+    }
 
+    // Manual computation for edge cases where index exists but cache wasn't built
+    const days = new Map<number, number>();
     for (const history of Object.values(index.albums)) {
       for (const play of history.plays) {
         const day = new Date(play.timestamp * 1000).getDay();

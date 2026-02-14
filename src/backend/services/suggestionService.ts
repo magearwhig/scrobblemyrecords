@@ -41,6 +41,11 @@ export class SuggestionService {
   private recentSuggestions: Map<number, number> = new Map(); // albumId -> timestamp
   private readonly SUGGESTION_MEMORY_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
+  // Cache last suggestion results to avoid redundant scoring (e.g., AI endpoint reuse)
+  private lastResults: SuggestionResult[] | null = null;
+  private lastResultsTime = 0;
+  private readonly RESULTS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
   constructor(
     analyticsService: AnalyticsService,
     historyStorage: ScrobbleHistoryStorage
@@ -60,7 +65,10 @@ export class SuggestionService {
   /**
    * Calculate all suggestion factors for a single album
    */
-  async calculateFactors(album: CollectionItem): Promise<SuggestionFactors> {
+  async calculateFactors(
+    album: CollectionItem,
+    precomputed?: { timeOfDayScore: number }
+  ): Promise<SuggestionFactors> {
     const artist = album.release.artist;
     const title = album.release.title;
 
@@ -94,11 +102,12 @@ export class SuggestionService {
 
     if (historyResult.entry && historyResult.entry.playCount > 0) {
       neverPlayed = false;
-      const daysSince = await this.historyStorage.getDaysSinceLastPlayed(
-        artist,
-        title
-      );
-      recencyGap = daysSince ?? Infinity;
+      if (historyResult.entry.lastPlayed > 0) {
+        const nowSeconds = Math.floor(Date.now() / 1000);
+        recencyGap = Math.floor(
+          (nowSeconds - historyResult.entry.lastPlayed) / (60 * 60 * 24)
+        );
+      }
     }
 
     // Calculate days since added to collection
@@ -119,8 +128,10 @@ export class SuggestionService {
     // Get user rating (default to 0 if not rated)
     const userRating = album.rating || 0;
 
-    // Get time-of-day preference
-    const timeOfDay = await this.analyticsService.getTimeOfDayPreference();
+    // Get time-of-day preference (use pre-computed value if available)
+    const timeOfDay =
+      precomputed?.timeOfDayScore ??
+      (await this.analyticsService.getTimeOfDayPreference());
 
     // Calculate diversity penalty based on recent suggestions
     const diversityPenalty = this.calculateDiversityPenalty(album);
@@ -281,12 +292,18 @@ export class SuggestionService {
       `Generating ${count} suggestions from ${collection.length} albums`
     );
 
+    // Pre-compute values that are identical for all albums
+    await this.analyticsService.getTopArtistsMap(); // Warm cache + max play count
+    const timeOfDayScore = await this.analyticsService.getTimeOfDayPreference();
+
+    const precomputed = { timeOfDayScore };
+
     // Score all albums
     const scoredAlbums: SuggestionResult[] = [];
 
     for (const album of collection) {
       try {
-        const factors = await this.calculateFactors(album);
+        const factors = await this.calculateFactors(album, precomputed);
 
         // Optional filtering
         if (excludeRecentlyPlayed && factors.recencyGap < 7) {
@@ -325,6 +342,10 @@ export class SuggestionService {
       this.recentSuggestions.set(suggestion.album.id, Date.now());
     }
 
+    // Cache results for reuse by other endpoints (e.g., AI suggestions)
+    this.lastResults = scoredAlbums.slice(0, Math.max(count, 10));
+    this.lastResultsTime = Date.now();
+
     this.logger.debug(
       `Generated ${topSuggestions.length} suggestions, top score: ${topSuggestions[0]?.score.toFixed(2) || 'N/A'}`
     );
@@ -344,11 +365,28 @@ export class SuggestionService {
   }
 
   /**
+   * Get cached suggestion results if available and fresh.
+   * Returns null if cache is expired or empty.
+   * Used by AI endpoint to avoid redundant scoring.
+   */
+  getCachedSuggestions(count: number = 10): SuggestionResult[] | null {
+    if (
+      this.lastResults &&
+      Date.now() - this.lastResultsTime < this.RESULTS_CACHE_TTL
+    ) {
+      return this.lastResults.slice(0, count);
+    }
+    return null;
+  }
+
+  /**
    * Clear the recent suggestions memory
    * (useful for getting fresh suggestions)
    */
   clearSuggestionMemory(): void {
     this.recentSuggestions.clear();
+    this.lastResults = null;
+    this.lastResultsTime = 0;
     this.logger.debug('Suggestion memory cleared');
   }
 

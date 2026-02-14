@@ -1347,10 +1347,10 @@ export default function createSuggestionsRouter(
       const recentAISuggestionsList = getRecentAISuggestions();
 
       // Get algorithm-based suggestions for comparison/grounding
-      const algorithmPicks = await suggestionService.getSuggestions(
-        allItems,
-        10
-      );
+      // Use cached results from recent suggestion requests to avoid redundant scoring
+      const algorithmPicks =
+        suggestionService.getCachedSuggestions(10) ||
+        (await suggestionService.getSuggestions(allItems, 10));
 
       const context: AIPromptContext = {
         currentTime: now,
