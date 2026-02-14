@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-2145%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-2745%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -548,14 +548,17 @@ A Spotify Wrapped-style interactive slideshow summarizing your listening activit
 - Listening activity heatmap
 
 ### 📦 Discard Pile
-Track records you want to sell, gift, or remove from your collection:
+Track records you want to sell, gift, trade in, or remove from your collection:
 
 - **Reasons**: Mark albums as selling, duplicate, damaged, upgrading, not listening, or giving away
-- **Status Tracking**: Marked, listed, sold, gifted, or removed
+- **Status Tracking**: Marked, listed, sold, gifted, traded in, or removed
+- **Traded In**: Mark records traded at a store — data preserved locally as permanent history
+- **Bulk Operations**: Multi-select with shift-click range selection, bulk "Trade In" with confirmation
 - **Marketplace Integration**: Track listing URLs and sale prices
 - **Orphaned Detection**: Find records no longer in your Discogs collection
-- **Stats**: Total items, estimated value, items sold, and revenue tracking
-- **Tabs**: All, Marked, Listed, Sold, Orphaned
+- **Stats**: Total items, estimated value, actual sales — financial stats reflect current filter view
+- **Tabs**: Active (default, hides completed items), Pending, Listed, History (sold/gifted/traded in/removed), Orphaned
+- **Component Architecture**: Decomposed into DiscardItemCard, DiscardStatsBar, DiscardFilterBar, and selection hook
 
 ### 📀 Album Scrobble History
 View detailed listening history for any album:
@@ -584,6 +587,7 @@ Protect your user-generated data with manual and automatic backups:
 - Local want list and vinyl watch list
 - Monitored sellers list
 - MusicBrainz artist mappings and excluded artists
+- Discard pile items (full history with merge support)
 
 **Manual Backup (Settings → Backup):**
 - **Export Preview**: See exactly what will be backed up before exporting
@@ -681,6 +685,7 @@ src/
 │   │   ├── SearchBar.tsx          # Search input
 │   │   ├── ui/                    # Reusable primitives (Button, Modal, Badge, etc.)
 │   │   ├── dashboard/             # Dashboard widgets
+│   │   ├── discard/              # Discard pile components (ItemCard, StatsBar, FilterBar, TradedInModal)
 │   │   ├── discovery/             # Discovery tab components
 │   │   ├── marketplace/           # Marketplace components
 │   │   ├── settings/              # Settings page sections

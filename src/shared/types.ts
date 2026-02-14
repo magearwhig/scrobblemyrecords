@@ -1286,6 +1286,9 @@ export interface BackupData {
   artistMbidMappings: ArtistMbidMapping[];
   hiddenReleases: HiddenRelease[];
   excludedArtists: ExcludedArtist[];
+
+  // Discard Pile
+  discardPileItems: DiscardPileItem[];
 }
 
 /**
@@ -1324,6 +1327,7 @@ export interface BackupPreview {
   artistMbidMappingsCount: number;
   hiddenReleasesCount: number;
   excludedArtistsCount: number;
+  discardPileItemsCount: number;
 }
 
 /**
@@ -1355,6 +1359,7 @@ export interface BackupImportPreview {
     artistMbidMappings: ImportCategorySummary;
     hiddenReleases: ImportCategorySummary;
     excludedArtists: ImportCategorySummary;
+    discardPileItems: ImportCategorySummary;
     settingsWillMerge: boolean;
   };
 }
@@ -1518,7 +1523,8 @@ export type DiscardStatus =
   | 'listed' // Listed for sale somewhere
   | 'sold' // Successfully sold
   | 'gifted' // Given away
-  | 'removed'; // Actually removed from collection
+  | 'removed' // Actually removed from collection
+  | 'traded_in'; // Traded in at a store
 
 /**
  * Item marked for discard/sale tracking

@@ -320,6 +320,46 @@ export default function createDiscardPileRouter(
   });
 
   /**
+   * POST /api/v1/discard-pile/bulk/traded-in
+   * Bulk mark items as traded in
+   */
+  router.post('/bulk/traded-in', async (req: Request, res: Response) => {
+    try {
+      const { ids } = req.body;
+
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'ids must be a non-empty array',
+        });
+      }
+
+      // Validate IDs
+      for (let i = 0; i < ids.length; i++) {
+        if (!validateIdentifier(ids[i])) {
+          return res.status(400).json({
+            success: false,
+            error: `Invalid id format at index ${i}`,
+          });
+        }
+      }
+
+      const result = await discardPileService.bulkMarkAsTradedIn(ids);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      logger.error('Error bulk marking as traded in', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
    * POST /api/v1/discard-pile/refresh-values
    * Bulk refresh estimated values from Discogs marketplace data
    */
@@ -468,7 +508,14 @@ export default function createDiscardPileRouter(
       }
 
       // Validate status if provided
-      const validStatuses = ['marked', 'listed', 'sold', 'gifted', 'removed'];
+      const validStatuses = [
+        'marked',
+        'listed',
+        'sold',
+        'gifted',
+        'removed',
+        'traded_in',
+      ];
       if (status && !validStatuses.includes(status)) {
         return res.status(400).json({
           success: false,
@@ -616,6 +663,51 @@ export default function createDiscardPileRouter(
       });
     } catch (error) {
       logger.error('Error marking as listed', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * POST /api/v1/discard-pile/:id/traded-in
+   * Quick action: mark as traded in
+   */
+  router.post('/:id/traded-in', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      if (!validateIdentifier(id)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid id format',
+        });
+      }
+
+      const updated = await discardPileService.markAsTradedIn(id);
+
+      if (!updated) {
+        return res.status(404).json({
+          success: false,
+          error: 'Item not found',
+        });
+      }
+
+      res.json({
+        success: true,
+        data: updated,
+      });
+    } catch (error) {
+      // Check for terminal status error
+      if (error instanceof Error && error.message.includes('terminal status')) {
+        return res.status(409).json({
+          success: false,
+          error: error.message,
+        });
+      }
+
+      logger.error('Error marking as traded in', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

@@ -7592,6 +7592,7 @@ body {
 
 /* Item Card */
 .discard-item-card {
+  position: relative;
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -7600,7 +7601,8 @@ body {
   flex-direction: column;
   transition:
     box-shadow 0.2s,
-    transform 0.2s;
+    transform 0.2s,
+    border-color 0.2s;
   padding: 0;
 }
 
@@ -7765,6 +7767,11 @@ body {
   color: white;
 }
 
+.status-badge.status-traded_in {
+  background: #ea580c;
+  color: white;
+}
+
 /* Item Details */
 .discard-item-card .item-details {
   padding: 0 1rem 0.75rem;
@@ -7824,6 +7831,57 @@ body {
 .discard-item-card .item-actions .btn {
   flex: 1;
   min-width: fit-content;
+}
+
+/* Multi-select checkbox on card (Phase 2) */
+.discard-item-card .item-select-checkbox {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 2;
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+/* Selected card highlight (Phase 2) */
+.discard-item-card.selected {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-primary);
+}
+
+/* Bulk Traded In list in modal */
+.bulk-traded-in-list {
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 1rem 0;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.bulk-traded-in-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.bulk-traded-in-item:last-child {
+  border-bottom: none;
+}
+
+.bulk-traded-in-cover {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.bulk-traded-in-label {
+  font-size: 0.875rem;
+  color: var(--text-primary);
 }
 
 /* Empty State */

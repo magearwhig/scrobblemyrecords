@@ -33,6 +33,8 @@ import {
   BackupImportResult,
   BackupPreview,
   BackupSettings,
+  DiscardPileItem,
+  DiscardPileStore,
   ExcludedArtist,
   ExcludedArtistsStore,
   HiddenAlbum,
@@ -78,6 +80,7 @@ const FILE_PATHS = {
   artistMbidMappings: 'releases/artist-mbid-map.json',
   hiddenReleases: 'releases/hidden-releases.json',
   excludedArtists: 'releases/excluded-artists.json',
+  discardPile: 'collections/discard-pile.json',
   backupSettings: 'settings/backup-settings.json',
 } as const;
 
@@ -343,6 +346,13 @@ export class BackupService {
     return store?.items ?? [];
   }
 
+  private async loadDiscardPile(): Promise<DiscardPileItem[]> {
+    const store = await this.fileStorage.readJSON<DiscardPileStore>(
+      FILE_PATHS.discardPile
+    );
+    return store?.items ?? [];
+  }
+
   // ============================================
   // Backup Preview
   // ============================================
@@ -369,6 +379,7 @@ export class BackupService {
       artistMbidMappings,
       hiddenReleases,
       excludedArtists,
+      discardPileItems,
     ] = await Promise.all([
       this.loadUserSettings(false),
       this.loadSuggestionSettings(),
@@ -387,6 +398,7 @@ export class BackupService {
       this.loadArtistMbidMappings(),
       this.loadHiddenReleases(),
       this.loadExcludedArtists(),
+      this.loadDiscardPile(),
     ]);
 
     return {
@@ -407,6 +419,7 @@ export class BackupService {
       artistMbidMappingsCount: artistMbidMappings.length,
       hiddenReleasesCount: hiddenReleases.length,
       excludedArtistsCount: excludedArtists.length,
+      discardPileItemsCount: discardPileItems.length,
     };
   }
 
@@ -445,6 +458,7 @@ export class BackupService {
       artistMbidMappings,
       hiddenReleases,
       excludedArtists,
+      discardPileItems,
     ] = await Promise.all([
       this.loadUserSettings(includeCredentials),
       this.loadSuggestionSettings(),
@@ -463,6 +477,7 @@ export class BackupService {
       this.loadArtistMbidMappings(),
       this.loadHiddenReleases(),
       this.loadExcludedArtists(),
+      this.loadDiscardPile(),
     ]);
 
     // Build backup data
@@ -484,6 +499,7 @@ export class BackupService {
       artistMbidMappings,
       hiddenReleases,
       excludedArtists,
+      discardPileItems,
     };
 
     // Encrypt credentials if included
@@ -594,6 +610,7 @@ export class BackupService {
       currentArtistMbidMappings,
       currentHiddenReleases,
       currentExcludedArtists,
+      currentDiscardPileItems,
     ] = await Promise.all([
       this.loadAlbumMappings(),
       this.loadArtistMappings(),
@@ -605,6 +622,7 @@ export class BackupService {
       this.loadArtistMbidMappings(),
       this.loadHiddenReleases(),
       this.loadExcludedArtists(),
+      this.loadDiscardPile(),
     ]);
 
     // Calculate summary
@@ -659,6 +677,11 @@ export class BackupService {
         currentExcludedArtists,
         (a: ExcludedArtist) => a.normalizedName
       ),
+      discardPileItems: this.compareMappings(
+        backup.data.discardPileItems,
+        currentDiscardPileItems,
+        (item: DiscardPileItem) => item.id
+      ),
       settingsWillMerge: true,
     };
 
@@ -684,6 +707,7 @@ export class BackupService {
       artistMbidMappings: { new: 0, existing: 0 },
       hiddenReleases: { new: 0, existing: 0 },
       excludedArtists: { new: 0, existing: 0 },
+      discardPileItems: { new: 0, existing: 0 },
       settingsWillMerge: false,
     };
   }
@@ -1092,6 +1116,22 @@ export class BackupService {
       updated += result.updated;
     } catch (e) {
       errors.push(`Excluded artists: ${e instanceof Error ? e.message : e}`);
+    }
+
+    // Import discard pile items
+    try {
+      const result = await this.mergeAndSave(
+        FILE_PATHS.discardPile,
+        data.discardPileItems,
+        (item: DiscardPileItem) => item.id,
+        'items',
+        merge,
+        (a, b) => (a.statusChangedAt > b.statusChangedAt ? a : b)
+      );
+      added += result.added;
+      updated += result.updated;
+    } catch (e) {
+      errors.push(`Discard pile items: ${e instanceof Error ? e.message : e}`);
     }
 
     return { added, updated, errors };

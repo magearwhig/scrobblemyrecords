@@ -1780,6 +1780,26 @@ class ApiService {
   }
 
   /**
+   * Mark a discard pile item as traded in.
+   */
+  async markDiscardItemTradedIn(id: string): Promise<DiscardPileItem> {
+    const response = await this.api.post(`/discard-pile/${id}/traded-in`);
+    return response.data.data;
+  }
+
+  /**
+   * Bulk mark discard pile items as traded in.
+   */
+  async bulkMarkDiscardItemsTradedIn(
+    ids: string[]
+  ): Promise<{ succeeded: string[]; failed: string[] }> {
+    const response = await this.api.post('/discard-pile/bulk/traded-in', {
+      ids,
+    });
+    return response.data.data;
+  }
+
+  /**
    * Bulk refresh estimated values from Discogs marketplace data.
    */
   async refreshDiscardPileValues(): Promise<{

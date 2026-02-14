@@ -15,4 +15,5 @@ Active plans and feature specs. Completed plans are in `done/`.
 | done/wrapped-plan.md | Complete -- all 6 phases implemented |
 | done/discard-pile-plan.md | Complete -- Feature 7 |
 | done/wishlist-new-release-tracking-plan.md | Complete -- Feature 5.5 |
+| traded-in-archive-plan.md | Complete -- Feature 7 extension, all 3 phases implemented |
 | backlog_ideas.md | Reference -- consolidation proposals implemented |

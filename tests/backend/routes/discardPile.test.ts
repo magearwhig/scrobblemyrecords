@@ -77,7 +77,14 @@ describe('Discard Pile Routes', () => {
       .mockResolvedValue(1);
     mockDiscardPileService.getDiscardPileStats = jest.fn().mockResolvedValue({
       totalItems: 1,
-      byStatus: { marked: 1, listed: 0, sold: 0, gifted: 0, removed: 0 },
+      byStatus: {
+        marked: 1,
+        listed: 0,
+        sold: 0,
+        gifted: 0,
+        removed: 0,
+        traded_in: 0,
+      },
       byReason: {
         selling: 1,
         duplicate: 0,
@@ -102,6 +109,14 @@ describe('Discard Pile Routes', () => {
       ...mockItem,
       status: 'listed',
       marketplaceUrl: 'https://discogs.com/sell/item/123',
+    });
+    mockDiscardPileService.markAsTradedIn = jest.fn().mockResolvedValue({
+      ...mockItem,
+      status: 'traded_in',
+    });
+    mockDiscardPileService.bulkMarkAsTradedIn = jest.fn().mockResolvedValue({
+      succeeded: ['abc123def456'],
+      failed: [],
     });
 
     // Create Express app with routes
@@ -529,6 +544,97 @@ describe('Discard Pile Routes', () => {
     });
   });
 
+  describe('POST /api/v1/discard-pile/:id/traded-in', () => {
+    it('should mark item as traded in and return updated item', async () => {
+      const response = await request(app)
+        .post('/api/v1/discard-pile/abc123def456/traded-in')
+        .send({});
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.status).toBe('traded_in');
+    });
+
+    it('should reject invalid id format', async () => {
+      const response = await request(app)
+        .post('/api/v1/discard-pile/invalid@id!/traded-in')
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('id format');
+    });
+
+    it('should return 404 for non-existent item', async () => {
+      mockDiscardPileService.markAsTradedIn.mockResolvedValue(null);
+
+      const response = await request(app)
+        .post('/api/v1/discard-pile/nonexistent1/traded-in')
+        .send({});
+
+      expect(response.status).toBe(404);
+    });
+
+    it('should return 409 for item in terminal status', async () => {
+      mockDiscardPileService.markAsTradedIn.mockRejectedValue(
+        new Error(
+          "Cannot mark as traded in: item is already in terminal status 'sold'"
+        )
+      );
+
+      const response = await request(app)
+        .post('/api/v1/discard-pile/abc123def456/traded-in')
+        .send({});
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toContain('terminal status');
+    });
+  });
+
+  describe('POST /api/v1/discard-pile/bulk/traded-in', () => {
+    it('should bulk mark items as traded in', async () => {
+      const response = await request(app)
+        .post('/api/v1/discard-pile/bulk/traded-in')
+        .send({ ids: ['abc123def456'] });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.succeeded).toEqual(['abc123def456']);
+    });
+
+    it('should reject empty ids array', async () => {
+      const response = await request(app)
+        .post('/api/v1/discard-pile/bulk/traded-in')
+        .send({ ids: [] });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('non-empty array');
+    });
+
+    it('should validate id format in array', async () => {
+      const response = await request(app)
+        .post('/api/v1/discard-pile/bulk/traded-in')
+        .send({ ids: ['valid1234567', 'invalid id!'] });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('id format');
+    });
+
+    it('should return partial success when some items fail', async () => {
+      mockDiscardPileService.bulkMarkAsTradedIn.mockResolvedValue({
+        succeeded: ['abc123def456'],
+        failed: ['nonexistent1'],
+      });
+
+      const response = await request(app)
+        .post('/api/v1/discard-pile/bulk/traded-in')
+        .send({ ids: ['abc123def456', 'nonexistent1'] });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.succeeded).toEqual(['abc123def456']);
+      expect(response.body.data.failed).toEqual(['nonexistent1']);
+    });
+  });
+
   describe('Route ordering', () => {
     it('should match /stats before /:id', async () => {
       const response = await request(app).get('/api/v1/discard-pile/stats');
@@ -565,6 +671,15 @@ describe('Discard Pile Routes', () => {
 
       expect(response.status).toBe(201);
       expect(mockDiscardPileService.bulkAddToDiscardPile).toHaveBeenCalled();
+    });
+
+    it('should match /bulk/traded-in before /:id', async () => {
+      const response = await request(app)
+        .post('/api/v1/discard-pile/bulk/traded-in')
+        .send({ ids: ['abc123def456'] });
+
+      expect(response.status).toBe(200);
+      expect(mockDiscardPileService.bulkMarkAsTradedIn).toHaveBeenCalled();
     });
   });
 });

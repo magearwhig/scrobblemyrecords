@@ -7,10 +7,18 @@ import {
   DiscardStatus,
   MarketplaceStats,
 } from '../../shared/types';
+import DiscardFilterBar, {
+  TabType,
+  SortOption,
+} from '../components/discard/DiscardFilterBar';
+import DiscardItemCard from '../components/discard/DiscardItemCard';
+import DiscardStatsBar from '../components/discard/DiscardStatsBar';
+import DiscardTradedInModal from '../components/discard/DiscardTradedInModal';
 import { Modal, ModalFooter } from '../components/ui';
 import { ListItemSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { useDiscardPileSelection } from '../hooks/useDiscardPileSelection';
 import {
   useNotifications,
   createSuccessNotification,
@@ -19,9 +27,6 @@ import { getApiService } from '../services/api';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('DiscardPilePage');
-
-type TabType = 'all' | 'marked' | 'listed' | 'sold' | 'orphaned';
-type SortOption = 'date' | 'artist' | 'title' | 'value' | 'status';
 
 interface EditModalState {
   isOpen: boolean;
@@ -56,7 +61,16 @@ const STATUS_LABELS: Record<DiscardStatus, string> = {
   sold: 'Sold',
   gifted: 'Gifted',
   removed: 'Removed',
+  traded_in: 'Traded In',
 };
+
+/** Terminal statuses that represent completed/history items */
+const HISTORY_STATUSES: DiscardStatus[] = [
+  'sold',
+  'gifted',
+  'removed',
+  'traded_in',
+];
 
 const DiscardPilePage: React.FC = () => {
   const { state } = useApp();
@@ -87,6 +101,7 @@ const DiscardPilePage: React.FC = () => {
     item: null,
     marketplaceUrl: '',
   });
+  const [bulkTradedInModalOpen, setBulkTradedInModalOpen] = useState(false);
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -136,17 +151,22 @@ const DiscardPilePage: React.FC = () => {
   const filteredItems = useMemo(() => {
     let filtered = [...items];
 
-    // Filter by tab
+    // Filter by tab ('all' shows only active/non-terminal items)
     switch (activeTab) {
+      case 'all':
+        filtered = filtered.filter(
+          item => !HISTORY_STATUSES.includes(item.status)
+        );
+        break;
       case 'marked':
         filtered = filtered.filter(item => item.status === 'marked');
         break;
       case 'listed':
         filtered = filtered.filter(item => item.status === 'listed');
         break;
-      case 'sold':
-        filtered = filtered.filter(
-          item => item.status === 'sold' || item.status === 'gifted'
+      case 'history':
+        filtered = filtered.filter(item =>
+          HISTORY_STATUSES.includes(item.status)
         );
         break;
       case 'orphaned':
@@ -183,6 +203,21 @@ const DiscardPilePage: React.FC = () => {
 
     return filtered;
   }, [items, activeTab, searchQuery, sortBy]);
+
+  // Selection hook (Phase 2)
+  const {
+    selectedIds,
+    selectionMode,
+    toggleSelectionMode,
+    toggleSelect,
+    clearSelection,
+    selectedItems: getSelectedItems,
+  } = useDiscardPileSelection(filteredItems);
+
+  const currentSelectedItems = useMemo(
+    () => getSelectedItems(items),
+    [getSelectedItems, items]
+  );
 
   const handleRemove = async (item: DiscardPileItem) => {
     if (
@@ -247,6 +282,78 @@ const DiscardPilePage: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to mark as listed');
     }
   };
+
+  const handleMarkAsTradedIn = async (item: DiscardPileItem) => {
+    try {
+      const updated = await api.markDiscardItemTradedIn(item.id);
+      setItems(prev => prev.map(i => (i.id === updated.id ? updated : i)));
+      addNotification(
+        createSuccessNotification('Traded In', 'Item marked as traded in')
+      );
+      const newStats = await api.getDiscardPileStats();
+      setStats(newStats);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to mark as traded in'
+      );
+    }
+  };
+
+  const handleBulkTradedIn = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      const result = await api.bulkMarkDiscardItemsTradedIn(ids);
+
+      // Update items that succeeded
+      if (result.succeeded.length > 0) {
+        const succeededSet = new Set(result.succeeded);
+        setItems(prev =>
+          prev.map(item =>
+            succeededSet.has(item.id)
+              ? {
+                  ...item,
+                  status: 'traded_in' as DiscardStatus,
+                  statusChangedAt: Date.now(),
+                }
+              : item
+          )
+        );
+      }
+
+      setBulkTradedInModalOpen(false);
+      toggleSelectionMode(); // Clears selection and exits selection mode
+
+      addNotification(
+        createSuccessNotification(
+          'Traded In',
+          `${result.succeeded.length} item${result.succeeded.length !== 1 ? 's' : ''} marked as traded in${result.failed.length > 0 ? ` (${result.failed.length} failed)` : ''}`
+        )
+      );
+
+      const newStats = await api.getDiscardPileStats();
+      setStats(newStats);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to bulk mark as traded in'
+      );
+    }
+  };
+
+  // Card action handlers that open modals
+  const handleSoldClick = useCallback((item: DiscardPileItem) => {
+    setSoldModal({
+      isOpen: true,
+      item,
+      salePrice:
+        item.status === 'listed' ? item.estimatedValue?.toString() || '' : '',
+    });
+  }, []);
+
+  const handleListedClick = useCallback((item: DiscardPileItem) => {
+    setListedModal({ isOpen: true, item, marketplaceUrl: '' });
+  }, []);
 
   const handleSaveEdit = async () => {
     if (!editModal.item) return;
@@ -409,43 +516,14 @@ const DiscardPilePage: React.FC = () => {
         </p>
       </div>
 
-      {/* Stats Summary */}
       {stats && (
-        <div className='discard-stats-summary'>
-          <div className='stat-card'>
-            <div className='stat-value'>{stats.totalItems}</div>
-            <div className='stat-label'>Total Items</div>
-          </div>
-          <div className='stat-card'>
-            <div className='stat-value'>{stats.byStatus.marked}</div>
-            <div className='stat-label'>Pending</div>
-          </div>
-          <div className='stat-card'>
-            <div className='stat-value'>{stats.byStatus.listed}</div>
-            <div className='stat-label'>Listed</div>
-          </div>
-          <div className='stat-card'>
-            <div className='stat-value'>
-              {stats.byStatus.sold + stats.byStatus.gifted}
-            </div>
-            <div className='stat-label'>Completed</div>
-          </div>
-          <div className='stat-card'>
-            <div className='stat-value'>
-              {formatCurrency(stats.totalEstimatedValue, stats.currency)}
-            </div>
-            <div className='stat-label'>Est. Value</div>
-          </div>
-          <div className='stat-card'>
-            <div className='stat-value'>
-              {formatCurrency(stats.totalActualSales, stats.currency)}
-            </div>
-            <div className='stat-label'>Actual Sales</div>
-          </div>
-        </div>
+        <DiscardStatsBar
+          stats={stats}
+          filteredItems={filteredItems}
+          formatCurrency={formatCurrency}
+        />
       )}
 
-      {/* Actions */}
       <div className='discard-pile-actions'>
         <button
           className='btn btn-secondary'
@@ -454,202 +532,93 @@ const DiscardPilePage: React.FC = () => {
         >
           {refreshing ? 'Refreshing...' : 'Refresh Marketplace Values'}
         </button>
+        <button
+          className={`btn ${selectionMode ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={toggleSelectionMode}
+          disabled={items.length === 0}
+          aria-label={
+            selectionMode ? 'Exit selection mode' : 'Enter selection mode'
+          }
+        >
+          {selectionMode ? 'Cancel Selection' : 'Select Items'}
+        </button>
       </div>
 
-      {/* Filter Bar */}
-      <div className='filter-bar'>
-        <div className='tabs'>
-          {(['all', 'marked', 'listed', 'sold', 'orphaned'] as TabType[]).map(
-            tab => (
-              <button
-                key={tab}
-                className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab === 'all'
-                  ? `All (${items.length})`
-                  : tab === 'marked'
-                    ? `Pending (${items.filter(i => i.status === 'marked').length})`
-                    : tab === 'listed'
-                      ? `Listed (${items.filter(i => i.status === 'listed').length})`
-                      : tab === 'sold'
-                        ? `Completed (${items.filter(i => i.status === 'sold' || i.status === 'gifted').length})`
-                        : `Orphaned (${items.filter(i => i.orphaned).length})`}
-              </button>
-            )
-          )}
-        </div>
+      <DiscardFilterBar
+        items={items}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
 
-        <div className='filter-controls'>
-          <input
-            type='text'
-            placeholder='Search artist or album...'
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className='search-input'
-          />
-          <select
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value as SortOption)}
-            className='sort-select'
-          >
-            <option value='date'>Sort by Date Added</option>
-            <option value='artist'>Sort by Artist</option>
-            <option value='title'>Sort by Title</option>
-            <option value='value'>Sort by Value</option>
-            <option value='status'>Sort by Status</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Items List */}
       {filteredItems.length === 0 ? (
         <div className='empty-state'>
           <p>
             {searchQuery
               ? 'No items match your search.'
               : activeTab === 'all'
-                ? 'Your discard pile is empty. Add items from your collection to track them here.'
+                ? 'No active items. Add items from your collection or check the History tab.'
                 : 'No items in this category.'}
           </p>
         </div>
       ) : (
         <div className='discard-items-grid'>
           {filteredItems.map(item => (
-            <div
+            <DiscardItemCard
               key={item.id}
-              className={`discard-item-card ${item.orphaned ? 'orphaned' : ''}`}
-            >
-              <div className='item-cover'>
-                {item.coverImage ? (
-                  <img src={item.coverImage} alt={`${item.title} cover`} />
-                ) : (
-                  <div className='no-cover'>No Image</div>
-                )}
-                {item.orphaned && (
-                  <div
-                    className='orphaned-badge'
-                    title='No longer in collection'
-                  >
-                    Orphaned
-                  </div>
-                )}
-              </div>
-
-              <div className='item-info'>
-                <div className='item-title'>{item.title}</div>
-                <div className='item-artist'>{item.artist}</div>
-                {item.format && (
-                  <div className='item-format'>{item.format.join(', ')}</div>
-                )}
-                {item.year && <div className='item-year'>{item.year}</div>}
-              </div>
-
-              <div className='item-badges'>
-                <span className={`reason-badge reason-${item.reason}`}>
-                  {REASON_LABELS[item.reason]}
-                </span>
-                <span className={`status-badge status-${item.status}`}>
-                  {STATUS_LABELS[item.status]}
-                </span>
-              </div>
-
-              <div className='item-details'>
-                {item.estimatedValue !== undefined && (
-                  <div className='item-value'>
-                    Est: {formatCurrency(item.estimatedValue, item.currency)}
-                  </div>
-                )}
-                {item.actualSalePrice !== undefined && (
-                  <div className='item-sale-price'>
-                    Sold: {formatCurrency(item.actualSalePrice, item.currency)}
-                  </div>
-                )}
-                <div className='item-date'>
-                  Added: {formatDate(item.addedAt)}
-                </div>
-              </div>
-
-              {item.marketplaceUrl && (
-                <a
-                  href={item.marketplaceUrl}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  className='marketplace-link'
-                >
-                  View Listing
-                </a>
-              )}
-
-              {item.notes && (
-                <div className='item-notes' title={item.notes}>
-                  {item.notes.length > 50
-                    ? `${item.notes.substring(0, 50)}...`
-                    : item.notes}
-                </div>
-              )}
-
-              <div className='item-actions'>
-                <button
-                  className='btn btn-small btn-secondary'
-                  onClick={() => openEditModal(item)}
-                  title='Edit'
-                >
-                  Edit
-                </button>
-                {item.status === 'marked' && (
-                  <>
-                    <button
-                      className='btn btn-small btn-primary'
-                      onClick={() =>
-                        setListedModal({
-                          isOpen: true,
-                          item,
-                          marketplaceUrl: '',
-                        })
-                      }
-                      title='Mark as Listed'
-                    >
-                      Listed
-                    </button>
-                    <button
-                      className='btn btn-small btn-success'
-                      onClick={() =>
-                        setSoldModal({ isOpen: true, item, salePrice: '' })
-                      }
-                      title='Mark as Sold'
-                    >
-                      Sold
-                    </button>
-                  </>
-                )}
-                {item.status === 'listed' && (
-                  <button
-                    className='btn btn-small btn-success'
-                    onClick={() =>
-                      setSoldModal({
-                        isOpen: true,
-                        item,
-                        salePrice: item.estimatedValue?.toString() || '',
-                      })
-                    }
-                    title='Mark as Sold'
-                  >
-                    Sold
-                  </button>
-                )}
-                <button
-                  className='btn btn-small btn-danger'
-                  onClick={() => handleRemove(item)}
-                  title='Remove'
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
+              item={item}
+              selected={selectedIds.has(item.id)}
+              selectionMode={selectionMode}
+              onEdit={openEditModal}
+              onSold={handleSoldClick}
+              onListed={handleListedClick}
+              onTradedIn={handleMarkAsTradedIn}
+              onRemove={handleRemove}
+              onToggleSelect={toggleSelect}
+              formatCurrency={formatCurrency}
+              formatDate={formatDate}
+            />
           ))}
         </div>
       )}
+
+      {selectionMode && selectedIds.size > 0 && (
+        <div className='floating-action-bar'>
+          <div className='floating-action-bar-content'>
+            <div className='floating-action-bar-info'>
+              <span className='floating-action-bar-count'>
+                {selectedIds.size} selected
+              </span>
+            </div>
+            <div className='floating-action-bar-actions'>
+              <button
+                className='btn btn-outline-warning'
+                onClick={() => setBulkTradedInModalOpen(true)}
+                aria-label={`Trade in ${selectedIds.size} selected items`}
+              >
+                Trade In ({selectedIds.size})
+              </button>
+              <button
+                className='btn btn-secondary'
+                onClick={clearSelection}
+                aria-label='Clear selection'
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <DiscardTradedInModal
+        isOpen={bulkTradedInModalOpen}
+        items={currentSelectedItems}
+        onConfirm={handleBulkTradedIn}
+        onClose={() => setBulkTradedInModalOpen(false)}
+      />
 
       {/* Edit Modal */}
       {editModal.item && (

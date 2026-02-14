@@ -302,6 +302,7 @@ export class DiscardPileService {
       sold: 0,
       gifted: 0,
       removed: 0,
+      traded_in: 0,
     };
 
     const byReason: Record<DiscardReason, number> = {
@@ -416,6 +417,94 @@ export class DiscardPileService {
     this.logger.info(`Marked as listed: ${item.artist} - ${item.title}`);
 
     return store.items[index];
+  }
+
+  /**
+   * Terminal statuses that cannot be changed to another terminal status.
+   */
+  private readonly TERMINAL_STATUSES: DiscardStatus[] = [
+    'sold',
+    'gifted',
+    'removed',
+    'traded_in',
+  ];
+
+  /**
+   * Quick action: mark an item as traded in at a store.
+   * Rejects items already in a terminal status.
+   */
+  async markAsTradedIn(id: string): Promise<DiscardPileItem | null> {
+    const store = await this.loadStore();
+    const index = store.items.findIndex(item => item.id === id);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const item = store.items[index];
+
+    if (this.TERMINAL_STATUSES.includes(item.status)) {
+      throw new Error(
+        `Cannot mark as traded in: item is already in terminal status '${item.status}'`
+      );
+    }
+
+    const now = Date.now();
+    store.items[index] = {
+      ...item,
+      status: 'traded_in',
+      statusChangedAt: now,
+    };
+
+    await this.saveStore(store);
+    this.logger.info(`Marked as traded in: ${item.artist} - ${item.title}`);
+
+    return store.items[index];
+  }
+
+  /**
+   * Bulk mark items as traded in. Single file write for atomicity.
+   * Returns counts of succeeded/failed items.
+   */
+  async bulkMarkAsTradedIn(
+    ids: string[]
+  ): Promise<{ succeeded: string[]; failed: string[] }> {
+    const store = await this.loadStore();
+    const succeeded: string[] = [];
+    const failed: string[] = [];
+    const now = Date.now();
+
+    for (const id of ids) {
+      const index = store.items.findIndex(item => item.id === id);
+
+      if (index === -1) {
+        failed.push(id);
+        continue;
+      }
+
+      const item = store.items[index];
+
+      if (this.TERMINAL_STATUSES.includes(item.status)) {
+        failed.push(id);
+        continue;
+      }
+
+      store.items[index] = {
+        ...item,
+        status: 'traded_in',
+        statusChangedAt: now,
+      };
+      succeeded.push(id);
+    }
+
+    if (succeeded.length > 0) {
+      await this.saveStore(store);
+      this.logger.info(
+        `Bulk marked ${succeeded.length} items as traded in (${failed.length} failed)`
+      );
+    }
+
+    return { succeeded, failed };
   }
 
   /**
