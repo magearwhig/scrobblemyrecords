@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 import {
   CollectionItem,
+  ListeningPatterns,
   ScrobbleTrack,
   ScrobbleProgress,
 } from '../../shared/types';
+import { QuickTimePresets } from '../components/scrobble/QuickTimePresets';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
@@ -34,6 +36,7 @@ const ScrobblePage: React.FC = () => {
   const [disambiguationArtists, setDisambiguationArtists] = useState<string[]>(
     []
   );
+  const [patterns, setPatterns] = useState<ListeningPatterns | null>(null);
 
   const api = getApiService(state.serverUrl);
 
@@ -56,6 +59,39 @@ const ScrobblePage: React.FC = () => {
         setError('Failed to load selected albums');
       }
     }
+  }, []);
+
+  // Load listening patterns for quick presets
+  useEffect(() => {
+    const loadPatterns = async () => {
+      try {
+        const p = await api.getPatterns();
+        setPatterns(p);
+      } catch {
+        // Patterns are optional - don't show error
+        logger.debug('Patterns not available');
+      }
+    };
+    if (authStatus.lastfm.authenticated) {
+      loadPatterns();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authStatus.lastfm.authenticated]);
+
+  const handlePresetSelected = useCallback((timestamp: number) => {
+    setUseCurrentTime(false);
+    const date = new Date(timestamp * 1000);
+    // Format for datetime-local input: YYYY-MM-DDTHH:mm
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    setCustomTimestamp(`${year}-${month}-${day}T${hours}:${minutes}`);
+  }, []);
+
+  const handleCustomSelected = useCallback(() => {
+    setUseCurrentTime(false);
   }, []);
 
   const checkAuthStatus = async () => {
@@ -371,6 +407,11 @@ const ScrobblePage: React.FC = () => {
 
         <div className='scrobble-section'>
           <h3>Timestamp Settings</h3>
+          <QuickTimePresets
+            patterns={patterns}
+            onSelectPreset={handlePresetSelected}
+            onSelectCustom={handleCustomSelected}
+          />
           <div className='scrobble-timestamp-settings'>
             <label className='scrobble-radio-label'>
               <input

@@ -57,8 +57,8 @@ Route modules:
 - `src/backend/routes/sellers.ts` ✅
 - `src/backend/routes/releases.ts` ✅
 
-**Planned (not yet created):**
-- `src/backend/routes/patterns.ts` *(Feature 3: Smart Scrobble Scheduling)*
+**Implemented:**
+- `src/backend/routes/patterns.ts` ✅ *(Feature 3: Smart Scrobble Scheduling)*
 
 **Recently Implemented:**
 - `src/backend/routes/backup.ts` ✅ *(Feature 10: Backup & Restore)*
@@ -657,15 +657,28 @@ Add "Wishlist" tab with:
 
 ## Feature 3: Smart Scrobble Scheduling
 
-### Status: PLANNED
+### Status: COMPLETE ✅
 
-### Implementation Plan
-See `.plan/smart-scrobble-scheduling-plan.md` for full specification including:
-- `ListeningPatternService` for pattern learning from scrobble history
-- `/api/v1/patterns/*` routes for suggestions and conflict detection
-- `QuickTimePresets.tsx` for enhanced timestamp selection
-- `BackfillDialog.tsx` for batch album scrobbling
-- `ListeningQueueWidget.tsx` for real-time session tracking (Phase 4)
+**Completed:**
+- `ListeningPatternService` (`src/backend/services/listeningPatternService.ts`) with session detection, pattern calculation, backfill suggestions, and conflict detection
+- `/api/v1/patterns/*` routes (GET patterns, POST suggest, POST check-conflicts, POST recalculate)
+- `QuickTimePresets.tsx` for enhanced timestamp selection with pattern-based presets
+- `BackfillDialog.tsx` for batch album scrobbling with timestamp preview and conflict warnings
+- `useListeningQueue.ts` hook for real-time session tracking (localStorage-based)
+- API client methods in `api.ts` (getPatterns, suggestBackfillTimestamps, checkConflicts)
+- Integration with existing ScrobblePage.tsx
+- All types defined in `shared/types.ts` (ListeningPatterns, BackfillSuggestion, BackfillAlbum, ListeningQueue)
+- 34 new tests (17 service + 17 route tests), all passing
+- Frontend component tests for QuickTimePresets, BackfillDialog, and useListeningQueue
+
+**Implementation Details:**
+- Session gap threshold: 60 minutes (stricter than album completeness 2-hour threshold)
+- Pattern analysis window: 6 months of history
+- Pattern cache TTL: 7 days
+- Default gap between albums: 15 minutes (configurable)
+- Last.fm 14-day window detection with warnings
+- Conflict detection with early pruning via lastPlayed timestamps
+- Uses existing POST /api/v1/scrobble/batch for submission
 
 ### Overview
 Make backfilling scrobbles easier with intelligent timestamp suggestions, batch operations, and a listening queue system.

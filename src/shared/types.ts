@@ -17,6 +17,7 @@ export interface Track {
   title: string;
   duration?: string;
   artist?: string;
+  type_?: string; // Discogs track type: 'track', 'heading', 'index'
 }
 
 /**
@@ -1724,4 +1725,93 @@ export interface WrappedCrossSourceStats {
   vinylScrobbles: number; // From RecordScrobbles
   otherScrobbles: number; // From other sources
   vinylPercentage: number; // 0-100
+}
+
+// ============================================
+// Smart Scrobble Scheduling Types
+// ============================================
+
+/**
+ * Learned listening patterns from scrobble history.
+ * Computed by ListeningPatternService from session analysis.
+ */
+export interface ListeningPatterns {
+  /** Typical start times by day of week (0=Sunday, 6=Saturday) */
+  typicalStartTimes: {
+    dayOfWeek: number;
+    morning: number | null; // Hour (6-11) if user listens then
+    afternoon: number | null; // Hour (12-17)
+    evening: number | null; // Hour (18-23)
+  }[];
+
+  /** Average listening session length in minutes */
+  averageSessionLengthMinutes: number;
+  /** Average gap between albums within a session in minutes */
+  averageGapBetweenAlbumsMinutes: number;
+  /** Average number of distinct albums per session */
+  averageAlbumsPerSession: number;
+
+  /** Weekday listening peak */
+  weekdayPattern: { peakHour: number; sessionCount: number };
+  /** Weekend listening peak */
+  weekendPattern: { peakHour: number; sessionCount: number };
+
+  /** Oldest scrobble timestamp (seconds) considered in analysis */
+  analyzedFromTimestamp: number;
+  /** Newest scrobble timestamp (seconds) considered in analysis */
+  analyzedToTimestamp: number;
+  /** Total sessions detected */
+  sessionCount: number;
+  /** When patterns were last computed (milliseconds) */
+  lastCalculated: number;
+}
+
+/**
+ * Suggested timestamps for backfilling albums.
+ * Each suggestion represents a preset option (e.g. "Yesterday evening").
+ */
+export interface BackfillSuggestion {
+  presetLabel: string;
+  presetDescription: string;
+  startTimestamp: number; // Unix seconds
+  calculatedTimestamps: {
+    albumIndex: number;
+    startTimestamp: number;
+    endTimestamp: number;
+  }[];
+  hasConflicts: boolean;
+  conflictMessage?: string;
+  isOutsideLastFmWindow: boolean;
+  lastFmWindowWarning?: string;
+}
+
+/**
+ * Album in backfill queue with duration info.
+ */
+export interface BackfillAlbum {
+  releaseId: number;
+  artist: string;
+  album: string;
+  durationSeconds: number;
+  trackCount: number;
+  coverUrl?: string;
+}
+
+/**
+ * Active listening queue for real-time tracking.
+ * Stored in localStorage (frontend-only), not persisted to backend.
+ */
+export interface ListeningQueue {
+  id: string;
+  sessionStarted: number; // Unix timestamp (seconds) when session began
+  albums: {
+    releaseId: number;
+    artist: string;
+    album: string;
+    addedAt: number;
+    startedAt?: number;
+    finishedAt?: number;
+    scrobbled: boolean;
+  }[];
+  status: 'active' | 'completed';
 }

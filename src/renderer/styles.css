@@ -9867,3 +9867,360 @@ body {
     max-width: 100%;
   }
 }
+
+/* ============================================
+   Smart Scrobble Scheduling - Quick Time Presets
+   ============================================ */
+
+.quick-time-presets {
+  margin-bottom: 1rem;
+}
+
+.quick-time-presets__label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.quick-time-presets__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.quick-time-presets__btn {
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+
+.quick-time-presets__btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-color);
+}
+
+.quick-time-presets__btn:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.quick-time-presets__btn--custom {
+  border-style: dashed;
+}
+
+.quick-time-presets__hint {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ============================================
+   Smart Scrobble Scheduling - Backfill Dialog
+   ============================================ */
+
+.backfill-empty-message {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.backfill-album-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.backfill-album-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  gap: 0.75rem;
+}
+
+.backfill-album-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.backfill-album-cover {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.backfill-album-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.backfill-album-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.backfill-album-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.backfill-album-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.backfill-album-remove:hover {
+  color: var(--error-color);
+}
+
+.backfill-total-duration {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.backfill-loading {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.backfill-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.backfill-preset-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.backfill-preset-option:hover {
+  background: var(--bg-hover);
+}
+
+.backfill-preset-option--selected {
+  border-color: var(--accent-color);
+  background: rgba(var(--bg-primary-rgb), 0.3);
+}
+
+.backfill-preset-option--disabled {
+  opacity: 0.6;
+}
+
+.backfill-preset-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.backfill-preset-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.backfill-preset-description {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.backfill-conflict-badge,
+.backfill-window-badge {
+  margin-left: auto;
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.backfill-conflict-badge {
+  background: var(--warning-color);
+  color: #333;
+}
+
+.backfill-window-badge {
+  background: var(--error-color);
+  color: #fff;
+}
+
+.backfill-custom-inputs {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  align-items: flex-end;
+}
+
+.backfill-input-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.backfill-date-input,
+.backfill-time-input {
+  max-width: 180px;
+}
+
+.backfill-gap-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.backfill-gap-label {
+  white-space: nowrap;
+}
+
+.backfill-gap-input {
+  width: 60px;
+  text-align: center;
+}
+
+.backfill-gap-unit {
+  color: var(--text-secondary);
+}
+
+.backfill-gap-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.backfill-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.backfill-preview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0.5rem;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.backfill-preview-album {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 1rem;
+}
+
+.backfill-preview-time {
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.backfill-warning {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: rgba(255, 212, 59, 0.15);
+  border: 1px solid var(--warning-color);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.backfill-warning--severe {
+  background: rgba(255, 107, 107, 0.15);
+  border-color: var(--error-color);
+}
+
+.backfill-error {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 107, 107, 0.1);
+  border-radius: 6px;
+  color: var(--error-color);
+  font-size: 0.85rem;
+}
+
+.backfill-results {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: rgba(81, 207, 102, 0.1);
+  border: 1px solid var(--success-color);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.backfill-results-success {
+  color: var(--success-color);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.backfill-results-failed {
+  color: var(--error-color);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 600px) {
+  .backfill-custom-inputs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .backfill-date-input,
+  .backfill-time-input {
+    max-width: 100%;
+  }
+
+  .backfill-preview-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .backfill-preview-album {
+    margin-right: 0;
+  }
+}

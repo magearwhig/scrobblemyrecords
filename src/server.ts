@@ -18,6 +18,7 @@ import createCollectionRouter from './backend/routes/collection';
 import createDiscardPileRouter from './backend/routes/discardPile';
 import createImagesRouter from './backend/routes/images';
 import jobsRouter from './backend/routes/jobs';
+import createPatternsRouter from './backend/routes/patterns';
 import createReleasesRouter from './backend/routes/releases';
 import createScrobbleRouter from './backend/routes/scrobble';
 import createSellersRouter from './backend/routes/sellers';
@@ -35,6 +36,7 @@ import { HiddenItemService } from './backend/services/hiddenItemService';
 import { HiddenReleasesService } from './backend/services/hiddenReleasesService';
 import { ImageService } from './backend/services/imageService';
 import { LastFmService } from './backend/services/lastfmService';
+import { ListeningPatternService } from './backend/services/listeningPatternService';
 import { MappingService } from './backend/services/mappingService';
 import { MigrationService } from './backend/services/migrationService';
 import { MusicBrainzService } from './backend/services/musicbrainzService';
@@ -274,6 +276,7 @@ const discogsService = new DiscogsService(fileStorage, authService);
 
 // Initialize suggestion-related services
 const historyStorage = new ScrobbleHistoryStorage(fileStorage);
+const listeningPatternService = new ListeningPatternService(historyStorage);
 const syncService = new ScrobbleHistorySyncService(
   fileStorage,
   authService,
@@ -400,6 +403,7 @@ app.use(
   createDiscardPileRouter(discardPileService, wishlistService)
 );
 app.use('/api/v1/wrapped', createWrappedRouter(wrappedService));
+app.use('/api/v1/patterns', createPatternsRouter(listeningPatternService));
 app.use('/api/v1/jobs', jobsRouter);
 
 // API info endpoint
@@ -420,6 +424,7 @@ app.get('/api/v1', (req, res) => {
       backup: '/api/v1/backup',
       discardPile: '/api/v1/discard-pile',
       wrapped: '/api/v1/wrapped',
+      patterns: '/api/v1/patterns',
       jobs: '/api/v1/jobs',
     },
   });
