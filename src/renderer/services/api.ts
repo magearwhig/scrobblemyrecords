@@ -56,9 +56,6 @@ import {
   WishlistSettings,
   WishlistSyncStatus,
   WrappedData,
-  BackfillAlbum,
-  BackfillSuggestion,
-  ListeningPatterns,
 } from '../../shared/types';
 import { createLogger } from '../utils/logger';
 
@@ -1800,55 +1797,6 @@ class ApiService {
     }[]
   > {
     const response = await this.api.get('/jobs');
-    return response.data.data;
-  }
-
-  // ============================================
-  // Smart Scrobble Scheduling (Pattern) methods
-  // ============================================
-
-  /**
-   * Get learned listening patterns from scrobble history.
-   */
-  async getPatterns(): Promise<ListeningPatterns | null> {
-    const response = await this.api.get('/patterns');
-    return response.data.data;
-  }
-
-  /**
-   * Get backfill timestamp suggestions for a list of albums.
-   * Uses POST because albums array can be large.
-   */
-  async suggestBackfillTimestamps(
-    albums: BackfillAlbum[],
-    options?: {
-      targetDate?: string;
-      timeOfDay?: string;
-      customStartTime?: number;
-    }
-  ): Promise<BackfillSuggestion[]> {
-    const response = await this.api.post('/patterns/suggest', {
-      albums,
-      ...options,
-    });
-    return response.data.data;
-  }
-
-  /**
-   * Check if a time range has existing scrobbles.
-   */
-  async checkConflicts(
-    startTimestamp: number,
-    endTimestamp: number
-  ): Promise<{
-    hasConflicts: boolean;
-    message?: string;
-    existingCount?: number;
-  }> {
-    const response = await this.api.post('/patterns/check-conflicts', {
-      startTimestamp,
-      endTimestamp,
-    });
     return response.data.data;
   }
 
