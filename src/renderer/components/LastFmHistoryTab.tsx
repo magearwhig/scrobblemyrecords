@@ -1,10 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
+import { CollectionItem } from '../../shared/types';
+import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import { useApp } from '../context/AppContext';
+import {
+  useCollectionLookup,
+  lookupInCollection,
+} from '../hooks/useCollectionLookup';
 import { getApiService } from '../services/api';
 import { playTrackOnSpotify } from '../utils/spotifyUtils';
 
 import SyncStatusBar from './SyncStatusBar';
+import { Badge } from './ui/Badge';
 
 interface AlbumHistoryItem {
   artist: string;
@@ -53,6 +60,17 @@ const getViewFromUrl = (): ViewMode | null => {
 const LastFmHistoryTab: React.FC = () => {
   const { state } = useApp();
   const api = getApiService(state.serverUrl);
+
+  // Collection lookup for "In Collection" badges
+  const { collectionMap, collectionArtistCounts } = useCollectionLookup();
+  const hasCollection = collectionMap.size > 0;
+
+  // Navigate to a collection item's release details page
+  const navigateToAlbum = (item: CollectionItem) => {
+    localStorage.setItem('selectedRelease', JSON.stringify(item.release));
+    localStorage.setItem('selectedCollectionItemId', item.id.toString());
+    window.location.hash = '#release-details';
+  };
 
   // View mode toggle (supports deep-linking via ?view= param)
   const [viewMode, setViewMode] = useState<ViewMode>(
@@ -261,6 +279,9 @@ const LastFmHistoryTab: React.FC = () => {
         ? 'tracks'
         : 'artists';
 
+  // Enriched class modifier when collection data is available
+  const enrichedClass = hasCollection ? ' lastfm-history-enriched' : '';
+
   return (
     <div className='lastfm-history-tab'>
       {/* Sync Status */}
@@ -468,7 +489,7 @@ const LastFmHistoryTab: React.FC = () => {
       {viewMode === 'albums' && albums.length > 0 && (
         <div className='card lastfm-history-list-card'>
           {/* Header row */}
-          <div className='lastfm-history-list-header'>
+          <div className={`lastfm-history-list-header${enrichedClass}`}>
             <button
               className={`lastfm-history-header-btn lastfm-history-col-artist ${albumSortBy === 'artist' ? 'active' : ''}`}
               onClick={() => handleAlbumSortChange('artist')}
@@ -493,29 +514,58 @@ const LastFmHistoryTab: React.FC = () => {
             >
               Last Played{getAlbumSortIndicator('lastPlayed')}
             </button>
+            {hasCollection && (
+              <div className='lastfm-history-col-collection'>Collection</div>
+            )}
           </div>
 
           {/* Album rows */}
           <div className='lastfm-history-list'>
-            {albums.map((album, index) => (
-              <div
-                key={`${album.artist}-${album.album}-${index}`}
-                className='lastfm-history-item'
-              >
-                <div className='lastfm-history-col-artist' title={album.artist}>
-                  {album.artist}
+            {albums.map((album, index) => {
+              const collectionItem = lookupInCollection(
+                collectionMap,
+                album.artist,
+                album.album
+              );
+              return (
+                <div
+                  key={`${album.artist}-${album.album}-${index}`}
+                  className={`lastfm-history-item${enrichedClass}`}
+                >
+                  <div
+                    className='lastfm-history-col-artist'
+                    title={album.artist}
+                  >
+                    {album.artist}
+                  </div>
+                  <div className='lastfm-history-col-album' title={album.album}>
+                    {album.album}
+                  </div>
+                  <div className='lastfm-history-col-plays'>
+                    {album.playCount.toLocaleString()}
+                  </div>
+                  <div className='lastfm-history-col-last'>
+                    {formatLastPlayed(album.lastPlayed)}
+                  </div>
+                  {hasCollection && (
+                    <div className='lastfm-history-col-collection'>
+                      {collectionItem && (
+                        <button
+                          className='enrichment-collection-link'
+                          onClick={() => navigateToAlbum(collectionItem)}
+                          title='View in Collection'
+                          aria-label={`View ${album.album} in your collection`}
+                        >
+                          <Badge variant='success' size='small'>
+                            In Collection
+                          </Badge>
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div className='lastfm-history-col-album' title={album.album}>
-                  {album.album}
-                </div>
-                <div className='lastfm-history-col-plays'>
-                  {album.playCount.toLocaleString()}
-                </div>
-                <div className='lastfm-history-col-last'>
-                  {formatLastPlayed(album.lastPlayed)}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Loading overlay for pagination */}
@@ -531,7 +581,9 @@ const LastFmHistoryTab: React.FC = () => {
       {viewMode === 'tracks' && tracks.length > 0 && (
         <div className='card lastfm-history-list-card'>
           {/* Header row */}
-          <div className='lastfm-history-list-header lastfm-history-track-header'>
+          <div
+            className={`lastfm-history-list-header lastfm-history-track-header${enrichedClass}`}
+          >
             <button
               className={`lastfm-history-header-btn lastfm-history-col-track ${trackSortBy === 'track' ? 'active' : ''}`}
               onClick={() => handleTrackSortChange('track')}
@@ -562,50 +614,76 @@ const LastFmHistoryTab: React.FC = () => {
             >
               Last Played{getTrackSortIndicator('lastPlayed')}
             </button>
-            <div className='lastfm-history-col-actions'></div>
+            <div className='lastfm-history-col-actions'>
+              {hasCollection && 'Collection'}
+            </div>
           </div>
 
           {/* Track rows */}
           <div className='lastfm-history-list'>
-            {tracks.map((track, index) => (
-              <div
-                key={`${track.artist}-${track.album}-${track.track}-${index}`}
-                className='lastfm-history-item lastfm-history-track-item'
-              >
-                <div className='lastfm-history-col-track' title={track.track}>
-                  {track.track}
-                </div>
+            {tracks.map((track, index) => {
+              const collectionItem = lookupInCollection(
+                collectionMap,
+                track.artist,
+                track.album
+              );
+              return (
                 <div
-                  className='lastfm-history-col-artist-sm'
-                  title={track.artist}
+                  key={`${track.artist}-${track.album}-${track.track}-${index}`}
+                  className={`lastfm-history-item lastfm-history-track-item${enrichedClass}`}
                 >
-                  {track.artist}
-                </div>
-                <div
-                  className='lastfm-history-col-album-sm'
-                  title={track.album}
-                >
-                  {track.album}
-                </div>
-                <div className='lastfm-history-col-plays'>
-                  {track.playCount.toLocaleString()}
-                </div>
-                <div className='lastfm-history-col-last'>
-                  {formatLastPlayed(track.lastPlayed)}
-                </div>
-                <div className='lastfm-history-col-actions'>
-                  <button
-                    className='btn btn-small btn-icon'
-                    onClick={() =>
-                      playTrackOnSpotify(track.artist, track.track, track.album)
-                    }
-                    title='Play on Spotify'
+                  <div className='lastfm-history-col-track' title={track.track}>
+                    {track.track}
+                  </div>
+                  <div
+                    className='lastfm-history-col-artist-sm'
+                    title={track.artist}
                   >
-                    ▶️
-                  </button>
+                    {track.artist}
+                  </div>
+                  <div
+                    className='lastfm-history-col-album-sm'
+                    title={track.album}
+                  >
+                    {track.album}
+                  </div>
+                  <div className='lastfm-history-col-plays'>
+                    {track.playCount.toLocaleString()}
+                  </div>
+                  <div className='lastfm-history-col-last'>
+                    {formatLastPlayed(track.lastPlayed)}
+                  </div>
+                  <div className='lastfm-history-col-actions'>
+                    {collectionItem ? (
+                      <button
+                        className='enrichment-collection-link'
+                        onClick={() => navigateToAlbum(collectionItem)}
+                        title='View in Collection'
+                        aria-label={`View ${track.album} in your collection`}
+                      >
+                        <Badge variant='success' size='small'>
+                          In Collection
+                        </Badge>
+                      </button>
+                    ) : (
+                      <button
+                        className='btn btn-small btn-icon'
+                        onClick={() =>
+                          playTrackOnSpotify(
+                            track.artist,
+                            track.track,
+                            track.album
+                          )
+                        }
+                        title='Play on Spotify'
+                      >
+                        ▶️
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Loading overlay for pagination */}
@@ -621,7 +699,9 @@ const LastFmHistoryTab: React.FC = () => {
       {viewMode === 'artists' && artists.length > 0 && (
         <div className='card lastfm-history-list-card'>
           {/* Header row */}
-          <div className='lastfm-history-list-header lastfm-history-artist-header'>
+          <div
+            className={`lastfm-history-list-header lastfm-history-artist-header${enrichedClass}`}
+          >
             <button
               className={`lastfm-history-header-btn lastfm-history-col-artist ${artistSortBy === 'artist' ? 'active' : ''}`}
               onClick={() => handleArtistSortChange('artist')}
@@ -646,32 +726,49 @@ const LastFmHistoryTab: React.FC = () => {
             >
               Last Played{getArtistSortIndicator('lastPlayed')}
             </button>
+            {hasCollection && (
+              <div className='lastfm-history-col-collection'>Owned</div>
+            )}
           </div>
 
           {/* Artist rows */}
           <div className='lastfm-history-list'>
-            {artists.map((artist, index) => (
-              <div
-                key={`${artist.artist}-${index}`}
-                className='lastfm-history-item lastfm-history-artist-item'
-              >
+            {artists.map((artist, index) => {
+              const ownedCount = collectionArtistCounts.get(
+                normalizeForMatching(artist.artist)
+              );
+              return (
                 <div
-                  className='lastfm-history-col-artist'
-                  title={artist.artist}
+                  key={`${artist.artist}-${index}`}
+                  className={`lastfm-history-item lastfm-history-artist-item${enrichedClass}`}
                 >
-                  {artist.artist}
+                  <div
+                    className='lastfm-history-col-artist'
+                    title={artist.artist}
+                  >
+                    {artist.artist}
+                  </div>
+                  <div className='lastfm-history-col-albums'>
+                    {artist.albumCount.toLocaleString()}
+                  </div>
+                  <div className='lastfm-history-col-plays'>
+                    {artist.playCount.toLocaleString()}
+                  </div>
+                  <div className='lastfm-history-col-last'>
+                    {formatLastPlayed(artist.lastPlayed)}
+                  </div>
+                  {hasCollection && (
+                    <div className='lastfm-history-col-collection'>
+                      {ownedCount && ownedCount > 0 && (
+                        <Badge variant='success' size='small'>
+                          {ownedCount} owned
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div className='lastfm-history-col-albums'>
-                  {artist.albumCount.toLocaleString()}
-                </div>
-                <div className='lastfm-history-col-plays'>
-                  {artist.playCount.toLocaleString()}
-                </div>
-                <div className='lastfm-history-col-last'>
-                  {formatLastPlayed(artist.lastPlayed)}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Loading overlay for pagination */}

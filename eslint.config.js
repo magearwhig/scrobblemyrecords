@@ -59,6 +59,8 @@ module.exports = [
         requestAnimationFrame: 'readonly',
         confirm: 'readonly',
         ResizeObserver: 'readonly',
+        AbortController: 'readonly',
+        AbortSignal: 'readonly',
 
         // Timer functions
         setTimeout: 'readonly',

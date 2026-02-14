@@ -1716,3 +1716,91 @@ Unlike Spotify Wrapped (yearly only), this supports **custom date ranges** plus 
 - Full-screen slideshow with animated transitions
 - Keyboard navigation (arrow keys, space, escape, home, end)
 - Progress dots showing current slide position
+
+---
+
+## Feature 12: Cross-Feature Data Enrichment
+
+### Status: PLANNED
+
+Surface play count data, collection ownership badges, and cross-references throughout the app. Bridges data silos between Collection, Stats, Wishlist, Seller Matches, and Discovery.
+
+**Key Deliverables:**
+- Play count badges and last-played on AlbumCard (Collection view)
+- "In Collection" badges on Stats top artist/album lists
+- Prominent play counts on Wishlist and Seller Match cards
+- "You own this" indicators on Forgotten Favorites
+- Scrobble history links to collection items
+- Album track completeness indicator (e.g., "8/12 tracks played")
+- Reusable `useCollectionLookup` hook for fuzzy collection matching
+
+**Implementation Plan:** See `.plan/cross-feature-data-enrichment-plan.md`
+
+**Dependencies:** None (builds on existing endpoints and data)
+
+**Priority:** HIGH -- affects most-used pages, low complexity
+
+---
+
+## Feature 13: Collection Analytics
+
+### Status: PLANNED
+
+Discogs-only collection analytics: value estimation, format breakdown, label distribution, decade histogram, and collection growth timeline. No Last.fm dependency.
+
+**Key Deliverables:**
+- Collection value estimation via Discogs marketplace stats (progressive scan)
+- Format breakdown (LP, 7", 12", Box Set, etc.)
+- Label distribution (top labels with normalization)
+- Decade/year histogram
+- Collection growth timeline (monthly/yearly)
+- New Collection Analytics page with tabs
+
+**Implementation Plan:** See `.plan/collection-analytics-plan.md`
+
+**Dependencies:** None (Discogs-only)
+
+**Priority:** MEDIUM -- valuable for collectors, moderate complexity
+
+---
+
+## Feature 14: Listening Pattern Visualizations
+
+### Status: PLANNED
+
+Deeper listening pattern analysis on the Stats Dashboard: hourly polar chart, day-of-week bars, genre treemap, "On This Day" nostalgia feature, heatmap click-to-expand, and Wrapped without Discogs.
+
+**Key Deliverables:**
+- Hourly distribution polar chart
+- Day-of-week bar chart
+- Genre/tag treemap (from Last.fm artist.getTopTags)
+- "On This Day" feature (1/2/3 years ago)
+- Calendar heatmap click-to-expand (show albums played that day)
+- Wrapped without Discogs (10 of 14 slides work with Last.fm only)
+
+**Implementation Plan:** See `.plan/listening-pattern-visualizations-plan.md`
+
+**Dependencies:** None
+
+**Priority:** MEDIUM-HIGH -- high engagement value, builds on existing data
+
+---
+
+## Feature 15: Artist & Track Deep Dives
+
+### Status: PLANNED
+
+Dedicated detail pages for individual artists and tracks, reachable from anywhere artist/track names appear. Transforms static text into an interconnected navigation experience.
+
+**Key Deliverables:**
+- Artist detail page (play trend, top tracks, albums, collection cross-reference)
+- Track detail page (play history, albums it appears on)
+- ArtistLink / TrackLink navigation components
+- PlayTrendChart reusable component
+- Integration across Stats, History, Collection, Discovery pages
+
+**Implementation Plan:** See `.plan/artist-track-deep-dives-plan.md`
+
+**Dependencies:** Feature 12 (useCollectionLookup hook) recommended but not required
+
+**Priority:** MEDIUM -- high engagement value, moderate complexity

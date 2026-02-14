@@ -27,6 +27,7 @@ import { StatCard } from '../components/stats/StatCard';
 import { StreakCard } from '../components/stats/StreakCard';
 import { TopList } from '../components/stats/TopList';
 import { StatsPageSkeleton } from '../components/ui/Skeleton';
+import { useCollectionLookup } from '../hooks/useCollectionLookup';
 import { imagesApi, statsApi } from '../services/statsApi';
 import { createLogger } from '../utils/logger';
 
@@ -58,6 +59,9 @@ type CoveragePeriod =
   | 'days365';
 
 export const StatsPage: React.FC = () => {
+  // Collection lookup for "In Collection" badges
+  const { collectionMap, collectionArtistCounts } = useCollectionLookup();
+
   // Loading states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -449,6 +453,7 @@ export const StatsPage: React.FC = () => {
           onPeriodChange={handleArtistPeriodChange}
           loading={topListsLoading}
           customDateRange={artistDateRange}
+          collectionArtistCounts={collectionArtistCounts}
         />
         <TopList
           title='Top Albums'
@@ -458,6 +463,7 @@ export const StatsPage: React.FC = () => {
           onPeriodChange={handleAlbumPeriodChange}
           loading={topListsLoading}
           customDateRange={albumDateRange}
+          collectionMap={collectionMap}
         />
         <TopList
           title='Top Tracks'

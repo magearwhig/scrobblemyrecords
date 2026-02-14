@@ -998,6 +998,54 @@ export default function createStatsRouter(
   });
 
   // ============================================
+  // Album Tracks Played
+  // ============================================
+
+  /**
+   * GET /api/v1/stats/album-tracks-played
+   * Get which tracks from an album have been scrobbled.
+   * Uses fuzzy matching to handle naming differences.
+   *
+   * Query params:
+   *   artist: string (required)
+   *   album: string (required)
+   */
+  router.get('/album-tracks-played', async (req: Request, res: Response) => {
+    try {
+      const artist = req.query.artist as string;
+      const album = req.query.album as string;
+
+      if (!artist || !album) {
+        return res.status(400).json({
+          success: false,
+          error: 'Both artist and album query parameters are required',
+        });
+      }
+
+      const tracksPlayed = await statsService.getAlbumTracksPlayed(
+        artist,
+        album
+      );
+
+      res.json({
+        success: true,
+        data: {
+          artist,
+          album,
+          tracksPlayed,
+          totalScrobbledTracks: tracksPlayed.length,
+        },
+      });
+    } catch (error) {
+      logger.error('Error getting album tracks played', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // ============================================
   // Album Play Counts (Batch)
   // ============================================
 

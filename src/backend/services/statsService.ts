@@ -1416,6 +1416,29 @@ export class StatsService {
     };
   }
 
+  /**
+   * Get unique track names that have been scrobbled for a given album.
+   * Uses fuzzy matching to handle naming differences between Discogs and Last.fm.
+   *
+   * @param artist - Artist name
+   * @param album - Album name
+   * @returns Array of unique track names that have been scrobbled
+   */
+  async getAlbumTracksPlayed(artist: string, album: string): Promise<string[]> {
+    const result = await this.historyStorage.getAlbumHistoryFuzzy(
+      artist,
+      album
+    );
+    if (!result.entry) return [];
+    const tracks = new Set<string>();
+    for (const play of result.entry.plays) {
+      if (play.track) {
+        tracks.add(play.track);
+      }
+    }
+    return Array.from(tracks);
+  }
+
   // ============================================
   // Helper Methods
   // ============================================

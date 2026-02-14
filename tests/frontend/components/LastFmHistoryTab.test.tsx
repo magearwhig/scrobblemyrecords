@@ -35,6 +35,17 @@ jest.mock('../../../src/renderer/context/AppContext', () => ({
   useApp: () => mockUseApp,
 }));
 
+// Mock useCollectionLookup hook (used by Phase 6 cross-feature enrichment)
+jest.mock('../../../src/renderer/hooks/useCollectionLookup', () => ({
+  useCollectionLookup: () => ({
+    collectionMap: new Map(),
+    collectionArtistCounts: new Map(),
+    loading: false,
+    collection: [],
+  }),
+  lookupInCollection: () => undefined,
+}));
+
 const createMockApiInstance = () => ({
   getAlbumHistoryPaginated: jest.fn(),
   getTrackHistoryPaginated: jest.fn(),

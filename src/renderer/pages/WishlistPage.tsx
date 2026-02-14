@@ -159,29 +159,27 @@ const WishlistPage: React.FC = () => {
     [api, playCounts, getPlayCountKey]
   );
 
-  // Fetch play counts when sorting by scrobbles
-  // Include both Discogs items and local monitored items when toggle is on
+  // Fetch play counts eagerly on load for all wishlist items
+  // Also include local monitored items when toggle is on
   useEffect(() => {
-    if (sortBy === 'scrobbles') {
-      const albums: AlbumIdentifier[] = [];
+    const albums: AlbumIdentifier[] = [];
 
-      // Add Discogs wishlist items
-      for (const item of items) {
-        albums.push({ artist: item.artist, title: item.title });
-      }
+    // Add Discogs wishlist items
+    for (const item of items) {
+      albums.push({ artist: item.artist, title: item.title });
+    }
 
-      // Add local monitored items if toggle is on
-      if (includeMonitored) {
-        for (const item of localWantItems) {
-          albums.push({ artist: item.artist, title: item.album });
-        }
-      }
-
-      if (albums.length > 0) {
-        fetchPlayCounts(albums);
+    // Add local monitored items if toggle is on
+    if (includeMonitored) {
+      for (const item of localWantItems) {
+        albums.push({ artist: item.artist, title: item.album });
       }
     }
-  }, [sortBy, items, localWantItems, includeMonitored, fetchPlayCounts]);
+
+    if (albums.length > 0) {
+      fetchPlayCounts(albums);
+    }
+  }, [items, localWantItems, includeMonitored, fetchPlayCounts]);
 
   // Poll for sync status when syncing
   useEffect(() => {
@@ -812,7 +810,6 @@ const WishlistPage: React.FC = () => {
                   getStatusBadge={getStatusBadge}
                   formatDate={formatDate}
                   formatPrice={formatPrice}
-                  showPlayCounts={sortBy === 'scrobbles'}
                   playCount={playCounts.get(
                     getPlayCountKey(item.artist, item.title)
                   )}

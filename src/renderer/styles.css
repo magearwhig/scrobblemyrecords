@@ -1810,6 +1810,22 @@ body {
   gap: 0.5rem;
 }
 
+/* Forgotten Favorites "You Own This" indicator */
+.forgotten-collection-badge {
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
+.btn-success {
+  background: var(--success-color);
+  color: white;
+  border: 1px solid var(--success-color);
+}
+
+.btn-success:hover {
+  opacity: 0.9;
+}
+
 /* Icon Buttons for external links */
 .btn-icon {
   background: var(--bg-tertiary);
@@ -9865,5 +9881,135 @@ body {
 
   .wrapped-date-input {
     max-width: 100%;
+  }
+}
+
+/* =============================================================================
+   Cross-Feature Data Enrichment Styles
+   Play count badges, "In Collection" badges, and cross-reference links
+   ============================================================================= */
+
+/* --- Play Count Badge (shared across Collection, Wishlist, Seller cards) --- */
+.album-play-count-badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  background: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* --- Last Played Text (shared across Collection, Wishlist, Seller cards) --- */
+.album-last-played {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin-top: 0.25rem;
+}
+
+/* --- Top List "Owned" badge (inline with album/artist name) --- */
+.top-list-owned-badge {
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
+/* --- Seller Match "Never listened" indicator --- */
+.enrichment-never-listened {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* --- Seller Match Play Count Badge (inline with title) --- */
+.seller-match-badge-plays {
+  background: var(--accent-color);
+  color: white;
+}
+
+/* --- Seller Match "Last listened" text --- */
+.seller-match-last-listened {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin-top: 0.25rem;
+}
+
+/* --- "View in Collection" link (History, Forgotten Favorites) --- */
+.enrichment-collection-link {
+  font-size: 0.8rem;
+  color: var(--accent-color);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.enrichment-collection-link:hover {
+  color: var(--accent-primary-hover);
+  text-decoration: underline;
+}
+
+/* --- History Tab: "In Collection" badge column --- */
+.lastfm-history-col-collection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Album view grid with collection badge column */
+.lastfm-history-list-header.lastfm-history-enriched {
+  grid-template-columns: 2fr 2fr 80px 120px auto;
+}
+
+.lastfm-history-item.lastfm-history-enriched {
+  grid-template-columns: 2fr 2fr 80px 120px auto;
+}
+
+/* Track view grid with collection badge column */
+.lastfm-history-track-header.lastfm-history-enriched {
+  grid-template-columns: 2fr 1.5fr 1.5fr 70px 100px auto;
+}
+
+.lastfm-history-track-item.lastfm-history-enriched {
+  grid-template-columns: 2fr 1.5fr 1.5fr 70px 100px auto;
+}
+
+/* Artist view grid with collection badge column */
+.lastfm-history-artist-header.lastfm-history-enriched {
+  grid-template-columns: 2fr 80px 80px 120px auto;
+}
+
+.lastfm-history-artist-item.lastfm-history-enriched {
+  grid-template-columns: 2fr 80px 80px 120px auto;
+}
+
+/* --- Responsive adjustments for enrichment --- */
+@media (max-width: 768px) {
+  .lastfm-history-list-header.lastfm-history-enriched {
+    grid-template-columns: 2fr 2fr 60px 100px auto;
+  }
+
+  .lastfm-history-item.lastfm-history-enriched {
+    grid-template-columns: 2fr 2fr 60px 100px auto;
+  }
+
+  .lastfm-history-track-header.lastfm-history-enriched {
+    grid-template-columns: 2fr 1fr 1fr 50px 80px auto;
+  }
+
+  .lastfm-history-track-item.lastfm-history-enriched {
+    grid-template-columns: 2fr 1fr 1fr 50px 80px auto;
   }
 }

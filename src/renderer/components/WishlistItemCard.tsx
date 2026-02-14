@@ -5,6 +5,7 @@ import {
   EnrichedWishlistItem,
   VinylStatus,
 } from '../../shared/types';
+import { formatRelativeTime } from '../utils/dateUtils';
 
 interface WishlistItemCardProps {
   item: EnrichedWishlistItem;
@@ -15,7 +16,6 @@ interface WishlistItemCardProps {
     price: number | undefined,
     currency: string | undefined
   ) => string;
-  showPlayCounts: boolean;
   playCount: AlbumPlayCountResult | undefined;
   onOpenVersions: (item: EnrichedWishlistItem) => void;
   onOpenMarketplace: (item: EnrichedWishlistItem) => void;
@@ -27,11 +27,13 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
   getStatusBadge,
   formatDate,
   formatPrice,
-  showPlayCounts,
   playCount,
   onOpenVersions,
   onOpenMarketplace,
 }) => {
+  const plays = playCount?.playCount ?? 0;
+  const lastPlayed = playCount?.lastPlayed ?? null;
+
   return (
     <div className='wishlist-card'>
       <div className='wishlist-card-image'>
@@ -44,6 +46,14 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
         {isMonitored && (
           <span className='wishlist-badge wishlist-badge-monitored'>
             Monitored
+          </span>
+        )}
+        {plays > 0 && (
+          <span
+            className='album-play-count-badge'
+            aria-label={`${plays} ${plays === 1 ? 'play' : 'plays'}`}
+          >
+            {plays} {plays === 1 ? 'play' : 'plays'}
           </span>
         )}
       </div>
@@ -60,12 +70,12 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
               From: {formatPrice(item.lowestVinylPrice, item.priceCurrency)}
             </span>
           )}
-          {showPlayCounts && (playCount?.playCount ?? 0) > 0 && (
-            <span className='wishlist-card-plays'>
-              {playCount?.playCount} plays
-            </span>
-          )}
         </div>
+        {lastPlayed != null && lastPlayed > 0 && (
+          <div className='album-last-played'>
+            Last played {formatRelativeTime(lastPlayed)}
+          </div>
+        )}
       </div>
       <div className='wishlist-card-actions'>
         <button

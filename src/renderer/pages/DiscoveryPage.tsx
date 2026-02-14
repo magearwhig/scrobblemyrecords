@@ -17,6 +17,7 @@ import SyncStatusBar from '../components/SyncStatusBar';
 import { Modal, ModalFooter } from '../components/ui';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { useCollectionLookup } from '../hooks/useCollectionLookup';
 import { getApiService } from '../services/api';
 import { createLogger } from '../utils/logger';
 
@@ -52,6 +53,7 @@ interface MappingModalState {
 const DiscoveryPage: React.FC = () => {
   const { state } = useApp();
   const { authStatus } = useAuth();
+  const { collection } = useCollectionLookup();
   const [activeTab, setActiveTab] = useState<TabType>('albums');
   const [missingAlbums, setMissingAlbums] = useState<MissingAlbum[]>([]);
   const [missingArtists, setMissingArtists] = useState<MissingArtist[]>([]);
@@ -490,6 +492,7 @@ const DiscoveryPage: React.FC = () => {
               formatDate={formatDate}
               openLink={openLink}
               api={api}
+              collection={collection}
             />
           )}
         </div>

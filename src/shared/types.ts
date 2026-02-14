@@ -1639,6 +1639,17 @@ export interface AlbumPlayCountResponse {
   results: AlbumPlayCountResult[];
 }
 
+/**
+ * Response for album tracks played endpoint.
+ * Returns which tracks from an album have been scrobbled.
+ */
+export interface AlbumTracksPlayedResponse {
+  artist: string;
+  album: string;
+  tracksPlayed: string[];
+  totalScrobbledTracks: number;
+}
+
 // ============================================
 // Wrapped (Period In Review) types
 // ============================================

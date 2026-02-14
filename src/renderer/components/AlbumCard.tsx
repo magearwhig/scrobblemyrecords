@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { CollectionItem, DiscogsRelease } from '../../shared/types';
+import { formatRelativeTime } from '../utils/dateUtils';
 
 interface AlbumCardProps {
   item: CollectionItem;
@@ -9,6 +10,8 @@ interface AlbumCardProps {
   onViewDetails: (release: DiscogsRelease) => void;
   isInDiscardPile?: boolean;
   onAddToDiscardPile?: (item: CollectionItem) => void;
+  playCount?: number;
+  lastPlayed?: number | null;
 }
 
 const AlbumCard: React.FC<AlbumCardProps> = ({
@@ -18,6 +21,8 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
   onViewDetails,
   isInDiscardPile = false,
   onAddToDiscardPile,
+  playCount,
+  lastPlayed,
 }) => {
   const { release } = item;
 
@@ -52,6 +57,14 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
             📦
           </span>
         )}
+        {playCount != null && playCount > 0 && (
+          <span
+            className='album-play-count-badge'
+            aria-label={`${playCount} ${playCount === 1 ? 'play' : 'plays'}`}
+          >
+            {playCount} {playCount === 1 ? 'play' : 'plays'}
+          </span>
+        )}
       </div>
 
       <div className='album-card-info'>
@@ -69,6 +82,12 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
 
         {release.label && release.label.length > 0 && (
           <div className='album-metadata'>{formatArray(release.label)}</div>
+        )}
+
+        {lastPlayed != null && lastPlayed > 0 && (
+          <div className='album-last-played'>
+            Last played {formatRelativeTime(lastPlayed)}
+          </div>
         )}
       </div>
 

@@ -3,9 +3,12 @@ import React, { useState } from 'react';
 import {
   AlbumPlayCount,
   ArtistPlayCount,
+  CollectionItem,
   DateRange,
   TrackPlayCount,
 } from '../../../shared/types';
+import { normalizeForMatching } from '../../../shared/utils/trackNormalization';
+import { Badge } from '../../components/ui/Badge';
 import {
   playTrackOnSpotify,
   playAlbumOnSpotify,
@@ -31,6 +34,8 @@ interface TopListProps {
   currentPeriod: Period;
   loading?: boolean;
   customDateRange?: DateRange;
+  collectionMap?: Map<string, CollectionItem>;
+  collectionArtistCounts?: Map<string, number>;
 }
 
 /**
@@ -125,6 +130,8 @@ export const TopList: React.FC<TopListProps> = ({
   currentPeriod,
   loading,
   customDateRange,
+  collectionMap,
+  collectionArtistCounts,
 }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -263,11 +270,42 @@ export const TopList: React.FC<TopListProps> = ({
                       </>
                     ) : isAlbumData(item) ? (
                       <>
-                        <div className='top-list-name'>{item.album}</div>
+                        <div className='top-list-name'>
+                          {item.album}
+                          {collectionMap &&
+                            collectionMap.has(
+                              `${normalizeForMatching(item.artist)}|${normalizeForMatching(item.album)}`
+                            ) && (
+                              <Badge
+                                variant='success'
+                                size='small'
+                                className='top-list-owned-badge'
+                              >
+                                Owned
+                              </Badge>
+                            )}
+                        </div>
                         <div className='top-list-artist'>{item.artist}</div>
                       </>
                     ) : (
-                      <div className='top-list-name'>{item.artist}</div>
+                      <div className='top-list-name'>
+                        {item.artist}
+                        {collectionArtistCounts &&
+                          (() => {
+                            const count = collectionArtistCounts.get(
+                              normalizeForMatching(item.artist)
+                            );
+                            return count && count > 0 ? (
+                              <Badge
+                                variant='success'
+                                size='small'
+                                className='top-list-owned-badge'
+                              >
+                                {count} owned
+                              </Badge>
+                            ) : null;
+                          })()}
+                      </div>
                     )}
                   </div>
                   <button

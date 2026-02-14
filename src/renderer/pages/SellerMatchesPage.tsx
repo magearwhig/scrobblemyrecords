@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
-import { MonitoredSeller, SellerMatch } from '../../shared/types';
+import {
+  AlbumIdentifier,
+  AlbumPlayCountResult,
+  MonitoredSeller,
+  SellerMatch,
+} from '../../shared/types';
 import MatchCard from '../components/MatchCard';
 import { useApp } from '../context/AppContext';
 import { getApiService } from '../services/api';
@@ -31,6 +36,9 @@ const SellerMatchesPage: React.FC = () => {
   const [markingAsSeen, setMarkingAsSeen] = useState<Set<string>>(new Set());
   const [cacheInfo, setCacheInfo] = useState<CacheInfo | null>(null);
   const [verifying, setVerifying] = useState<Set<string>>(new Set());
+  const [playCounts, setPlayCounts] = useState<
+    Map<string, AlbumPlayCountResult>
+  >(new Map());
 
   // Parse query param for seller filter
   useEffect(() => {
@@ -67,6 +75,55 @@ const SellerMatchesPage: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Helper to create a cache key for play counts
+  const getPlayCountKey = useCallback(
+    (artist: string, title: string): string => {
+      return `${artist.toLowerCase()}|${title.toLowerCase()}`;
+    },
+    []
+  );
+
+  // Fetch play counts after matches load
+  useEffect(() => {
+    if (matches.length === 0) return;
+
+    const controller = new AbortController();
+
+    const fetchPlayCounts = async () => {
+      // Deduplicate albums across matches
+      const seen = new Set<string>();
+      const albums: AlbumIdentifier[] = [];
+      for (const match of matches) {
+        const key = getPlayCountKey(match.artist, match.title);
+        if (!seen.has(key)) {
+          seen.add(key);
+          albums.push({ artist: match.artist, title: match.title });
+        }
+      }
+
+      try {
+        const response = await api.getAlbumPlayCounts(albums);
+        if (controller.signal.aborted) return;
+
+        const newMap = new Map<string, AlbumPlayCountResult>();
+        for (const result of response.results) {
+          newMap.set(getPlayCountKey(result.artist, result.title), result);
+        }
+        setPlayCounts(newMap);
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          logger.error('Error fetching play counts for matches', err);
+        }
+      }
+    };
+
+    fetchPlayCounts();
+
+    return () => {
+      controller.abort();
+    };
+  }, [matches, api, getPlayCountKey]);
 
   // Handle mark as seen
   const handleMarkAsSeen = async (matchId: string) => {
@@ -333,19 +390,25 @@ const SellerMatchesPage: React.FC = () => {
         </div>
       ) : (
         <div className='seller-match-list'>
-          {filteredMatches.map(match => (
-            <MatchCard
-              key={match.id}
-              match={match}
-              formatPrice={formatPrice}
-              formatRelativeTime={formatRelativeTime}
-              getSellerDisplayName={getSellerDisplayName}
-              onMarkAsSeen={handleMarkAsSeen}
-              onVerify={handleVerify}
-              markingAsSeen={markingAsSeen.has(match.id)}
-              verifying={verifying.has(match.id)}
-            />
-          ))}
+          {filteredMatches.map(match => {
+            const pcKey = getPlayCountKey(match.artist, match.title);
+            const pcData = playCounts.get(pcKey);
+            return (
+              <MatchCard
+                key={match.id}
+                match={match}
+                formatPrice={formatPrice}
+                formatRelativeTime={formatRelativeTime}
+                getSellerDisplayName={getSellerDisplayName}
+                onMarkAsSeen={handleMarkAsSeen}
+                onVerify={handleVerify}
+                markingAsSeen={markingAsSeen.has(match.id)}
+                verifying={verifying.has(match.id)}
+                playCount={pcData?.playCount}
+                lastPlayed={pcData?.lastPlayed}
+              />
+            );
+          })}
         </div>
       )}
     </div>

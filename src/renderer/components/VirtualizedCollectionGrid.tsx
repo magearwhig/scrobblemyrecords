@@ -1,7 +1,11 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { CollectionItem, DiscogsRelease } from '../../shared/types';
+import {
+  AlbumPlayCountResult,
+  CollectionItem,
+  DiscogsRelease,
+} from '../../shared/types';
 
 import AlbumCard from './AlbumCard';
 
@@ -12,6 +16,8 @@ interface VirtualizedCollectionGridProps {
   onAlbumSelect: (releaseId: number) => void;
   onViewDetails: (release: DiscogsRelease, item: CollectionItem) => void;
   onAddToDiscardPile: (item: CollectionItem) => void;
+  playCounts?: Map<string, AlbumPlayCountResult>;
+  getPlayCountKey?: (artist: string, title: string) => string;
 }
 
 const CARD_MIN_WIDTH = 280;
@@ -25,6 +31,8 @@ const VirtualizedCollectionGrid: React.FC<VirtualizedCollectionGridProps> = ({
   onAlbumSelect,
   onViewDetails,
   onAddToDiscardPile,
+  playCounts,
+  getPlayCountKey,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(4);
@@ -83,17 +91,26 @@ const VirtualizedCollectionGrid: React.FC<VirtualizedCollectionGridProps> = ({
                 transform: `translateY(${virtualRow.start}px)`,
               }}
             >
-              {rowItems.map((item, colIndex) => (
-                <AlbumCard
-                  key={`${item.id}-${item.date_added || startIndex + colIndex}`}
-                  item={item}
-                  selected={selectedAlbums.has(item.release.id)}
-                  onSelect={() => onAlbumSelect(item.release.id)}
-                  onViewDetails={release => onViewDetails(release, item)}
-                  isInDiscardPile={discardPileIds.has(item.id)}
-                  onAddToDiscardPile={onAddToDiscardPile}
-                />
-              ))}
+              {rowItems.map((item, colIndex) => {
+                const pcKey = getPlayCountKey?.(
+                  item.release.artist,
+                  item.release.title
+                );
+                const pcData = pcKey ? playCounts?.get(pcKey) : undefined;
+                return (
+                  <AlbumCard
+                    key={`${item.id}-${item.date_added || startIndex + colIndex}`}
+                    item={item}
+                    selected={selectedAlbums.has(item.release.id)}
+                    onSelect={() => onAlbumSelect(item.release.id)}
+                    onViewDetails={release => onViewDetails(release, item)}
+                    isInDiscardPile={discardPileIds.has(item.id)}
+                    onAddToDiscardPile={onAddToDiscardPile}
+                    playCount={pcData?.playCount}
+                    lastPlayed={pcData?.lastPlayed}
+                  />
+                );
+              })}
             </div>
           );
         })}

@@ -1,10 +1,17 @@
 /* global navigator */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
-import { ForgottenTrack, TrackMapping } from '../../../shared/types';
+import {
+  CollectionItem,
+  ForgottenTrack,
+  TrackMapping,
+} from '../../../shared/types';
+import { normalizeForMatching } from '../../../shared/utils/trackNormalization';
+import { lookupInCollection } from '../../hooks/useCollectionLookup';
 import ApiService from '../../services/api';
 import { createLogger } from '../../utils/logger';
 import { playTrackOnSpotify } from '../../utils/spotifyUtils';
+import { Badge } from '../ui/Badge';
 import { Modal, ModalSection } from '../ui/Modal';
 
 const logger = createLogger('ForgottenFavoritesTab');
@@ -26,6 +33,7 @@ interface ForgottenFavoritesTabProps {
   formatDate: (timestamp: number) => string;
   openLink: (url: string) => void;
   api: ApiService;
+  collection?: CollectionItem[];
 }
 
 const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
@@ -43,6 +51,7 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
   formatDate,
   openLink,
   api,
+  collection,
 }) => {
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [mappingModalOpen, setMappingModalOpen] = useState(false);
@@ -62,6 +71,24 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
   const [mappingSuccess, setMappingSuccess] = useState<string | null>(null);
   const [mappingError, setMappingError] = useState<string | null>(null);
   const [existingMappings, setExistingMappings] = useState<TrackMapping[]>([]);
+
+  // Build collection lookup map for "In Collection" matching
+  const collectionMap = useMemo(() => {
+    const map = new Map<string, CollectionItem>();
+    if (!collection) return map;
+    for (const item of collection) {
+      const key = `${normalizeForMatching(item.release.artist)}|${normalizeForMatching(item.release.title)}`;
+      map.set(key, item);
+    }
+    return map;
+  }, [collection]);
+
+  // Navigate to a collection item's release details page
+  const navigateToAlbum = (item: CollectionItem) => {
+    localStorage.setItem('selectedRelease', JSON.stringify(item.release));
+    localStorage.setItem('selectedCollectionItemId', item.id.toString());
+    window.location.hash = '#release-details';
+  };
 
   // Load existing track mappings on mount
   useEffect(() => {
@@ -363,67 +390,99 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
           )}
 
           <div className='missing-list'>
-            {sortedForgottenTracks.map((track, index) => (
-              <div
-                key={`${track.artist}-${track.album}-${track.track}-${index}`}
-                className='missing-item'
-              >
-                <div className='missing-item-info'>
-                  <div className='missing-item-title'>{track.track}</div>
-                  <div className='missing-item-artist'>
-                    {track.artist}
-                    <span className='missing-item-album'>
-                      {' '}
-                      &middot; {track.album || '(Single)'}
+            {sortedForgottenTracks.map((track, index) => {
+              const collectionItem = track.album
+                ? lookupInCollection(collectionMap, track.artist, track.album)
+                : undefined;
+
+              return (
+                <div
+                  key={`${track.artist}-${track.album}-${track.track}-${index}`}
+                  className='missing-item'
+                >
+                  <div className='missing-item-info'>
+                    <div className='missing-item-title'>
+                      {track.track}
+                      {collectionItem && (
+                        <span title='You own this on vinyl! Put it on the turntable.'>
+                          <Badge
+                            variant='success'
+                            size='small'
+                            className='forgotten-collection-badge'
+                          >
+                            In Collection
+                          </Badge>
+                        </span>
+                      )}
+                    </div>
+                    <div className='missing-item-artist'>
+                      {track.artist}
+                      <span className='missing-item-album'>
+                        {' '}
+                        &middot; {track.album || '(Single)'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className='missing-item-stats'>
+                    <span className='missing-item-playcount'>
+                      {track.allTimePlayCount} plays
+                    </span>
+                    <span className='forgotten-dormancy'>
+                      {formatDormancy(track.daysSincePlay)}
                     </span>
                   </div>
+                  <div className='missing-item-actions'>
+                    <button
+                      className='btn btn-small btn-icon'
+                      onClick={() =>
+                        playTrackOnSpotify(
+                          track.artist,
+                          track.track,
+                          track.album
+                        )
+                      }
+                      title='Play on Spotify'
+                    >
+                      ▶️
+                    </button>
+                    <button
+                      className='btn btn-small btn-icon'
+                      onClick={() =>
+                        openLink(
+                          `https://www.last.fm/music/${encodeURIComponent(track.artist)}/_/${encodeURIComponent(track.track)}`
+                        )
+                      }
+                      title='View track on Last.fm'
+                    >
+                      Last.fm
+                    </button>
+                    <button
+                      className='btn btn-small'
+                      onClick={() => copyTrackToClipboard(track)}
+                      title='Copy to clipboard'
+                    >
+                      Copy
+                    </button>
+                    <button
+                      className='btn btn-small btn-secondary'
+                      onClick={() => openTrackMappingModal(track)}
+                      title='Map this track to local cache'
+                    >
+                      Map
+                    </button>
+                    {collectionItem && (
+                      <button
+                        className='btn btn-small btn-success'
+                        onClick={() => navigateToAlbum(collectionItem)}
+                        aria-label={`Go to ${track.album} in your collection`}
+                      >
+                        Go to Album
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className='missing-item-stats'>
-                  <span className='missing-item-playcount'>
-                    {track.allTimePlayCount} plays
-                  </span>
-                  <span className='forgotten-dormancy'>
-                    {formatDormancy(track.daysSincePlay)}
-                  </span>
-                </div>
-                <div className='missing-item-actions'>
-                  <button
-                    className='btn btn-small btn-icon'
-                    onClick={() =>
-                      playTrackOnSpotify(track.artist, track.track, track.album)
-                    }
-                    title='Play on Spotify'
-                  >
-                    ▶️
-                  </button>
-                  <button
-                    className='btn btn-small btn-icon'
-                    onClick={() =>
-                      openLink(
-                        `https://www.last.fm/music/${encodeURIComponent(track.artist)}/_/${encodeURIComponent(track.track)}`
-                      )
-                    }
-                    title='View track on Last.fm'
-                  >
-                    Last.fm
-                  </button>
-                  <button
-                    className='btn btn-small'
-                    onClick={() => copyTrackToClipboard(track)}
-                    title='Copy to clipboard'
-                  >
-                    Copy
-                  </button>
-                  <button
-                    className='btn btn-small btn-secondary'
-                    onClick={() => openTrackMappingModal(track)}
-                    title='Map this track to local cache'
-                  >
-                    Map
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}

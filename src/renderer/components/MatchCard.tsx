@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { SellerMatch } from '../../shared/types';
+import { formatRelativeTime as formatRelativeTimeUtil } from '../utils/dateUtils';
 
 interface MatchCardProps {
   match: SellerMatch;
@@ -11,6 +12,8 @@ interface MatchCardProps {
   onVerify: (matchId: string) => void;
   markingAsSeen: boolean;
   verifying: boolean;
+  playCount?: number;
+  lastPlayed?: number | null;
 }
 
 const MatchCard: React.FC<MatchCardProps> = ({
@@ -22,6 +25,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
   onVerify,
   markingAsSeen,
   verifying,
+  playCount,
+  lastPlayed,
 }) => {
   return (
     <div
@@ -41,6 +46,17 @@ const MatchCard: React.FC<MatchCardProps> = ({
       <div className='seller-match-info'>
         <div className='seller-match-title'>
           {match.artist} - {match.title}
+          {playCount != null && playCount > 0 && (
+            <span
+              className='seller-match-badge seller-match-badge-plays'
+              aria-label={`${playCount} ${playCount === 1 ? 'play' : 'plays'}`}
+            >
+              {playCount} {playCount === 1 ? 'play' : 'plays'}
+            </span>
+          )}
+          {playCount != null && playCount === 0 && (
+            <span className='enrichment-never-listened'>Never listened</span>
+          )}
           {match.status === 'seen' && (
             <span className='seller-match-badge seller-match-badge-seen'>
               SEEN
@@ -73,6 +89,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
         <div className='seller-match-date'>
           Found: {formatRelativeTime(match.dateFound)}
         </div>
+        {playCount != null && playCount > 0 && lastPlayed != null && (
+          <div className='seller-match-last-listened'>
+            Last listened: {formatRelativeTimeUtil(lastPlayed)}
+          </div>
+        )}
       </div>
       <div className='seller-match-actions'>
         {match.status === 'sold' && (

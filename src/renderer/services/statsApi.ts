@@ -1,5 +1,6 @@
 import {
   AlbumPlayCount,
+  AlbumTracksPlayedResponse,
   ApiResponse,
   ArtistPlayCount,
   CalendarHeatmapData,
@@ -267,6 +268,21 @@ export const statsApi = {
     }
 
     const response = await fetch(url);
+    return response.json();
+  },
+
+  /**
+   * Get which tracks from an album have been scrobbled.
+   * Used for album track completeness indicator.
+   */
+  async getAlbumTracksPlayed(
+    artist: string,
+    album: string
+  ): Promise<ApiResponse<AlbumTracksPlayedResponse>> {
+    const params = new URLSearchParams({ artist, album });
+    const response = await fetch(
+      `${API_BASE}/stats/album-tracks-played?${params}`
+    );
     return response.json();
   },
 };

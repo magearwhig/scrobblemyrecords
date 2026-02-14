@@ -762,16 +762,16 @@ const CollectionPage: React.FC = () => {
     [api, playCounts, getPlayCountKey]
   );
 
-  // Fetch play counts when sorting by scrobbles
+  // Eagerly fetch play counts on collection load for enrichment badges
   useEffect(() => {
-    if (sortBy === 'scrobbles' && entireCollection.length > 0) {
+    if (entireCollection.length > 0) {
       const albums: AlbumIdentifier[] = entireCollection.map(item => ({
         artist: item.release.artist,
         title: item.release.title,
       }));
       fetchPlayCounts(albums);
     }
-  }, [sortBy, entireCollection, fetchPlayCounts]);
+  }, [entireCollection, fetchPlayCounts]);
 
   // Handle opening the discard modal
   const handleOpenDiscardModal = async (item: CollectionItem) => {
@@ -1263,27 +1263,36 @@ const CollectionPage: React.FC = () => {
         viewMode === 'grid' &&
         (isSearchMode ? (
           <div className='collection-grid'>
-            {getVisibleItems().map((item, index) => (
-              <AlbumCard
-                key={`${item.id}-${item.date_added || index}`}
-                item={item}
-                selected={selectedAlbums.has(item.release.id)}
-                onSelect={() => handleAlbumSelect(item.release.id)}
-                onViewDetails={release => {
-                  localStorage.setItem(
-                    'selectedRelease',
-                    JSON.stringify(release)
-                  );
-                  localStorage.setItem(
-                    'selectedCollectionItemId',
-                    item.id.toString()
-                  );
-                  window.location.hash = '#release-details';
-                }}
-                isInDiscardPile={discardPileIds.has(item.id)}
-                onAddToDiscardPile={handleOpenDiscardModal}
-              />
-            ))}
+            {getVisibleItems().map((item, index) => {
+              const pcKey = getPlayCountKey(
+                item.release.artist,
+                item.release.title
+              );
+              const pcData = playCounts.get(pcKey);
+              return (
+                <AlbumCard
+                  key={`${item.id}-${item.date_added || index}`}
+                  item={item}
+                  selected={selectedAlbums.has(item.release.id)}
+                  onSelect={() => handleAlbumSelect(item.release.id)}
+                  onViewDetails={release => {
+                    localStorage.setItem(
+                      'selectedRelease',
+                      JSON.stringify(release)
+                    );
+                    localStorage.setItem(
+                      'selectedCollectionItemId',
+                      item.id.toString()
+                    );
+                    window.location.hash = '#release-details';
+                  }}
+                  isInDiscardPile={discardPileIds.has(item.id)}
+                  onAddToDiscardPile={handleOpenDiscardModal}
+                  playCount={pcData?.playCount}
+                  lastPlayed={pcData?.lastPlayed}
+                />
+              );
+            })}
           </div>
         ) : (
           <VirtualizedCollectionGrid
@@ -1300,6 +1309,8 @@ const CollectionPage: React.FC = () => {
               window.location.hash = '#release-details';
             }}
             onAddToDiscardPile={handleOpenDiscardModal}
+            playCounts={playCounts}
+            getPlayCountKey={getPlayCountKey}
           />
         ))}
 
@@ -1339,33 +1350,37 @@ const CollectionPage: React.FC = () => {
 
           {/* Single Album Card */}
           <div className='collection-single-card'>
-            <AlbumCard
-              key={`single-${filteredCollection[currentRecordIndex].id}`}
-              item={filteredCollection[currentRecordIndex]}
-              selected={selectedAlbums.has(
-                filteredCollection[currentRecordIndex].release.id
-              )}
-              onSelect={() =>
-                handleAlbumSelect(
-                  filteredCollection[currentRecordIndex].release.id
-                )
-              }
-              onViewDetails={release => {
-                localStorage.setItem(
-                  'selectedRelease',
-                  JSON.stringify(release)
-                );
-                localStorage.setItem(
-                  'selectedCollectionItemId',
-                  filteredCollection[currentRecordIndex].id.toString()
-                );
-                window.location.hash = '#release-details';
-              }}
-              isInDiscardPile={discardPileIds.has(
-                filteredCollection[currentRecordIndex].id
-              )}
-              onAddToDiscardPile={handleOpenDiscardModal}
-            />
+            {(() => {
+              const currentItem = filteredCollection[currentRecordIndex];
+              const pcKey = getPlayCountKey(
+                currentItem.release.artist,
+                currentItem.release.title
+              );
+              const pcData = playCounts.get(pcKey);
+              return (
+                <AlbumCard
+                  key={`single-${currentItem.id}`}
+                  item={currentItem}
+                  selected={selectedAlbums.has(currentItem.release.id)}
+                  onSelect={() => handleAlbumSelect(currentItem.release.id)}
+                  onViewDetails={release => {
+                    localStorage.setItem(
+                      'selectedRelease',
+                      JSON.stringify(release)
+                    );
+                    localStorage.setItem(
+                      'selectedCollectionItemId',
+                      currentItem.id.toString()
+                    );
+                    window.location.hash = '#release-details';
+                  }}
+                  isInDiscardPile={discardPileIds.has(currentItem.id)}
+                  onAddToDiscardPile={handleOpenDiscardModal}
+                  playCount={pcData?.playCount}
+                  lastPlayed={pcData?.lastPlayed}
+                />
+              );
+            })()}
           </div>
 
           {/* Keyboard hint */}

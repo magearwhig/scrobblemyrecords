@@ -6,6 +6,11 @@ import '@testing-library/jest-dom';
 import AlbumCard from '../../../src/renderer/components/AlbumCard';
 import { CollectionItem, DiscogsRelease } from '../../../src/shared/types';
 
+// Mock dateUtils so we can test "Last played" text without time-dependent flakiness
+jest.mock('../../../src/renderer/utils/dateUtils', () => ({
+  formatRelativeTime: jest.fn((timestamp: number) => '3 days ago'),
+}));
+
 const mockRelease: DiscogsRelease = {
   id: 123,
   title: 'Test Album',
@@ -204,5 +209,99 @@ describe('AlbumCard', () => {
     card = screen.getByText('Test Album').closest('.album-card');
     expect(card).toHaveClass('album-card');
     expect(card).toHaveClass('selected');
+  });
+
+  describe('Play count badge', () => {
+    it('renders play count badge when playCount > 0', () => {
+      // Act
+      render(<AlbumCard {...defaultProps} playCount={47} />);
+
+      // Assert
+      const badge = screen.getByLabelText('47 plays');
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveClass('album-play-count-badge');
+      expect(badge).toHaveTextContent('47 plays');
+    });
+
+    it('renders singular "play" for playCount of 1', () => {
+      // Act
+      render(<AlbumCard {...defaultProps} playCount={1} />);
+
+      // Assert
+      const badge = screen.getByLabelText('1 play');
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveTextContent('1 play');
+    });
+
+    it('hides badge when playCount is 0', () => {
+      // Act
+      render(<AlbumCard {...defaultProps} playCount={0} />);
+
+      // Assert
+      expect(screen.queryByLabelText(/plays/)).not.toBeInTheDocument();
+    });
+
+    it('hides badge when playCount is undefined', () => {
+      // Act
+      render(<AlbumCard {...defaultProps} />);
+
+      // Assert
+      expect(screen.queryByLabelText(/plays/)).not.toBeInTheDocument();
+    });
+
+    it('hides badge when playCount is null', () => {
+      // Act
+      render(
+        <AlbumCard {...defaultProps} playCount={null as unknown as undefined} />
+      );
+
+      // Assert
+      expect(screen.queryByLabelText(/plays/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Last played text', () => {
+    it('renders "Last played X ago" when lastPlayed is provided', () => {
+      // Act
+      render(<AlbumCard {...defaultProps} lastPlayed={1704067200} />);
+
+      // Assert
+      expect(screen.getByText('Last played 3 days ago')).toBeInTheDocument();
+    });
+
+    it('hides last played when lastPlayed is null', () => {
+      // Act
+      render(<AlbumCard {...defaultProps} lastPlayed={null} />);
+
+      // Assert
+      expect(screen.queryByText(/Last played/)).not.toBeInTheDocument();
+    });
+
+    it('hides last played when lastPlayed is undefined', () => {
+      // Act
+      render(<AlbumCard {...defaultProps} />);
+
+      // Assert
+      expect(screen.queryByText(/Last played/)).not.toBeInTheDocument();
+    });
+
+    it('hides last played when lastPlayed is 0', () => {
+      // Act
+      render(<AlbumCard {...defaultProps} lastPlayed={0} />);
+
+      // Assert
+      expect(screen.queryByText(/Last played/)).not.toBeInTheDocument();
+    });
+
+    it('renders both play count badge and last played together', () => {
+      // Act
+      render(
+        <AlbumCard {...defaultProps} playCount={47} lastPlayed={1704067200} />
+      );
+
+      // Assert
+      expect(screen.getByLabelText('47 plays')).toBeInTheDocument();
+      expect(screen.getByText('Last played 3 days ago')).toBeInTheDocument();
+    });
   });
 });

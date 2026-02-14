@@ -5,6 +5,16 @@ import '@testing-library/jest-dom';
 import { StatsPage } from '../../../src/renderer/pages/StatsPage';
 import { statsApi, imagesApi } from '../../../src/renderer/services/statsApi';
 
+// Mock useCollectionLookup hook
+jest.mock('../../../src/renderer/hooks/useCollectionLookup', () => ({
+  useCollectionLookup: () => ({
+    collectionMap: new Map(),
+    collectionArtistCounts: new Map(),
+    loading: false,
+    collection: [],
+  }),
+}));
+
 // Mock the stats API
 jest.mock('../../../src/renderer/services/statsApi', () => ({
   statsApi: {
