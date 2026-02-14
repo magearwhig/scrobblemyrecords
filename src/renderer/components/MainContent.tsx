@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
+import ArtistDetailPage from '../pages/ArtistDetailPage';
 import CollectionPage from '../pages/CollectionPage';
 import DiscardPilePage from '../pages/DiscardPilePage';
 import DiscoveryPage from '../pages/DiscoveryPage';
@@ -10,6 +11,7 @@ import ReleaseDetailsPage from '../pages/ReleaseDetailsPage';
 import ScrobblePage from '../pages/ScrobblePage';
 import SettingsPage from '../pages/SettingsPage';
 import StatsPage from '../pages/StatsPage';
+import TrackDetailPage from '../pages/TrackDetailPage';
 import WhatToPlayPage from '../pages/WhatToPlayPage';
 import WrappedPage from '../pages/WrappedPage';
 import { ROUTES } from '../routes';
@@ -19,14 +21,20 @@ interface MainContentProps {
 }
 
 const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
-  // Track a unique key to force remount of ReleaseDetailsPage when navigating to it
+  // Track unique keys to force remount of detail pages when navigating to them
   const [releaseKey, setReleaseKey] = useState<string>('0');
+  const [artistKey, setArtistKey] = useState<string>('0');
+  const [trackKey, setTrackKey] = useState<string>('0');
 
   useEffect(() => {
-    // When navigating to release-details, generate a new key to force remount
+    // When navigating to detail pages, generate a new key to force remount
     // Use timestamp to always get a fresh key, ensuring the page reloads
     if (currentPage === ROUTES.RELEASE_DETAILS) {
       setReleaseKey(`release-${Date.now()}`);
+    } else if (currentPage === ROUTES.ARTIST_DETAIL) {
+      setArtistKey(`artist-${Date.now()}`);
+    } else if (currentPage === ROUTES.TRACK_DETAIL) {
+      setTrackKey(`track-${Date.now()}`);
     }
   }, [currentPage]);
 
@@ -57,6 +65,10 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
         return <DiscardPilePage />;
       case ROUTES.WRAPPED:
         return <WrappedPage />;
+      case ROUTES.ARTIST_DETAIL:
+        return <ArtistDetailPage key={artistKey} />;
+      case ROUTES.TRACK_DETAIL:
+        return <TrackDetailPage key={trackKey} />;
       default:
         return <HomePage />;
     }

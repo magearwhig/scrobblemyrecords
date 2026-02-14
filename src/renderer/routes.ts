@@ -15,6 +15,8 @@ export const ROUTES = {
   STATS: 'stats',
   DISCARD_PILE: 'discard-pile',
   WRAPPED: 'wrapped',
+  ARTIST_DETAIL: 'artist',
+  TRACK_DETAIL: 'track',
 } as const;
 
 /**

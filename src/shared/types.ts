@@ -551,6 +551,63 @@ export interface RankingsOverTimeResponse {
 }
 
 // ============================================
+// Artist & Track Deep Dive Types
+// ============================================
+
+export interface ArtistDetailResponse {
+  artist: string;
+  totalPlayCount: number;
+  firstPlayed: number | null; // Unix timestamp (seconds)
+  lastPlayed: number | null; // Unix timestamp (seconds)
+  periodCounts: {
+    thisWeek: number;
+    thisMonth: number;
+    thisYear: number;
+    allTime: number;
+  };
+  playTrend: Array<{
+    period: string; // 'YYYY-MM' or 'YYYY-Www'
+    count: number;
+  }>;
+  topTracks: Array<{
+    track: string;
+    album: string;
+    playCount: number;
+    lastPlayed: number;
+  }>;
+  albums: Array<{
+    album: string;
+    playCount: number;
+    lastPlayed: number;
+    coverUrl?: string;
+    inCollection: boolean;
+    collectionReleaseId?: number;
+  }>;
+  imageUrl?: string;
+}
+
+export interface TrackDetailResponse {
+  artist: string;
+  track: string;
+  totalPlayCount: number;
+  firstPlayed: number | null; // Unix timestamp (seconds)
+  lastPlayed: number | null; // Unix timestamp (seconds)
+  playTrend: Array<{
+    period: string; // 'YYYY-MM' or 'YYYY-Www'
+    count: number;
+  }>;
+  appearsOn: Array<{
+    album: string;
+    artist: string;
+    playCount: number;
+    lastPlayed: number;
+    coverUrl?: string;
+    inCollection: boolean;
+    collectionReleaseId?: number;
+  }>;
+}
+
+// ============================================
 // Notification System Types
 // ============================================
 

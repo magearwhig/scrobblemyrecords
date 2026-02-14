@@ -1,5 +1,6 @@
 import {
   AlbumPlayCount,
+  ArtistDetailResponse,
   ArtistPlayCount,
   CalendarHeatmapData,
   CollectionCoverage,
@@ -15,6 +16,7 @@ import {
   StatsOverview,
   StreakInfo,
   TimelineDataPoint,
+  TrackDetailResponse,
   TrackPlayCount,
 } from '../../shared/types';
 import { createNormalizedTrackKey } from '../../shared/utils/trackNormalization';
@@ -1437,6 +1439,358 @@ export class StatsService {
       }
     }
     return Array.from(tracks);
+  }
+
+  // ============================================
+  // Artist & Track Deep Dive Methods
+  // ============================================
+
+  /**
+   * Get detailed stats for a specific artist.
+   * Aggregates data across all albums by that artist in the scrobble history.
+   *
+   * @param artistName - Artist name (case-insensitive matching against history index)
+   * @param trendPeriod - Granularity for the play trend chart ('month' or 'week')
+   * @param collection - User's Discogs collection, used to cross-reference album ownership
+   * @returns Aggregate stats including play counts, top tracks, albums, and trend data
+   */
+  async getArtistDetail(
+    artistName: string,
+    trendPeriod: 'month' | 'week' = 'month',
+    collection: CollectionItem[]
+  ): Promise<ArtistDetailResponse> {
+    const index = await this.historyStorage.getIndex();
+    if (!index) {
+      return {
+        artist: artistName,
+        totalPlayCount: 0,
+        firstPlayed: null,
+        lastPlayed: null,
+        periodCounts: { thisWeek: 0, thisMonth: 0, thisYear: 0, allTime: 0 },
+        playTrend: [],
+        topTracks: [],
+        albums: [],
+      };
+    }
+
+    const normalizedArtistName = artistName.toLowerCase();
+
+    // Period cutoffs (timestamps in seconds)
+    const now = new Date();
+    const weekStart = this.getStartOfWeek(now).getTime() / 1000;
+    const monthStart = this.getStartOfMonth(now).getTime() / 1000;
+    const yearStart = this.getStartOfYear(now).getTime() / 1000;
+
+    // Aggregate data across all albums by this artist
+    let totalPlayCount = 0;
+    let firstPlayed: number | null = null;
+    let lastPlayed: number | null = null;
+    let thisWeek = 0;
+    let thisMonth = 0;
+    let thisYear = 0;
+
+    // Track play counts: key = normalized track name, value = { track, album, count, lastPlayed }
+    const trackCounts = new Map<
+      string,
+      { track: string; album: string; count: number; lastPlayed: number }
+    >();
+
+    // Album data: key = normalized album name, value = { album, playCount, lastPlayed }
+    const albumCounts = new Map<
+      string,
+      { album: string; playCount: number; lastPlayed: number }
+    >();
+
+    // Play trend data: key = period string (YYYY-MM or YYYY-Www), value = count
+    const trendCounts = new Map<string, number>();
+
+    for (const [key, albumHistory] of Object.entries(index.albums)) {
+      const [artist, album] = key.split('|');
+      if (artist.toLowerCase() !== normalizedArtistName) {
+        continue;
+      }
+
+      const normalizedAlbum = album.toLowerCase();
+      const existingAlbum = albumCounts.get(normalizedAlbum);
+      if (existingAlbum) {
+        existingAlbum.playCount += albumHistory.playCount;
+        if (albumHistory.lastPlayed > existingAlbum.lastPlayed) {
+          existingAlbum.lastPlayed = albumHistory.lastPlayed;
+        }
+      } else {
+        albumCounts.set(normalizedAlbum, {
+          album,
+          playCount: albumHistory.playCount,
+          lastPlayed: albumHistory.lastPlayed,
+        });
+      }
+
+      for (const play of albumHistory.plays) {
+        totalPlayCount++;
+
+        // Track first/last played
+        if (firstPlayed === null || play.timestamp < firstPlayed) {
+          firstPlayed = play.timestamp;
+        }
+        if (lastPlayed === null || play.timestamp > lastPlayed) {
+          lastPlayed = play.timestamp;
+        }
+
+        // Period counts
+        if (play.timestamp >= weekStart) thisWeek++;
+        if (play.timestamp >= monthStart) thisMonth++;
+        if (play.timestamp >= yearStart) thisYear++;
+
+        // Track aggregation
+        if (play.track) {
+          const trackKey = createNormalizedTrackKey(artist, album, play.track);
+          const existing = trackCounts.get(trackKey);
+          if (existing) {
+            existing.count++;
+            if (play.timestamp > existing.lastPlayed) {
+              existing.lastPlayed = play.timestamp;
+            }
+          } else {
+            trackCounts.set(trackKey, {
+              track: play.track,
+              album,
+              count: 1,
+              lastPlayed: play.timestamp,
+            });
+          }
+        }
+
+        // Play trend aggregation
+        const playDate = new Date(play.timestamp * 1000);
+        let periodKey: string;
+        if (trendPeriod === 'month') {
+          periodKey = `${playDate.getFullYear()}-${String(playDate.getMonth() + 1).padStart(2, '0')}`;
+        } else {
+          // Week: use ISO week format YYYY-Www based on Monday start
+          const weekStartDate = this.getStartOfWeek(playDate);
+          const year = weekStartDate.getFullYear();
+          // Calculate ISO week number
+          const jan1 = new Date(year, 0, 1);
+          const daysSinceJan1 = Math.floor(
+            (weekStartDate.getTime() - jan1.getTime()) / (24 * 60 * 60 * 1000)
+          );
+          const weekNum = Math.ceil((daysSinceJan1 + jan1.getDay() + 1) / 7);
+          periodKey = `${year}-W${String(weekNum).padStart(2, '0')}`;
+        }
+        trendCounts.set(periodKey, (trendCounts.get(periodKey) || 0) + 1);
+      }
+    }
+
+    // Build collection lookup for cross-referencing albums
+    const collectionMap = new Map<string, CollectionItem>();
+    for (const item of collection) {
+      const colKey = `${item.release.artist.toLowerCase()}|${item.release.title.toLowerCase()}`;
+      collectionMap.set(colKey, item);
+    }
+
+    // Build top tracks (sorted by play count descending)
+    const topTracks = Array.from(trackCounts.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20)
+      .map(t => ({
+        track: this.capitalizeTitle(t.track),
+        album: this.capitalizeTitle(t.album),
+        playCount: t.count,
+        lastPlayed: t.lastPlayed,
+      }));
+
+    // Build albums list with collection cross-reference
+    const albums = Array.from(albumCounts.values())
+      .sort((a, b) => b.playCount - a.playCount)
+      .map(a => {
+        const colKey = `${normalizedArtistName}|${a.album.toLowerCase()}`;
+        const collectionItem = collectionMap.get(colKey);
+        return {
+          album: this.capitalizeTitle(a.album),
+          playCount: a.playCount,
+          lastPlayed: a.lastPlayed,
+          coverUrl: collectionItem?.release.cover_image,
+          inCollection: !!collectionItem,
+          collectionReleaseId: collectionItem?.release.id,
+        };
+      });
+
+    // Build play trend (sorted chronologically)
+    const playTrend = Array.from(trendCounts.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([period, count]) => ({ period, count }));
+
+    return {
+      artist: this.capitalizeArtist(artistName),
+      totalPlayCount,
+      firstPlayed,
+      lastPlayed,
+      periodCounts: {
+        thisWeek,
+        thisMonth,
+        thisYear,
+        allTime: totalPlayCount,
+      },
+      playTrend,
+      topTracks,
+      albums,
+    };
+  }
+
+  /**
+   * Get detailed stats for a specific track.
+   * Scans all album entries for plays matching the track name.
+   *
+   * @param artist - Artist name (case-insensitive matching)
+   * @param track - Track name (case-insensitive matching)
+   * @param album - Optional album filter; when provided, only counts plays from that album
+   * @param trendPeriod - Granularity for the play trend chart ('month' or 'week')
+   * @param collection - User's Discogs collection, used to mark albums as "In Collection"
+   * @returns Play counts, trend data, and list of albums the track appears on
+   */
+  async getTrackDetail(
+    artist: string,
+    track: string,
+    album?: string,
+    trendPeriod: 'month' | 'week' = 'month',
+    collection: CollectionItem[] = []
+  ): Promise<TrackDetailResponse> {
+    const index = await this.historyStorage.getIndex();
+    if (!index) {
+      return {
+        artist,
+        track,
+        totalPlayCount: 0,
+        firstPlayed: null,
+        lastPlayed: null,
+        playTrend: [],
+        appearsOn: [],
+      };
+    }
+
+    const normalizedArtist = artist.toLowerCase();
+    const normalizedTrack = track.toLowerCase();
+    const normalizedAlbumFilter = album?.toLowerCase();
+
+    let totalPlayCount = 0;
+    let firstPlayed: number | null = null;
+    let lastPlayed: number | null = null;
+
+    // Play trend data
+    const trendCounts = new Map<string, number>();
+
+    // Albums this track appears on: key = normalized album, value = { album, artist, playCount, lastPlayed }
+    const albumAppearances = new Map<
+      string,
+      { album: string; artist: string; playCount: number; lastPlayed: number }
+    >();
+
+    for (const [key, albumHistory] of Object.entries(index.albums)) {
+      const [entryArtist, entryAlbum] = key.split('|');
+
+      // Filter by artist
+      if (entryArtist.toLowerCase() !== normalizedArtist) {
+        continue;
+      }
+
+      // If album filter is provided, only look at that album
+      if (
+        normalizedAlbumFilter &&
+        entryAlbum.toLowerCase() !== normalizedAlbumFilter
+      ) {
+        continue;
+      }
+
+      for (const play of albumHistory.plays) {
+        // Match track name (case-insensitive)
+        if (!play.track || play.track.toLowerCase() !== normalizedTrack) {
+          continue;
+        }
+
+        totalPlayCount++;
+
+        // Track first/last played
+        if (firstPlayed === null || play.timestamp < firstPlayed) {
+          firstPlayed = play.timestamp;
+        }
+        if (lastPlayed === null || play.timestamp > lastPlayed) {
+          lastPlayed = play.timestamp;
+        }
+
+        // Album appearances
+        const normalizedEntryAlbum = entryAlbum.toLowerCase();
+        const existing = albumAppearances.get(normalizedEntryAlbum);
+        if (existing) {
+          existing.playCount++;
+          if (play.timestamp > existing.lastPlayed) {
+            existing.lastPlayed = play.timestamp;
+          }
+        } else {
+          albumAppearances.set(normalizedEntryAlbum, {
+            album: entryAlbum,
+            artist: entryArtist,
+            playCount: 1,
+            lastPlayed: play.timestamp,
+          });
+        }
+
+        // Play trend aggregation
+        const playDate = new Date(play.timestamp * 1000);
+        let periodKey: string;
+        if (trendPeriod === 'month') {
+          periodKey = `${playDate.getFullYear()}-${String(playDate.getMonth() + 1).padStart(2, '0')}`;
+        } else {
+          const weekStartDate = this.getStartOfWeek(playDate);
+          const year = weekStartDate.getFullYear();
+          const jan1 = new Date(year, 0, 1);
+          const daysSinceJan1 = Math.floor(
+            (weekStartDate.getTime() - jan1.getTime()) / (24 * 60 * 60 * 1000)
+          );
+          const weekNum = Math.ceil((daysSinceJan1 + jan1.getDay() + 1) / 7);
+          periodKey = `${year}-W${String(weekNum).padStart(2, '0')}`;
+        }
+        trendCounts.set(periodKey, (trendCounts.get(periodKey) || 0) + 1);
+      }
+    }
+
+    // Build collection lookup
+    const collectionMap = new Map<string, CollectionItem>();
+    for (const item of collection) {
+      const colKey = `${item.release.artist.toLowerCase()}|${item.release.title.toLowerCase()}`;
+      collectionMap.set(colKey, item);
+    }
+
+    // Build appearsOn list with collection cross-reference
+    const appearsOn = Array.from(albumAppearances.values())
+      .sort((a, b) => b.playCount - a.playCount)
+      .map(a => {
+        const colKey = `${a.artist.toLowerCase()}|${a.album.toLowerCase()}`;
+        const collectionItem = collectionMap.get(colKey);
+        return {
+          album: this.capitalizeTitle(a.album),
+          artist: this.capitalizeArtist(a.artist),
+          playCount: a.playCount,
+          lastPlayed: a.lastPlayed,
+          coverUrl: collectionItem?.release.cover_image,
+          inCollection: !!collectionItem,
+          collectionReleaseId: collectionItem?.release.id,
+        };
+      });
+
+    // Build play trend (sorted chronologically)
+    const playTrend = Array.from(trendCounts.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([period, count]) => ({ period, count }));
+
+    return {
+      artist: this.capitalizeArtist(artist),
+      track: this.capitalizeTitle(track),
+      totalPlayCount,
+      firstPlayed,
+      lastPlayed,
+      playTrend,
+      appearsOn,
+    };
   }
 
   // ============================================

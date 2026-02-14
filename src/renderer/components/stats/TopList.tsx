@@ -13,6 +13,8 @@ import {
   playTrackOnSpotify,
   playAlbumOnSpotify,
 } from '../../utils/spotifyUtils';
+import ArtistLink from '../ArtistLink';
+import TrackLink from '../TrackLink';
 
 import DateRangePicker from './DateRangePicker';
 
@@ -265,8 +267,16 @@ export const TopList: React.FC<TopListProps> = ({
                   <div className='top-list-info'>
                     {isTrackData(item) ? (
                       <>
-                        <div className='top-list-name'>{item.track}</div>
-                        <div className='top-list-artist'>{item.artist}</div>
+                        <div className='top-list-name'>
+                          <TrackLink
+                            artist={item.artist}
+                            track={item.track}
+                            album={item.album}
+                          />
+                        </div>
+                        <div className='top-list-artist'>
+                          <ArtistLink artist={item.artist} />
+                        </div>
                       </>
                     ) : isAlbumData(item) ? (
                       <>
@@ -285,11 +295,13 @@ export const TopList: React.FC<TopListProps> = ({
                               </Badge>
                             )}
                         </div>
-                        <div className='top-list-artist'>{item.artist}</div>
+                        <div className='top-list-artist'>
+                          <ArtistLink artist={item.artist} />
+                        </div>
                       </>
                     ) : (
                       <div className='top-list-name'>
-                        {item.artist}
+                        <ArtistLink artist={item.artist} />
                         {collectionArtistCounts &&
                           (() => {
                             const count = collectionArtistCounts.get(

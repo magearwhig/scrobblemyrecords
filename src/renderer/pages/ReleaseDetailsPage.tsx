@@ -8,6 +8,7 @@ import {
 } from '../../shared/types';
 import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import AlbumScrobbleHistory from '../components/AlbumScrobbleHistory';
+import ArtistLink from '../components/ArtistLink';
 import { Modal } from '../components/ui/Modal';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { useApp } from '../context/AppContext';
@@ -104,12 +105,14 @@ const ReleaseDetailsPage: React.FC = () => {
       loadReleaseDetails();
     }, 0);
     return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (release?.artist) {
       loadArtistMapping(release.artist);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [release?.artist]);
 
   // Load album history function (must be defined before useEffect that uses it)
@@ -835,7 +838,7 @@ const ReleaseDetailsPage: React.FC = () => {
           <div className='release-details-content'>
             <h3 className='release-details-title'>{release.title}</h3>
             <p className='release-details-artist'>
-              {release.artist}
+              <ArtistLink artist={release.artist} />
               {artistMapping && artistMapping.hasMapping && (
                 <span
                   className='release-details-artist-mapping-badge'

@@ -223,8 +223,8 @@ describe('AnalyticsService', () => {
       // Arrange
       mockHistoryStorage.getIndex.mockResolvedValue(null);
 
-      // Act
-      const preference = await analyticsService.getEraPreference(2000);
+      // Act - year 1985 falls in the 1980s decade which returns 0.5
+      const preference = await analyticsService.getEraPreference(1985);
 
       // Assert
       expect(preference).toBe(0.5);

@@ -10,7 +10,9 @@ import {
 import { getApiService } from '../services/api';
 import { playTrackOnSpotify } from '../utils/spotifyUtils';
 
+import ArtistLink from './ArtistLink';
 import SyncStatusBar from './SyncStatusBar';
+import TrackLink from './TrackLink';
 import { Badge } from './ui/Badge';
 
 interface AlbumHistoryItem {
@@ -535,7 +537,7 @@ const LastFmHistoryTab: React.FC = () => {
                     className='lastfm-history-col-artist'
                     title={album.artist}
                   >
-                    {album.artist}
+                    <ArtistLink artist={album.artist} />
                   </div>
                   <div className='lastfm-history-col-album' title={album.album}>
                     {album.album}
@@ -632,13 +634,17 @@ const LastFmHistoryTab: React.FC = () => {
                   className={`lastfm-history-item lastfm-history-track-item${enrichedClass}`}
                 >
                   <div className='lastfm-history-col-track' title={track.track}>
-                    {track.track}
+                    <TrackLink
+                      artist={track.artist}
+                      track={track.track}
+                      album={track.album}
+                    />
                   </div>
                   <div
                     className='lastfm-history-col-artist-sm'
                     title={track.artist}
                   >
-                    {track.artist}
+                    <ArtistLink artist={track.artist} />
                   </div>
                   <div
                     className='lastfm-history-col-album-sm'
@@ -745,7 +751,7 @@ const LastFmHistoryTab: React.FC = () => {
                     className='lastfm-history-col-artist'
                     title={artist.artist}
                   >
-                    {artist.artist}
+                    <ArtistLink artist={artist.artist} />
                   </div>
                   <div className='lastfm-history-col-albums'>
                     {artist.albumCount.toLocaleString()}

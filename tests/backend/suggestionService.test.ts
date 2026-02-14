@@ -49,6 +49,7 @@ describe('SuggestionService', () => {
       getEraPreference: jest.fn().mockResolvedValue(0.5),
       getTimeOfDayPreference: jest.fn().mockResolvedValue(0.5),
       getAlbumCompleteness: jest.fn().mockResolvedValue(0.5),
+      getTopArtistsMap: jest.fn().mockResolvedValue(new Map()),
     } as unknown as jest.Mocked<AnalyticsService>;
 
     mockHistoryStorage = {
@@ -108,15 +109,16 @@ describe('SuggestionService', () => {
     it('should calculate recency gap from play history', async () => {
       // Arrange
       const album = createMockCollectionItem();
+      const thirtyDaysAgoSeconds =
+        Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
       mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
         entry: {
-          lastPlayed: Math.floor(Date.now() / 1000),
+          lastPlayed: thirtyDaysAgoSeconds,
           playCount: 5,
           plays: [],
         },
         matchType: 'exact',
       });
-      mockHistoryStorage.getDaysSinceLastPlayed.mockResolvedValue(30);
 
       // Act
       const factors = await suggestionService.calculateFactors(album);

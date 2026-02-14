@@ -3,6 +3,8 @@ import React from 'react';
 import { CollectionItem, DiscogsRelease } from '../../shared/types';
 import { formatRelativeTime } from '../utils/dateUtils';
 
+import ArtistLink from './ArtistLink';
+
 interface AlbumCardProps {
   item: CollectionItem;
   selected: boolean;
@@ -82,7 +84,7 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
         </div>
 
         <div className='album-artist' title={release.artist}>
-          {release.artist}
+          <ArtistLink artist={release.artist} />
         </div>
 
         <div className='album-year'>{release.year || 'Unknown Year'}</div>

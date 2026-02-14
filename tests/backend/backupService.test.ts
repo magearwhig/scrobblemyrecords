@@ -317,6 +317,7 @@ describe('BackupService', () => {
           artistMbidMappings: [],
           hiddenReleases: [],
           excludedArtists: [],
+          discardPileItems: [],
         },
       };
 

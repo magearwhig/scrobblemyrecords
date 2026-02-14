@@ -2,6 +2,7 @@ import {
   AlbumPlayCount,
   AlbumTracksPlayedResponse,
   ApiResponse,
+  ArtistDetailResponse,
   ArtistPlayCount,
   CalendarHeatmapData,
   CollectionCoverage,
@@ -16,6 +17,7 @@ import {
   StatsOverview,
   StreakInfo,
   TimelineDataPoint,
+  TrackDetailResponse,
   TrackPlayCount,
 } from '../../shared/types';
 
@@ -283,6 +285,43 @@ export const statsApi = {
     const response = await fetch(
       `${API_BASE}/stats/album-tracks-played?${params}`
     );
+    return response.json();
+  },
+
+  /**
+   * Get detailed stats for a specific artist
+   * @param artistName - Artist name
+   * @param trendPeriod - Granularity for play trend chart (default: 'month')
+   */
+  async getArtistDetail(
+    artistName: string,
+    trendPeriod: 'month' | 'week' = 'month'
+  ): Promise<ApiResponse<ArtistDetailResponse>> {
+    const params = new URLSearchParams({ trendPeriod });
+    const response = await fetch(
+      `${API_BASE}/stats/artist/${encodeURIComponent(artistName)}?${params}`
+    );
+    return response.json();
+  },
+
+  /**
+   * Get detailed stats for a specific track
+   * @param artist - Artist name
+   * @param track - Track name
+   * @param album - Optional album name to scope to specific album
+   * @param trendPeriod - Granularity for play trend chart (default: 'month')
+   */
+  async getTrackDetail(
+    artist: string,
+    track: string,
+    album?: string,
+    trendPeriod: 'month' | 'week' = 'month'
+  ): Promise<ApiResponse<TrackDetailResponse>> {
+    const params = new URLSearchParams({ artist, track, trendPeriod });
+    if (album) {
+      params.set('album', album);
+    }
+    const response = await fetch(`${API_BASE}/stats/track?${params}`);
     return response.json();
   },
 };

@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-2745%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-2864%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -115,6 +115,7 @@ npm run start:web
 - **Smart Timing**: Auto timing (simulates just finishing listening) or custom timestamps
 - **History View**: Dual-tab history showing app scrobble sessions and synced Last.fm listening history
 - **Stats Dashboard**: Comprehensive listening statistics and visualizations
+- **Artist & Track Deep Dives**: Clickable artist/track names throughout the app link to rich detail pages
 - **What to Play Hub**: Play Suggestions, Forgotten Favorites, and Dusty Corners in one place
 - **Marketplace Hub**: Wishlist, New Releases, Local Sellers, Seller Matches, and Missing Albums
 - **Wrapped**: Spotify Wrapped-style period-in-review slideshow for any date range
@@ -170,6 +171,31 @@ Comprehensive listening statistics and visualizations:
 - **Dusty Corners**: Albums in your collection you haven't played in 6+ months, with Spotify play buttons
 - **Source Breakdown**: See which sources your scrobbles come from
 - **Listening Timeline**: Visualize listening trends over time
+
+### 🎤 Artist & Track Deep Dives
+Click any artist or track name throughout the app to navigate to a dedicated detail page:
+
+**Artist Detail Page:**
+- Play trend chart with period selector (weekly/monthly/yearly)
+- Period stats: this week, this month, this year, all-time
+- Top tracks by play count
+- Albums list with "In Collection" badges and cover art
+- First/last played dates
+- External links to Last.fm and Spotify
+
+**Track Detail Page:**
+- Play trend chart with period selector
+- Total play count with first/last played dates
+- "Appears On" album list with collection badges
+- Clickable artist name linking back to artist detail
+- External links to Last.fm and Spotify
+
+**Clickable Links Across the App:**
+- Stats page top lists (artists, albums, tracks)
+- Last.fm listening history
+- Monthly highlights on the dashboard
+- Release details page artist names
+- Album cards throughout the collection
 
 ### 🎲 What to Play
 A hub for deciding what to spin next, with three tabs: **Play Suggestions**, **Forgotten Favorites**, and **Dusty Corners**.
@@ -682,6 +708,9 @@ src/
 │   │   ├── Sidebar.tsx            # Navigation sidebar
 │   │   ├── MainContent.tsx        # Page router
 │   │   ├── AlbumCard.tsx          # Album grid card
+│   │   ├── ArtistLink.tsx         # Clickable artist name navigation
+│   │   ├── TrackLink.tsx          # Clickable track name navigation
+│   │   ├── PlayTrendChart.tsx     # Reusable play trend area chart
 │   │   ├── SearchBar.tsx          # Search input
 │   │   ├── ui/                    # Reusable primitives (Button, Modal, Badge, etc.)
 │   │   ├── dashboard/             # Dashboard widgets
@@ -705,6 +734,8 @@ src/
 │   │   ├── StatsPage.tsx          # Listening statistics
 │   │   ├── WrappedPage.tsx        # Period in review slideshow
 │   │   ├── MarketplacePage.tsx    # Marketplace hub (wishlist, releases, sellers)
+│   │   ├── ArtistDetailPage.tsx   # Artist deep dive
+│   │   ├── TrackDetailPage.tsx    # Track deep dive
 │   │   ├── DiscardPilePage.tsx    # Discard pile
 │   │   └── SettingsPage.tsx       # Settings (tabs: Connections, Mappings, Filters, etc.)
 │   ├── context/                   # React Context providers

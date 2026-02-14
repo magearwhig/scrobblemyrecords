@@ -1219,6 +1219,92 @@ export default function createStatsRouter(
     }
   });
 
+  // ============================================
+  // Artist & Track Deep Dives
+  // ============================================
+
+  /**
+   * GET /api/v1/stats/artist/:artistName
+   * Get detailed stats for a specific artist
+   * Query params:
+   *   trendPeriod: 'month' | 'week' (default: 'month')
+   */
+  router.get('/artist/:artistName', async (req: Request, res: Response) => {
+    try {
+      const artistName = decodeURIComponent(req.params.artistName);
+      const trendPeriod =
+        (req.query.trendPeriod as 'month' | 'week') || 'month';
+
+      const settings = await authService.getUserSettings();
+      const username = settings.discogs.username;
+      const collection = username ? await loadCollection(username) : [];
+
+      const data = await statsService.getArtistDetail(
+        artistName,
+        trendPeriod,
+        collection
+      );
+
+      res.json({ success: true, data });
+    } catch (error) {
+      logger.error('Error getting artist detail', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * GET /api/v1/stats/track
+   * Get detailed stats for a specific track
+   * Query params:
+   *   artist: string (required)
+   *   track: string (required)
+   *   album: string (optional - filter to specific album)
+   *   trendPeriod: 'month' | 'week' (default: 'month')
+   */
+  router.get('/track', async (req: Request, res: Response) => {
+    try {
+      const artist = req.query.artist as string;
+      const track = req.query.track as string;
+      const album = req.query.album as string | undefined;
+      const trendPeriod =
+        (req.query.trendPeriod as 'month' | 'week') || 'month';
+
+      if (!artist || !track) {
+        return res.status(400).json({
+          success: false,
+          error: 'Both artist and track query parameters are required',
+        });
+      }
+
+      const settings = await authService.getUserSettings();
+      const username = settings.discogs.username;
+      const collection = username ? await loadCollection(username) : [];
+
+      const data = await statsService.getTrackDetail(
+        artist,
+        track,
+        album,
+        trendPeriod,
+        collection
+      );
+
+      res.json({ success: true, data });
+    } catch (error) {
+      logger.error('Error getting track detail', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // ============================================
+  // Rankings Over Time
+  // ============================================
+
   /**
    * GET /rankings-over-time
    * Get rankings (tracks/artists/albums) over time for animated visualization

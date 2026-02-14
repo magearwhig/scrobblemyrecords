@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { DashboardTopAlbum, DashboardTopArtist } from '../../../shared/types';
+import ArtistLink from '../ArtistLink';
 
 interface MonthlyHighlightsProps {
   artists: DashboardTopArtist[];
@@ -49,7 +50,7 @@ export const MonthlyHighlights: React.FC<MonthlyHighlightsProps> = ({
                   </div>
                   <div className='dashboard-highlight-info'>
                     <span className='dashboard-highlight-name'>
-                      {artist.name}
+                      <ArtistLink artist={artist.name} />
                     </span>
                     <span className='dashboard-highlight-count'>
                       {artist.playCount} plays
@@ -86,7 +87,7 @@ export const MonthlyHighlights: React.FC<MonthlyHighlightsProps> = ({
                       {album.album}
                     </span>
                     <span className='dashboard-highlight-artist'>
-                      {album.artist}
+                      <ArtistLink artist={album.artist} />
                     </span>
                     <span className='dashboard-highlight-count'>
                       {album.playCount} plays
