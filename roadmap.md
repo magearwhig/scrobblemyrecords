@@ -1512,7 +1512,7 @@ Track records from your Discogs collection that you want to get rid of during co
 
 ### Key Features
 - Add collection items to discard pile with reason (selling, duplicate, damaged, etc.)
-- Track status lifecycle: marked → listed → sold/gifted/removed
+- Track status lifecycle: marked → listed → sold/gifted/removed/traded_in
 - Bulk operations from collection view
 - Stats: estimated value, actual sales, by-status/reason breakdown
 - Orphan detection (items removed from Discogs collection externally)
@@ -1523,11 +1523,18 @@ Track records from your Discogs collection that you want to get rid of during co
 - Optional marketplace URL for listed items
 
 ### Implementation Details
-See `.plan/discard-pile-plan.md` for full specification including:
+See `.plan/done/discard-pile-plan.md` for original specification and `.plan/traded-in-archive-plan.md` for the Traded In extension:
 - `DiscardPileService` with CRUD and bulk operations
 - `/api/v1/discard-pile/*` routes
 - `DiscardPilePage.tsx` with filtering and stats
 - Collection view integration with badges
+
+### Feature 7.1: Traded In & Local Archive (COMPLETE)
+- "Traded In" status for records traded at stores
+- Local archive (discard pile items persist as history after Discogs deletion)
+- Bulk multi-select for batch trade-in operations
+- Backup system integration (fixes existing gap: discard pile not in backups)
+- See `.plan/traded-in-archive-plan.md` for full specification
 
 ---
 
