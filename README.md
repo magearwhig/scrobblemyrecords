@@ -115,6 +115,10 @@ npm run start:web
 - **Smart Timing**: Auto timing (simulates just finishing listening) or custom timestamps
 - **History View**: Dual-tab history showing app scrobble sessions and synced Last.fm listening history
 - **Stats Dashboard**: Comprehensive listening statistics and visualizations
+- **What to Play Hub**: Play Suggestions, Forgotten Favorites, and Dusty Corners in one place
+- **Marketplace Hub**: Wishlist, New Releases, Local Sellers, Seller Matches, and Missing Albums
+- **Wrapped**: Spotify Wrapped-style period-in-review slideshow for any date range
+- **Discard Pile**: Track records to sell, gift, or remove with marketplace integration
 - **Cache Management**: Force reload collection data when needed
 - **Cache Updates**: Check for new Discogs additions and update the cache incrementally
 - **Discovery + Mapping**: Find "missing" albums/artists and map them to items in your collection
@@ -167,7 +171,10 @@ Comprehensive listening statistics and visualizations:
 - **Source Breakdown**: See which sources your scrobbles come from
 - **Listening Timeline**: Visualize listening trends over time
 
-### 🎲 Play Suggestions
+### 🎲 What to Play
+A hub for deciding what to spin next, with three tabs: **Play Suggestions**, **Forgotten Favorites**, and **Dusty Corners**.
+
+#### Play Suggestions
 Intelligent album recommendations based on 9 weighted factors:
 
 | Factor | Description |
@@ -187,6 +194,25 @@ Intelligent album recommendations based on 9 weighted factors:
 - Refresh for new suggestions
 - One-click navigation to collection
 - "Why this suggestion?" breakdown
+
+#### Forgotten Favorites
+Surface tracks with high all-time play counts that you haven't listened to recently:
+
+- **Configurable Dormant Period**: Set how long "forgotten" means (3 months to 3 years)
+- **Configurable Min Plays**: Filter by minimum play count (5 to 100+)
+- **Sorting Options**: Sort by play count, artist name, track name, or dormancy
+- **Copy to Clipboard**: Copy single track or all tracks for playlist creation
+- **CSV Export**: Export your forgotten favorites for external use
+- **Last.fm Links**: Quick access to track pages on Last.fm
+- **Spotify Integration**: Play button for each track
+- **Track Mapping Support**: Manual track mappings ensure accurate matching
+
+#### Dusty Corners
+Albums in your collection you haven't played in 6+ months:
+
+- Sorted by how long since last played
+- Spotify play buttons for quick rediscovery
+- Configurable dormancy threshold
 
 ### 📊 Scrobble History Sync
 Sync your complete Last.fm history for smarter suggestions:
@@ -223,7 +249,7 @@ Two-tab view of your listening activity:
 - Sync controls to update the history index
 
 ### 🔍 Discovery Page
-Find albums you listen to but don't own, and rediscover forgotten favorites:
+Find albums and artists you listen to but don't own on vinyl:
 
 **Missing Albums Tab:**
 - **Missing Albums**: Albums in your scrobble history not in your collection
@@ -236,18 +262,10 @@ Find albums you listen to but don't own, and rediscover forgotten favorites:
 - **Play Count Sorting**: Prioritized by how often you listen
 - **Map to Collection**: Map artist to a release in your collection
 
-**Forgotten Favorites Tab:**
-- **Rediscover Tracks**: Surface tracks with high all-time play counts that you haven't listened to recently
-- **Configurable Dormant Period**: Set how long "forgotten" means (3 months to 3 years)
-- **Configurable Min Plays**: Filter by minimum play count (5 to 100+)
-- **Sorting Options**: Sort by play count, artist name, track name, or dormancy
-- **Copy to Clipboard**: Copy single track or all tracks for playlist creation
-- **CSV Export**: Export your forgotten favorites for external use
-- **Last.fm Links**: Quick access to track pages on Last.fm
-- **Spotify Integration**: Play button for each track to instantly search and play on Spotify
-- **Track Mapping Support**: Manual track mappings ensure accurate matching when automatic normalization fails
+### 🛒 Marketplace
+A hub for all acquisition-related features, with tabs for Wishlist, New Releases, Local Sellers, Seller Matches, and Missing Albums.
 
-### ❤️ Wishlist Page
+#### ❤️ Wishlist
 Sync and manage your Discogs wantlist with vinyl availability tracking:
 
 **Discogs Wantlist Sync:**
@@ -296,7 +314,7 @@ Sync and manage your Discogs wantlist with vinyl availability tracking:
 - Dismiss individual releases or bulk dismiss all
 - Quick links to Discogs marketplace listings
 
-### 🏪 Local Seller Monitoring
+#### 🏪 Local Sellers
 Track Discogs inventories of your favorite local record shops to find wishlist items available nearby:
 
 **Seller Management:**
@@ -329,7 +347,7 @@ Track Discogs inventories of your favorite local record shops to find wishlist i
 - Enable/disable notifications
 - Quick-add sellers directly from settings
 
-### 🎵 New Releases Tracking
+#### 🎵 New Releases
 Track new and upcoming releases from artists in your collection using MusicBrainz data:
 
 **Release Discovery:**
@@ -512,6 +530,33 @@ Instantly play tracks and albums on Spotify with one-click play buttons througho
 - Spotify desktop app (recommended) or web browser access
 - No additional configuration needed
 
+### 🎁 Wrapped (Period in Review)
+A Spotify Wrapped-style interactive slideshow summarizing your listening activity over any time period:
+
+**Presets & Custom Ranges:**
+- Quick presets: This Year, Last Year, Last 6/3 Months, This/Last Month
+- Custom date range picker for any period
+
+**Slideshow Slides:**
+- Total scrobbles, listening hours, unique artists/albums
+- Top artists, top albums, top tracks with play counts
+- New artists discovered during the period
+- Peak listening day and longest listening streak
+- Collection growth (records added)
+- Most-played new addition
+- Vinyl vs digital listening breakdown
+- Listening activity heatmap
+
+### 📦 Discard Pile
+Track records you want to sell, gift, or remove from your collection:
+
+- **Reasons**: Mark albums as selling, duplicate, damaged, upgrading, not listening, or giving away
+- **Status Tracking**: Marked, listed, sold, gifted, or removed
+- **Marketplace Integration**: Track listing URLs and sale prices
+- **Orphaned Detection**: Find records no longer in your Discogs collection
+- **Stats**: Total items, estimated value, items sold, and revenue tracking
+- **Tabs**: All, Marked, Listed, Sold, Orphaned
+
 ### 📀 Album Scrobble History
 View detailed listening history for any album:
 
@@ -591,7 +636,8 @@ src/
 │   │   ├── sellers.ts             # Local seller monitoring
 │   │   ├── releases.ts            # New release tracking
 │   │   ├── backup.ts              # Backup & restore
-│   │   └── discardPile.ts         # Discard pile management
+│   │   ├── discardPile.ts         # Discard pile management
+│   │   └── wrapped.ts             # Wrapped/period-in-review
 │   ├── services/                  # Business logic
 │   │   ├── authService.ts         # Encrypted credential storage
 │   │   ├── discogsService.ts      # Discogs API client (rate-limited)
@@ -613,6 +659,7 @@ src/
 │   │   ├── musicbrainzService.ts  # MusicBrainz API
 │   │   ├── releaseTrackingService.ts  # New release tracking
 │   │   ├── discardPileService.ts  # Discard pile logic
+│   │   ├── wrappedService.ts     # Wrapped/period-in-review
 │   │   ├── backupService.ts       # Backup & restore
 │   │   ├── cleanupService.ts      # Cache cleanup
 │   │   ├── migrationService.ts    # Data schema migrations
@@ -635,22 +682,24 @@ src/
 │   │   ├── ui/                    # Reusable primitives (Button, Modal, Badge, etc.)
 │   │   ├── dashboard/             # Dashboard widgets
 │   │   ├── discovery/             # Discovery tab components
+│   │   ├── marketplace/           # Marketplace components
 │   │   ├── settings/              # Settings page sections
 │   │   ├── stats/                 # Stats visualizations
-│   │   └── wishlist/              # Wishlist components
+│   │   ├── whattoplay/            # What to Play components
+│   │   ├── wishlist/              # Wishlist components
+│   │   └── wrapped/               # Wrapped slideshow slides
 │   ├── pages/                     # Application pages
 │   │   ├── HomePage.tsx           # Dashboard
 │   │   ├── CollectionPage.tsx     # Discogs collection browser
 │   │   ├── ReleaseDetailsPage.tsx # Album detail & scrobble
 │   │   ├── ScrobblePage.tsx       # Quick scrobble
 │   │   ├── HistoryPage.tsx        # Scrobble history & Last.fm
-│   │   ├── SuggestionsPage.tsx    # Listening suggestions & AI
-│   │   ├── DiscoveryPage.tsx      # Music discovery
+│   │   ├── WhatToPlayPage.tsx     # What to Play hub (suggestions, forgotten, dusty)
+│   │   ├── SuggestionsPage.tsx    # Play suggestions & AI
+│   │   ├── DiscoveryPage.tsx      # Missing albums & artists
 │   │   ├── StatsPage.tsx          # Listening statistics
-│   │   ├── WishlistPage.tsx       # Vinyl wishlist
-│   │   ├── SellersPage.tsx        # Local seller monitoring
-│   │   ├── SellerMatchesPage.tsx  # Seller inventory matches
-│   │   ├── NewReleasesPage.tsx    # New release tracking
+│   │   ├── WrappedPage.tsx        # Period in review slideshow
+│   │   ├── MarketplacePage.tsx    # Marketplace hub (wishlist, releases, sellers)
 │   │   ├── DiscardPilePage.tsx    # Discard pile
 │   │   └── SettingsPage.tsx       # Settings (tabs: Connections, Mappings, Filters, etc.)
 │   ├── context/                   # React Context providers
