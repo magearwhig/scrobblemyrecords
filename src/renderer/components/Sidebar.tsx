@@ -81,13 +81,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           disabledReason: discogsReason,
         },
         {
-          id: ROUTES.WISHLIST,
-          label: 'Wishlist',
-          icon: '❤️',
-          enabled: authStatus.discogs.authenticated,
-          disabledReason: discogsReason,
-        },
-        {
           id: ROUTES.DISCARD_PILE,
           label: 'Discard Pile',
           icon: '📦',
@@ -100,8 +93,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: 'Listening',
       items: [
         {
-          id: ROUTES.SUGGESTIONS,
-          label: 'Play Suggestions',
+          id: ROUTES.WHAT_TO_PLAY,
+          label: 'What to Play',
           icon: '🎲',
           enabled:
             authStatus.discogs.authenticated && authStatus.lastfm.authenticated,
@@ -135,25 +128,18 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: 'Explore',
       items: [
         {
+          id: ROUTES.MARKETPLACE,
+          label: 'Marketplace',
+          icon: '🏪',
+          enabled: authStatus.discogs.authenticated,
+          disabledReason: discogsReason,
+        },
+        {
           id: ROUTES.DISCOVERY,
           label: 'Discovery',
           icon: '🔍',
           enabled: authStatus.lastfm.authenticated,
           disabledReason: lastfmReason,
-        },
-        {
-          id: ROUTES.RELEASES,
-          label: 'New Releases',
-          icon: '📢',
-          enabled: authStatus.discogs.authenticated,
-          disabledReason: discogsReason,
-        },
-        {
-          id: ROUTES.SELLERS,
-          label: 'Local Sellers',
-          icon: '🏪',
-          enabled: authStatus.discogs.authenticated,
-          disabledReason: discogsReason,
         },
       ],
     },

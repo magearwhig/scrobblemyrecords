@@ -17,7 +17,13 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('SuggestionsPage');
 
-const SuggestionsPage: React.FC = () => {
+interface SuggestionsPageProps {
+  embedded?: boolean;
+}
+
+const SuggestionsPage: React.FC<SuggestionsPageProps> = ({
+  embedded = false,
+}) => {
   const { state } = useApp();
   const [suggestions, setSuggestions] = useState<SuggestionResult[]>([]);
   const [loading, setLoading] = useState(true);
@@ -189,7 +195,7 @@ const SuggestionsPage: React.FC = () => {
   return (
     <div className='suggestions-page'>
       <div className='suggestions-header'>
-        <h1>Play Suggestions</h1>
+        {!embedded && <h1>Play Suggestions</h1>}
         <div className='suggestions-actions'>
           <button
             className='btn btn-secondary'

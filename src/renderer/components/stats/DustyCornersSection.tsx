@@ -6,6 +6,7 @@ import { playAlbumOnSpotify } from '../../utils/spotifyUtils';
 interface DustyCornersSectionProps {
   albums: DustyCornerAlbum[];
   loading?: boolean;
+  showAll?: boolean;
 }
 
 /**
@@ -55,6 +56,7 @@ const VinylPlaceholder: React.FC = () => (
 export const DustyCornersSection: React.FC<DustyCornersSectionProps> = ({
   albums,
   loading,
+  showAll = false,
 }) => {
   const formatLastPlayed = (album: DustyCornerAlbum): string => {
     if (album.daysSincePlay === -1 || album.lastPlayed === 0) {
@@ -106,7 +108,7 @@ export const DustyCornersSection: React.FC<DustyCornersSectionProps> = ({
       </div>
 
       <div className='dusty-corners-grid'>
-        {albums.slice(0, 8).map(album => (
+        {(showAll ? albums : albums.slice(0, 8)).map(album => (
           <div
             key={`${album.artist}-${album.album}`}
             className='dusty-corners-card'
@@ -160,9 +162,18 @@ export const DustyCornersSection: React.FC<DustyCornersSectionProps> = ({
         ))}
       </div>
 
-      {albums.length > 8 && (
+      {!showAll && albums.length > 8 && (
         <div className='dusty-corners-more'>
-          +{albums.length - 8} more albums need some love
+          <span>+{albums.length - 8} more albums need some love</span>
+          <button
+            className='btn btn-small btn-outline'
+            onClick={() => {
+              window.location.hash = 'what-to-play?tab=dusty';
+            }}
+            aria-label='See all dusty corners in What to Play'
+          >
+            See all &rarr;
+          </button>
         </div>
       )}
     </div>

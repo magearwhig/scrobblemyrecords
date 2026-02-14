@@ -5,9 +5,9 @@
   "scripts": {
     "build": "npm run build:backend && npm run build:web",
     "build:backend": "tsc",
-    "build:web": "webpack --mode=production",
+    "build:web": "NODE_OPTIONS='--max-old-space-size=8192' webpack --mode=production",
     "dev": "nodemon --exec ts-node src/server.ts",
-    "dev:web": "webpack serve --mode=development",
+    "dev:web": "NODE_OPTIONS='--max-old-space-size=8192' webpack serve --mode=development",
     "dev:app": "concurrently \"npm run dev\" \"npm run dev:web\"",
     "start": "node dist/server.js",
     "start:web": "npm run build && concurrently \"npm run start\" \"npx serve dist/web -p 8080\"",

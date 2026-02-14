@@ -12,7 +12,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { useJobPoller } from './hooks/useJobPoller';
-import { DEFAULT_ROUTE } from './routes';
+import { DEFAULT_ROUTE, ROUTE_REDIRECTS } from './routes';
 
 const JobPollerSetup: React.FC = () => {
   useJobPoller();
@@ -41,8 +41,32 @@ const App: React.FC = () => {
     // Handle hash-based routing
     const handleHashChange = () => {
       const fullHash = window.location.hash.replace('#', '') || DEFAULT_ROUTE;
-      // Extract page name before any query params (e.g., 'seller-matches?seller=foo' -> 'seller-matches')
+      // Extract page name before any query params (e.g., 'marketplace?tab=sellers' -> 'marketplace')
       const hash = fullHash.split('?')[0];
+      const queryPart = fullHash.includes('?') ? fullHash.split('?')[1] : '';
+
+      // Redirect legacy routes to consolidated pages
+      const redirect = ROUTE_REDIRECTS[hash];
+      if (redirect) {
+        // Preserve any extra query params from the original URL
+        const redirectBase = redirect.split('?')[0];
+        const redirectParams = redirect.includes('?')
+          ? redirect.split('?')[1]
+          : '';
+        const merged = new URLSearchParams(redirectParams);
+        if (queryPart) {
+          const original = new URLSearchParams(queryPart);
+          original.forEach((value, key) => {
+            if (!merged.has(key)) merged.set(key, value);
+          });
+        }
+        const newHash = merged.toString()
+          ? `${redirectBase}?${merged.toString()}`
+          : redirectBase;
+        window.location.hash = newHash;
+        return;
+      }
+
       setCurrentPage(hash);
     };
 

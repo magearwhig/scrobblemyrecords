@@ -38,6 +38,9 @@ const webConfig = {
     path: path.resolve(__dirname, 'dist/web'),
     clean: true,
     publicPath: '/',
+    environment: {
+      globalThis: true,
+    },
   },
   plugins: [
     new HtmlWebpackPlugin({

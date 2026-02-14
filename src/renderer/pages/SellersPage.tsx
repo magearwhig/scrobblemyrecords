@@ -11,7 +11,11 @@ import {
 } from '../hooks/useNotifications';
 import { getApiService } from '../services/api';
 
-const SellersPage: React.FC = () => {
+interface SellersPageProps {
+  embedded?: boolean;
+}
+
+const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
   const { state } = useApp();
   const { addNotification } = useNotifications();
   const api = getApiService(state.serverUrl);
@@ -128,7 +132,7 @@ const SellersPage: React.FC = () => {
                     `${match.artist} - ${match.title} at ${sellerName} for ${formatPrice(match.price, match.currency)}`,
                     {
                       label: 'View',
-                      route: 'seller-matches',
+                      route: 'marketplace?tab=matches',
                     }
                   )
                 );
@@ -142,7 +146,7 @@ const SellersPage: React.FC = () => {
                     'View all matches on the Seller Matches page',
                     {
                       label: 'View All',
-                      route: 'seller-matches',
+                      route: 'marketplace?tab=matches',
                     }
                   )
                 );
@@ -284,7 +288,7 @@ const SellersPage: React.FC = () => {
   if (loading || checkingWishlist) {
     return (
       <div className='sellers-page'>
-        <h1>Local Sellers</h1>
+        {!embedded && <h1>Local Sellers</h1>}
         <div className='loading-container'>
           <div className='spinner'></div>
           <p>Loading...</p>
@@ -297,7 +301,7 @@ const SellersPage: React.FC = () => {
   if (error) {
     return (
       <div className='sellers-page'>
-        <h1>Local Sellers</h1>
+        {!embedded && <h1>Local Sellers</h1>}
         <div className='error-state'>
           <p>{error}</p>
           <button className='btn' onClick={loadSellers}>
@@ -312,7 +316,7 @@ const SellersPage: React.FC = () => {
   if (wishlistEmpty) {
     return (
       <div className='sellers-page'>
-        <h1>Local Sellers</h1>
+        {!embedded && <h1>Local Sellers</h1>}
         <div className='card'>
           <div className='empty-state'>
             <h2>Sync Wishlist First</h2>
@@ -323,7 +327,7 @@ const SellersPage: React.FC = () => {
             <button
               className='btn'
               onClick={() => {
-                window.location.hash = 'wishlist';
+                window.location.hash = 'marketplace?tab=wishlist';
               }}
             >
               Go to Wishlist
@@ -336,10 +340,14 @@ const SellersPage: React.FC = () => {
 
   return (
     <div className='sellers-page'>
-      <h1>Local Sellers</h1>
-      <p className='page-description'>
-        Track inventories of local record shops for wishlist items.
-      </p>
+      {!embedded && (
+        <>
+          <h1>Local Sellers</h1>
+          <p className='page-description'>
+            Track inventories of local record shops for wishlist items.
+          </p>
+        </>
+      )}
 
       {/* Header actions */}
       <div className='sellers-header'>
@@ -616,7 +624,7 @@ const SellersPage: React.FC = () => {
           <button
             className='btn btn-outline'
             onClick={() => {
-              window.location.hash = 'seller-matches';
+              window.location.hash = 'marketplace?tab=matches';
             }}
           >
             View All Matches

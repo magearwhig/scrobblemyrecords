@@ -39,7 +39,7 @@ const SellerCard: React.FC<SellerCardProps> = ({
           <button
             className='btn btn-small'
             onClick={() => {
-              window.location.hash = `seller-matches?seller=${encodeURIComponent(seller.username)}`;
+              window.location.hash = `marketplace?tab=matches&seller=${encodeURIComponent(seller.username)}`;
             }}
           >
             View Matches

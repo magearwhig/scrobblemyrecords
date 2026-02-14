@@ -5,15 +5,12 @@ import DiscardPilePage from '../pages/DiscardPilePage';
 import DiscoveryPage from '../pages/DiscoveryPage';
 import HistoryPage from '../pages/HistoryPage';
 import HomePage from '../pages/HomePage';
-import NewReleasesPage from '../pages/NewReleasesPage';
+import MarketplacePage from '../pages/MarketplacePage';
 import ReleaseDetailsPage from '../pages/ReleaseDetailsPage';
 import ScrobblePage from '../pages/ScrobblePage';
-import SellerMatchesPage from '../pages/SellerMatchesPage';
-import SellersPage from '../pages/SellersPage';
 import SettingsPage from '../pages/SettingsPage';
 import StatsPage from '../pages/StatsPage';
-import SuggestionsPage from '../pages/SuggestionsPage';
-import WishlistPage from '../pages/WishlistPage';
+import WhatToPlayPage from '../pages/WhatToPlayPage';
 import WrappedPage from '../pages/WrappedPage';
 import { ROUTES } from '../routes';
 
@@ -48,20 +45,14 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
       case ROUTES.RELEASE_DETAILS:
         // Use key to force remount when a different release is selected
         return <ReleaseDetailsPage key={releaseKey} />;
-      case ROUTES.SUGGESTIONS:
-        return <SuggestionsPage />;
+      case ROUTES.MARKETPLACE:
+        return <MarketplacePage />;
+      case ROUTES.WHAT_TO_PLAY:
+        return <WhatToPlayPage />;
       case ROUTES.DISCOVERY:
         return <DiscoveryPage />;
       case ROUTES.STATS:
         return <StatsPage />;
-      case ROUTES.WISHLIST:
-        return <WishlistPage />;
-      case ROUTES.RELEASES:
-        return <NewReleasesPage />;
-      case ROUTES.SELLERS:
-        return <SellersPage />;
-      case ROUTES.SELLER_MATCHES:
-        return <SellerMatchesPage />;
       case ROUTES.DISCARD_PILE:
         return <DiscardPilePage />;
       case ROUTES.WRAPPED:

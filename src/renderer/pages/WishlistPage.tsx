@@ -40,7 +40,11 @@ interface VersionsModalState {
   loading: boolean;
 }
 
-const WishlistPage: React.FC = () => {
+interface WishlistPageProps {
+  embedded?: boolean;
+}
+
+const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
   const { state } = useApp();
   const { authStatus } = useAuth();
   const { addNotification } = useNotifications();
@@ -441,7 +445,7 @@ const WishlistPage: React.FC = () => {
             `${item.artist} - ${item.album} now has vinyl pressings available`,
             {
               label: 'View',
-              route: '/wishlist',
+              route: '/marketplace?tab=wishlist',
             }
           )
         );
@@ -525,7 +529,7 @@ const WishlistPage: React.FC = () => {
     }
   };
 
-  if (!authStatus.discogs.authenticated) {
+  if (!authStatus.discogs.authenticated && !embedded) {
     return (
       <div className='page'>
         <div className='page-header'>
@@ -541,10 +545,44 @@ const WishlistPage: React.FC = () => {
   }
 
   return (
-    <div className='page'>
-      <div className='page-header'>
-        <h2>Wishlist</h2>
-        <div className='page-header-actions'>
+    <div className={embedded ? 'wishlist-embedded' : 'page'}>
+      {!embedded && (
+        <div className='page-header'>
+          <h2>Wishlist</h2>
+          <div className='page-header-actions'>
+            <button
+              className='btn btn-primary'
+              onClick={() => handleSync(false)}
+              disabled={
+                syncStarting ||
+                syncStatus?.status === 'syncing' ||
+                syncStatus?.status === 'checking_vinyl'
+              }
+            >
+              {syncStarting
+                ? 'Starting...'
+                : syncStatus?.status === 'syncing' ||
+                    syncStatus?.status === 'checking_vinyl'
+                  ? 'Syncing...'
+                  : 'Sync Wishlist'}
+            </button>
+            <button
+              className='btn btn-secondary'
+              onClick={() => handleSync(true)}
+              disabled={
+                syncStarting ||
+                syncStatus?.status === 'syncing' ||
+                syncStatus?.status === 'checking_vinyl'
+              }
+              title='Re-check vinyl availability for all items (slower, makes more API calls)'
+            >
+              Refresh All
+            </button>
+          </div>
+        </div>
+      )}
+      {embedded && (
+        <div className='wishlist-actions'>
           <button
             className='btn btn-primary'
             onClick={() => handleSync(false)}
@@ -574,7 +612,7 @@ const WishlistPage: React.FC = () => {
             Refresh All
           </button>
         </div>
-      </div>
+      )}
 
       {/* Sync Status Bar */}
       {(syncStarting ||

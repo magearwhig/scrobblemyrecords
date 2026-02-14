@@ -6,27 +6,20 @@ import {
   CollectionItem,
   LocalWantItem,
   EnrichedWishlistItem,
-  ForgottenTrack,
 } from '../../shared/types';
-import {
-  MissingAlbumsTab,
-  MissingArtistsTab,
-  ForgottenFavoritesTab,
-} from '../components/discovery';
+import { MissingAlbumsTab, MissingArtistsTab } from '../components/discovery';
 import SyncStatusBar from '../components/SyncStatusBar';
 import { Modal, ModalFooter } from '../components/ui';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { useCollectionLookup } from '../hooks/useCollectionLookup';
 import { getApiService } from '../services/api';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('DiscoveryPage');
 
-type TabType = 'albums' | 'artists' | 'forgotten';
+type TabType = 'albums' | 'artists';
 type AlbumSortOption = 'plays' | 'artist' | 'album' | 'recent';
 type ArtistSortOption = 'plays' | 'artist' | 'albums' | 'recent';
-type ForgottenSortOption = 'plays' | 'artist' | 'track' | 'dormant';
 
 // Normalize album/artist names for matching
 // Removes quotes, edition suffixes, and normalizes to lowercase
@@ -53,7 +46,6 @@ interface MappingModalState {
 const DiscoveryPage: React.FC = () => {
   const { state } = useApp();
   const { authStatus } = useAuth();
-  const { collection } = useCollectionLookup();
   const [activeTab, setActiveTab] = useState<TabType>('albums');
   const [missingAlbums, setMissingAlbums] = useState<MissingAlbum[]>([]);
   const [missingArtists, setMissingArtists] = useState<MissingArtist[]>([]);
@@ -87,19 +79,8 @@ const DiscoveryPage: React.FC = () => {
   // Sorting state
   const [albumSort, setAlbumSort] = useState<AlbumSortOption>('plays');
   const [artistSort, setArtistSort] = useState<ArtistSortOption>('plays');
-  const [forgottenSort, setForgottenSort] =
-    useState<ForgottenSortOption>('plays');
-
   // Hide wanted items toggle
   const [hideWantedItems, setHideWantedItems] = useState(false);
-
-  // Forgotten favorites state
-  const [forgottenTracks, setForgottenTracks] = useState<ForgottenTrack[]>([]);
-  const [forgottenLoading, setForgottenLoading] = useState(false);
-  const [forgottenError, setForgottenError] = useState<string | null>(null);
-  const [forgottenTotalMatching, setForgottenTotalMatching] = useState(0);
-  const [dormantDays, setDormantDays] = useState(90); // Default 3 months (per plan)
-  const [minPlays, setMinPlays] = useState(10); // Default 10 plays
 
   const api = getApiService(state.serverUrl);
 
@@ -149,34 +130,6 @@ const DiscoveryPage: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
-
-  // Load forgotten favorites (separate from main load since it can be slow)
-  const loadForgottenFavorites = useCallback(async () => {
-    try {
-      setForgottenLoading(true);
-      setForgottenError(null);
-      const result = await api.getForgottenFavorites(
-        dormantDays,
-        minPlays,
-        100
-      );
-      setForgottenTracks(result.tracks);
-      setForgottenTotalMatching(result.meta.totalMatching);
-    } catch (err) {
-      setForgottenError(
-        err instanceof Error
-          ? err.message
-          : 'Failed to load forgotten favorites'
-      );
-    } finally {
-      setForgottenLoading(false);
-    }
-  }, [api, dormantDays, minPlays]);
-
-  // Load forgotten favorites on mount and when params change
-  useEffect(() => {
-    loadForgottenFavorites();
-  }, [loadForgottenFavorites]);
 
   const formatDate = (timestamp: number): string => {
     const date = new Date(timestamp * 1000);
@@ -418,12 +371,6 @@ const DiscoveryPage: React.FC = () => {
         >
           Missing Artists ({missingArtists.length})
         </button>
-        <button
-          className={`discovery-tab ${activeTab === 'forgotten' ? 'active' : ''}`}
-          onClick={() => setActiveTab('forgotten')}
-        >
-          Forgotten Favorites ({forgottenTracks.length})
-        </button>
       </div>
 
       {error && (
@@ -473,26 +420,6 @@ const DiscoveryPage: React.FC = () => {
               getDiscogsArtistUrl={getDiscogsArtistUrl}
               openArtistMapping={openArtistMapping}
               handleHideArtist={handleHideArtist}
-            />
-          )}
-
-          {activeTab === 'forgotten' && (
-            <ForgottenFavoritesTab
-              forgottenTracks={forgottenTracks}
-              forgottenLoading={forgottenLoading}
-              forgottenError={forgottenError}
-              forgottenTotalMatching={forgottenTotalMatching}
-              dormantDays={dormantDays}
-              setDormantDays={setDormantDays}
-              minPlays={minPlays}
-              setMinPlays={setMinPlays}
-              forgottenSort={forgottenSort}
-              setForgottenSort={setForgottenSort}
-              loadForgottenFavorites={loadForgottenFavorites}
-              formatDate={formatDate}
-              openLink={openLink}
-              api={api}
-              collection={collection}
             />
           )}
         </div>

@@ -11,64 +11,24 @@ Future consolidation opportunities identified during the January 2026 UI reorgan
 
 ---
 
-## 1. Consolidate Marketplace Features
+## 1. Consolidate Marketplace Features -- DONE (February 2026)
 
-**Current State:**
-- **Wishlist** - Discogs wantlist with vinyl availability checking
-- **New Releases** - Track new releases from artists in collection
-- **Local Sellers** - Monitor local record shop inventories
-- **Discovery "Missing Albums/Artists"** - Albums/artists you listen to but don't own
-
-**Proposed:**
-Create unified "Marketplace" or "Want List" hub with tabs/filters:
-- Tab 1: **Wishlist** (Discogs wantlist)
-- Tab 2: **Missing** (Discovery's albums you listen to but don't own)
-- Tab 3: **New Releases** (upcoming from collection artists)
-- Tab 4: **Local Shops** (sellers + matches integrated)
-
-**Benefits:**
-- Unified filters: "vinyl available", "affordable", "at local seller"
-- Single destination for all "acquisition" workflows
-- Reduces cognitive load - all buying-related features in one place
-
-**Files Involved:**
-- `src/renderer/pages/WishlistPage.tsx`
-- `src/renderer/pages/NewReleasesPage.tsx`
-- `src/renderer/pages/SellersPage.tsx`
-- `src/renderer/pages/SellerMatchesPage.tsx`
-- `src/renderer/pages/DiscoveryPage.tsx` (missing albums/artists tabs)
+Implemented as "Marketplace" hub page with 5 tabs: Wishlist, New Releases, Sellers, Matches, Missing Albums.
+See `done/consolidation-plan.md` for full details.
 
 ---
 
-## 2. Consolidate "What to Play" Features
+## 2. Consolidate "What to Play" Features -- DONE (February 2026)
 
-**Current State:**
-- **Play Suggestions** - Algorithm and AI-based album recommendations
-- **Discovery > Forgotten Favorites** - Dormant tracks you used to love
-- **Stats > Dusty Corners** - Albums you haven't played in a while
-
-**Proposed:**
-Merge into single "What to Play" page with modes/tabs:
-- **Algorithm Suggestions** (current weighted suggestions)
-- **AI Suggestions** (Ollama-powered if enabled)
-- **Forgotten Favorites** (from Discovery)
-- **Dusty Corners** (from Stats)
-- **Random Pick** (new: just shuffle from collection)
-
-**Benefits:**
-- Single answer to "what should I play?"
-- Users can switch between suggestion modes easily
-- Eliminates feature fragmentation across pages
-
-**Files Involved:**
-- `src/renderer/pages/SuggestionsPage.tsx`
-- `src/renderer/pages/DiscoveryPage.tsx` (forgotten favorites tab)
-- `src/renderer/pages/StatsPage.tsx` (dusty corners section)
+Implemented as "What to Play" page with 3 tabs: Suggestions, Forgotten Favorites, Dusty Corners.
+See `done/consolidation-plan.md` for full details.
 
 ---
 
 ## Implementation Notes
 
-These consolidations are higher effort and require careful UX design. They should be tackled after the initial UI reorganization (grouped sidebar, floating action bar, Setup→Settings merge) is stable.
-
-Consider user testing to validate the consolidated workflows make sense.
+Both consolidations completed. Additional fixes applied:
+- OOM fix: batch play count endpoint now uses `countsOnly` mode and chunked processing
+- CSP fix: webpack `output.environment.globalThis` eliminates `new Function` polyfill
+- Backward-compat redirects for old route hashes
+- StatsPage DustyCornersSection shows top 8 with "See all" link to What to Play

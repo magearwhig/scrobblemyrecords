@@ -432,7 +432,7 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
                 <button
                   className='btn btn-outline'
                   onClick={() => {
-                    window.location.hash = 'sellers';
+                    window.location.hash = 'marketplace?tab=sellers';
                   }}
                 >
                   Manage Sellers &rarr;

@@ -30,7 +30,13 @@ interface DisambiguationModalState {
   searchQuery: string;
 }
 
-const NewReleasesPage: React.FC = () => {
+interface NewReleasesPageProps {
+  embedded?: boolean;
+}
+
+const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
+  embedded = false,
+}) => {
   const { state } = useApp();
   const { authStatus } = useAuth();
   const { addNotification } = useNotifications();
@@ -448,7 +454,7 @@ const NewReleasesPage: React.FC = () => {
   };
 
   // Not authenticated state
-  if (!authStatus.discogs.authenticated) {
+  if (!authStatus.discogs.authenticated && !embedded) {
     return (
       <div className='new-releases-page'>
         <h1>New Releases</h1>
@@ -464,8 +470,8 @@ const NewReleasesPage: React.FC = () => {
 
   return (
     <div className='new-releases-page'>
-      <header className='page-header'>
-        <h1>New Releases</h1>
+      <header className={embedded ? 'new-releases-actions' : 'page-header'}>
+        {!embedded && <h1>New Releases</h1>}
         <div className='header-actions'>
           {syncStatus && syncStatus.status !== 'syncing' && (
             <span className='sync-info'>

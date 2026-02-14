@@ -4669,7 +4669,10 @@ body {
 }
 
 .dusty-corners-more {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
   margin-top: 1rem;
   font-size: 0.85rem;
   color: var(--text-secondary);
@@ -10012,4 +10015,54 @@ body {
   .lastfm-history-track-item.lastfm-history-enriched {
     grid-template-columns: 2fr 1fr 1fr 50px 80px auto;
   }
+}
+
+/* ===== Marketplace Page ===== */
+.marketplace-page {
+  padding: 1.5rem;
+}
+
+.marketplace-page h1 {
+  margin-bottom: 0.25rem;
+}
+
+.marketplace-page .page-description {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.marketplace-tab-content {
+  margin-top: 0.5rem;
+}
+
+/* ===== What to Play Page ===== */
+.what-to-play-page {
+  padding: 1.5rem;
+}
+
+.what-to-play-page h1 {
+  margin-bottom: 0.25rem;
+}
+
+.what-to-play-page .page-description {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.what-to-play-tab-content {
+  margin-top: 0.5rem;
+}
+
+/* Embedded page action bars (when pages render inside tab containers) */
+.wishlist-actions,
+.new-releases-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.wishlist-embedded {
+  padding: 0;
 }

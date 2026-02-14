@@ -202,7 +202,8 @@ export class ScrobbleHistoryStorage {
    */
   async getAlbumHistoryFuzzy(
     artist: string,
-    album: string
+    album: string,
+    options?: { countsOnly?: boolean }
   ): Promise<{
     entry: AlbumHistoryEntry | null;
     matchType: 'exact' | 'fuzzy' | 'none';
@@ -216,8 +217,20 @@ export class ScrobbleHistoryStorage {
     // Try exact match first
     const exactKey = this.normalizeKey(artist, album);
     if (index.albums[exactKey]) {
+      const entry = index.albums[exactKey];
+      if (options?.countsOnly) {
+        return {
+          entry: {
+            playCount: entry.playCount,
+            lastPlayed: entry.lastPlayed,
+            plays: [],
+          },
+          matchType: 'exact',
+          matchedKeys: [exactKey],
+        };
+      }
       return {
-        entry: index.albums[exactKey],
+        entry,
         matchType: 'exact',
         matchedKeys: [exactKey],
       };
@@ -234,6 +247,30 @@ export class ScrobbleHistoryStorage {
     // Aggregate all matching albums
     let totalPlayCount = 0;
     let latestPlayed = 0;
+
+    if (options?.countsOnly) {
+      // Skip play-level aggregation — only compute counts
+      for (const key of matchedExactKeys) {
+        const entry = index.albums[key];
+        if (entry) {
+          totalPlayCount += entry.playCount;
+          if (entry.lastPlayed > latestPlayed) {
+            latestPlayed = entry.lastPlayed;
+          }
+        }
+      }
+
+      return {
+        entry: {
+          playCount: totalPlayCount,
+          lastPlayed: latestPlayed,
+          plays: [],
+        },
+        matchType: 'fuzzy',
+        matchedKeys: matchedExactKeys,
+      };
+    }
+
     const allPlays: Array<{ timestamp: number; track?: string }> = [];
 
     for (const key of matchedExactKeys) {

@@ -1097,100 +1097,112 @@ export default function createStatsRouter(
         });
       }
 
-      // Process each album using mapping pipeline + fuzzy matching
-      const results: AlbumPlayCountResult[] = await Promise.all(
-        body.albums.map(async album => {
-          // Try album mappings first (handles Discogs→Last.fm name differences)
-          if (mappingService) {
-            const albumMappings =
-              await mappingService.getAllAlbumMappingsForCollection(
-                album.artist,
-                album.title
-              );
+      // Process albums in chunks to avoid OOM from parallel fuzzy matching
+      const CHUNK_SIZE = 50;
+      const countsOnly = { countsOnly: true };
+      const results: AlbumPlayCountResult[] = [];
 
-            if (albumMappings.length > 0) {
-              let totalPlayCount = 0;
-              let latestPlayed: number | null = null;
-              let bestMatchType: 'exact' | 'fuzzy' | 'none' = 'none';
-
-              for (const mapping of albumMappings) {
-                let result = await historyStorage.getAlbumHistoryFuzzy(
-                  mapping.historyArtist,
-                  mapping.historyAlbum
+      for (let i = 0; i < body.albums.length; i += CHUNK_SIZE) {
+        const chunk = body.albums.slice(i, i + CHUNK_SIZE);
+        const chunkResults = await Promise.all(
+          chunk.map(async album => {
+            // Try album mappings first (handles Discogs→Last.fm name differences)
+            if (mappingService) {
+              const albumMappings =
+                await mappingService.getAllAlbumMappingsForCollection(
+                  album.artist,
+                  album.title
                 );
 
-                // If not found, try artist name mapping as fallback
-                if (result.matchType === 'none') {
-                  const mappedArtist = artistMappingService.getLastfmName(
-                    mapping.historyArtist
+              if (albumMappings.length > 0) {
+                let totalPlayCount = 0;
+                let latestPlayed: number | null = null;
+                let bestMatchType: 'exact' | 'fuzzy' | 'none' = 'none';
+
+                for (const mapping of albumMappings) {
+                  let result = await historyStorage.getAlbumHistoryFuzzy(
+                    mapping.historyArtist,
+                    mapping.historyAlbum,
+                    countsOnly
                   );
-                  if (mappedArtist !== mapping.historyArtist) {
-                    result = await historyStorage.getAlbumHistoryFuzzy(
-                      mappedArtist,
-                      mapping.historyAlbum
+
+                  // If not found, try artist name mapping as fallback
+                  if (result.matchType === 'none') {
+                    const mappedArtist = artistMappingService.getLastfmName(
+                      mapping.historyArtist
                     );
+                    if (mappedArtist !== mapping.historyArtist) {
+                      result = await historyStorage.getAlbumHistoryFuzzy(
+                        mappedArtist,
+                        mapping.historyAlbum,
+                        countsOnly
+                      );
+                    }
+                  }
+
+                  if (result.entry && result.matchType !== 'none') {
+                    totalPlayCount += result.entry.playCount;
+                    if (
+                      result.entry.lastPlayed &&
+                      (!latestPlayed || result.entry.lastPlayed > latestPlayed)
+                    ) {
+                      latestPlayed = result.entry.lastPlayed;
+                    }
+                    if (result.matchType === 'exact') {
+                      bestMatchType = 'exact';
+                    } else if (
+                      result.matchType === 'fuzzy' &&
+                      bestMatchType !== 'exact'
+                    ) {
+                      bestMatchType = 'fuzzy';
+                    }
                   }
                 }
 
-                if (result.entry && result.matchType !== 'none') {
-                  totalPlayCount += result.entry.playCount;
-                  if (
-                    result.entry.lastPlayed &&
-                    (!latestPlayed || result.entry.lastPlayed > latestPlayed)
-                  ) {
-                    latestPlayed = result.entry.lastPlayed;
-                  }
-                  if (result.matchType === 'exact') {
-                    bestMatchType = 'exact';
-                  } else if (
-                    result.matchType === 'fuzzy' &&
-                    bestMatchType !== 'exact'
-                  ) {
-                    bestMatchType = 'fuzzy';
-                  }
+                if (bestMatchType !== 'none') {
+                  return {
+                    artist: album.artist,
+                    title: album.title,
+                    playCount: totalPlayCount,
+                    lastPlayed: latestPlayed,
+                    matchType: bestMatchType,
+                  };
                 }
-              }
-
-              if (bestMatchType !== 'none') {
-                return {
-                  artist: album.artist,
-                  title: album.title,
-                  playCount: totalPlayCount,
-                  lastPlayed: latestPlayed,
-                  matchType: bestMatchType,
-                };
               }
             }
-          }
 
-          // No mappings found — try direct fuzzy match with raw Discogs names
-          let historyResult = await historyStorage.getAlbumHistoryFuzzy(
-            album.artist,
-            album.title
-          );
-
-          // If still not found, try artist name mapping as last resort
-          if (historyResult.matchType === 'none') {
-            const mappedArtist = artistMappingService.getLastfmName(
-              album.artist
+            // No mappings found — try direct fuzzy match with raw Discogs names
+            let historyResult = await historyStorage.getAlbumHistoryFuzzy(
+              album.artist,
+              album.title,
+              countsOnly
             );
-            if (mappedArtist !== album.artist) {
-              historyResult = await historyStorage.getAlbumHistoryFuzzy(
-                mappedArtist,
-                album.title
-              );
-            }
-          }
 
-          return {
-            artist: album.artist,
-            title: album.title,
-            playCount: historyResult.entry?.playCount || 0,
-            lastPlayed: historyResult.entry?.lastPlayed || null,
-            matchType: historyResult.matchType,
-          };
-        })
-      );
+            // If still not found, try artist name mapping as last resort
+            if (historyResult.matchType === 'none') {
+              const mappedArtist = artistMappingService.getLastfmName(
+                album.artist
+              );
+              if (mappedArtist !== album.artist) {
+                historyResult = await historyStorage.getAlbumHistoryFuzzy(
+                  mappedArtist,
+                  album.title,
+                  countsOnly
+                );
+              }
+            }
+
+            return {
+              artist: album.artist,
+              title: album.title,
+              playCount: historyResult.entry?.playCount || 0,
+              lastPlayed: historyResult.entry?.lastPlayed || null,
+              matchType: historyResult.matchType,
+            };
+          })
+        );
+        results.push(...chunkResults);
+      }
 
       const response: AlbumPlayCountResponse = { results };
 

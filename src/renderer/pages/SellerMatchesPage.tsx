@@ -21,7 +21,13 @@ interface CacheInfo {
   nextScanDue: number;
 }
 
-const SellerMatchesPage: React.FC = () => {
+interface SellerMatchesPageProps {
+  embedded?: boolean;
+}
+
+const SellerMatchesPage: React.FC<SellerMatchesPageProps> = ({
+  embedded = false,
+}) => {
   const { state } = useApp();
   const api = getApiService(state.serverUrl);
 
@@ -269,7 +275,7 @@ const SellerMatchesPage: React.FC = () => {
   if (loading) {
     return (
       <div className='seller-matches-page'>
-        <h1>Wishlist Matches</h1>
+        {!embedded && <h1>Wishlist Matches</h1>}
         <div className='loading-container'>
           <div className='spinner'></div>
           <p>Loading matches...</p>
@@ -282,7 +288,7 @@ const SellerMatchesPage: React.FC = () => {
   if (error) {
     return (
       <div className='seller-matches-page'>
-        <h1>Wishlist Matches</h1>
+        {!embedded && <h1>Wishlist Matches</h1>}
         <div className='error-state'>
           <p>{error}</p>
           <button className='btn' onClick={loadData}>
@@ -295,7 +301,7 @@ const SellerMatchesPage: React.FC = () => {
 
   return (
     <div className='seller-matches-page'>
-      <h1>Wishlist Matches</h1>
+      {!embedded && <h1>Wishlist Matches</h1>}
       <p className='page-description'>
         {filteredMatches.length === 0
           ? 'No matches found from your monitored sellers.'
@@ -313,17 +319,19 @@ const SellerMatchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Back link */}
-      <div className='seller-matches-back'>
-        <button
-          className='btn btn-outline btn-small'
-          onClick={() => {
-            window.location.hash = 'sellers';
-          }}
-        >
-          &larr; Back to Sellers
-        </button>
-      </div>
+      {/* Back link - hidden when embedded in Marketplace tabs */}
+      {!embedded && (
+        <div className='seller-matches-back'>
+          <button
+            className='btn btn-outline btn-small'
+            onClick={() => {
+              window.location.hash = 'marketplace?tab=sellers';
+            }}
+          >
+            &larr; Back to Sellers
+          </button>
+        </div>
+      )}
 
       {/* Filter and sort controls */}
       {matches.length > 0 && (

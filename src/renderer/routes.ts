@@ -9,16 +9,25 @@ export const ROUTES = {
   HISTORY: 'history',
   SETTINGS: 'settings',
   RELEASE_DETAILS: 'release-details',
-  SUGGESTIONS: 'suggestions',
+  MARKETPLACE: 'marketplace',
+  WHAT_TO_PLAY: 'what-to-play',
   DISCOVERY: 'discovery',
   STATS: 'stats',
-  WISHLIST: 'wishlist',
-  RELEASES: 'releases',
-  SELLERS: 'sellers',
-  SELLER_MATCHES: 'seller-matches',
   DISCARD_PILE: 'discard-pile',
   WRAPPED: 'wrapped',
 } as const;
+
+/**
+ * Maps legacy route hashes to their new consolidated equivalents.
+ * Used in App.tsx to redirect old bookmarks/links.
+ */
+export const ROUTE_REDIRECTS: Record<string, string> = {
+  wishlist: 'marketplace?tab=wishlist',
+  releases: 'marketplace?tab=new-releases',
+  sellers: 'marketplace?tab=sellers',
+  'seller-matches': 'marketplace?tab=matches',
+  suggestions: 'what-to-play?tab=suggestions',
+};
 
 export type RouteId = (typeof ROUTES)[keyof typeof ROUTES];
 

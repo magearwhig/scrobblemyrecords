@@ -486,6 +486,16 @@ export const StatsPage: React.FC = () => {
       {/* Dusty corners */}
       <section className='stats-section'>
         <DustyCornersSection albums={dustyCorners} loading={dustyLoading} />
+        {dustyCorners.length > 0 && (
+          <button
+            className='btn btn-outline btn-small'
+            onClick={() => {
+              window.location.hash = 'what-to-play?tab=dusty';
+            }}
+          >
+            View all in What to Play
+          </button>
+        )}
       </section>
 
       {/* Rankings over time */}
