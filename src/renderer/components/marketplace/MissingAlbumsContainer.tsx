@@ -6,6 +6,7 @@ import {
   LocalWantItem,
   EnrichedWishlistItem,
 } from '../../../shared/types';
+import { normalizeForMatching } from '../../../shared/utils/trackNormalization';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { getApiService } from '../../services/api';
@@ -17,19 +18,6 @@ import { Button } from '../ui/Button';
 const logger = createLogger('MissingAlbumsContainer');
 
 type AlbumSortOption = 'plays' | 'artist' | 'album' | 'recent';
-
-const normalizeForMatching = (str: string): string => {
-  return str
-    .toLowerCase()
-    .replace(/["\u201C\u201D\u2018\u2019'`]/g, '')
-    .replace(/\s*\[explicit\]\s*/gi, '')
-    .replace(/\s*\(deluxe\s*(edition)?\)\s*/gi, '')
-    .replace(/\s*\(explicit\)\s*/gi, '')
-    .replace(/\s*\(remaster(ed)?\)\s*/gi, '')
-    .replace(/\s*\(expanded\s*(edition)?\)\s*/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-};
 
 interface MappingModalState {
   isOpen: boolean;

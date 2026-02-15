@@ -1,8 +1,10 @@
 import { CollectionItem } from '../../shared/types';
+import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
 import { LastFmService } from './lastfmService';
+import { MappingService } from './mappingService';
 
 const ALBUM_COVERS_CACHE = 'images/album-covers.json';
 const ARTIST_IMAGES_CACHE = 'images/artist-images.json';
@@ -31,6 +33,7 @@ interface ImageCache {
 export class ImageService {
   private fileStorage: FileStorage;
   private lastfmService: LastFmService;
+  private mappingService: MappingService | null = null;
   private logger = createLogger('ImageService');
 
   // In-memory caches for performance
@@ -41,6 +44,10 @@ export class ImageService {
   constructor(fileStorage: FileStorage, lastfmService: LastFmService) {
     this.fileStorage = fileStorage;
     this.lastfmService = lastfmService;
+  }
+
+  setMappingService(mappingService: MappingService): void {
+    this.mappingService = mappingService;
   }
 
   /**
@@ -104,19 +111,37 @@ export class ImageService {
 
   /**
    * Get album cover from collection (if available)
+   * Uses mapping service to translate Discogs names to Last.fm names,
+   * then fuzzy-matches via normalizeForMatching to handle edition suffixes,
+   * disambiguation numbers, etc.
    */
-  getAlbumCoverFromCollection(
+  async getAlbumCoverFromCollection(
     collection: CollectionItem[],
     artist: string,
     album: string
-  ): string | null {
-    const normalizedArtist = artist.toLowerCase().trim();
-    const normalizedAlbum = album.toLowerCase().trim();
+  ): Promise<string | null> {
+    const normalizedSearchArtist = normalizeForMatching(artist);
+    const normalizedSearchAlbum = normalizeForMatching(album);
 
     for (const item of collection) {
+      let matchArtist = item.release.artist;
+      let matchAlbum = item.release.title;
+
+      if (this.mappingService) {
+        const albumMapping =
+          await this.mappingService.getAlbumMappingForCollection(
+            item.release.artist,
+            item.release.title
+          );
+        if (albumMapping) {
+          matchArtist = albumMapping.historyArtist;
+          matchAlbum = albumMapping.historyAlbum;
+        }
+      }
+
       if (
-        item.release.artist.toLowerCase().trim() === normalizedArtist &&
-        item.release.title.toLowerCase().trim() === normalizedAlbum
+        normalizeForMatching(matchArtist) === normalizedSearchArtist &&
+        normalizeForMatching(matchAlbum) === normalizedSearchAlbum
       ) {
         return item.release.cover_image || null;
       }

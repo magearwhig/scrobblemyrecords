@@ -3179,4 +3179,503 @@ describe('StatsService', () => {
       ).not.toThrow();
     });
   });
+
+  describe('getArtistDetail mapping service integration', () => {
+    // Helper to create a mock index with track info for artist detail tests
+    const createMockIndexWithTracks = (
+      albums: Record<
+        string,
+        {
+          lastPlayed: number;
+          playCount: number;
+          plays: { timestamp: number; track?: string }[];
+        }
+      >
+    ): ScrobbleHistoryIndex => ({
+      albums,
+      totalScrobbles: Object.values(albums).reduce(
+        (sum, a) => sum + a.playCount,
+        0
+      ),
+      lastSyncTimestamp: Math.floor(Date.now() / 1000),
+      oldestScrobbleDate: 0,
+    });
+
+    it('should use mapping service to match collection items when mapping exists', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+
+      // History has Last.fm name "Bestiary (Bonus Track Version)"
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'hail mary mallon|bestiary (bonus track version)': {
+            lastPlayed: now,
+            playCount: 10,
+            plays: Array.from({ length: 10 }, () => ({
+              timestamp: now,
+              track: 'Whales',
+            })),
+          },
+        })
+      );
+
+      // Collection has Discogs name "Bestiary"
+      const collection = [
+        createMockCollectionItem({
+          id: 999,
+          artist: 'Hail Mary Mallon',
+          title: 'Bestiary',
+          coverImage: 'https://example.com/bestiary.jpg',
+        }),
+      ];
+
+      // Mapping service maps Discogs -> Last.fm names
+      const mockMappingService = {
+        getAlbumMappingForCollection: jest.fn().mockResolvedValue({
+          historyArtist: 'hail mary mallon',
+          historyAlbum: 'bestiary (bonus track version)',
+          collectionId: 999,
+          collectionArtist: 'Hail Mary Mallon',
+          collectionAlbum: 'Bestiary',
+          createdAt: Date.now(),
+        }),
+      } as unknown as MappingService;
+
+      statsService.setMappingService(mockMappingService);
+
+      // Act
+      const result = await statsService.getArtistDetail(
+        'Hail Mary Mallon',
+        'month',
+        collection
+      );
+
+      // Assert
+      expect(
+        mockMappingService.getAlbumMappingForCollection
+      ).toHaveBeenCalledWith('Hail Mary Mallon', 'Bestiary');
+      expect(result.albums).toHaveLength(1);
+      expect(result.albums[0].inCollection).toBe(true);
+      expect(result.albums[0].collectionReleaseId).toBe(999);
+      expect(result.albums[0].coverUrl).toBe(
+        'https://example.com/bestiary.jpg'
+      );
+    });
+
+    it('should fall back to fuzzy matching when mapping service returns null', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'radiohead|ok computer': {
+            lastPlayed: now,
+            playCount: 20,
+            plays: Array.from({ length: 20 }, () => ({
+              timestamp: now,
+              track: 'Paranoid Android',
+            })),
+          },
+        })
+      );
+
+      const collection = [
+        createMockCollectionItem({
+          id: 456,
+          artist: 'Radiohead',
+          title: 'OK Computer',
+        }),
+      ];
+
+      // Mapping service returns null (no mapping needed, names match)
+      const mockMappingService = {
+        getAlbumMappingForCollection: jest.fn().mockResolvedValue(null),
+      } as unknown as MappingService;
+
+      statsService.setMappingService(mockMappingService);
+
+      // Act
+      const result = await statsService.getArtistDetail(
+        'Radiohead',
+        'month',
+        collection
+      );
+
+      // Assert
+      expect(
+        mockMappingService.getAlbumMappingForCollection
+      ).toHaveBeenCalled();
+      expect(result.albums).toHaveLength(1);
+      // Should still match via fuzzy normalization since names are identical
+      expect(result.albums[0].inCollection).toBe(true);
+      expect(result.albums[0].collectionReleaseId).toBe(456);
+    });
+
+    it('should use fuzzy matching only when mapping service is not set', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'radiohead|ok computer': {
+            lastPlayed: now,
+            playCount: 15,
+            plays: Array.from({ length: 15 }, () => ({
+              timestamp: now,
+              track: 'Karma Police',
+            })),
+          },
+        })
+      );
+
+      const collection = [
+        createMockCollectionItem({
+          id: 789,
+          artist: 'Radiohead',
+          title: 'OK Computer',
+        }),
+      ];
+
+      // Do NOT set mapping service (it remains null)
+
+      // Act
+      const result = await statsService.getArtistDetail(
+        'Radiohead',
+        'month',
+        collection
+      );
+
+      // Assert - should still match via fuzzy key since names are the same
+      expect(result.albums).toHaveLength(1);
+      expect(result.albums[0].inCollection).toBe(true);
+    });
+
+    it('should match Discogs "Tobacco (3)" to Last.fm "tobacco" via fuzzy normalization', async () => {
+      // Arrange - Real-world edge case: Discogs uses disambiguation numbers
+      const now = Math.floor(Date.now() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'tobacco|fucked up friends': {
+            lastPlayed: now,
+            playCount: 25,
+            plays: Array.from({ length: 25 }, () => ({
+              timestamp: now,
+              track: 'Tape Hiss Orgy',
+            })),
+          },
+        })
+      );
+
+      // Discogs has "Tobacco (3)" but Last.fm has "tobacco"
+      const collection = [
+        createMockCollectionItem({
+          id: 555,
+          artist: 'Tobacco (3)',
+          title: 'Fucked Up Friends',
+        }),
+      ];
+
+      // No mapping needed - fuzzyNormalizeKey strips "(3)" suffix
+      const mockMappingService = {
+        getAlbumMappingForCollection: jest.fn().mockResolvedValue(null),
+      } as unknown as MappingService;
+
+      statsService.setMappingService(mockMappingService);
+
+      // Act
+      const result = await statsService.getArtistDetail(
+        'Tobacco',
+        'month',
+        collection
+      );
+
+      // Assert - fuzzyNormalizeKey strips "(3)", so "Tobacco (3)" -> "tobacco"
+      expect(result.albums).toHaveLength(1);
+      expect(result.albums[0].inCollection).toBe(true);
+      expect(result.albums[0].collectionReleaseId).toBe(555);
+    });
+
+    it('should match "Bestiary" in Discogs to "Bestiary (Bonus Track Version)" via mapping', async () => {
+      // Arrange - Real-world edge case: album edition differences
+      const now = Math.floor(Date.now() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'hail mary mallon|bestiary (bonus track version)': {
+            lastPlayed: now,
+            playCount: 30,
+            plays: Array.from({ length: 30 }, () => ({
+              timestamp: now,
+              track: 'Dollywood',
+            })),
+          },
+        })
+      );
+
+      const collection = [
+        createMockCollectionItem({
+          id: 777,
+          artist: 'Hail Mary Mallon',
+          title: 'Bestiary',
+        }),
+      ];
+
+      // Mapping service provides the Last.fm name
+      const mockMappingService = {
+        getAlbumMappingForCollection: jest.fn().mockResolvedValue({
+          historyArtist: 'hail mary mallon',
+          historyAlbum: 'bestiary (bonus track version)',
+          collectionId: 777,
+          collectionArtist: 'Hail Mary Mallon',
+          collectionAlbum: 'Bestiary',
+          createdAt: Date.now(),
+        }),
+      } as unknown as MappingService;
+
+      statsService.setMappingService(mockMappingService);
+
+      // Act
+      const result = await statsService.getArtistDetail(
+        'Hail Mary Mallon',
+        'month',
+        collection
+      );
+
+      // Assert
+      expect(result.albums).toHaveLength(1);
+      expect(result.albums[0].inCollection).toBe(true);
+      expect(result.albums[0].collectionReleaseId).toBe(777);
+    });
+  });
+
+  describe('getTrackDetail mapping service integration', () => {
+    // Helper to create a mock index with track info
+    const createMockIndexWithTracks = (
+      albums: Record<
+        string,
+        {
+          lastPlayed: number;
+          playCount: number;
+          plays: { timestamp: number; track?: string }[];
+        }
+      >
+    ): ScrobbleHistoryIndex => ({
+      albums,
+      totalScrobbles: Object.values(albums).reduce(
+        (sum, a) => sum + a.playCount,
+        0
+      ),
+      lastSyncTimestamp: Math.floor(Date.now() / 1000),
+      oldestScrobbleDate: 0,
+    });
+
+    it('should use mapping service to set inCollection on appearsOn albums', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'hail mary mallon|bestiary (bonus track version)': {
+            lastPlayed: now,
+            playCount: 5,
+            plays: Array.from({ length: 5 }, () => ({
+              timestamp: now,
+              track: 'Whales',
+            })),
+          },
+        })
+      );
+
+      const collection = [
+        createMockCollectionItem({
+          id: 888,
+          artist: 'Hail Mary Mallon',
+          title: 'Bestiary',
+          coverImage: 'https://example.com/bestiary-cover.jpg',
+        }),
+      ];
+
+      const mockMappingService = {
+        getAlbumMappingForCollection: jest.fn().mockResolvedValue({
+          historyArtist: 'hail mary mallon',
+          historyAlbum: 'bestiary (bonus track version)',
+          collectionId: 888,
+          collectionArtist: 'Hail Mary Mallon',
+          collectionAlbum: 'Bestiary',
+          createdAt: Date.now(),
+        }),
+      } as unknown as MappingService;
+
+      statsService.setMappingService(mockMappingService);
+
+      // Act
+      const result = await statsService.getTrackDetail(
+        'Hail Mary Mallon',
+        'Whales',
+        undefined,
+        'month',
+        collection
+      );
+
+      // Assert
+      expect(
+        mockMappingService.getAlbumMappingForCollection
+      ).toHaveBeenCalledWith('Hail Mary Mallon', 'Bestiary');
+      expect(result.appearsOn).toHaveLength(1);
+      expect(result.appearsOn[0].inCollection).toBe(true);
+      expect(result.appearsOn[0].collectionReleaseId).toBe(888);
+      expect(result.appearsOn[0].coverUrl).toBe(
+        'https://example.com/bestiary-cover.jpg'
+      );
+    });
+
+    it('should fall back to fuzzy matching when mapping returns null', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'radiohead|ok computer': {
+            lastPlayed: now,
+            playCount: 8,
+            plays: Array.from({ length: 8 }, () => ({
+              timestamp: now,
+              track: 'Paranoid Android',
+            })),
+          },
+        })
+      );
+
+      const collection = [
+        createMockCollectionItem({
+          id: 111,
+          artist: 'Radiohead',
+          title: 'OK Computer',
+        }),
+      ];
+
+      const mockMappingService = {
+        getAlbumMappingForCollection: jest.fn().mockResolvedValue(null),
+      } as unknown as MappingService;
+
+      statsService.setMappingService(mockMappingService);
+
+      // Act
+      const result = await statsService.getTrackDetail(
+        'Radiohead',
+        'Paranoid Android',
+        undefined,
+        'month',
+        collection
+      );
+
+      // Assert
+      expect(
+        mockMappingService.getAlbumMappingForCollection
+      ).toHaveBeenCalled();
+      expect(result.appearsOn).toHaveLength(1);
+      expect(result.appearsOn[0].inCollection).toBe(true);
+    });
+
+    it('should use fuzzy matching only when mapping service is not set', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'radiohead|ok computer': {
+            lastPlayed: now,
+            playCount: 12,
+            plays: Array.from({ length: 12 }, () => ({
+              timestamp: now,
+              track: 'Karma Police',
+            })),
+          },
+        })
+      );
+
+      const collection = [
+        createMockCollectionItem({
+          id: 222,
+          artist: 'Radiohead',
+          title: 'OK Computer',
+        }),
+      ];
+
+      // Do NOT set mapping service
+
+      // Act
+      const result = await statsService.getTrackDetail(
+        'Radiohead',
+        'Karma Police',
+        undefined,
+        'month',
+        collection
+      );
+
+      // Assert
+      expect(result.appearsOn).toHaveLength(1);
+      expect(result.appearsOn[0].inCollection).toBe(true);
+    });
+
+    it('should correctly mark inCollection for multiple appearsOn albums with mapping', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'radiohead|ok computer': {
+            lastPlayed: now,
+            playCount: 10,
+            plays: Array.from({ length: 10 }, () => ({
+              timestamp: now,
+              track: 'Paranoid Android',
+            })),
+          },
+          'radiohead|live at glastonbury': {
+            lastPlayed: now,
+            playCount: 3,
+            plays: Array.from({ length: 3 }, () => ({
+              timestamp: now,
+              track: 'Paranoid Android',
+            })),
+          },
+        })
+      );
+
+      // Only OK Computer is in the collection
+      const collection = [
+        createMockCollectionItem({
+          id: 333,
+          artist: 'Radiohead',
+          title: 'OK Computer',
+        }),
+      ];
+
+      const mockMappingService = {
+        getAlbumMappingForCollection: jest.fn().mockResolvedValue(null),
+      } as unknown as MappingService;
+
+      statsService.setMappingService(mockMappingService);
+
+      // Act
+      const result = await statsService.getTrackDetail(
+        'Radiohead',
+        'Paranoid Android',
+        undefined,
+        'month',
+        collection
+      );
+
+      // Assert
+      expect(result.appearsOn).toHaveLength(2);
+      const okComputer = result.appearsOn.find(a => a.album === 'Ok Computer');
+      const live = result.appearsOn.find(
+        a => a.album === 'Live At Glastonbury'
+      );
+      expect(okComputer?.inCollection).toBe(true);
+      expect(live?.inCollection).toBe(false);
+    });
+  });
 });

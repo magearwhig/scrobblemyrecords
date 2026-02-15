@@ -65,7 +65,7 @@ export default function createImagesRouter(
 
       if (username) {
         const collection = await loadCollection(username);
-        const collectionCover = imageService.getAlbumCoverFromCollection(
+        const collectionCover = await imageService.getAlbumCoverFromCollection(
           collection,
           artist,
           album

@@ -56,7 +56,7 @@ describe('Images Routes', () => {
     mockImageService.getArtistImage = jest.fn().mockResolvedValue(null);
     mockImageService.getAlbumCoverFromCollection = jest
       .fn()
-      .mockReturnValue(null);
+      .mockResolvedValue(null);
     mockImageService.batchGetAlbumCovers = jest
       .fn()
       .mockResolvedValue(new Map());
@@ -127,7 +127,7 @@ describe('Images Routes', () => {
         })
         .mockResolvedValueOnce(null);
 
-      mockImageService.getAlbumCoverFromCollection.mockReturnValue(
+      mockImageService.getAlbumCoverFromCollection.mockResolvedValue(
         'https://discogs.jpg'
       );
 
@@ -435,7 +435,7 @@ describe('Images Routes', () => {
         .mockResolvedValueOnce({ data: collection, timestamp: Date.now() })
         .mockResolvedValueOnce(null); // No more pages
 
-      mockImageService.getAlbumCoverFromCollection.mockReturnValue(
+      mockImageService.getAlbumCoverFromCollection.mockResolvedValue(
         'https://discogs.jpg'
       );
 

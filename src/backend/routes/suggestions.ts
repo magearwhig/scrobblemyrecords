@@ -1378,21 +1378,44 @@ export default function createSuggestionsRouter(
       const candidateIds = new Set(candidates.map(c => c.id));
 
       // Build avoid ID set (recently played + recent AI suggestions)
+      // Use mapping service + fuzzy matching to handle Discogs↔Last.fm name differences
+      const collectionByFuzzyKey = new Map<string, CollectionItem>();
+      for (const item of allItems) {
+        let searchArtist = item.release.artist;
+        let searchAlbum = item.release.title;
+        if (mappingService) {
+          const albumMapping =
+            await mappingService.getAlbumMappingForCollection(
+              item.release.artist,
+              item.release.title
+            );
+          if (albumMapping) {
+            searchArtist = albumMapping.historyArtist;
+            searchAlbum = albumMapping.historyAlbum;
+          }
+        }
+        const fuzzyKey = historyStorage.fuzzyNormalizeKey(
+          searchArtist,
+          searchAlbum
+        );
+        collectionByFuzzyKey.set(fuzzyKey, item);
+      }
+
       const avoidIds = new Set<number>();
       for (const recent of recentlyPlayed) {
-        const match = allItems.find(
-          item =>
-            item.release.artist.toLowerCase() === recent.artist.toLowerCase() &&
-            item.release.title.toLowerCase() === recent.album.toLowerCase()
+        const fuzzyKey = historyStorage.fuzzyNormalizeKey(
+          recent.artist,
+          recent.album
         );
+        const match = collectionByFuzzyKey.get(fuzzyKey);
         if (match) avoidIds.add(match.id);
       }
       for (const aiSugg of recentAISuggestionsList) {
-        const match = allItems.find(
-          item =>
-            item.release.artist.toLowerCase() === aiSugg.artist.toLowerCase() &&
-            item.release.title.toLowerCase() === aiSugg.album.toLowerCase()
+        const fuzzyKey = historyStorage.fuzzyNormalizeKey(
+          aiSugg.artist,
+          aiSugg.album
         );
+        const match = collectionByFuzzyKey.get(fuzzyKey);
         if (match) avoidIds.add(match.id);
       }
 

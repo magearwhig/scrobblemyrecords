@@ -112,9 +112,21 @@ Also check `src/renderer/hooks/`:
 ## Mapping System
 
 This app has several mapping layers that translate between Discogs and Last.fm data:
+- **Album mappings** (`mappingService.ts`): `getAlbumMappingForCollection()` translates Discogs artist+album to Last.fm history artist+album
 - **Artist mappings** (`artistMappingService.ts`): Discogs artist name ↔ Last.fm artist name
+- **Artist name resolver** (`artistNameResolver.ts`): Bidirectional alias graph using union-find for transitive artist name resolution
 - **Track mappings** (`trackMappingService.ts`): Discogs track ↔ Last.fm track (handles title differences)
-- **Scrobble artist mappings** (`mappingService.ts`): user-corrected artist names for scrobbling
 - **Hidden items** (`hiddenItemService.ts`, `hiddenReleasesService.ts`): user-excluded items
+
+### Canonical Pattern for Discogs↔Last.fm Collection Matching
+
+**WARNING:** Never use naive `toLowerCase()` to compare Discogs collection data against Last.fm history data. Discogs and Last.fm frequently use different names for the same artist or album (e.g., "Aesop Rock, Blockhead" vs "Aesop Rock", "Tobacco (3)" vs "Tobacco", "Bestiary" vs "Bestiary (Bonus Track Version)").
+
+**Required pattern** (see `buildFuzzyCollectionMap()` in `statsService.ts`):
+1. For each collection item, call `mappingService.getAlbumMappingForCollection(artist, album)` to get the mapped Last.fm names
+2. Build a fuzzy lookup key via `historyStorage.fuzzyNormalizeKey(searchArtist, searchAlbum)`
+3. Match against history data using the fuzzy key
+
+**Methods that correctly use this pattern:** `getCollectionCoverage()`, `getDustyCorners()`, `getHeavyRotation()`, `getTopAlbums()`, `getArtistDetail()`, `getTrackDetail()`, dashboard recent albums route, AI suggestion avoid-set (suggestions route), `ImageService.getAlbumCoverFromCollection()`.
 
 When implementing features that display or process tracks/artists, check if any of these mappings should be applied. The `trackNormalization.ts` utilities help with fuzzy matching.

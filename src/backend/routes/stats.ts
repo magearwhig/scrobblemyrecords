@@ -215,17 +215,38 @@ export default function createStatsRouter(
 
           const recentAlbums = await historyStorage.getRecentlyPlayedAlbums(10);
 
-          // Check which albums are in collection
+          // Check which albums are in collection using fuzzy matching
           const collection = username ? await loadCollection(username) : [];
-          const collectionMap = new Map<string, CollectionItem>();
+          const collectionByFuzzyKey = new Map<string, CollectionItem>();
           for (const item of collection) {
-            const key = `${item.release.artist.toLowerCase()}|${item.release.title.toLowerCase()}`;
-            collectionMap.set(key, item);
+            let searchArtist = item.release.artist;
+            let searchAlbum = item.release.title;
+
+            if (mappingService) {
+              const albumMapping =
+                await mappingService.getAlbumMappingForCollection(
+                  item.release.artist,
+                  item.release.title
+                );
+              if (albumMapping) {
+                searchArtist = albumMapping.historyArtist;
+                searchAlbum = albumMapping.historyAlbum;
+              }
+            }
+
+            const fuzzyKey = historyStorage!.fuzzyNormalizeKey(
+              searchArtist,
+              searchAlbum
+            );
+            collectionByFuzzyKey.set(fuzzyKey, item);
           }
 
           return recentAlbums.map(album => {
-            const key = `${album.artist.toLowerCase()}|${album.album.toLowerCase()}`;
-            const collectionItem = collectionMap.get(key);
+            const fuzzyKey = historyStorage!.fuzzyNormalizeKey(
+              album.artist,
+              album.album
+            );
+            const collectionItem = collectionByFuzzyKey.get(fuzzyKey);
 
             return {
               artist: album.artist,

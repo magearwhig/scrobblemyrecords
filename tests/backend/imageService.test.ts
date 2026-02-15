@@ -206,7 +206,7 @@ describe('ImageService', () => {
   });
 
   describe('getAlbumCoverFromCollection', () => {
-    it('should return cover from collection', () => {
+    it('should return cover from collection', async () => {
       // Arrange
       const collection = [
         createMockCollectionItem({
@@ -217,7 +217,7 @@ describe('ImageService', () => {
       ];
 
       // Act
-      const url = imageService.getAlbumCoverFromCollection(
+      const url = await imageService.getAlbumCoverFromCollection(
         collection,
         'Test Artist',
         'Test Album'
@@ -227,7 +227,7 @@ describe('ImageService', () => {
       expect(url).toBe('https://collection.jpg');
     });
 
-    it('should be case insensitive', () => {
+    it('should be case insensitive', async () => {
       // Arrange
       const collection = [
         createMockCollectionItem({
@@ -238,7 +238,7 @@ describe('ImageService', () => {
       ];
 
       // Act
-      const url = imageService.getAlbumCoverFromCollection(
+      const url = await imageService.getAlbumCoverFromCollection(
         collection,
         'TEST ARTIST',
         'TEST ALBUM'
@@ -248,7 +248,7 @@ describe('ImageService', () => {
       expect(url).toBe('https://collection.jpg');
     });
 
-    it('should return null when not in collection', () => {
+    it('should return null when not in collection', async () => {
       // Arrange
       const collection = [
         createMockCollectionItem({
@@ -258,7 +258,7 @@ describe('ImageService', () => {
       ];
 
       // Act
-      const url = imageService.getAlbumCoverFromCollection(
+      const url = await imageService.getAlbumCoverFromCollection(
         collection,
         'Test Artist',
         'Test Album'
@@ -268,9 +268,9 @@ describe('ImageService', () => {
       expect(url).toBeNull();
     });
 
-    it('should return null for empty collection', () => {
+    it('should return null for empty collection', async () => {
       // Act
-      const url = imageService.getAlbumCoverFromCollection(
+      const url = await imageService.getAlbumCoverFromCollection(
         [],
         'Artist',
         'Album'
@@ -654,7 +654,7 @@ describe('ImageService', () => {
   });
 
   describe('getAlbumCoverFromCollection edge cases', () => {
-    it('should handle collection item with no cover image', () => {
+    it('should handle collection item with no cover image', async () => {
       // Arrange
       const collection = [
         {
@@ -675,7 +675,7 @@ describe('ImageService', () => {
       ];
 
       // Act
-      const url = imageService.getAlbumCoverFromCollection(
+      const url = await imageService.getAlbumCoverFromCollection(
         collection as CollectionItem[],
         'Test Artist',
         'Test Album'
@@ -683,6 +683,108 @@ describe('ImageService', () => {
 
       // Assert - empty string is falsy so returns null
       expect(url).toBeNull();
+    });
+  });
+
+  describe('getAlbumCoverFromCollection mapping service integration', () => {
+    it('should match via mapping service when Discogs and Last.fm names differ', async () => {
+      // Arrange - Discogs has "Tobacco (3)" but Last.fm uses "Tobacco"
+      const mockMappingService = {
+        getAlbumMappingForCollection: jest.fn().mockResolvedValue({
+          historyArtist: 'Tobacco',
+          historyAlbum: 'Fucked Up Friends',
+        }),
+      };
+      imageService.setMappingService(mockMappingService as never);
+
+      const collection = [
+        createMockCollectionItem({
+          artist: 'Tobacco (3)',
+          title: 'Fucked Up Friends',
+          coverImage: 'https://discogs-tobacco.jpg',
+        }),
+      ];
+
+      // Act - search using Last.fm name
+      const url = await imageService.getAlbumCoverFromCollection(
+        collection,
+        'Tobacco',
+        'Fucked Up Friends'
+      );
+
+      // Assert
+      expect(url).toBe('https://discogs-tobacco.jpg');
+      expect(
+        mockMappingService.getAlbumMappingForCollection
+      ).toHaveBeenCalledWith('Tobacco (3)', 'Fucked Up Friends');
+    });
+
+    it('should strip edition suffixes via normalizeForMatching', async () => {
+      // Arrange - no mapping service, but normalizeForMatching strips [Explicit]
+      const collection = [
+        createMockCollectionItem({
+          artist: 'Kendrick Lamar',
+          title: 'good kid, m.A.A.d city',
+          coverImage: 'https://gkmc.jpg',
+        }),
+      ];
+
+      // Act - search with [Explicit] suffix
+      const url = await imageService.getAlbumCoverFromCollection(
+        collection,
+        'Kendrick Lamar',
+        'good kid, m.A.A.d city [Explicit]'
+      );
+
+      // Assert
+      expect(url).toBe('https://gkmc.jpg');
+    });
+
+    it('should fall through gracefully when mapping returns null', async () => {
+      // Arrange
+      const mockMappingService = {
+        getAlbumMappingForCollection: jest.fn().mockResolvedValue(null),
+      };
+      imageService.setMappingService(mockMappingService as never);
+
+      const collection = [
+        createMockCollectionItem({
+          artist: 'Test Artist',
+          title: 'Test Album',
+          coverImage: 'https://test.jpg',
+        }),
+      ];
+
+      // Act
+      const url = await imageService.getAlbumCoverFromCollection(
+        collection,
+        'Test Artist',
+        'Test Album'
+      );
+
+      // Assert - still matches via normalizeForMatching fallback
+      expect(url).toBe('https://test.jpg');
+    });
+
+    it('should strip Discogs disambiguation numbers without mapping service', async () => {
+      // Arrange - no mapping service set
+      const collection = [
+        createMockCollectionItem({
+          artist: 'Tobacco (3)',
+          title: 'Maniac Meat',
+          coverImage: 'https://maniac.jpg',
+        }),
+      ];
+
+      // Act - search without disambiguation number
+      const url = await imageService.getAlbumCoverFromCollection(
+        collection,
+        'Tobacco',
+        'Maniac Meat'
+      );
+
+      // Assert - normalizeForMatching strips "(3)"
+      expect(url).toBe('https://maniac.jpg');
     });
   });
 });

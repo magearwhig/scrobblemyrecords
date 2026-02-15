@@ -6,7 +6,9 @@ import request from 'supertest';
 import createStatsRouter from '../../../src/backend/routes/stats';
 import { AuthService } from '../../../src/backend/services/authService';
 import { GenreAnalysisService } from '../../../src/backend/services/genreAnalysisService';
+import { MappingService } from '../../../src/backend/services/mappingService';
 import { RankingsService } from '../../../src/backend/services/rankingsService';
+import { ScrobbleHistoryStorage } from '../../../src/backend/services/scrobbleHistoryStorage';
 import { StatsService } from '../../../src/backend/services/statsService';
 import { FileStorage } from '../../../src/backend/utils/fileStorage';
 
@@ -15,6 +17,8 @@ jest.mock('../../../src/backend/services/authService');
 jest.mock('../../../src/backend/services/statsService');
 jest.mock('../../../src/backend/services/rankingsService');
 jest.mock('../../../src/backend/services/genreAnalysisService');
+jest.mock('../../../src/backend/services/mappingService');
+jest.mock('../../../src/backend/services/scrobbleHistoryStorage');
 jest.mock('../../../src/backend/utils/fileStorage');
 
 const MockedAuthService = AuthService as jest.MockedClass<typeof AuthService>;
@@ -2125,6 +2129,280 @@ describe('Stats Routes', () => {
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
       expect(response.body.error).toContain('Genre analysis error');
+    });
+  });
+
+  describe('Dashboard recent albums mapping service integration', () => {
+    let dashboardApp: express.Application;
+    let dashboardFileStorage: jest.Mocked<FileStorage>;
+    let dashboardAuthService: jest.Mocked<AuthService>;
+    let dashboardStatsService: jest.Mocked<StatsService>;
+    let dashboardHistoryStorage: jest.Mocked<ScrobbleHistoryStorage>;
+    let dashboardMappingService: jest.Mocked<MappingService>;
+
+    const MockedHistoryStorage = ScrobbleHistoryStorage as jest.MockedClass<
+      typeof ScrobbleHistoryStorage
+    >;
+    const MockedMappingService = MappingService as jest.MockedClass<
+      typeof MappingService
+    >;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+
+      dashboardFileStorage = new MockedFileStorage(
+        'test'
+      ) as jest.Mocked<FileStorage>;
+      dashboardAuthService = new MockedAuthService(
+        dashboardFileStorage
+      ) as jest.Mocked<AuthService>;
+      dashboardStatsService = new MockedStatsService(
+        dashboardFileStorage,
+        {} as any
+      ) as jest.Mocked<StatsService>;
+      dashboardHistoryStorage = new MockedHistoryStorage(
+        dashboardFileStorage
+      ) as jest.Mocked<ScrobbleHistoryStorage>;
+      dashboardMappingService = new MockedMappingService(
+        dashboardFileStorage
+      ) as jest.Mocked<MappingService>;
+
+      // Auth setup
+      dashboardAuthService.getUserSettings = jest.fn().mockResolvedValue({
+        discogs: { username: 'testuser' },
+        lastfm: {},
+        preferences: {
+          defaultTimestamp: 'now' as const,
+          batchSize: 50,
+          autoScrobble: false,
+        },
+      });
+
+      // Stats mocks - needed for dashboard quick stats
+      dashboardStatsService.calculateStreaks = jest.fn().mockResolvedValue({
+        currentStreak: 0,
+        longestStreak: 0,
+      });
+      dashboardStatsService.getScrobbleCounts = jest.fn().mockResolvedValue({
+        today: 0,
+        thisWeek: 0,
+        thisMonth: 0,
+        thisYear: 0,
+        allTime: 0,
+      });
+      dashboardStatsService.getListeningHours = jest.fn().mockResolvedValue({
+        today: 0,
+        thisWeek: 0,
+        thisMonth: 0,
+      });
+      dashboardStatsService.getNewArtistsThisMonth = jest
+        .fn()
+        .mockResolvedValue(0);
+      dashboardStatsService.getMilestones = jest.fn().mockResolvedValue({
+        total: 0,
+        nextMilestone: 1000,
+        scrobblesToNext: 1000,
+        progressPercent: 0,
+        history: [],
+      });
+      dashboardStatsService.getCollectionCoverage = jest
+        .fn()
+        .mockResolvedValue({
+          thisMonth: 0,
+          thisYear: 0,
+          allTime: 0,
+          days30: 0,
+          days90: 0,
+          days365: 0,
+          albumsPlayedThisMonth: 0,
+          albumsPlayedThisYear: 0,
+          albumsPlayedAllTime: 0,
+          albumsPlayedDays30: 0,
+          albumsPlayedDays90: 0,
+          albumsPlayedDays365: 0,
+          totalAlbums: 0,
+        });
+      dashboardStatsService.getDustyCorners = jest.fn().mockResolvedValue([]);
+      dashboardStatsService.getTopArtists = jest.fn().mockResolvedValue([]);
+      dashboardStatsService.getTopAlbums = jest.fn().mockResolvedValue([]);
+
+      // History storage mocks
+      dashboardHistoryStorage.getRecentlyPlayedAlbums = jest
+        .fn()
+        .mockResolvedValue([]);
+      dashboardHistoryStorage.getOldestScrobbleDate = jest
+        .fn()
+        .mockResolvedValue(null);
+      dashboardHistoryStorage.fuzzyNormalizeKey = jest
+        .fn()
+        .mockImplementation((artist: string, album: string) => {
+          const norm = (s: string) =>
+            s
+              .replace(/\s*\(\d+\)\s*$/g, '')
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, '');
+          return `${norm(artist)}|${norm(album)}`;
+        });
+    });
+
+    const createDashboardApp = (
+      withMappingService = true
+    ): express.Application => {
+      const testApp = express();
+      testApp.use(helmet());
+      testApp.use(cors());
+      testApp.use(express.json());
+      testApp.use((_req, res, next) => {
+        res.set('Connection', 'close');
+        next();
+      });
+
+      testApp.use(
+        '/api/v1/stats',
+        createStatsRouter(
+          dashboardFileStorage,
+          dashboardAuthService,
+          dashboardStatsService,
+          dashboardHistoryStorage,
+          undefined, // wishlistService
+          undefined, // sellerMonitoringService
+          undefined, // analyticsService
+          undefined, // rankingsService
+          withMappingService ? dashboardMappingService : undefined
+        )
+      );
+
+      return testApp;
+    };
+
+    it('should use mapping service for recent albums collection matching', async () => {
+      // Arrange
+      dashboardHistoryStorage.getRecentlyPlayedAlbums.mockResolvedValue([
+        {
+          artist: 'hail mary mallon',
+          album: 'bestiary (bonus track version)',
+          playCount: 10,
+          lastPlayed: Math.floor(Date.now() / 1000),
+        },
+      ]);
+
+      const collectionPage = {
+        data: [
+          {
+            id: 1,
+            date_added: '2024-01-15T00:00:00Z',
+            rating: 0,
+            release: {
+              id: 999,
+              artist: 'Hail Mary Mallon',
+              title: 'Bestiary',
+              year: 2014,
+              format: ['Vinyl'],
+              label: ['Rhymesayers'],
+              cover_image: 'https://example.com/bestiary.jpg',
+              resource_url: 'https://api.discogs.com/releases/999',
+            },
+          },
+        ],
+        timestamp: Date.now(),
+      };
+
+      // loadCollection reads pages keyed by collections/{username}-page-{n}.json
+      dashboardFileStorage.readJSON = jest
+        .fn()
+        .mockImplementation((key: string) => {
+          if (key === 'collections/testuser-page-1.json')
+            return Promise.resolve(collectionPage);
+          return Promise.resolve(null);
+        });
+
+      // Mapping service maps Discogs -> Last.fm names
+      dashboardMappingService.getAlbumMappingForCollection = jest
+        .fn()
+        .mockResolvedValue({
+          historyArtist: 'hail mary mallon',
+          historyAlbum: 'bestiary (bonus track version)',
+          collectionId: 999,
+          collectionArtist: 'Hail Mary Mallon',
+          collectionAlbum: 'Bestiary',
+          createdAt: Date.now(),
+        });
+
+      dashboardApp = createDashboardApp(true);
+
+      // Act
+      const response = await request(dashboardApp).get(
+        '/api/v1/stats/dashboard'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(
+        dashboardMappingService.getAlbumMappingForCollection
+      ).toHaveBeenCalledWith('Hail Mary Mallon', 'Bestiary');
+
+      const recentAlbums = response.body.data.recentAlbums;
+      expect(recentAlbums).toHaveLength(1);
+      expect(recentAlbums[0].inCollection).toBe(true);
+      expect(recentAlbums[0].releaseId).toBe(999);
+      expect(recentAlbums[0].coverUrl).toBe('https://example.com/bestiary.jpg');
+    });
+
+    it('should work without mapping service (fallback to fuzzy only)', async () => {
+      // Arrange
+      dashboardHistoryStorage.getRecentlyPlayedAlbums.mockResolvedValue([
+        {
+          artist: 'radiohead',
+          album: 'ok computer',
+          playCount: 20,
+          lastPlayed: Math.floor(Date.now() / 1000),
+        },
+      ]);
+
+      const collectionPage = {
+        data: [
+          {
+            id: 1,
+            date_added: '2024-01-15T00:00:00Z',
+            rating: 0,
+            release: {
+              id: 456,
+              artist: 'Radiohead',
+              title: 'OK Computer',
+              year: 1997,
+              format: ['Vinyl'],
+              label: ['Parlophone'],
+              cover_image: 'https://example.com/okc.jpg',
+              resource_url: 'https://api.discogs.com/releases/456',
+            },
+          },
+        ],
+        timestamp: Date.now(),
+      };
+
+      dashboardFileStorage.readJSON = jest
+        .fn()
+        .mockImplementation((key: string) => {
+          if (key === 'collections/testuser-page-1.json')
+            return Promise.resolve(collectionPage);
+          return Promise.resolve(null);
+        });
+
+      // Create app WITHOUT mapping service
+      dashboardApp = createDashboardApp(false);
+
+      // Act
+      const response = await request(dashboardApp).get(
+        '/api/v1/stats/dashboard'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      const recentAlbums = response.body.data.recentAlbums;
+      expect(recentAlbums).toHaveLength(1);
+      // Should still match via fuzzy normalization since names are the same
+      expect(recentAlbums[0].inCollection).toBe(true);
+      expect(recentAlbums[0].releaseId).toBe(456);
     });
   });
 });

@@ -520,37 +520,15 @@ export class StatsService {
 
     // Enrich with collection info if collection is provided
     if (collection && collection.length > 0) {
-      const collectionByFuzzyKey = new Map<string, CollectionItem>();
-
-      for (const item of collection) {
-        let searchArtist = item.release.artist;
-        let searchAlbum = item.release.title;
-
-        if (this.mappingService) {
-          const albumMapping =
-            await this.mappingService.getAlbumMappingForCollection(
-              item.release.artist,
-              item.release.title
-            );
-          if (albumMapping) {
-            searchArtist = albumMapping.historyArtist;
-            searchAlbum = albumMapping.historyAlbum;
-          }
-        }
-
-        const fuzzyKey = this.historyStorage.fuzzyNormalizeKey(
-          searchArtist,
-          searchAlbum
-        );
-        collectionByFuzzyKey.set(fuzzyKey, item);
-      }
+      const collectionByFuzzyKey =
+        await this.buildFuzzyCollectionMap(collection);
 
       for (const album of result) {
-        const fuzzyKey = this.historyStorage.fuzzyNormalizeKey(
+        const collectionItem = this.lookupCollectionItem(
+          collectionByFuzzyKey,
           album.artist,
           album.album
         );
-        const collectionItem = collectionByFuzzyKey.get(fuzzyKey);
         if (collectionItem) {
           album.inCollection = true;
           album.collectionReleaseId = collectionItem.release.id;
@@ -1566,10 +1544,10 @@ export class StatsService {
       { track: string; album: string; count: number; lastPlayed: number }
     >();
 
-    // Album data: key = normalized album name, value = { album, playCount, lastPlayed }
+    // Album data: key = normalized album name, value = { artist, album, playCount, lastPlayed }
     const albumCounts = new Map<
       string,
-      { album: string; playCount: number; lastPlayed: number }
+      { artist: string; album: string; playCount: number; lastPlayed: number }
     >();
 
     // Play trend data: key = period string (YYYY-MM or YYYY-Www), value = count
@@ -1590,6 +1568,7 @@ export class StatsService {
         }
       } else {
         albumCounts.set(normalizedAlbum, {
+          artist,
           album,
           playCount: albumHistory.playCount,
           lastPlayed: albumHistory.lastPlayed,
@@ -1652,12 +1631,9 @@ export class StatsService {
       }
     }
 
-    // Build collection lookup for cross-referencing albums
-    const collectionMap = new Map<string, CollectionItem>();
-    for (const item of collection) {
-      const colKey = `${item.release.artist.toLowerCase()}|${item.release.title.toLowerCase()}`;
-      collectionMap.set(colKey, item);
-    }
+    // Build fuzzy collection lookup for cross-referencing albums
+    // Uses mapping service + fuzzy normalization to handle Discogs↔Last.fm name differences
+    const collectionByFuzzyKey = await this.buildFuzzyCollectionMap(collection);
 
     // Build top tracks (sorted by play count descending)
     const topTracks = Array.from(trackCounts.values())
@@ -1674,8 +1650,11 @@ export class StatsService {
     const albums = Array.from(albumCounts.values())
       .sort((a, b) => b.playCount - a.playCount)
       .map(a => {
-        const colKey = `${this.resolveArtistName(artistName)}|${a.album.toLowerCase()}`;
-        const collectionItem = collectionMap.get(colKey);
+        const collectionItem = this.lookupCollectionItem(
+          collectionByFuzzyKey,
+          a.artist,
+          a.album
+        );
         return {
           album: this.capitalizeTitle(a.album),
           playCount: a.playCount,
@@ -1825,19 +1804,19 @@ export class StatsService {
       }
     }
 
-    // Build collection lookup
-    const collectionMap = new Map<string, CollectionItem>();
-    for (const item of collection) {
-      const colKey = `${item.release.artist.toLowerCase()}|${item.release.title.toLowerCase()}`;
-      collectionMap.set(colKey, item);
-    }
+    // Build fuzzy collection lookup for cross-referencing albums
+    // Uses mapping service + fuzzy normalization to handle Discogs↔Last.fm name differences
+    const collectionByFuzzyKey = await this.buildFuzzyCollectionMap(collection);
 
     // Build appearsOn list with collection cross-reference
     const appearsOn = Array.from(albumAppearances.values())
       .sort((a, b) => b.playCount - a.playCount)
       .map(a => {
-        const colKey = `${a.artist.toLowerCase()}|${a.album.toLowerCase()}`;
-        const collectionItem = collectionMap.get(colKey);
+        const collectionItem = this.lookupCollectionItem(
+          collectionByFuzzyKey,
+          a.artist,
+          a.album
+        );
         return {
           album: this.capitalizeTitle(a.album),
           artist: this.capitalizeArtist(a.artist),
@@ -2144,6 +2123,57 @@ export class StatsService {
   // ============================================
   // Helper Methods
   // ============================================
+
+  /**
+   * Build a fuzzy collection lookup map for cross-referencing history albums
+   * with the user's Discogs collection. Uses mapping service to resolve
+   * Discogs→Last.fm name differences, then fuzzyNormalizeKey for edition variants.
+   *
+   * This is the canonical pattern for collection matching — use this instead of
+   * naive toLowerCase() comparison between Discogs and Last.fm names.
+   */
+  private async buildFuzzyCollectionMap(
+    collection: CollectionItem[]
+  ): Promise<Map<string, CollectionItem>> {
+    const collectionByFuzzyKey = new Map<string, CollectionItem>();
+
+    for (const item of collection) {
+      let searchArtist = item.release.artist;
+      let searchAlbum = item.release.title;
+
+      if (this.mappingService) {
+        const albumMapping =
+          await this.mappingService.getAlbumMappingForCollection(
+            item.release.artist,
+            item.release.title
+          );
+        if (albumMapping) {
+          searchArtist = albumMapping.historyArtist;
+          searchAlbum = albumMapping.historyAlbum;
+        }
+      }
+
+      const fuzzyKey = this.historyStorage.fuzzyNormalizeKey(
+        searchArtist,
+        searchAlbum
+      );
+      collectionByFuzzyKey.set(fuzzyKey, item);
+    }
+
+    return collectionByFuzzyKey;
+  }
+
+  /**
+   * Look up a collection item by history artist/album using fuzzy matching.
+   */
+  private lookupCollectionItem(
+    collectionByFuzzyKey: Map<string, CollectionItem>,
+    artist: string,
+    album: string
+  ): CollectionItem | undefined {
+    const fuzzyKey = this.historyStorage.fuzzyNormalizeKey(artist, album);
+    return collectionByFuzzyKey.get(fuzzyKey);
+  }
 
   private formatDateKey(date: Date): string {
     const year = date.getFullYear();

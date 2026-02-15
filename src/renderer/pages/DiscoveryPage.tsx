@@ -7,6 +7,7 @@ import {
   LocalWantItem,
   EnrichedWishlistItem,
 } from '../../shared/types';
+import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import { MissingAlbumsTab, MissingArtistsTab } from '../components/discovery';
 import SyncStatusBar from '../components/SyncStatusBar';
 import { Modal, ModalFooter } from '../components/ui';
@@ -22,21 +23,6 @@ const logger = createLogger('DiscoveryPage');
 type TabType = 'albums' | 'artists';
 type AlbumSortOption = 'plays' | 'artist' | 'album' | 'recent';
 type ArtistSortOption = 'plays' | 'artist' | 'albums' | 'recent';
-
-// Normalize album/artist names for matching
-// Removes quotes, edition suffixes, and normalizes to lowercase
-const normalizeForMatching = (str: string): string => {
-  return str
-    .toLowerCase()
-    .replace(/[""''"`]/g, '') // Remove various quote characters
-    .replace(/\s*\[explicit\]\s*/gi, '') // Remove [Explicit] tag
-    .replace(/\s*\(deluxe\s*(edition)?\)\s*/gi, '') // Remove (Deluxe) or (Deluxe Edition)
-    .replace(/\s*\(explicit\)\s*/gi, '') // Remove (Explicit)
-    .replace(/\s*\(remaster(ed)?\)\s*/gi, '') // Remove (Remaster) or (Remastered)
-    .replace(/\s*\(expanded\s*(edition)?\)\s*/gi, '') // Remove (Expanded) or (Expanded Edition)
-    .replace(/\s+/g, ' ') // Normalize whitespace
-    .trim();
-};
 
 interface MappingModalState {
   isOpen: boolean;

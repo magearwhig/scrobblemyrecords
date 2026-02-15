@@ -301,6 +301,7 @@ statsService.setTrackMappingService(trackMappingService);
 statsService.setMappingService(mappingService);
 const rankingsService = new RankingsService(historyStorage);
 const imageService = new ImageService(fileStorage, lastfmService);
+imageService.setMappingService(mappingService);
 const wishlistService = new WishlistService(fileStorage, authService);
 const collectionAnalyticsService = new CollectionAnalyticsService(
   fileStorage,
