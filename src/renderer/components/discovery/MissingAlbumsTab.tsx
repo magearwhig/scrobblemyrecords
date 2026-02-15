@@ -9,17 +9,17 @@ interface MissingAlbumsTabProps {
   missingAlbums: MissingAlbum[];
   albumSort: AlbumSortOption;
   setAlbumSort: (sort: AlbumSortOption) => void;
-  hideWantedItems: boolean;
-  setHideWantedItems: (hide: boolean) => void;
-  addingToWantList: Set<string>;
-  addedToWantList: Set<string>;
+  hideWishlistedAndMonitored: boolean;
+  setHideWishlistedAndMonitored: (hide: boolean) => void;
+  addingToMonitored: Set<string>;
+  monitoredAlbums: Set<string>;
   isInDiscogsWishlist: (artist: string, album: string) => boolean;
   formatDate: (timestamp: number) => string;
   openLink: (url: string) => void;
   getLastFmAlbumUrl: (artist: string, album: string) => string;
   getDiscogsAlbumUrl: (artist: string, album: string) => string;
   openAlbumMapping: (album: MissingAlbum) => void;
-  handleAddToWantList: (album: MissingAlbum) => void;
+  handleMonitorAlbum: (album: MissingAlbum) => void;
   handleHideAlbum: (album: MissingAlbum) => void;
 }
 
@@ -27,24 +27,24 @@ const MissingAlbumsTab: React.FC<MissingAlbumsTabProps> = ({
   missingAlbums,
   albumSort,
   setAlbumSort,
-  hideWantedItems,
-  setHideWantedItems,
-  addingToWantList,
-  addedToWantList,
+  hideWishlistedAndMonitored,
+  setHideWishlistedAndMonitored,
+  addingToMonitored,
+  monitoredAlbums,
   isInDiscogsWishlist,
   formatDate,
   openLink,
   getLastFmAlbumUrl,
   getDiscogsAlbumUrl,
   openAlbumMapping,
-  handleAddToWantList,
+  handleMonitorAlbum,
   handleHideAlbum,
 }) => {
-  // Check if an album is wanted (in Discogs wantlist or local want list)
-  const isWantedItem = (artist: string, album: string): boolean => {
+  // Check if an album is wishlisted or monitored
+  const isWishlistedOrMonitored = (artist: string, album: string): boolean => {
     return (
       isInDiscogsWishlist(artist, album) ||
-      addedToWantList.has(`${artist}:${album}`)
+      monitoredAlbums.has(`${artist}:${album}`)
     );
   };
 
@@ -52,8 +52,8 @@ const MissingAlbumsTab: React.FC<MissingAlbumsTabProps> = ({
   // Limit to 100 items for display
   const sortedAlbums = [...missingAlbums]
     .filter(album => {
-      if (!hideWantedItems) return true;
-      return !isWantedItem(album.artist, album.album);
+      if (!hideWishlistedAndMonitored) return true;
+      return !isWishlistedOrMonitored(album.artist, album.album);
     })
     .sort((a, b) => {
       switch (albumSort) {
@@ -79,8 +79,8 @@ const MissingAlbumsTab: React.FC<MissingAlbumsTabProps> = ({
           <label className='discovery-toggle'>
             <input
               type='checkbox'
-              checked={hideWantedItems}
-              onChange={e => setHideWantedItems(e.target.checked)}
+              checked={hideWishlistedAndMonitored}
+              onChange={e => setHideWishlistedAndMonitored(e.target.checked)}
             />
             <span>Hide wishlisted & monitored</span>
           </label>
@@ -101,7 +101,7 @@ const MissingAlbumsTab: React.FC<MissingAlbumsTabProps> = ({
       </div>
       {sortedAlbums.length === 0 ? (
         <p className='empty-state'>
-          {hideWantedItems && missingAlbums.length > 0
+          {hideWishlistedAndMonitored && missingAlbums.length > 0
             ? 'All albums are in your wishlist or being monitored. Turn off "Hide wishlisted & monitored" to see them.'
             : 'No missing albums found. Either you own everything you listen to, or you need to sync your history first!'}
         </p>
@@ -123,7 +123,7 @@ const MissingAlbumsTab: React.FC<MissingAlbumsTabProps> = ({
                       In Wishlist
                     </span>
                   )}
-                  {addedToWantList.has(`${album.artist}:${album.album}`) && (
+                  {monitoredAlbums.has(`${album.artist}:${album.album}`) && (
                     <span
                       className='discovery-badge discovery-badge-monitoring'
                       title='Monitoring for vinyl availability'
@@ -171,21 +171,21 @@ const MissingAlbumsTab: React.FC<MissingAlbumsTabProps> = ({
                 </Button>
                 <Button
                   variant={
-                    addedToWantList.has(`${album.artist}:${album.album}`)
+                    monitoredAlbums.has(`${album.artist}:${album.album}`)
                       ? 'success'
                       : 'primary'
                   }
                   size='small'
-                  onClick={() => handleAddToWantList(album)}
+                  onClick={() => handleMonitorAlbum(album)}
                   disabled={
-                    addingToWantList.has(`${album.artist}:${album.album}`) ||
-                    addedToWantList.has(`${album.artist}:${album.album}`)
+                    addingToMonitored.has(`${album.artist}:${album.album}`) ||
+                    monitoredAlbums.has(`${album.artist}:${album.album}`)
                   }
                   title='Monitor for vinyl availability'
                 >
-                  {addingToWantList.has(`${album.artist}:${album.album}`)
+                  {addingToMonitored.has(`${album.artist}:${album.album}`)
                     ? 'Adding...'
-                    : addedToWantList.has(`${album.artist}:${album.album}`)
+                    : monitoredAlbums.has(`${album.artist}:${album.album}`)
                       ? 'Monitoring'
                       : 'Monitor'}
                 </Button>

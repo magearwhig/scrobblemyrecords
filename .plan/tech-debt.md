@@ -27,7 +27,7 @@ README and `dev_prompt.md` specify 90% coverage target but Jest config enforces 
 - `jest.config.js` thresholds: branches 50%, functions 57%, lines 63%, statements 63%
 - Actual coverage: branches 52.72%, functions 59.06%, lines 65.52%, statements 65.15%
 - Target: 90%
-- All 94 test suites pass (2671 tests), zero flaky failures
+- All 122 test suites pass (3209 tests), zero flaky failures
 
 **Improvement Plan:**
 1. Current baseline prevents regression

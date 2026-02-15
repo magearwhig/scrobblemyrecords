@@ -138,6 +138,10 @@ describe('Wrapped Routes', () => {
     app.use(helmet());
     app.use(cors());
     app.use(express.json());
+    app.use((_req, res, next) => {
+      res.set('Connection', 'close');
+      next();
+    });
     app.use('/api/v1/wrapped', createWrappedRouter(mockWrappedService));
   });
 

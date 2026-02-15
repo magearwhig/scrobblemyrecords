@@ -382,6 +382,40 @@ describe('Naming Updates', () => {
 
 ---
 
+## Implementation Status (February 2026)
+
+All 4 enhancements are **COMPLETE**.
+
+| Enhancement | Status | Details |
+|-------------|--------|---------|
+| 1A: Sort Wishlist by Scrobbles | Done | Batch endpoint, API client, sort option, play count badges |
+| 1B: Sort Collection by Scrobbles | Done | Reuses batch endpoint, eager fetch, client caching, sort option |
+| 2: Include Monitored Toggle | Done | Toggle UI, merge/dedup logic, filter behavior |
+| 3: Naming Conventions | Done | All UI text + variable renames in DiscoveryPage & MissingAlbumsTab |
+
+### Tests Added
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| `tests/backend/albumPlayCounts.test.ts` | 23 | Validation, success, matching, edge cases, chunking |
+| `tests/frontend/pages/WishlistPage.test.tsx` | +14 | Scrobbles sort, monitored toggle, dedup, naming, play counts |
+| `tests/frontend/pages/CollectionPage.test.tsx` | +6 | Sort dropdown, loading state, API fetch, caching |
+| `tests/frontend/pages/DiscoveryPage.test.tsx` | +5 | Sort options for albums and artists tabs |
+
+### Verification Results
+- TypeScript: PASS (zero errors)
+- ESLint: PASS (no new issues)
+- Tests: 3208/3209 pass (1 pre-existing flaky test)
+- Build: PASS (backend + webpack production)
+- Naming audit: PASS (zero old variable names in src/)
+
+### Remaining "Want List" References (Out of Scope)
+These UI labels exist in areas unrelated to the 4 enhancements and use "Local Want List" as a distinct concept:
+- `NewReleasesTab.tsx`, `NewReleaseCard.tsx`, `SellersPage.tsx`, `BackupImportDialog.tsx`, `SettingsBackupSection.tsx`, `QuickActionsGrid.tsx`
+
+Backend identifiers (`localWantList`, `getLocalWantList`, `addToLocalWantList`) remain unchanged — renaming backend/API layer was not in scope.
+
+---
+
 ## Technical Notes
 
 ### Album Matching

@@ -25,41 +25,25 @@ import app, { serverStartup } from '../../src/server';
 
 describe('API Integration Tests', () => {
   const testDataDir = './test-data-integration';
-  const originalDataDir = './data';
-  const backupDataDir = './data-backup-integration';
 
   beforeAll(async () => {
     await serverStartup;
-  });
+  }, 15000);
 
   // Ensure proper test isolation with mock cleanup and data cleanup
+  // NOTE: We only clean up the test data directory (test-data-integration).
+  // We NEVER rename or move the real ./data directory — if tests crash or
+  // timeout before afterEach runs, the real data would be lost.
   beforeEach(async () => {
     jest.clearAllMocks();
-
-    // Backup existing data directory to avoid encryption conflicts
-    try {
-      await fs.access(originalDataDir);
-      await fs.rename(originalDataDir, backupDataDir);
-    } catch (error) {
-      // Original data directory doesn't exist, which is fine
-    }
   });
 
   afterEach(async () => {
     // Clean up test data directory after each test
     try {
       await fs.rm(testDataDir, { recursive: true, force: true });
-      await fs.rm(originalDataDir, { recursive: true, force: true });
     } catch (error) {
       // Ignore errors if directory doesn't exist
-    }
-
-    // Restore original data directory
-    try {
-      await fs.access(backupDataDir);
-      await fs.rename(backupDataDir, originalDataDir);
-    } catch (error) {
-      // Backup doesn't exist, which is fine
     }
   });
 

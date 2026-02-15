@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-3161%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-3209%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -126,7 +126,7 @@ npm run start:web
 - **Discovery + Mapping**: Find "missing" albums/artists and map them to items in your collection
 - **Dark Mode**: Toggle between light and dark themes
 - **Local Timezone**: All times displayed in your local timezone
-- **Sorting Options**: Sort collection by artist, title, year, or date added
+- **Sorting Options**: Sort collection by artist, title, year, date added, or scrobble count
 - **Artist Name Resolution**: Unified alias graph resolves Discogs/Last.fm name variants across stats, history, and Wrapped
 - **Artist Name Mapping**: Map Discogs artist names to Last.fm names for consistent scrobbling
 - **Disambiguation Warnings**: Alerts when scrobbling artists with Discogs disambiguation suffixes (e.g., "Ghost (32)")
@@ -298,7 +298,9 @@ Find albums and artists you listen to but don't own on vinyl:
 - **Missing Albums**: Albums in your scrobble history not in your collection
 - **Play Count Sorting**: Prioritized by how often you listen
 - **Map to Collection**: Mark a "missing" album as owned by mapping it to an item in your Discogs collection
-- **Add to Wanted List**: Track albums you want on vinyl for later
+- **Monitor for Vinyl**: Start monitoring albums you want on vinyl
+- **Status Badges**: "In Wishlist" for Discogs wantlist items, "Monitoring" for locally monitored items
+- **Hide Wishlisted & Monitored**: Toggle to filter out items already being tracked
 
 **Missing Artists Tab:**
 - **Missing Artists**: Artists you love but don't have on vinyl

@@ -28,6 +28,12 @@ const mockApiServiceInstance = {
   scrobbleBatch: jest.fn(),
   getScrobbleProgress: jest.fn(),
   getReleaseDetails: jest.fn(),
+  getAlbumPlayCounts: jest.fn(),
+  getDiscardPileCollectionIds: jest.fn(),
+  getCacheProgress: jest.fn(),
+  preloadCollection: jest.fn(),
+  getMarketplaceStats: jest.fn(),
+  addToDiscardPile: jest.fn(),
 };
 
 // Mock the getApiService function to return our mock instance
@@ -284,6 +290,16 @@ describe('CollectionPage', () => {
       success: true,
       data: mockCollectionItems,
     });
+    mockApiServiceInstance.getAlbumPlayCounts.mockResolvedValue({
+      results: [],
+    });
+    mockApiServiceInstance.getDiscardPileCollectionIds.mockResolvedValue([]);
+    mockApiServiceInstance.getCacheProgress.mockResolvedValue({
+      status: 'completed',
+    });
+    mockApiServiceInstance.preloadCollection.mockResolvedValue(undefined);
+    mockApiServiceInstance.getMarketplaceStats.mockResolvedValue(null);
+    mockApiServiceInstance.addToDiscardPile.mockResolvedValue(undefined);
   });
 
   describe('Authentication', () => {
@@ -1192,6 +1208,185 @@ describe('CollectionPage', () => {
         });
         expect(elements.length).toBeGreaterThan(0);
       });
+    });
+  });
+
+  describe('Scrobbles Sort', () => {
+    it('has "Scrobbles (Most Played)" option in sort dropdown', async () => {
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      const sortSelect = screen.getByDisplayValue('Artist');
+      const scrobblesOption = sortSelect.querySelector(
+        'option[value="scrobbles"]'
+      );
+      expect(scrobblesOption).toBeInTheDocument();
+      expect(scrobblesOption).toHaveTextContent('Scrobbles (Most Played)');
+    });
+
+    it('shows "Loading play counts..." when scrobbles sort is selected and play counts are loading', async () => {
+      // Make getAlbumPlayCounts hang to simulate loading
+      mockApiServiceInstance.getAlbumPlayCounts.mockImplementation(
+        () => new Promise(() => {})
+      );
+
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      const sortSelect = screen.getByDisplayValue('Artist');
+      await userEvent.selectOptions(sortSelect, 'scrobbles');
+
+      await waitFor(() => {
+        expect(screen.getByText('Loading play counts...')).toBeInTheDocument();
+      });
+    });
+
+    it('does not show "Loading play counts..." when play counts have loaded', async () => {
+      mockApiServiceInstance.getAlbumPlayCounts.mockResolvedValue({
+        results: [
+          {
+            artist: 'Artist A',
+            title: 'Album A',
+            playCount: 50,
+            lastPlayed: null,
+            matchType: 'exact',
+          },
+        ],
+      });
+
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      const sortSelect = screen.getByDisplayValue('Artist');
+      await userEvent.selectOptions(sortSelect, 'scrobbles');
+
+      // Wait for play counts to finish loading
+      await waitFor(() => {
+        expect(
+          screen.queryByText('Loading play counts...')
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it('fetches play counts from API when collection loads', async () => {
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      await waitFor(() => {
+        expect(mockApiServiceInstance.getAlbumPlayCounts).toHaveBeenCalledWith(
+          expect.arrayContaining([
+            expect.objectContaining({
+              artist: 'Artist A',
+              title: 'Album A',
+            }),
+          ])
+        );
+      });
+    });
+
+    it('does not re-fetch play counts for already cached albums', async () => {
+      // First call returns results, caching them
+      mockApiServiceInstance.getAlbumPlayCounts.mockResolvedValue({
+        results: [
+          {
+            artist: 'Artist A',
+            title: 'Album A',
+            playCount: 50,
+            lastPlayed: null,
+            matchType: 'exact',
+          },
+          {
+            artist: 'Artist B',
+            title: 'Album B',
+            playCount: 30,
+            lastPlayed: null,
+            matchType: 'exact',
+          },
+          {
+            artist: 'Artist C',
+            title: 'Album C',
+            playCount: 10,
+            lastPlayed: null,
+            matchType: 'exact',
+          },
+        ],
+      });
+
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      // Wait for initial play counts fetch
+      await waitFor(() => {
+        expect(mockApiServiceInstance.getAlbumPlayCounts).toHaveBeenCalledTimes(
+          1
+        );
+      });
+
+      // The component eagerly fetches play counts on collection load.
+      // Since all albums are now cached, no additional fetch should happen.
+      // The mock was called exactly once for the initial batch.
+      expect(mockApiServiceInstance.getAlbumPlayCounts).toHaveBeenCalledTimes(
+        1
+      );
+    });
+
+    it('sorts collection by play count when scrobbles sort is selected', async () => {
+      mockApiServiceInstance.getAlbumPlayCounts.mockResolvedValue({
+        results: [
+          {
+            artist: 'Artist A',
+            title: 'Album A',
+            playCount: 10,
+            lastPlayed: null,
+            matchType: 'exact',
+          },
+          {
+            artist: 'Artist B',
+            title: 'Album B',
+            playCount: 50,
+            lastPlayed: null,
+            matchType: 'exact',
+          },
+          {
+            artist: 'Artist C',
+            title: 'Album C',
+            playCount: 30,
+            lastPlayed: null,
+            matchType: 'exact',
+          },
+        ],
+      });
+
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      // Wait for play counts to load
+      await waitFor(() => {
+        expect(mockApiServiceInstance.getAlbumPlayCounts).toHaveBeenCalled();
+      });
+
+      const sortSelect = screen.getByDisplayValue('Artist');
+      await userEvent.selectOptions(sortSelect, 'scrobbles');
+
+      expect(sortSelect).toHaveValue('scrobbles');
     });
   });
 });

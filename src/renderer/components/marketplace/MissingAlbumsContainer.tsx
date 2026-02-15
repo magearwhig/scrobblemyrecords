@@ -53,17 +53,18 @@ const MissingAlbumsContainer: React.FC = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [mappingInProgress, setMappingInProgress] = useState(false);
 
-  const [addingToWantList, setAddingToWantList] = useState<Set<string>>(
+  const [addingToMonitored, setAddingToMonitored] = useState<Set<string>>(
     new Set()
   );
-  const [addedToWantList, setAddedToWantList] = useState<Set<string>>(
+  const [monitoredAlbums, setMonitoredAlbums] = useState<Set<string>>(
     new Set()
   );
   const [discogsWishlistItems, setDiscogsWishlistItems] = useState<
     Array<{ artist: string; title: string }>
   >([]);
   const [albumSort, setAlbumSort] = useState<AlbumSortOption>('plays');
-  const [hideWantedItems, setHideWantedItems] = useState(false);
+  const [hideWishlistedAndMonitored, setHideWishlistedAndMonitored] =
+    useState(false);
 
   const api = getApiService(state.serverUrl);
 
@@ -85,7 +86,7 @@ const MissingAlbumsContainer: React.FC = () => {
           (item: LocalWantItem) => `${item.artist}:${item.album}`
         )
       );
-      setAddedToWantList(existingWantedKeys);
+      setMonitoredAlbums(existingWantedKeys);
 
       const normalizedWishlist = discogsWishlist.map(
         (item: EnrichedWishlistItem) => ({
@@ -215,23 +216,23 @@ const MissingAlbumsContainer: React.FC = () => {
     }
   };
 
-  const handleAddToWantList = async (album: MissingAlbum) => {
+  const handleMonitorAlbum = async (album: MissingAlbum) => {
     const key = `${album.artist}:${album.album}`;
-    if (addingToWantList.has(key) || addedToWantList.has(key)) return;
+    if (addingToMonitored.has(key) || monitoredAlbums.has(key)) return;
 
     try {
-      setAddingToWantList(prev => new Set([...prev, key]));
+      setAddingToMonitored(prev => new Set([...prev, key]));
       await api.addToLocalWantList({
         artist: album.artist,
         album: album.album,
         playCount: album.playCount,
         lastPlayed: album.lastPlayed,
       });
-      setAddedToWantList(prev => new Set([...prev, key]));
+      setMonitoredAlbums(prev => new Set([...prev, key]));
     } catch (err) {
       logger.error('Failed to add to want list', err);
     } finally {
-      setAddingToWantList(prev => {
+      setAddingToMonitored(prev => {
         const next = new Set(prev);
         next.delete(key);
         return next;
@@ -264,17 +265,17 @@ const MissingAlbumsContainer: React.FC = () => {
         missingAlbums={missingAlbums}
         albumSort={albumSort}
         setAlbumSort={setAlbumSort}
-        hideWantedItems={hideWantedItems}
-        setHideWantedItems={setHideWantedItems}
-        addingToWantList={addingToWantList}
-        addedToWantList={addedToWantList}
+        hideWishlistedAndMonitored={hideWishlistedAndMonitored}
+        setHideWishlistedAndMonitored={setHideWishlistedAndMonitored}
+        addingToMonitored={addingToMonitored}
+        monitoredAlbums={monitoredAlbums}
         isInDiscogsWishlist={isInDiscogsWishlist}
         formatDate={formatDate}
         openLink={openLink}
         getLastFmAlbumUrl={getLastFmAlbumUrl}
         getDiscogsAlbumUrl={getDiscogsAlbumUrl}
         openAlbumMapping={openAlbumMapping}
-        handleAddToWantList={handleAddToWantList}
+        handleMonitorAlbum={handleMonitorAlbum}
         handleHideAlbum={handleHideAlbum}
       />
 

@@ -66,6 +66,10 @@ describe('Auth Routes', () => {
     app.use(cors());
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
+    app.use((_req, res, next) => {
+      res.set('Connection', 'close');
+      next();
+    });
 
     // Create router with mocked services
     const fileStorage = new FileStorage();

@@ -40,6 +40,10 @@ describe('Artist Mapping Routes', () => {
     app.use(helmet());
     app.use(cors());
     app.use(express.json());
+    app.use((_req, res, next) => {
+      res.set('Connection', 'close');
+      next();
+    });
 
     // Mount artist mapping routes
     app.use('/api/v1/artist-mapping', artistMappingRouter);

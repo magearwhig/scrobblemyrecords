@@ -65,11 +65,11 @@ const DiscoveryPage: React.FC = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [mappingInProgress, setMappingInProgress] = useState(false);
 
-  // Want list state - track which albums are being added
-  const [addingToWantList, setAddingToWantList] = useState<Set<string>>(
+  // Monitor list state - track which albums are being added
+  const [addingToMonitored, setAddingToMonitored] = useState<Set<string>>(
     new Set()
   );
-  const [addedToWantList, setAddedToWantList] = useState<Set<string>>(
+  const [monitoredAlbums, setMonitoredAlbums] = useState<Set<string>>(
     new Set()
   );
 
@@ -81,8 +81,9 @@ const DiscoveryPage: React.FC = () => {
   // Sorting state
   const [albumSort, setAlbumSort] = useState<AlbumSortOption>('plays');
   const [artistSort, setArtistSort] = useState<ArtistSortOption>('plays');
-  // Hide wanted items toggle
-  const [hideWantedItems, setHideWantedItems] = useState(false);
+  // Hide wishlisted and monitored items toggle
+  const [hideWishlistedAndMonitored, setHideWishlistedAndMonitored] =
+    useState(false);
 
   const api = getApiService(state.serverUrl);
 
@@ -103,13 +104,13 @@ const DiscoveryPage: React.FC = () => {
       setMissingAlbums(albums);
       setMissingArtists(artists);
 
-      // Pre-populate addedToWantList with existing local want list items
+      // Pre-populate monitoredAlbums with existing local want list items
       const existingWantedKeys = new Set(
         localWantList.map(
           (item: LocalWantItem) => `${item.artist}:${item.album}`
         )
       );
-      setAddedToWantList(existingWantedKeys);
+      setMonitoredAlbums(existingWantedKeys);
 
       // Pre-populate discogsWishlistItems with normalized Discogs wantlist items
       // Store as array for flexible matching (handles Last.fm quirks like "Artist & Album Title")
@@ -302,23 +303,23 @@ const DiscoveryPage: React.FC = () => {
   };
 
   // Add album to local want list (tracks for vinyl availability)
-  const handleAddToWantList = async (album: MissingAlbum) => {
+  const handleMonitorAlbum = async (album: MissingAlbum) => {
     const key = `${album.artist}:${album.album}`;
-    if (addingToWantList.has(key) || addedToWantList.has(key)) return;
+    if (addingToMonitored.has(key) || monitoredAlbums.has(key)) return;
 
     try {
-      setAddingToWantList(prev => new Set([...prev, key]));
+      setAddingToMonitored(prev => new Set([...prev, key]));
       await api.addToLocalWantList({
         artist: album.artist,
         album: album.album,
         playCount: album.playCount,
         lastPlayed: album.lastPlayed,
       });
-      setAddedToWantList(prev => new Set([...prev, key]));
+      setMonitoredAlbums(prev => new Set([...prev, key]));
     } catch (err) {
       logger.error('Failed to add to want list', err);
     } finally {
-      setAddingToWantList(prev => {
+      setAddingToMonitored(prev => {
         const next = new Set(prev);
         next.delete(key);
         return next;
@@ -338,11 +339,11 @@ const DiscoveryPage: React.FC = () => {
   };
 
   // Calculate filtered album count for tab display
-  const filteredAlbumCount = hideWantedItems
+  const filteredAlbumCount = hideWishlistedAndMonitored
     ? missingAlbums.filter(
         album =>
           !isInDiscogsWishlist(album.artist, album.album) &&
-          !addedToWantList.has(`${album.artist}:${album.album}`)
+          !monitoredAlbums.has(`${album.artist}:${album.album}`)
       ).length
     : missingAlbums.length;
 
@@ -362,7 +363,7 @@ const DiscoveryPage: React.FC = () => {
           onClick={() => setActiveTab('albums')}
         >
           Missing Albums (
-          {hideWantedItems
+          {hideWishlistedAndMonitored
             ? `${Math.min(filteredAlbumCount, 100)}/${missingAlbums.length}`
             : missingAlbums.length}
           )
@@ -395,17 +396,17 @@ const DiscoveryPage: React.FC = () => {
               missingAlbums={missingAlbums}
               albumSort={albumSort}
               setAlbumSort={setAlbumSort}
-              hideWantedItems={hideWantedItems}
-              setHideWantedItems={setHideWantedItems}
-              addingToWantList={addingToWantList}
-              addedToWantList={addedToWantList}
+              hideWishlistedAndMonitored={hideWishlistedAndMonitored}
+              setHideWishlistedAndMonitored={setHideWishlistedAndMonitored}
+              addingToMonitored={addingToMonitored}
+              monitoredAlbums={monitoredAlbums}
               isInDiscogsWishlist={isInDiscogsWishlist}
               formatDate={formatDate}
               openLink={openLink}
               getLastFmAlbumUrl={getLastFmAlbumUrl}
               getDiscogsAlbumUrl={getDiscogsAlbumUrl}
               openAlbumMapping={openAlbumMapping}
-              handleAddToWantList={handleAddToWantList}
+              handleMonitorAlbum={handleMonitorAlbum}
               handleHideAlbum={handleHideAlbum}
             />
           )}

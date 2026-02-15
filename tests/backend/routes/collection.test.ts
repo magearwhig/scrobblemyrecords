@@ -59,6 +59,10 @@ describe('Collection Routes', () => {
     app.use(helmet());
     app.use(cors());
     app.use(express.json());
+    app.use((_req, res, next) => {
+      res.set('Connection', 'close');
+      next();
+    });
 
     // Add the mocked services to app.locals
     app.locals.discogsService = mockDiscogsService;

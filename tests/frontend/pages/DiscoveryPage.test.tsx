@@ -894,6 +894,89 @@ describe('DiscoveryPage', () => {
     expect(screen.getByText(/Missing Albums.*2\/3.*/)).toBeInTheDocument();
   });
 
+  it('sorts albums by album name', async () => {
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Radiohead')).toBeInTheDocument();
+    });
+
+    const sortSelect = screen.getByLabelText('Sort by:');
+    await user.selectOptions(sortSelect, 'album');
+
+    expect(sortSelect).toHaveValue('album');
+  });
+
+  it('sorts albums by recently played', async () => {
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Radiohead')).toBeInTheDocument();
+    });
+
+    const sortSelect = screen.getByLabelText('Sort by:');
+    await user.selectOptions(sortSelect, 'recent');
+
+    expect(sortSelect).toHaveValue('recent');
+  });
+
+  it('sorts artists by artist name', async () => {
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Missing Artists (2)')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Missing Artists (2)'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Pink Floyd')).toBeInTheDocument();
+    });
+
+    const sortSelect = screen.getByLabelText('Sort by:');
+    await user.selectOptions(sortSelect, 'artist');
+
+    expect(sortSelect).toHaveValue('artist');
+  });
+
+  it('sorts artists by most albums', async () => {
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Missing Artists (2)')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Missing Artists (2)'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Pink Floyd')).toBeInTheDocument();
+    });
+
+    const sortSelect = screen.getByLabelText('Sort by:');
+    await user.selectOptions(sortSelect, 'albums');
+
+    expect(sortSelect).toHaveValue('albums');
+  });
+
+  it('sorts artists by recently played', async () => {
+    renderDiscoveryPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Missing Artists (2)')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Missing Artists (2)'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Pink Floyd')).toBeInTheDocument();
+    });
+
+    const sortSelect = screen.getByLabelText('Sort by:');
+    await user.selectOptions(sortSelect, 'recent');
+
+    expect(sortSelect).toHaveValue('recent');
+  });
+
   it('shows special empty state when all albums are hidden by filter', async () => {
     // Only one album and it's in local want list
     mockGetMissingAlbums.mockResolvedValue([

@@ -14,7 +14,7 @@ export class FileStorage {
   // Maximum number of backup files to keep per original file
   private readonly MAX_BACKUPS = 10;
 
-  constructor(dataDir: string = './data') {
+  constructor(dataDir: string = process.env.DATA_DIR || './data') {
     this.dataDir = path.resolve(dataDir);
   }
 

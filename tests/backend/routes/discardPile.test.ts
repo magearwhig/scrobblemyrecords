@@ -124,6 +124,10 @@ describe('Discard Pile Routes', () => {
     app.use(helmet());
     app.use(cors());
     app.use(express.json());
+    app.use((_req, res, next) => {
+      res.set('Connection', 'close');
+      next();
+    });
     app.use(
       '/api/v1/discard-pile',
       createDiscardPileRouter(mockDiscardPileService, mockWishlistService)

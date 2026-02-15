@@ -222,6 +222,10 @@ describe('Collection Analytics Routes', () => {
     app.use(helmet());
     app.use(cors());
     app.use(express.json());
+    app.use((_req, res, next) => {
+      res.set('Connection', 'close');
+      next();
+    });
 
     // Mount collection analytics routes
     app.use(
