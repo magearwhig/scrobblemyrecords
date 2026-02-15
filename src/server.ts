@@ -11,7 +11,7 @@ import morgan from 'morgan';
 // Load environment variables before any other imports
 dotenv.config();
 
-import artistMappingRoutes from './backend/routes/artistMapping';
+import { createArtistMappingRouter } from './backend/routes/artistMapping';
 import { createAuthRouter } from './backend/routes/auth';
 import createBackupRouter from './backend/routes/backup';
 import createCollectionRouter from './backend/routes/collection';
@@ -26,6 +26,8 @@ import createSuggestionsRouter from './backend/routes/suggestions';
 import createWishlistRouter from './backend/routes/wishlist';
 import createWrappedRouter from './backend/routes/wrapped';
 import { AnalyticsService } from './backend/services/analyticsService';
+import { artistMappingService } from './backend/services/artistMappingService';
+import { ArtistNameResolver } from './backend/services/artistNameResolver';
 import { AuthService } from './backend/services/authService';
 import { BackupService } from './backend/services/backupService';
 import { CleanupService } from './backend/services/cleanupService';
@@ -33,6 +35,7 @@ import { DiscardPileService } from './backend/services/discardPileService';
 import { DiscogsService } from './backend/services/discogsService';
 import { HiddenItemService } from './backend/services/hiddenItemService';
 import { HiddenReleasesService } from './backend/services/hiddenReleasesService';
+import { HistoryIndexMergeService } from './backend/services/historyIndexMergeService';
 import { ImageService } from './backend/services/imageService';
 import { LastFmService } from './backend/services/lastfmService';
 import { MappingService } from './backend/services/mappingService';
@@ -339,40 +342,10 @@ app.use(
     mappingService
   )
 );
-app.use('/api/v1/artist-mappings', artistMappingRoutes);
-app.use(
-  '/api/v1/stats',
-  createStatsRouter(
-    fileStorage,
-    authService,
-    statsService,
-    historyStorage,
-    wishlistService,
-    sellerMonitoringService,
-    analyticsService,
-    rankingsService,
-    mappingService
-  )
-);
+// Artist mapping, suggestions, and stats routes are mounted in startServer() to inject runtime dependencies
 app.use(
   '/api/v1/images',
   createImagesRouter(fileStorage, authService, imageService)
-);
-app.use(
-  '/api/v1/suggestions',
-  createSuggestionsRouter(
-    fileStorage,
-    authService,
-    discogsService,
-    historyStorage,
-    syncService,
-    analyticsService,
-    suggestionService,
-    mappingService,
-    trackMappingService,
-    hiddenItemService,
-    statsService
-  )
 );
 app.use(
   '/api/v1/wishlist',
@@ -426,29 +399,7 @@ app.get('/api/v1', (req, res) => {
   });
 });
 
-// Error handling middleware
-app.use(
-  (
-    err: Error,
-    req: express.Request,
-    res: express.Response,
-    _next: express.NextFunction
-  ) => {
-    log.error('Request error', { message: err.message, path: req.path });
-    sendError(
-      res,
-      500,
-      process.env.NODE_ENV === 'production'
-        ? 'Internal server error'
-        : err.message
-    );
-  }
-);
-
-// 404 handler
-app.use((_req, res) => {
-  sendError(res, 404, 'Route not found');
-});
+// Error handling and 404 handlers are registered in startServer() after all routes
 
 async function startServer() {
   try {
@@ -507,6 +458,115 @@ async function startServer() {
     if (process.env.NODE_ENV === 'test') {
       await Promise.allSettled([cleanupPromise, backupPromise]);
     }
+
+    // Build artist name resolver from all mapping sources
+    const artistNameResolver = new ArtistNameResolver(
+      artistMappingService,
+      mappingService
+    );
+    await artistNameResolver.rebuild();
+
+    // Auto-detect and create missing artist mappings from album mappings
+    const missingMappings =
+      await artistNameResolver.detectMissingScrobbleMappings();
+    if (missingMappings.length > 0) {
+      for (const missing of missingMappings) {
+        artistMappingService.setMapping(
+          missing.discogsName,
+          missing.lastfmName
+        );
+      }
+      log.info(
+        `Auto-created ${missingMappings.length} missing artist mappings`
+      );
+      // Rebuild resolver with newly created mappings
+      await artistNameResolver.rebuild();
+    }
+
+    // Mount artist mapping routes with resolver for rebuild-on-change
+    app.use(
+      '/api/v1/artist-mappings',
+      createArtistMappingRouter(artistNameResolver)
+    );
+
+    // Mount suggestions routes now that artistNameResolver is available
+    app.use(
+      '/api/v1/suggestions',
+      createSuggestionsRouter(
+        fileStorage,
+        authService,
+        discogsService,
+        historyStorage,
+        syncService,
+        analyticsService,
+        suggestionService,
+        mappingService,
+        trackMappingService,
+        hiddenItemService,
+        statsService,
+        artistNameResolver
+      )
+    );
+
+    // Inject resolver into services that support artist name resolution
+    statsService.setArtistNameResolver(artistNameResolver);
+    historyStorage.setArtistNameResolver(artistNameResolver);
+    wrappedService.setArtistNameResolver(artistNameResolver);
+
+    // Create merge service for detecting and merging split history index entries
+    const historyIndexMergeService = new HistoryIndexMergeService(
+      artistNameResolver,
+      fileStorage
+    );
+
+    // Log split entry warnings at startup
+    const splitEntries = await historyIndexMergeService.findSplitEntries();
+    if (splitEntries.length > 0) {
+      log.warn(
+        `Found ${splitEntries.length} split history index entries that can be merged via /api/v1/stats/merge-split-entries`
+      );
+    }
+
+    // Mount stats routes now that historyIndexMergeService is available
+    app.use(
+      '/api/v1/stats',
+      createStatsRouter(
+        fileStorage,
+        authService,
+        statsService,
+        historyStorage,
+        wishlistService,
+        sellerMonitoringService,
+        analyticsService,
+        rankingsService,
+        mappingService,
+        historyIndexMergeService
+      )
+    );
+
+    // Error handling middleware (registered after all routes including stats)
+    app.use(
+      (
+        err: Error,
+        req: express.Request,
+        res: express.Response,
+        _next: express.NextFunction
+      ) => {
+        log.error('Request error', { message: err.message, path: req.path });
+        sendError(
+          res,
+          500,
+          process.env.NODE_ENV === 'production'
+            ? 'Internal server error'
+            : err.message
+        );
+      }
+    );
+
+    // 404 handler
+    app.use((_req: express.Request, res: express.Response) => {
+      sendError(res, 404, 'Route not found');
+    });
 
     // Only start server if not in test environment
     if (process.env.NODE_ENV !== 'test') {

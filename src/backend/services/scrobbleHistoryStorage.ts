@@ -2,6 +2,8 @@ import { ScrobbleHistoryIndex, AlbumHistoryEntry } from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
+import { ArtistNameResolver } from './artistNameResolver';
+
 const HISTORY_INDEX_FILE = 'history/scrobble-history-index.json';
 
 /**
@@ -23,8 +25,25 @@ export class ScrobbleHistoryStorage {
   private cachedHourlyDist: Map<number, number> | null = null;
   private cachedDayOfWeekDist: Map<number, number> | null = null;
 
+  private artistNameResolver: ArtistNameResolver | null = null;
+
   constructor(fileStorage: FileStorage) {
     this.fileStorage = fileStorage;
+  }
+
+  setArtistNameResolver(resolver: ArtistNameResolver): void {
+    this.artistNameResolver = resolver;
+  }
+
+  /**
+   * Resolve an artist name to its canonical form using the resolver,
+   * falling back to simple toLowerCase() if no resolver is set.
+   */
+  private resolveArtistName(name: string): string {
+    if (this.artistNameResolver) {
+      return this.artistNameResolver.resolveArtist(name);
+    }
+    return name.toLowerCase();
   }
 
   /**
@@ -462,7 +481,8 @@ export class ScrobbleHistoryStorage {
     >();
 
     for (const { artist, history } of albums) {
-      const existing = artists.get(artist.toLowerCase());
+      const key = this.resolveArtistName(artist);
+      const existing = artists.get(key);
       if (existing) {
         existing.playCount += history.playCount;
         existing.albumCount++;
@@ -470,7 +490,7 @@ export class ScrobbleHistoryStorage {
           existing.lastPlayed = history.lastPlayed;
         }
       } else {
-        artists.set(artist.toLowerCase(), {
+        artists.set(key, {
           playCount: history.playCount,
           albumCount: 1,
           lastPlayed: history.lastPlayed,
@@ -674,7 +694,7 @@ export class ScrobbleHistoryStorage {
     >();
 
     for (const { artist, history } of allAlbums) {
-      const key = artist.toLowerCase();
+      const key = this.resolveArtistName(artist);
       const existing = artistMap.get(key);
       if (existing) {
         existing.playCount += history.playCount;
@@ -683,8 +703,11 @@ export class ScrobbleHistoryStorage {
           existing.lastPlayed = history.lastPlayed;
         }
       } else {
+        const displayName = this.artistNameResolver
+          ? this.artistNameResolver.getDisplayName(artist)
+          : artist;
         artistMap.set(key, {
-          artist,
+          artist: displayName,
           playCount: history.playCount,
           albumCount: 1,
           lastPlayed: history.lastPlayed,

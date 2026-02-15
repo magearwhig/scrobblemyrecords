@@ -8,6 +8,7 @@ import {
 import { AIPromptBuilder, AIPromptContext } from '../services/aiPromptBuilder';
 import { AnalyticsService } from '../services/analyticsService';
 import { artistMappingService } from '../services/artistMappingService';
+import { ArtistNameResolver } from '../services/artistNameResolver';
 import { AuthService } from '../services/authService';
 import { DiscogsService } from '../services/discogsService';
 import { HiddenItemService } from '../services/hiddenItemService';
@@ -46,7 +47,8 @@ export default function createSuggestionsRouter(
   mappingService: MappingService,
   trackMappingService: TrackMappingService,
   hiddenItemService: HiddenItemService,
-  statsService: StatsService
+  statsService: StatsService,
+  artistNameResolver?: ArtistNameResolver
 ) {
   const router = express.Router();
   const logger = createLogger('SuggestionsRoutes');
@@ -1556,6 +1558,27 @@ export default function createSuggestionsRouter(
         collectionAlbum,
       });
 
+      // Rebuild resolver to reflect mapping changes
+      if (artistNameResolver) {
+        try {
+          await artistNameResolver.rebuild();
+          // Auto-detect and create missing scrobble mappings
+          const missing =
+            await artistNameResolver.detectMissingScrobbleMappings();
+          for (const m of missing) {
+            artistMappingService.setMapping(m.discogsName, m.lastfmName);
+          }
+          if (missing.length > 0) {
+            await artistNameResolver.rebuild();
+          }
+        } catch (rebuildError) {
+          logger.error(
+            'Failed to rebuild resolver after adding album mapping',
+            rebuildError
+          );
+        }
+      }
+
       res.json({
         success: true,
         message: 'Album mapping created',
@@ -1588,6 +1611,27 @@ export default function createSuggestionsRouter(
         historyArtist,
         historyAlbum
       );
+
+      // Rebuild resolver to reflect mapping changes
+      if (artistNameResolver) {
+        try {
+          await artistNameResolver.rebuild();
+          // Auto-detect and create missing scrobble mappings
+          const missing =
+            await artistNameResolver.detectMissingScrobbleMappings();
+          for (const m of missing) {
+            artistMappingService.setMapping(m.discogsName, m.lastfmName);
+          }
+          if (missing.length > 0) {
+            await artistNameResolver.rebuild();
+          }
+        } catch (rebuildError) {
+          logger.error(
+            'Failed to rebuild resolver after removing album mapping',
+            rebuildError
+          );
+        }
+      }
 
       res.json({
         success: true,
@@ -1643,6 +1687,18 @@ export default function createSuggestionsRouter(
         collectionArtist,
       });
 
+      // Rebuild resolver to reflect mapping changes
+      if (artistNameResolver) {
+        try {
+          await artistNameResolver.rebuild();
+        } catch (rebuildError) {
+          logger.error(
+            'Failed to rebuild resolver after adding artist mapping',
+            rebuildError
+          );
+        }
+      }
+
       res.json({
         success: true,
         message: 'Artist mapping created',
@@ -1672,6 +1728,18 @@ export default function createSuggestionsRouter(
       }
 
       const removed = await mappingService.removeArtistMapping(historyArtist);
+
+      // Rebuild resolver to reflect mapping changes
+      if (artistNameResolver) {
+        try {
+          await artistNameResolver.rebuild();
+        } catch (rebuildError) {
+          logger.error(
+            'Failed to rebuild resolver after removing artist mapping',
+            rebuildError
+          );
+        }
+      }
 
       res.json({
         success: true,

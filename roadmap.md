@@ -1823,3 +1823,24 @@ Dedicated detail pages for individual artists and tracks, reachable from anywher
 **Dependencies:** Feature 12 (useCollectionLookup hook) recommended but not required
 
 **Priority:** MEDIUM -- high engagement value, moderate complexity
+
+---
+
+## Feature 16: Mapping System Consolidation
+
+### Status: COMPLETE (February 2026)
+
+Unified three disconnected mapping services (`artistMappingService`, `mappingService` album mappings, `mappingService` artist mappings) into a layered resolution system. Fixes split history entries, wrong artist stats, and stale "Last played" timestamps caused by artist name variants across Discogs and Last.fm.
+
+**Delivered:**
+- `ArtistNameResolver` service with in-memory alias graph (union-find with path compression)
+- Query-time artist aggregation in `statsService`, `scrobbleHistoryStorage`, `wrappedService`
+- Auto-detection and creation of missing artist mappings at startup
+- Resolver rebuild on UI mapping changes (artist mapping routes + suggestions routes)
+- `HistoryIndexMergeService` opt-in merge tool with split-entry detection and safe merge (backup + dedup)
+- REST endpoints: `GET /api/stats/split-entries` and `POST /api/stats/merge-split-entries`
+- 44 new tests (31 for ArtistNameResolver, 13 for HistoryIndexMergeService)
+
+**Implementation Plan:** See `.plan/done/mapping-resolution-plan.md`
+
+**Dependencies:** None (reads from existing mapping data files)

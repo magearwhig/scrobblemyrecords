@@ -51,6 +51,14 @@ README and `dev_prompt.md` specify 90% coverage target but Jest config enforces 
 
 ## HIGH
 
+### ~~H7. Three disconnected mapping services cause split artist entries in history index~~ DONE
+
+**Completed:** February 2026. Created `ArtistNameResolver` service (`src/backend/services/artistNameResolver.ts`) with union-find alias graph that reads from all existing mapping sources. Applied resolver at query time in `statsService` (4 methods), `scrobbleHistoryStorage` (2 methods), and `wrappedService`. Auto-detects and creates missing artist mappings at startup. Resolver rebuilds on mapping changes via UI (artistMapping and suggestions routes). Opt-in history index merge tool via `HistoryIndexMergeService` with API endpoints at `/api/v1/stats/split-entries` and `/api/v1/stats/merge-split-entries`.
+
+**Plan:** See `.plan/mapping-resolution-plan.md`
+
+---
+
 ### ~~H1. No React Error Boundary~~ DONE
 
 **Completed:** February 2026. Created `ErrorBoundary` class component in `src/renderer/components/ErrorBoundary.tsx` wrapping `<MainContent>` in `App.tsx`. Shows "Something went wrong" UI with "Try Again" and "Reload Page" buttons. Logs errors via secure logger.
@@ -341,6 +349,7 @@ All components wrapped with `React.memo`. Inline styles replaced with CSS classe
 | # | Finding | Severity | Quick Win? |
 |---|---------|----------|------------|
 | C1 | Coverage thresholds (50–63%) vs 90% target | **Critical** | No (ongoing) |
+| ~~H7~~ | ~~Three disconnected mapping services cause split artist entries~~ | ~~**High**~~ | ~~DONE~~ |
 | ~~H1~~ | ~~No React Error Boundary~~ | ~~**High**~~ | ~~DONE~~ |
 | ~~H2~~ | ~~Empty-string fallbacks for API secrets~~ | ~~**High**~~ | ~~DONE~~ |
 | ~~H3~~ | ~~Lock file TOCTOU race condition~~ | ~~**High**~~ | ~~DONE~~ |
@@ -379,7 +388,7 @@ All components wrapped with `React.memo`. Inline styles replaced with CSS classe
 | ~~L11~~ | ~~Centralize route identifiers~~ | ~~Low~~ | ~~DONE~~ |
 | ~~L12~~ | ~~Sidebar reorganization~~ | ~~Low~~ | ~~DONE~~ |
 
-**Total open**: 1 item (C1 — ongoing coverage improvement) -- 37 completed/resolved (February 2026)
+**Total open**: 1 item (C1 — ongoing coverage improvement) -- 38 completed/resolved (February 2026)
 
 ---
 

@@ -224,6 +224,31 @@ export interface SyncSettings {
 }
 
 // ============================================
+// History Index Merge Types
+// ============================================
+
+/**
+ * A proposal to merge duplicate history index entries.
+ * Represents one source key being folded into a canonical target key.
+ */
+export interface MergeProposal {
+  sourceKey: string; // Original key to be merged (e.g., "billy woods, kenny segal|hiding places")
+  targetKey: string; // Target canonical key (e.g., "billy woods|hiding places")
+  sourcePlayCount: number;
+  targetPlayCount: number;
+  mergedPlayCount: number; // After dedup by timestamp
+}
+
+/**
+ * Report generated after running a history index merge operation.
+ */
+export interface MergeReport {
+  mergedCount: number;
+  proposals: MergeProposal[];
+  backupPath: string;
+}
+
+// ============================================
 // Discovery Types (Missing from Collection)
 // ============================================
 

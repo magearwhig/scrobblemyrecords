@@ -12,6 +12,7 @@ import {
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
+import { ArtistNameResolver } from './artistNameResolver';
 import { DiscogsService } from './discogsService';
 import { ImageService } from './imageService';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
@@ -27,6 +28,7 @@ const AVG_TRACK_DURATION_MINUTES = 3.5;
  */
 export class WrappedService {
   private logger = createLogger('WrappedService');
+  private artistNameResolver: ArtistNameResolver | null = null;
 
   constructor(
     private statsService: StatsService,
@@ -35,6 +37,32 @@ export class WrappedService {
     private imageService: ImageService,
     private fileStorage: FileStorage
   ) {}
+
+  setArtistNameResolver(resolver: ArtistNameResolver): void {
+    this.artistNameResolver = resolver;
+  }
+
+  /**
+   * Resolve an artist name to its canonical form using the resolver if available,
+   * falling back to simple toLowerCase().
+   */
+  private resolveArtistName(name: string): string {
+    if (this.artistNameResolver) {
+      return this.artistNameResolver.resolveArtist(name);
+    }
+    return name.toLowerCase();
+  }
+
+  /**
+   * Get the display name for an artist, using the resolver if available,
+   * falling back to capitalizeArtist().
+   */
+  private getArtistDisplayName(name: string): string {
+    if (this.artistNameResolver) {
+      return this.artistNameResolver.getDisplayName(name);
+    }
+    return this.capitalizeArtist(name);
+  }
 
   /**
    * Generate complete wrapped data for a date range.
@@ -98,7 +126,7 @@ export class WrappedService {
 
     for (const [key, albumHistory] of Object.entries(index.albums)) {
       const [artist] = key.split('|');
-      const normalizedArtist = artist.toLowerCase();
+      const normalizedArtist = this.resolveArtistName(artist);
 
       for (const play of albumHistory.plays) {
         // Track first-ever play for each artist (across all history)
@@ -186,7 +214,7 @@ export class WrappedService {
       if (firstPlay >= startSec && firstPlay <= endSec) {
         const rangePlays = artistRangePlays.get(artist) || 0;
         newArtists.push({
-          name: this.capitalizeArtist(artist),
+          name: this.getArtistDisplayName(artist),
           playCount: rangePlays,
           firstPlayDate: firstPlay * 1000, // Convert to milliseconds
         });

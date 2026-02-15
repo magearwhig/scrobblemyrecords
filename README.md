@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-2864%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-2908%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -126,9 +126,11 @@ npm run start:web
 - **Dark Mode**: Toggle between light and dark themes
 - **Local Timezone**: All times displayed in your local timezone
 - **Sorting Options**: Sort collection by artist, title, year, or date added
+- **Artist Name Resolution**: Unified alias graph resolves Discogs/Last.fm name variants across stats, history, and Wrapped
 - **Artist Name Mapping**: Map Discogs artist names to Last.fm names for consistent scrobbling
 - **Disambiguation Warnings**: Alerts when scrobbling artists with Discogs disambiguation suffixes (e.g., "Ghost (32)")
 - **Possible Mappings**: Automatically suggests artists in your collection that may need name mappings
+- **Split Entry Detection**: Detects and merges duplicate history entries caused by artist name variants
 
 ### 🏠 Home Dashboard
 Your personalized dashboard showing key metrics and insights at a glance:
@@ -682,6 +684,8 @@ src/
 │   │   ├── mappingService.ts      # Scrobble artist mappings
 │   │   ├── trackMappingService.ts # Discogs↔Last.fm track mappings
 │   │   ├── artistMappingService.ts # Artist name mappings
+│   │   ├── artistNameResolver.ts  # Unified artist alias resolution (union-find)
+│   │   ├── historyIndexMergeService.ts # Split history entry detection & merge
 │   │   ├── hiddenItemService.ts   # User-hidden suggestions
 │   │   ├── hiddenReleasesService.ts # User-hidden releases
 │   │   ├── wishlistService.ts     # Wishlist & vinyl tracking

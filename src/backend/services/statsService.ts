@@ -23,6 +23,7 @@ import { createNormalizedTrackKey } from '../../shared/utils/trackNormalization'
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
+import { ArtistNameResolver } from './artistNameResolver';
 import { MappingService } from './mappingService';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 import { TrackMappingService } from './trackMappingService';
@@ -52,6 +53,7 @@ export class StatsService {
   private historyStorage: ScrobbleHistoryStorage;
   private trackMappingService: TrackMappingService | null = null;
   private mappingService: MappingService | null = null;
+  private artistNameResolver: ArtistNameResolver | null = null;
   private logger = createLogger('StatsService');
 
   // In-memory cache for forgotten favorites (5 minute TTL)
@@ -84,6 +86,24 @@ export class StatsService {
    */
   setMappingService(service: MappingService): void {
     this.mappingService = service;
+  }
+
+  setArtistNameResolver(resolver: ArtistNameResolver): void {
+    this.artistNameResolver = resolver;
+  }
+
+  private resolveArtistName(name: string): string {
+    if (this.artistNameResolver) {
+      return this.artistNameResolver.resolveArtist(name);
+    }
+    return name.toLowerCase();
+  }
+
+  private isSameArtist(a: string, b: string): boolean {
+    if (this.artistNameResolver) {
+      return this.artistNameResolver.areSameArtist(a, b);
+    }
+    return a.toLowerCase() === b.toLowerCase();
   }
 
   /**
@@ -399,7 +419,7 @@ export class StatsService {
           play.timestamp >= cutoffTimestamp &&
           play.timestamp <= endTimestamp
         ) {
-          const normalizedArtist = artist.toLowerCase();
+          const normalizedArtist = this.resolveArtistName(artist);
           artistCounts.set(
             normalizedArtist,
             (artistCounts.get(normalizedArtist) || 0) + 1
@@ -413,7 +433,9 @@ export class StatsService {
       .sort((a, b) => b[1] - a[1])
       .slice(0, limit)
       .map(([artist, playCount]) => ({
-        artist: this.capitalizeArtist(artist),
+        artist: this.artistNameResolver
+          ? this.artistNameResolver.getDisplayName(artist)
+          : this.capitalizeArtist(artist),
         playCount,
       }));
   }
@@ -996,11 +1018,16 @@ export class StatsService {
 
     for (const [key, albumHistory] of Object.entries(index.albums)) {
       const [artist] = key.split('|');
-      const normalizedArtist = artist.toLowerCase();
+      const normalizedArtist = this.resolveArtistName(artist);
 
       // Track original casing
       if (!artistOriginalName.has(normalizedArtist)) {
-        artistOriginalName.set(normalizedArtist, artist);
+        artistOriginalName.set(
+          normalizedArtist,
+          this.artistNameResolver
+            ? this.artistNameResolver.getDisplayName(artist)
+            : artist
+        );
       }
 
       for (const play of albumHistory.plays) {
@@ -1024,7 +1051,7 @@ export class StatsService {
         let playCount = 0;
         for (const [key, albumHistory] of Object.entries(index.albums)) {
           const [artist] = key.split('|');
-          if (artist.toLowerCase() === normalizedArtist) {
+          if (this.resolveArtistName(artist) === normalizedArtist) {
             playCount += albumHistory.plays.filter(
               p => p.timestamp >= monthStart
             ).length;
@@ -1473,8 +1500,6 @@ export class StatsService {
       };
     }
 
-    const normalizedArtistName = artistName.toLowerCase();
-
     // Period cutoffs (timestamps in seconds)
     const now = new Date();
     const weekStart = this.getStartOfWeek(now).getTime() / 1000;
@@ -1506,7 +1531,7 @@ export class StatsService {
 
     for (const [key, albumHistory] of Object.entries(index.albums)) {
       const [artist, album] = key.split('|');
-      if (artist.toLowerCase() !== normalizedArtistName) {
+      if (!this.isSameArtist(artist, artistName)) {
         continue;
       }
 
@@ -1603,7 +1628,7 @@ export class StatsService {
     const albums = Array.from(albumCounts.values())
       .sort((a, b) => b.playCount - a.playCount)
       .map(a => {
-        const colKey = `${normalizedArtistName}|${a.album.toLowerCase()}`;
+        const colKey = `${this.resolveArtistName(artistName)}|${a.album.toLowerCase()}`;
         const collectionItem = collectionMap.get(colKey);
         return {
           album: this.capitalizeTitle(a.album),
@@ -1621,7 +1646,9 @@ export class StatsService {
       .map(([period, count]) => ({ period, count }));
 
     return {
-      artist: this.capitalizeArtist(artistName),
+      artist: this.artistNameResolver
+        ? this.artistNameResolver.getDisplayName(artistName)
+        : this.capitalizeArtist(artistName),
       totalPlayCount,
       firstPlayed,
       lastPlayed,
@@ -1668,7 +1695,6 @@ export class StatsService {
       };
     }
 
-    const normalizedArtist = artist.toLowerCase();
     const normalizedTrack = track.toLowerCase();
     const normalizedAlbumFilter = album?.toLowerCase();
 
@@ -1689,7 +1715,7 @@ export class StatsService {
       const [entryArtist, entryAlbum] = key.split('|');
 
       // Filter by artist
-      if (entryArtist.toLowerCase() !== normalizedArtist) {
+      if (!this.isSameArtist(entryArtist, artist)) {
         continue;
       }
 
@@ -1783,7 +1809,9 @@ export class StatsService {
       .map(([period, count]) => ({ period, count }));
 
     return {
-      artist: this.capitalizeArtist(artist),
+      artist: this.artistNameResolver
+        ? this.artistNameResolver.getDisplayName(artist)
+        : this.capitalizeArtist(artist),
       track: this.capitalizeTitle(track),
       totalPlayCount,
       firstPlayed,

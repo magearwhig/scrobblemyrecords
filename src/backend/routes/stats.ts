@@ -15,6 +15,7 @@ import {
 import { AnalyticsService } from '../services/analyticsService';
 import { artistMappingService } from '../services/artistMappingService';
 import { AuthService } from '../services/authService';
+import { HistoryIndexMergeService } from '../services/historyIndexMergeService';
 import { MappingService } from '../services/mappingService';
 import { RankingsService } from '../services/rankingsService';
 import { ScrobbleHistoryStorage } from '../services/scrobbleHistoryStorage';
@@ -36,7 +37,8 @@ export default function createStatsRouter(
   sellerMonitoringService?: SellerMonitoringService,
   analyticsService?: AnalyticsService,
   rankingsService?: RankingsService,
-  mappingService?: MappingService
+  mappingService?: MappingService,
+  historyIndexMergeService?: HistoryIndexMergeService
 ) {
   const router = express.Router();
   const logger = createLogger('StatsRoutes');
@@ -1361,6 +1363,48 @@ export default function createStatsRouter(
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
+    }
+  });
+
+  // ============================================
+  // History Index Merge (Split Entry Consolidation)
+  // ============================================
+
+  /**
+   * GET /api/v1/stats/split-entries
+   * Dry-run scan: find history index entries that should be merged
+   */
+  router.get('/split-entries', async (_req: Request, res: Response) => {
+    try {
+      if (!historyIndexMergeService) {
+        return res.status(503).json({ error: 'Merge service not available' });
+      }
+      const proposals = await historyIndexMergeService.findSplitEntries();
+      res.json({ proposals, count: proposals.length });
+    } catch (error) {
+      logger.error('Failed to find split entries', error);
+      res.status(500).json({ error: 'Failed to find split entries' });
+    }
+  });
+
+  /**
+   * POST /api/v1/stats/merge-split-entries
+   * Execute merge of split history index entries
+   */
+  router.post('/merge-split-entries', async (_req: Request, res: Response) => {
+    try {
+      if (!historyIndexMergeService) {
+        return res.status(503).json({ error: 'Merge service not available' });
+      }
+      const proposals = await historyIndexMergeService.findSplitEntries();
+      if (proposals.length === 0) {
+        return res.json({ message: 'No split entries found', mergedCount: 0 });
+      }
+      const report = await historyIndexMergeService.executeMerge(proposals);
+      res.json(report);
+    } catch (error) {
+      logger.error('Failed to merge split entries', error);
+      res.status(500).json({ error: 'Failed to merge split entries' });
     }
   });
 
