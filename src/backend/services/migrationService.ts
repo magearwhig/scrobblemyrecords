@@ -299,6 +299,23 @@ export class MigrationService {
     });
 
     // ============================================
+    // Collection Analytics Files (Feature 13)
+    // ============================================
+    this.register('collection-analytics-value-cache', {
+      path: 'collection-analytics/value-cache.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('collection-analytics-scan-status', {
+      path: 'collection-analytics/scan-status.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    // ============================================
     // Discard Pile Files (Feature 7)
     // ============================================
     this.register('discard-pile', {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 import ArtistDetailPage from '../pages/ArtistDetailPage';
+import CollectionAnalyticsPage from '../pages/CollectionAnalyticsPage';
 import CollectionPage from '../pages/CollectionPage';
 import DiscardPilePage from '../pages/DiscardPilePage';
 import DiscoveryPage from '../pages/DiscoveryPage';
@@ -63,6 +64,8 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
         return <StatsPage />;
       case ROUTES.DISCARD_PILE:
         return <DiscardPilePage />;
+      case ROUTES.COLLECTION_ANALYTICS:
+        return <CollectionAnalyticsPage />;
       case ROUTES.WRAPPED:
         return <WrappedPage />;
       case ROUTES.ARTIST_DETAIL:

@@ -87,6 +87,13 @@ const Sidebar: React.FC<SidebarProps> = ({
           enabled: authStatus.discogs.authenticated,
           disabledReason: discogsReason,
         },
+        {
+          id: ROUTES.COLLECTION_ANALYTICS,
+          label: 'Collection Analytics',
+          icon: '📈',
+          enabled: authStatus.discogs.authenticated,
+          disabledReason: discogsReason,
+        },
       ],
     },
     {

@@ -14,6 +14,7 @@ export const ROUTES = {
   DISCOVERY: 'discovery',
   STATS: 'stats',
   DISCARD_PILE: 'discard-pile',
+  COLLECTION_ANALYTICS: 'collection-analytics',
   WRAPPED: 'wrapped',
   ARTIST_DETAIL: 'artist',
   TRACK_DETAIL: 'track',

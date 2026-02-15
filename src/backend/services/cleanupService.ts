@@ -12,11 +12,13 @@
  * - Seller inventory cache: 7 days max age (based on file mtime)
  * - Collection artists cache (releases): 24 hours max age (uses fetchedAt timestamp)
  * - Artist tags cache (genre analysis): 30 days max age per entry (uses fetchedAt timestamp)
+ * - Collection value cache: 7 days max age (based on lastUpdated timestamp)
  */
 
 import {
   ArtistTagsCacheStore,
   CollectionArtistsCacheStore,
+  CollectionValueCacheStore,
   SellerMatchesStore,
   VersionsCache,
 } from '../../shared/types';
@@ -49,6 +51,7 @@ export interface CleanupReport {
   inventoryCacheFilesRemoved: number;
   collectionArtistsCacheCleared: boolean;
   artistTagsEntriesRemoved: number;
+  collectionValueCacheCleared: boolean;
   errors: string[];
   durationMs: number;
 }
@@ -63,6 +66,7 @@ export class CleanupService {
   private readonly INVENTORY_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
   private readonly COLLECTION_ARTISTS_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
   private readonly ARTIST_TAGS_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+  private readonly COLLECTION_VALUE_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
   constructor(storage: FileStorage) {
     this.storage = storage;
@@ -82,6 +86,7 @@ export class CleanupService {
       inventoryCacheFilesRemoved: 0,
       collectionArtistsCacheCleared: false,
       artistTagsEntriesRemoved: 0,
+      collectionValueCacheCleared: false,
       errors: [],
       durationMs: 0,
     };
@@ -144,6 +149,16 @@ export class CleanupService {
       report.artistTagsEntriesRemoved = await this.cleanupArtistTagsCache();
     } catch (e) {
       const msg = `Artist tags cache cleanup failed: ${e instanceof Error ? e.message : String(e)}`;
+      report.errors.push(msg);
+      log.error(msg);
+    }
+
+    // Collection value cache (collection analytics)
+    try {
+      report.collectionValueCacheCleared =
+        await this.cleanupCollectionValueCache();
+    } catch (e) {
+      const msg = `Collection value cache cleanup failed: ${e instanceof Error ? e.message : String(e)}`;
       report.errors.push(msg);
       log.error(msg);
     }
@@ -356,6 +371,30 @@ export class CleanupService {
   }
 
   /**
+   * Clean up expired collection value cache.
+   * Removes the entire cache file if lastUpdated is older than
+   * COLLECTION_VALUE_CACHE_MAX_AGE_MS.
+   *
+   * @returns True if cache was cleared, false otherwise
+   */
+  async cleanupCollectionValueCache(): Promise<boolean> {
+    const cutoff = nowUnixMs() - this.COLLECTION_VALUE_CACHE_MAX_AGE_MS;
+    const filePath = 'collection-analytics/value-cache.json';
+
+    const cache =
+      await this.storage.readJSON<CollectionValueCacheStore>(filePath);
+    if (!cache?.lastUpdated) return false;
+
+    if (cache.lastUpdated < cutoff) {
+      await this.storage.delete(filePath);
+      log.debug('Removed stale collection value cache');
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Get the retention period settings (for testing/debugging).
    */
   getRetentionSettings(): {
@@ -365,6 +404,7 @@ export class CleanupService {
     inventoryCacheMaxAgeMs: number;
     collectionArtistsCacheMaxAgeMs: number;
     artistTagsCacheMaxAgeMs: number;
+    collectionValueCacheMaxAgeMs: number;
   } {
     return {
       imageCacheMaxAgeMs: this.IMAGE_CACHE_MAX_AGE_MS,
@@ -373,6 +413,7 @@ export class CleanupService {
       inventoryCacheMaxAgeMs: this.INVENTORY_CACHE_MAX_AGE_MS,
       collectionArtistsCacheMaxAgeMs: this.COLLECTION_ARTISTS_CACHE_MAX_AGE_MS,
       artistTagsCacheMaxAgeMs: this.ARTIST_TAGS_CACHE_MAX_AGE_MS,
+      collectionValueCacheMaxAgeMs: this.COLLECTION_VALUE_CACHE_MAX_AGE_MS,
     };
   }
 }

@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-3003%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-3160%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -115,6 +115,7 @@ npm run start:web
 - **Smart Timing**: Auto timing (simulates just finishing listening) or custom timestamps
 - **History View**: Dual-tab history showing app scrobble sessions and synced Last.fm listening history
 - **Stats Dashboard**: Comprehensive listening statistics, listening patterns, genre analysis, and visualizations
+- **Collection Analytics**: Format breakdown, label distribution, decade histogram, growth timeline, and progressive collection value estimation from Discogs marketplace data
 - **Artist & Track Deep Dives**: Clickable artist/track names throughout the app link to rich detail pages
 - **What to Play Hub**: Play Suggestions, Forgotten Favorites, and Dusty Corners in one place
 - **Marketplace Hub**: Wishlist, New Releases, Local Sellers, Seller Matches, and Missing Albums
@@ -176,6 +177,17 @@ Comprehensive listening statistics and visualizations:
 - **Dusty Corners**: Albums in your collection you haven't played in 6+ months, with Spotify play buttons
 - **Source Breakdown**: See which sources your scrobbles come from
 - **Listening Timeline**: Visualize listening trends over time
+
+### 📊 Collection Analytics
+Insights into your vinyl collection powered by Discogs data -- no Last.fm sync required:
+
+- **Collection Summary**: Total records, artists, labels, average release year, and rating stats
+- **Format Breakdown**: Donut chart and detailed list showing LP, 7", 12", CD, cassette, and other format distribution with example releases
+- **Label Distribution**: Horizontal bar chart and ranked list of your most-collected labels with variant name grouping
+- **Decade Histogram**: Bar chart showing which musical eras dominate your shelves, with year-level drill-down
+- **Growth Timeline**: Area chart tracking collection size over time with monthly or yearly granularity
+- **Collection Value Estimation**: Progressive marketplace scan fetches median (VG+), low, and high prices for every release. Includes most/least valuable items, value by decade, and value by format
+- **Scan Progress**: Background scanning with real-time progress bar, ETA, and current-item display. Resumable after interruption with 7-day cache per release
 
 ### 🎤 Artist & Track Deep Dives
 Click any artist or track name throughout the app to navigate to a dedicated detail page:
@@ -673,7 +685,8 @@ src/
 │   │   ├── releases.ts            # New release tracking
 │   │   ├── backup.ts              # Backup & restore
 │   │   ├── discardPile.ts         # Discard pile management
-│   │   └── wrapped.ts             # Wrapped/period-in-review
+│   │   ├── wrapped.ts             # Wrapped/period-in-review
+│   │   └── collectionAnalytics.ts # Collection analytics & value estimation
 │   ├── services/                  # Business logic
 │   │   ├── authService.ts         # Encrypted credential storage
 │   │   ├── discogsService.ts      # Discogs API client (rate-limited)
@@ -703,7 +716,8 @@ src/
 │   │   ├── cleanupService.ts      # Cache cleanup
 │   │   ├── migrationService.ts    # Data schema migrations
 │   │   ├── ollamaService.ts       # AI integration (Ollama)
-│   │   └── aiPromptBuilder.ts     # AI prompt generation
+│   │   ├── aiPromptBuilder.ts     # AI prompt generation
+│   │   └── collectionAnalyticsService.ts # Collection analytics & value estimation
 │   └── utils/                     # Utilities
 │       ├── fileStorage.ts         # File-based JSON storage
 │       ├── logger.ts              # Secure logger with redaction
@@ -728,6 +742,7 @@ src/
 │   │   ├── marketplace/           # Marketplace components
 │   │   ├── settings/              # Settings page sections
 │   │   ├── stats/                 # Stats visualizations
+│   │   ├── collection-analytics/  # Collection analytics charts & sections
 │   │   ├── whattoplay/            # What to Play components
 │   │   ├── wishlist/              # Wishlist components
 │   │   └── wrapped/               # Wrapped slideshow slides
@@ -746,6 +761,7 @@ src/
 │   │   ├── ArtistDetailPage.tsx   # Artist deep dive
 │   │   ├── TrackDetailPage.tsx    # Track deep dive
 │   │   ├── DiscardPilePage.tsx    # Discard pile
+│   │   ├── CollectionAnalyticsPage.tsx # Collection analytics
 │   │   └── SettingsPage.tsx       # Settings (tabs: Connections, Mappings, Filters, etc.)
 │   ├── context/                   # React Context providers
 │   │   ├── AppContext.tsx         # Global app state

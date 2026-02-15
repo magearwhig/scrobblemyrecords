@@ -5,13 +5,19 @@ import {
   ArtistDetailResponse,
   ArtistPlayCount,
   CalendarHeatmapData,
+  CollectionAnalyticsOverview,
   CollectionCoverage,
+  CollectionValueEstimation,
   DateAlbumsResult,
   DateRange,
   DayOfWeekDistributionResult,
+  DecadeHistogram,
   DustyCornerAlbum,
+  FormatBreakdown,
   GenreDistributionResult,
+  GrowthTimeline,
   HourlyDistributionResult,
+  LabelDistribution,
   ListeningHours,
   OnThisDayResult,
   MilestoneInfo,
@@ -24,6 +30,7 @@ import {
   TimelineDataPoint,
   TrackDetailResponse,
   TrackPlayCount,
+  ValueScanStatus,
 } from '../../shared/types';
 
 const API_BASE = `http://localhost:${process.env.REACT_APP_BACKEND_PORT || '3001'}/api/v1`;
@@ -446,6 +453,74 @@ export const imagesApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ artists }),
     });
+    return response.json();
+  },
+};
+
+/**
+ * Collection Analytics API service
+ */
+export const collectionAnalyticsApi = {
+  async getOverview(): Promise<ApiResponse<CollectionAnalyticsOverview>> {
+    const response = await fetch(`${API_BASE}/collection-analytics/overview`);
+    return response.json();
+  },
+
+  async getValue(): Promise<
+    ApiResponse<{
+      estimation: CollectionValueEstimation | null;
+      scanStatus: ValueScanStatus;
+      lastScanTimestamp: number | null;
+      cacheAge: number;
+    }>
+  > {
+    const response = await fetch(`${API_BASE}/collection-analytics/value`);
+    return response.json();
+  },
+
+  async startValueScan(
+    batchSize?: number,
+    force?: boolean
+  ): Promise<ApiResponse<{ message: string }>> {
+    const response = await fetch(
+      `${API_BASE}/collection-analytics/value/scan`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batchSize, force }),
+      }
+    );
+    return response.json();
+  },
+
+  async getValueScanStatus(): Promise<ApiResponse<ValueScanStatus>> {
+    const response = await fetch(
+      `${API_BASE}/collection-analytics/value/scan/status`
+    );
+    return response.json();
+  },
+
+  async getFormats(): Promise<ApiResponse<FormatBreakdown>> {
+    const response = await fetch(`${API_BASE}/collection-analytics/formats`);
+    return response.json();
+  },
+
+  async getLabels(): Promise<ApiResponse<LabelDistribution>> {
+    const response = await fetch(`${API_BASE}/collection-analytics/labels`);
+    return response.json();
+  },
+
+  async getDecades(): Promise<ApiResponse<DecadeHistogram>> {
+    const response = await fetch(`${API_BASE}/collection-analytics/decades`);
+    return response.json();
+  },
+
+  async getGrowth(
+    granularity: 'month' | 'year' = 'month'
+  ): Promise<ApiResponse<GrowthTimeline>> {
+    const response = await fetch(
+      `${API_BASE}/collection-analytics/growth?granularity=${granularity}`
+    );
     return response.json();
   },
 };

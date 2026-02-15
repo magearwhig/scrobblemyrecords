@@ -15,6 +15,7 @@ import { createArtistMappingRouter } from './backend/routes/artistMapping';
 import { createAuthRouter } from './backend/routes/auth';
 import createBackupRouter from './backend/routes/backup';
 import createCollectionRouter from './backend/routes/collection';
+import createCollectionAnalyticsRouter from './backend/routes/collectionAnalytics';
 import createDiscardPileRouter from './backend/routes/discardPile';
 import createImagesRouter from './backend/routes/images';
 import jobsRouter from './backend/routes/jobs';
@@ -31,6 +32,7 @@ import { ArtistNameResolver } from './backend/services/artistNameResolver';
 import { AuthService } from './backend/services/authService';
 import { BackupService } from './backend/services/backupService';
 import { CleanupService } from './backend/services/cleanupService';
+import { CollectionAnalyticsService } from './backend/services/collectionAnalyticsService';
 import { DiscardPileService } from './backend/services/discardPileService';
 import { DiscogsService } from './backend/services/discogsService';
 import { GenreAnalysisService } from './backend/services/genreAnalysisService';
@@ -300,6 +302,11 @@ statsService.setMappingService(mappingService);
 const rankingsService = new RankingsService(historyStorage);
 const imageService = new ImageService(fileStorage, lastfmService);
 const wishlistService = new WishlistService(fileStorage, authService);
+const collectionAnalyticsService = new CollectionAnalyticsService(
+  fileStorage,
+  authService,
+  wishlistService
+);
 const sellerMonitoringService = new SellerMonitoringService(
   fileStorage,
   authService,
@@ -380,6 +387,14 @@ app.use(
   createDiscardPileRouter(discardPileService, wishlistService)
 );
 app.use('/api/v1/wrapped', createWrappedRouter(wrappedService));
+app.use(
+  '/api/v1/collection-analytics',
+  createCollectionAnalyticsRouter(
+    fileStorage,
+    authService,
+    collectionAnalyticsService
+  )
+);
 app.use('/api/v1/jobs', jobsRouter);
 
 // API info endpoint
@@ -400,6 +415,7 @@ app.get('/api/v1', (req, res) => {
       backup: '/api/v1/backup',
       discardPile: '/api/v1/discard-pile',
       wrapped: '/api/v1/wrapped',
+      collectionAnalytics: '/api/v1/collection-analytics',
       jobs: '/api/v1/jobs',
     },
   });

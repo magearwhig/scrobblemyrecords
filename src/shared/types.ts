@@ -2197,3 +2197,179 @@ export interface LastFmConnectionTestResult {
   message: string;
   userInfo?: LastFmUserInfo;
 }
+
+// ============================================
+// Collection Analytics Types (Feature 13)
+// ============================================
+
+/**
+ * Summary stats for the collection
+ */
+export interface CollectionSummary {
+  totalItems: number;
+  totalArtists: number;
+  totalLabels: number;
+  oldestRelease: { year: number; artist: string; title: string } | null;
+  newestRelease: { year: number; artist: string; title: string } | null;
+  oldestAddition: { date: string; artist: string; title: string } | null;
+  newestAddition: { date: string; artist: string; title: string } | null;
+  averageReleaseYear: number | null;
+  ratedCount: number;
+  averageRating: number | null;
+}
+
+/**
+ * Format breakdown (LP, 7", 12", etc.)
+ */
+export interface FormatBreakdown {
+  categories: FormatCategory[];
+  totalItems: number;
+}
+
+export interface FormatCategory {
+  name: string;
+  count: number;
+  percentage: number;
+  examples: { artist: string; title: string; coverImage?: string }[];
+}
+
+/**
+ * Label distribution (top labels in collection)
+ */
+export interface LabelDistribution {
+  labels: LabelCount[];
+  totalLabels: number;
+  totalItems: number;
+}
+
+export interface LabelCount {
+  name: string;
+  count: number;
+  percentage: number;
+  variants: string[];
+}
+
+/**
+ * Decade/year histogram
+ */
+export interface DecadeHistogram {
+  decades: DecadeBucket[];
+  years: YearBucket[];
+  unknownYearCount: number;
+}
+
+export interface DecadeBucket {
+  decade: string;
+  startYear: number;
+  count: number;
+  percentage: number;
+}
+
+export interface YearBucket {
+  year: number;
+  count: number;
+}
+
+/**
+ * Collection growth over time
+ */
+export interface GrowthTimeline {
+  dataPoints: GrowthDataPoint[];
+  granularity: 'month' | 'year';
+  totalAdded: number;
+}
+
+export interface GrowthDataPoint {
+  period: string;
+  added: number;
+  cumulative: number;
+}
+
+/**
+ * Collection value estimation
+ */
+export interface CollectionValueEstimation {
+  totalEstimatedValue: number;
+  totalLowestValue: number;
+  totalHighestValue: number;
+  currency: string;
+  itemsWithPricing: number;
+  itemsWithoutPricing: number;
+  totalItems: number;
+  averageItemValue: number;
+  mostValuableItems: CollectionValueItem[];
+  leastValuableItems: CollectionValueItem[];
+  valueByDecade: { decade: string; value: number; count: number }[];
+  valueByFormat: { format: string; value: number; count: number }[];
+  mixedCurrencies: boolean;
+}
+
+export interface CollectionValueItem {
+  releaseId: number;
+  artist: string;
+  title: string;
+  year?: number;
+  format: string[];
+  coverImage?: string;
+  estimatedValue: number;
+  lowestPrice?: number;
+  highestPrice?: number;
+  numForSale: number;
+  currency: string;
+}
+
+/**
+ * Value scan progress tracking
+ */
+export interface ValueScanStatus {
+  status: 'idle' | 'scanning' | 'completed' | 'error';
+  itemsScanned: number;
+  totalItems: number;
+  progress: number;
+  currentItem?: string;
+  estimatedTimeRemaining?: number;
+  error?: string;
+  lastScanTimestamp?: number;
+  startedAt?: number;
+}
+
+/**
+ * Cached value data per release
+ */
+export interface CachedReleaseValue {
+  releaseId: number;
+  lowestPrice?: number;
+  medianPrice?: number;
+  highestPrice?: number;
+  numForSale: number;
+  currency: string;
+  fetchedAt: number;
+}
+
+/**
+ * Versioned store for collection analytics value cache
+ */
+export interface CollectionValueCacheStore extends VersionedStore {
+  schemaVersion: 1;
+  lastUpdated: number;
+  items: Record<number, CachedReleaseValue>;
+}
+
+/**
+ * Versioned store for analytics scan status
+ */
+export interface CollectionValueScanStatusStore extends VersionedStore {
+  schemaVersion: 1;
+  status: ValueScanStatus;
+}
+
+/**
+ * Combined analytics overview (returned by /overview endpoint)
+ */
+export interface CollectionAnalyticsOverview {
+  summary: CollectionSummary;
+  formats: FormatBreakdown;
+  labels: LabelDistribution;
+  decades: DecadeHistogram;
+  growth: GrowthTimeline;
+}
