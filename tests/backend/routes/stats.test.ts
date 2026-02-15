@@ -5,6 +5,7 @@ import request from 'supertest';
 
 import createStatsRouter from '../../../src/backend/routes/stats';
 import { AuthService } from '../../../src/backend/services/authService';
+import { GenreAnalysisService } from '../../../src/backend/services/genreAnalysisService';
 import { RankingsService } from '../../../src/backend/services/rankingsService';
 import { StatsService } from '../../../src/backend/services/statsService';
 import { FileStorage } from '../../../src/backend/utils/fileStorage';
@@ -13,6 +14,7 @@ import { FileStorage } from '../../../src/backend/utils/fileStorage';
 jest.mock('../../../src/backend/services/authService');
 jest.mock('../../../src/backend/services/statsService');
 jest.mock('../../../src/backend/services/rankingsService');
+jest.mock('../../../src/backend/services/genreAnalysisService');
 jest.mock('../../../src/backend/utils/fileStorage');
 
 const MockedAuthService = AuthService as jest.MockedClass<typeof AuthService>;
@@ -21,6 +23,9 @@ const MockedStatsService = StatsService as jest.MockedClass<
 >;
 const MockedRankingsService = RankingsService as jest.MockedClass<
   typeof RankingsService
+>;
+const MockedGenreAnalysisService = GenreAnalysisService as jest.MockedClass<
+  typeof GenreAnalysisService
 >;
 const MockedFileStorage = FileStorage as jest.MockedClass<typeof FileStorage>;
 
@@ -156,6 +161,70 @@ describe('Stats Routes', () => {
       scrobblesToNext: 5000,
       progressPercent: 50,
       history: [],
+    });
+
+    mockStatsService.getAlbumsForDate = jest.fn().mockResolvedValue({
+      date: '2024-06-15',
+      totalScrobbles: 12,
+      albums: [
+        {
+          artist: 'Radiohead',
+          album: 'OK Computer',
+          playCount: 5,
+          coverUrl: null,
+        },
+        {
+          artist: 'Pink Floyd',
+          album: 'The Wall',
+          playCount: 7,
+          coverUrl: null,
+        },
+      ],
+    });
+
+    mockStatsService.getOnThisDay = jest.fn().mockResolvedValue({
+      date: { month: 6, day: 15 },
+      years: [
+        {
+          year: 2023,
+          yearsAgo: 1,
+          totalScrobbles: 8,
+          albums: [
+            {
+              artist: 'Radiohead',
+              album: 'Kid A',
+              playCount: 8,
+              coverUrl: null,
+            },
+          ],
+        },
+      ],
+    });
+
+    mockStatsService.getHourlyDistribution = jest.fn().mockResolvedValue({
+      distribution: Array.from({ length: 24 }, (_, hour) => ({
+        hour,
+        count: hour === 21 ? 150 : 10,
+      })),
+      peakHour: 21,
+      totalScrobbles: 380,
+      insight: 'evening' as const,
+    });
+
+    mockStatsService.getDayOfWeekDistribution = jest.fn().mockResolvedValue({
+      distribution: [
+        { day: 0, dayName: 'Sunday', count: 80 },
+        { day: 1, dayName: 'Monday', count: 50 },
+        { day: 2, dayName: 'Tuesday', count: 55 },
+        { day: 3, dayName: 'Wednesday', count: 60 },
+        { day: 4, dayName: 'Thursday', count: 45 },
+        { day: 5, dayName: 'Friday', count: 70 },
+        { day: 6, dayName: 'Saturday', count: 90 },
+      ],
+      peakDay: 6,
+      weekdayAvg: 56,
+      weekendAvg: 85,
+      insight: 'weekend' as const,
     });
 
     // Create Express app
@@ -1698,6 +1767,359 @@ describe('Stats Routes', () => {
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBe('Database error');
+    });
+  });
+
+  describe('GET /api/v1/stats/hourly-distribution', () => {
+    it('should return 200 with hourly distribution data', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/hourly-distribution'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.distribution).toHaveLength(24);
+      expect(response.body.data.peakHour).toBe(21);
+      expect(response.body.data.totalScrobbles).toBe(380);
+      expect(response.body.data.insight).toBe('evening');
+      expect(mockStatsService.getHourlyDistribution).toHaveBeenCalled();
+    });
+
+    it('should return distribution with correct hour range (0-23)', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/hourly-distribution'
+      );
+
+      // Assert
+      const distribution = response.body.data.distribution;
+      expect(distribution[0].hour).toBe(0);
+      expect(distribution[23].hour).toBe(23);
+      distribution.forEach(
+        (point: { hour: number; count: number }, index: number) => {
+          expect(point.hour).toBe(index);
+          expect(typeof point.count).toBe('number');
+        }
+      );
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockStatsService.getHourlyDistribution.mockRejectedValue(
+        new Error('Hourly distribution error')
+      );
+
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/hourly-distribution'
+      );
+
+      // Assert
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Hourly distribution error');
+    });
+  });
+
+  describe('GET /api/v1/stats/day-of-week-distribution', () => {
+    it('should return 200 with day-of-week distribution data', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/day-of-week-distribution'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.distribution).toHaveLength(7);
+      expect(response.body.data.peakDay).toBe(6);
+      expect(response.body.data.weekdayAvg).toBe(56);
+      expect(response.body.data.weekendAvg).toBe(85);
+      expect(response.body.data.insight).toBe('weekend');
+      expect(mockStatsService.getDayOfWeekDistribution).toHaveBeenCalled();
+    });
+
+    it('should return distribution with correct day range (0-6)', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/day-of-week-distribution'
+      );
+
+      // Assert
+      const distribution = response.body.data.distribution;
+      expect(distribution[0].day).toBe(0);
+      expect(distribution[0].dayName).toBe('Sunday');
+      expect(distribution[6].day).toBe(6);
+      expect(distribution[6].dayName).toBe('Saturday');
+      distribution.forEach(
+        (point: { day: number; dayName: string; count: number }) => {
+          expect(typeof point.day).toBe('number');
+          expect(typeof point.dayName).toBe('string');
+          expect(typeof point.count).toBe('number');
+        }
+      );
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockStatsService.getDayOfWeekDistribution.mockRejectedValue(
+        new Error('Day-of-week distribution error')
+      );
+
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/day-of-week-distribution'
+      );
+
+      // Assert
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Day-of-week distribution error');
+    });
+  });
+
+  describe('GET /api/v1/stats/heatmap/:date', () => {
+    it('should return 200 with albums for a valid date', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/heatmap/2024-06-15'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.date).toBe('2024-06-15');
+      expect(response.body.data.totalScrobbles).toBe(12);
+      expect(response.body.data.albums).toHaveLength(2);
+      expect(mockStatsService.getAlbumsForDate).toHaveBeenCalledWith(
+        '2024-06-15'
+      );
+    });
+
+    it('should return 400 for invalid date format', async () => {
+      // Act
+      const response = await request(app).get('/api/v1/stats/heatmap/invalid');
+
+      // Assert
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Invalid date format');
+    });
+
+    it('should return 400 for partial date format', async () => {
+      // Act
+      const response = await request(app).get('/api/v1/stats/heatmap/2024-06');
+
+      // Assert
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockStatsService.getAlbumsForDate.mockRejectedValue(
+        new Error('Albums for date error')
+      );
+
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/heatmap/2024-06-15'
+      );
+
+      // Assert
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Albums for date error');
+    });
+  });
+
+  describe('GET /api/v1/stats/on-this-day', () => {
+    it('should return 200 with on-this-day data using defaults', async () => {
+      // Act
+      const response = await request(app).get('/api/v1/stats/on-this-day');
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toHaveProperty('date');
+      expect(response.body.data).toHaveProperty('years');
+      expect(mockStatsService.getOnThisDay).toHaveBeenCalled();
+    });
+
+    it('should accept month and day query parameters', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/on-this-day?month=6&day=15'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(mockStatsService.getOnThisDay).toHaveBeenCalledWith(6, 15);
+    });
+
+    it('should return 400 for invalid month', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/on-this-day?month=13'
+      );
+
+      // Assert
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Invalid month');
+    });
+
+    it('should return 400 for month of 0', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/on-this-day?month=0'
+      );
+
+      // Assert
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Invalid month');
+    });
+
+    it('should return 400 for invalid day', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/on-this-day?day=32'
+      );
+
+      // Assert
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Invalid day');
+    });
+
+    it('should return 400 for non-numeric month', async () => {
+      // Act
+      const response = await request(app).get(
+        '/api/v1/stats/on-this-day?month=abc'
+      );
+
+      // Assert
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Invalid month');
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockStatsService.getOnThisDay.mockRejectedValue(
+        new Error('On this day error')
+      );
+
+      // Act
+      const response = await request(app).get('/api/v1/stats/on-this-day');
+
+      // Assert
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('On this day error');
+    });
+  });
+
+  describe('GET /api/v1/stats/genres', () => {
+    let appWithGenres: express.Application;
+    let mockGenreService: jest.Mocked<GenreAnalysisService>;
+
+    beforeEach(() => {
+      mockGenreService = new MockedGenreAnalysisService(
+        {} as any,
+        {} as any,
+        {} as any
+      ) as jest.Mocked<GenreAnalysisService>;
+
+      mockGenreService.getGenreDistribution = jest.fn().mockResolvedValue({
+        genres: [
+          { name: 'rock', weight: 0.35, artistCount: 15 },
+          { name: 'electronic', weight: 0.25, artistCount: 10 },
+          { name: 'indie', weight: 0.2, artistCount: 8 },
+        ],
+        totalArtistsAnalyzed: 30,
+        lastUpdated: 1704067200000,
+      });
+
+      appWithGenres = express();
+      appWithGenres.use(helmet());
+      appWithGenres.use(cors());
+      appWithGenres.use(express.json());
+
+      appWithGenres.use(
+        '/api/v1/stats',
+        createStatsRouter(
+          mockFileStorage,
+          mockAuthService,
+          mockStatsService,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          mockGenreService
+        )
+      );
+    });
+
+    it('should return 501 when genre service is not available', async () => {
+      // Use app without genre service
+      const response = await request(app).get('/api/v1/stats/genres');
+
+      expect(response.status).toBe(501);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain(
+        'Genre analysis service not available'
+      );
+    });
+
+    it('should return 200 with genre distribution data', async () => {
+      // Act
+      const response = await request(appWithGenres).get('/api/v1/stats/genres');
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.genres).toHaveLength(3);
+      expect(response.body.data.genres[0].name).toBe('rock');
+      expect(response.body.data.genres[0].weight).toBe(0.35);
+      expect(response.body.data.totalArtistsAnalyzed).toBe(30);
+      expect(mockGenreService.getGenreDistribution).toHaveBeenCalledWith(
+        50,
+        10
+      );
+    });
+
+    it('should accept limit and maxTags query parameters', async () => {
+      // Act
+      const response = await request(appWithGenres).get(
+        '/api/v1/stats/genres?limit=25&maxTags=5'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(mockGenreService.getGenreDistribution).toHaveBeenCalledWith(25, 5);
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockGenreService.getGenreDistribution.mockRejectedValue(
+        new Error('Genre analysis error')
+      );
+
+      // Act
+      const response = await request(appWithGenres).get('/api/v1/stats/genres');
+
+      // Assert
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Genre analysis error');
     });
   });
 });

@@ -576,6 +576,114 @@ export interface RankingsOverTimeResponse {
 }
 
 // ============================================
+// Listening Pattern Visualization Types (Feature 14)
+// ============================================
+
+/**
+ * Single hour data point for hourly distribution
+ */
+export interface HourlyDistributionData {
+  hour: number; // 0-23
+  count: number;
+}
+
+/**
+ * Hourly distribution result with insight
+ */
+export interface HourlyDistributionResult {
+  distribution: HourlyDistributionData[];
+  peakHour: number;
+  totalScrobbles: number;
+  insight: 'morning' | 'afternoon' | 'evening' | 'night';
+}
+
+/**
+ * Single day data point for day-of-week distribution
+ */
+export interface DayOfWeekDistributionData {
+  day: number; // 0=Sunday through 6=Saturday
+  dayName: string;
+  count: number;
+}
+
+/**
+ * Day-of-week distribution result with insight
+ */
+export interface DayOfWeekDistributionResult {
+  distribution: DayOfWeekDistributionData[];
+  peakDay: number;
+  weekdayAvg: number;
+  weekendAvg: number;
+  insight: 'weekend' | 'weekday';
+}
+
+/**
+ * Single genre entry with normalized weight
+ */
+export interface GenreData {
+  name: string;
+  weight: number; // 0.0-1.0, normalized
+  artistCount: number; // How many of user's artists have this tag
+}
+
+/**
+ * Genre distribution result from Last.fm tag analysis
+ */
+export interface GenreDistributionResult {
+  genres: GenreData[];
+  totalArtistsAnalyzed: number;
+  lastUpdated: number; // milliseconds
+}
+
+/**
+ * Cache store for Last.fm artist tags.
+ * Per-entry TTL: 30 days.
+ */
+export interface ArtistTagsCacheStore extends VersionedStore {
+  tags: Record<
+    string,
+    { tags: Array<{ name: string; count: number }>; fetchedAt: number }
+  >;
+}
+
+/**
+ * Album data for a single year in On This Day
+ */
+export interface OnThisDayYear {
+  year: number;
+  yearsAgo: number;
+  totalScrobbles: number;
+  albums: Array<{
+    artist: string;
+    album: string;
+    playCount: number;
+    coverUrl: string | null;
+  }>;
+}
+
+/**
+ * On This Day result across multiple years
+ */
+export interface OnThisDayResult {
+  date: { month: number; day: number };
+  years: OnThisDayYear[];
+}
+
+/**
+ * Albums played on a specific date (heatmap drill-down)
+ */
+export interface DateAlbumsResult {
+  date: string; // YYYY-MM-DD
+  totalScrobbles: number;
+  albums: Array<{
+    artist: string;
+    album: string;
+    playCount: number;
+    coverUrl: string | null;
+  }>;
+}
+
+// ============================================
 // Artist & Track Deep Dive Types
 // ============================================
 

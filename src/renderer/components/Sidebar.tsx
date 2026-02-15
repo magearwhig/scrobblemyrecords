@@ -118,9 +118,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           id: ROUTES.WRAPPED,
           label: 'Wrapped',
           icon: '🎁',
-          enabled:
-            authStatus.discogs.authenticated && authStatus.lastfm.authenticated,
-          disabledReason: bothReason,
+          enabled: authStatus.lastfm.authenticated,
+          disabledReason: lastfmReason,
         },
       ],
     },

@@ -343,4 +343,106 @@ describe('WrappedSlideshow', () => {
     // Assert - first slide is TotalScrobblesSlide
     expect(screen.getByText('5,000')).toBeInTheDocument();
   });
+
+  describe('with collection data (Discogs connected)', () => {
+    it('should show all 14 slides when collection data exists', () => {
+      // Arrange & Act
+      render(
+        <WrappedSlideshow data={createMockWrappedData()} onExit={mockOnExit} />
+      );
+
+      // Assert - 10 base + 4 collection slides = 14
+      const dots = screen.getAllByRole('tab');
+      expect(dots.length).toBe(14);
+    });
+  });
+
+  describe('without collection data (Last.fm only)', () => {
+    const createLastFmOnlyData = (): WrappedData => {
+      const data = createMockWrappedData();
+      return {
+        ...data,
+        collection: {
+          recordsAdded: 0,
+          recordsList: [],
+          mostPlayedNewAddition: null,
+        },
+        crossSource: {
+          collectionCoverage: 0,
+          totalCollectionSize: 0,
+          albumsPlayed: 0,
+          vinylScrobbles: 0,
+          otherScrobbles: 0,
+          vinylPercentage: 0,
+        },
+      };
+    };
+
+    it('should show only 10 slides when collection is empty', () => {
+      // Arrange & Act
+      render(
+        <WrappedSlideshow data={createLastFmOnlyData()} onExit={mockOnExit} />
+      );
+
+      // Assert - only the 10 Last.fm-only slides
+      const dots = screen.getAllByRole('tab');
+      expect(dots.length).toBe(10);
+    });
+
+    it('should navigate correctly with reduced slide count', async () => {
+      // Arrange
+      const user = userEvent.setup();
+      render(
+        <WrappedSlideshow data={createLastFmOnlyData()} onExit={mockOnExit} />
+      );
+
+      // Act - go to end
+      await user.keyboard('{End}');
+
+      // Assert - last slide is index 9 (10th slide)
+      const dots = screen.getAllByRole('tab');
+      expect(dots[9]).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('should disable next button on last slide (slide 10)', async () => {
+      // Arrange
+      const user = userEvent.setup();
+      render(
+        <WrappedSlideshow data={createLastFmOnlyData()} onExit={mockOnExit} />
+      );
+
+      // Act
+      await user.keyboard('{End}');
+
+      // Assert
+      const nextButton = screen.getByRole('button', { name: /next slide/i });
+      expect(nextButton).toBeDisabled();
+    });
+
+    it('should not go past the last slide with reduced count', async () => {
+      // Arrange
+      const user = userEvent.setup();
+      render(
+        <WrappedSlideshow data={createLastFmOnlyData()} onExit={mockOnExit} />
+      );
+
+      // Act - go to end, then try to go further
+      await user.keyboard('{End}');
+      await user.keyboard('{ArrowRight}');
+
+      // Assert - still on last slide
+      const dots = screen.getAllByRole('tab');
+      expect(dots[9]).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('should still display the first slide content', () => {
+      // Arrange & Act
+      render(
+        <WrappedSlideshow data={createLastFmOnlyData()} onExit={mockOnExit} />
+      );
+
+      // Assert - first slide is still TotalScrobblesSlide
+      expect(screen.getByText('5,000')).toBeInTheDocument();
+    });
+  });
 });

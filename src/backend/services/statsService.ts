@@ -5,10 +5,15 @@ import {
   CalendarHeatmapData,
   CollectionCoverage,
   CollectionItem,
+  DateAlbumsResult,
+  DayOfWeekDistributionResult,
   DustyCornerAlbum,
   ForgottenTrack,
+  HourlyDistributionResult,
   ListeningHours,
   MilestoneInfo,
+  OnThisDayResult,
+  OnThisDayYear,
   ScrobbleCounts,
   ScrobbleSession,
   SourceBreakdownItem,
@@ -1819,6 +1824,280 @@ export class StatsService {
       playTrend,
       appearsOn,
     };
+  }
+
+  // ============================================
+  // Listening Patterns (Hourly & Day-of-Week)
+  // ============================================
+
+  /**
+   * Get hourly distribution of scrobbles with peak-hour insight.
+   *
+   * Data source: Delegates to ScrobbleHistoryStorage's cached hourly data
+   * (computed once on index load, O(1) retrieval afterward).
+   *
+   * Insight calculation: Sums scrobbles into four 6-hour blocks
+   * (morning 6-11, afternoon 12-17, evening 18-23, night 0-5) and
+   * returns the block with the highest aggregate as the insight label.
+   *
+   * @returns Distribution array (always 24 entries), peak hour, total count, and insight
+   */
+  async getHourlyDistribution(): Promise<HourlyDistributionResult> {
+    const hourlyMap = await this.historyStorage.getHourlyDistribution();
+
+    // Build array for all 24 hours (Map may not have entries for every hour)
+    const hourCounts = new Array(24).fill(0);
+    let totalScrobbles = 0;
+    for (const [hour, count] of hourlyMap.entries()) {
+      hourCounts[hour] = count;
+      totalScrobbles += count;
+    }
+
+    // Find peak hour
+    let peakHour = 0;
+    let peakCount = 0;
+    for (let h = 0; h < 24; h++) {
+      if (hourCounts[h] > peakCount) {
+        peakCount = hourCounts[h];
+        peakHour = h;
+      }
+    }
+
+    // Determine insight based on which 6-hour block has highest aggregate
+    const blocks = {
+      morning: 0, // 6-11
+      afternoon: 0, // 12-17
+      evening: 0, // 18-23
+      night: 0, // 0-5
+    };
+    for (let h = 0; h < 24; h++) {
+      if (h >= 6 && h < 12) blocks.morning += hourCounts[h];
+      else if (h >= 12 && h < 18) blocks.afternoon += hourCounts[h];
+      else if (h >= 18) blocks.evening += hourCounts[h];
+      else blocks.night += hourCounts[h];
+    }
+
+    const insight = (
+      Object.entries(blocks) as Array<
+        [HourlyDistributionResult['insight'], number]
+      >
+    ).sort((a, b) => b[1] - a[1])[0][0];
+
+    return {
+      distribution: hourCounts.map((count, hour) => ({ hour, count })),
+      peakHour,
+      totalScrobbles,
+      insight,
+    };
+  }
+
+  /**
+   * Get day-of-week distribution of scrobbles with weekday/weekend insight.
+   *
+   * Data source: Delegates to ScrobbleHistoryStorage's cached day-of-week data
+   * (computed once on index load, O(1) retrieval afterward).
+   *
+   * Day numbering follows JavaScript's Date.getDay() convention:
+   * 0 = Sunday, 1 = Monday, ..., 6 = Saturday.
+   *
+   * Insight calculation: Computes average scrobbles per weekday (Mon-Fri, divided by 5)
+   * vs. per weekend day (Sat-Sun, divided by 2). The higher average determines the insight.
+   *
+   * @returns Distribution array (always 7 entries), peak day, weekday/weekend averages, and insight
+   */
+  async getDayOfWeekDistribution(): Promise<DayOfWeekDistributionResult> {
+    const dayMap = await this.historyStorage.getDayOfWeekDistribution();
+
+    const dayNames = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ];
+
+    // Build array for all 7 days (Map may not have entries for every day)
+    const dayCounts = new Array(7).fill(0);
+    for (const [day, count] of dayMap.entries()) {
+      dayCounts[day] = count;
+    }
+
+    // Find peak day
+    let peakDay = 0;
+    let peakCount = 0;
+    for (let d = 0; d < 7; d++) {
+      if (dayCounts[d] > peakCount) {
+        peakCount = dayCounts[d];
+        peakDay = d;
+      }
+    }
+
+    // Calculate weekday (Mon-Fri) and weekend (Sat-Sun) averages
+    const weekdayTotal =
+      dayCounts[1] + dayCounts[2] + dayCounts[3] + dayCounts[4] + dayCounts[5];
+    const weekendTotal = dayCounts[0] + dayCounts[6];
+    const weekdayAvg = Math.round(weekdayTotal / 5);
+    const weekendAvg = Math.round(weekendTotal / 2);
+
+    const insight: DayOfWeekDistributionResult['insight'] =
+      weekendAvg > weekdayAvg ? 'weekend' : 'weekday';
+
+    return {
+      distribution: dayCounts.map((count, day) => ({
+        day,
+        dayName: dayNames[day],
+        count,
+      })),
+      peakDay,
+      weekdayAvg,
+      weekendAvg,
+      insight,
+    };
+  }
+
+  // ============================================
+  // Heatmap Date Detail
+  // ============================================
+
+  /**
+   * Get albums played on a specific date (heatmap drill-down).
+   *
+   * Scans all plays in the history index and filters to those whose
+   * timestamp falls within the given calendar day in the user's local timezone.
+   * Albums are returned sorted by play count descending.
+   *
+   * Note: coverUrl is returned as null; callers that need album art should
+   * enrich results via the Last.fm album.getInfo API or collection data.
+   *
+   * @param dateStr - Date in YYYY-MM-DD format (parsed as local time)
+   * @returns The date, total scrobble count, and albums with per-album play counts
+   */
+  async getAlbumsForDate(dateStr: string): Promise<DateAlbumsResult> {
+    // Parse date and compute day boundaries in local time
+    const dateParts = dateStr.split('-');
+    const year = parseInt(dateParts[0]);
+    const month = parseInt(dateParts[1]) - 1; // Date constructor uses 0-based month
+    const day = parseInt(dateParts[2]);
+    const dayStart = new Date(year, month, day, 0, 0, 0).getTime() / 1000;
+    const dayEnd = new Date(year, month, day, 23, 59, 59).getTime() / 1000 + 1;
+
+    const index = await this.historyStorage.getIndex();
+    const albumMap = new Map<
+      string,
+      { artist: string; album: string; playCount: number }
+    >();
+    let totalScrobbles = 0;
+
+    if (index) {
+      for (const [key, albumHistory] of Object.entries(index.albums)) {
+        const [artist, album] = key.split('|');
+
+        for (const play of albumHistory.plays) {
+          if (play.timestamp >= dayStart && play.timestamp < dayEnd) {
+            totalScrobbles++;
+            const albumKey = `${artist}|${album}`;
+            const existing = albumMap.get(albumKey);
+            if (existing) {
+              existing.playCount++;
+            } else {
+              albumMap.set(albumKey, {
+                artist: this.capitalizeArtist(artist),
+                album: this.capitalizeTitle(album),
+                playCount: 1,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    const albums = Array.from(albumMap.values())
+      .sort((a, b) => b.playCount - a.playCount)
+      .map(a => ({ ...a, coverUrl: null as string | null }));
+
+    return { date: dateStr, totalScrobbles, albums };
+  }
+
+  // ============================================
+  // On This Day
+  // ============================================
+
+  /**
+   * Get "On This Day" data - what was listened to on this calendar date across all years.
+   *
+   * Scans the full history index and groups plays by year for any play whose
+   * local-time date matches the given month/day. Years with no matching plays
+   * are omitted from the result. Results are sorted with the most recent year first.
+   *
+   * Timezone handling: Uses the user's local timezone via JavaScript's Date object
+   * to determine which calendar date each scrobble falls on.
+   *
+   * @param month - Month number (1-12, January = 1)
+   * @param day - Day of month (1-31)
+   * @returns The queried date and an array of year summaries with album breakdowns
+   */
+  async getOnThisDay(month: number, day: number): Promise<OnThisDayResult> {
+    const index = await this.historyStorage.getIndex();
+    const currentYear = new Date().getFullYear();
+
+    // Map: year -> Map<albumKey, { artist, album, playCount }>
+    const yearData = new Map<
+      number,
+      Map<string, { artist: string; album: string; playCount: number }>
+    >();
+
+    if (index) {
+      for (const [key, albumHistory] of Object.entries(index.albums)) {
+        const [artist, album] = key.split('|');
+
+        for (const play of albumHistory.plays) {
+          const date = new Date(play.timestamp * 1000);
+          // month is 1-based, getMonth() is 0-based
+          if (date.getMonth() + 1 === month && date.getDate() === day) {
+            const yr = date.getFullYear();
+            if (!yearData.has(yr)) {
+              yearData.set(yr, new Map());
+            }
+            const albums = yearData.get(yr)!;
+            const albumKey = `${artist}|${album}`;
+            const existing = albums.get(albumKey);
+            if (existing) {
+              existing.playCount++;
+            } else {
+              albums.set(albumKey, {
+                artist: this.capitalizeArtist(artist),
+                album: this.capitalizeTitle(album),
+                playCount: 1,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Build result, only including years with data
+    const years: OnThisDayYear[] = [];
+    for (const [yr, albums] of yearData.entries()) {
+      const albumList = Array.from(albums.values())
+        .sort((a, b) => b.playCount - a.playCount)
+        .map(a => ({ ...a, coverUrl: null as string | null }));
+
+      const totalScrobbles = albumList.reduce((s, a) => s + a.playCount, 0);
+
+      years.push({
+        year: yr,
+        yearsAgo: currentYear - yr,
+        totalScrobbles,
+        albums: albumList,
+      });
+    }
+
+    // Sort by most recent year first
+    years.sort((a, b) => b.year - a.year);
+
+    return { date: { month, day }, years };
   }
 
   // ============================================

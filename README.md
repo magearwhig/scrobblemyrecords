@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-2908%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-3003%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -114,7 +114,7 @@ npm run start:web
 - **Batch Scrobbling**: Scrobble multiple items with progress tracking
 - **Smart Timing**: Auto timing (simulates just finishing listening) or custom timestamps
 - **History View**: Dual-tab history showing app scrobble sessions and synced Last.fm listening history
-- **Stats Dashboard**: Comprehensive listening statistics and visualizations
+- **Stats Dashboard**: Comprehensive listening statistics, listening patterns, genre analysis, and visualizations
 - **Artist & Track Deep Dives**: Clickable artist/track names throughout the app link to rich detail pages
 - **What to Play Hub**: Play Suggestions, Forgotten Favorites, and Dusty Corners in one place
 - **Marketplace Hub**: Wishlist, New Releases, Local Sellers, Seller Matches, and Missing Albums
@@ -166,7 +166,10 @@ Comprehensive listening statistics and visualizations:
 - **Listening Hours**: Track how many hours you've spent listening
 - **New Artists**: Count of new artists discovered this month
 - **Collection Coverage**: Percentage of your vinyl collection played over various time periods
-- **Calendar Heatmap**: GitHub-style visualization of daily listening activity by year
+- **Calendar Heatmap**: GitHub-style visualization of daily listening activity by year, with click-to-expand day detail showing albums played
+- **Listening Patterns**: Hourly polar chart (24-hour radar) and day-of-week bar chart with personalized insights ("You're an evening listener")
+- **On This Day**: See what you were listening to on this date 1, 2, and 3 years ago
+- **Your Music DNA**: Genre treemap powered by Last.fm artist tags, showing your top genres weighted by listening habits
 - **Top Artists & Albums**: Leaderboards with period selection (week/month/year/all-time/custom) with Spotify play buttons
 - **Custom Date Range**: Pick specific months or custom date ranges for all stats
 - **Milestone Progress**: Track progress toward scrobble milestones (1K, 5K, 10K, etc.)
@@ -564,15 +567,16 @@ A Spotify Wrapped-style interactive slideshow summarizing your listening activit
 **Presets & Custom Ranges:**
 - Quick presets: This Year, Last Year, Last 6/3 Months, This/Last Month
 - Custom date range picker for any period
+- Works with Last.fm only -- Discogs connection is optional (collection slides appear automatically when available)
 
 **Slideshow Slides:**
 - Total scrobbles, listening hours, unique artists/albums
 - Top artists, top albums, top tracks with play counts
 - New artists discovered during the period
 - Peak listening day and longest listening streak
-- Collection growth (records added)
-- Most-played new addition
-- Vinyl vs digital listening breakdown
+- Collection growth (records added) -- when Discogs connected
+- Most-played new addition -- when Discogs connected
+- Vinyl vs digital listening breakdown -- when Discogs connected
 - Listening activity heatmap
 
 ### 📦 Discard Pile
@@ -676,6 +680,7 @@ src/
 │   │   ├── lastfmService.ts       # Last.fm API client
 │   │   ├── analyticsService.ts    # Listening analytics
 │   │   ├── statsService.ts        # Stats calculations
+│   │   ├── genreAnalysisService.ts # Genre distribution via Last.fm tags
 │   │   ├── rankingsService.ts     # Rankings over time
 │   │   ├── imageService.ts        # Album/artist images
 │   │   ├── suggestionService.ts   # Recommendation algorithm

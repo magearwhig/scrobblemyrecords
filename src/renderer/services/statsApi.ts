@@ -6,9 +6,14 @@ import {
   ArtistPlayCount,
   CalendarHeatmapData,
   CollectionCoverage,
+  DateAlbumsResult,
   DateRange,
+  DayOfWeekDistributionResult,
   DustyCornerAlbum,
+  GenreDistributionResult,
+  HourlyDistributionResult,
   ListeningHours,
+  OnThisDayResult,
   MilestoneInfo,
   NewArtistDetail,
   RankingsOverTimeResponse,
@@ -204,6 +209,15 @@ export const statsApi = {
   },
 
   /**
+   * Get albums played on a specific date (heatmap drill-down)
+   * @param date - Date string in YYYY-MM-DD format
+   */
+  async getHeatmapDate(date: string): Promise<ApiResponse<DateAlbumsResult>> {
+    const response = await fetch(`${API_BASE}/stats/heatmap/${date}`);
+    return response.json();
+  },
+
+  /**
    * Get milestone progress
    */
   async getMilestones(): Promise<ApiResponse<MilestoneInfo>> {
@@ -244,6 +258,26 @@ export const statsApi = {
     }
 
     const response = await fetch(url);
+    return response.json();
+  },
+
+  /**
+   * Get hourly distribution of scrobbles (0-23) with peak-hour insight
+   */
+  async getHourlyDistribution(): Promise<
+    ApiResponse<HourlyDistributionResult>
+  > {
+    const response = await fetch(`${API_BASE}/stats/hourly-distribution`);
+    return response.json();
+  },
+
+  /**
+   * Get day-of-week distribution of scrobbles with weekday/weekend insight
+   */
+  async getDayOfWeekDistribution(): Promise<
+    ApiResponse<DayOfWeekDistributionResult>
+  > {
+    const response = await fetch(`${API_BASE}/stats/day-of-week-distribution`);
     return response.json();
   },
 
@@ -322,6 +356,40 @@ export const statsApi = {
       params.set('album', album);
     }
     const response = await fetch(`${API_BASE}/stats/track?${params}`);
+    return response.json();
+  },
+
+  /**
+   * Get "On This Day" data — what was listened to on this month/day across years
+   * @param month - Month (1-12), defaults to today
+   * @param day - Day (1-31), defaults to today
+   */
+  async getOnThisDay(
+    month?: number,
+    day?: number
+  ): Promise<ApiResponse<OnThisDayResult>> {
+    const params = new URLSearchParams();
+    if (month !== undefined) params.set('month', String(month));
+    if (day !== undefined) params.set('day', String(day));
+    const qs = params.toString();
+    const response = await fetch(
+      `${API_BASE}/stats/on-this-day${qs ? `?${qs}` : ''}`
+    );
+    return response.json();
+  },
+
+  /**
+   * Get genre distribution based on Last.fm artist tags
+   * @param limit - Number of top artists to analyze (default: 50)
+   * @param maxTags - Maximum genres to return (default: 10)
+   */
+  async getGenreDistribution(
+    limit: number = 50,
+    maxTags: number = 10
+  ): Promise<ApiResponse<GenreDistributionResult>> {
+    const response = await fetch(
+      `${API_BASE}/stats/genres?limit=${limit}&maxTags=${maxTags}`
+    );
     return response.json();
   },
 };

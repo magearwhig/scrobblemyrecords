@@ -59,6 +59,7 @@ module.exports = [
         requestAnimationFrame: 'readonly',
         confirm: 'readonly',
         ResizeObserver: 'readonly',
+        IntersectionObserver: 'readonly',
         AbortController: 'readonly',
         AbortSignal: 'readonly',
 
@@ -199,6 +200,8 @@ module.exports = [
         jest: 'readonly',
         MouseEvent: 'readonly',
         Response: 'readonly',
+        Element: 'readonly',
+        IntersectionObserverEntry: 'readonly',
       },
     },
     rules: {

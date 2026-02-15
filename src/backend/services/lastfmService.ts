@@ -812,4 +812,63 @@ export class LastFmService {
       return null;
     }
   }
+
+  /**
+   * Get top tags for an artist from Last.fm.
+   *
+   * API endpoint: artist.getTopTags (https://www.last.fm/api/show/artist.getTopTags)
+   * Each tag has a name and a count (0-100 relevance score assigned by Last.fm).
+   *
+   * Rate limiting: Inherits the 1 req/sec interceptor from the axios instance.
+   * Callers doing batch fetches should add their own inter-call delay.
+   *
+   * Error handling: Returns an empty array on any error (missing API key,
+   * network failure, unknown artist). This graceful failure allows the
+   * genre analysis to skip unavailable artists without aborting.
+   *
+   * @param artist - Artist name (matched by Last.fm's fuzzy lookup)
+   * @returns Array of { name, count } tags sorted by relevance, or empty array on error
+   */
+  async getArtistTopTags(
+    artist: string
+  ): Promise<Array<{ name: string; count: number }>> {
+    try {
+      const credentials = await this.authService.getLastFmCredentials();
+      if (!credentials.apiKey) {
+        return [];
+      }
+
+      const response = await this.axios.get('', {
+        params: {
+          method: 'artist.getTopTags',
+          api_key: credentials.apiKey,
+          artist,
+          format: 'json',
+        },
+      });
+
+      if (response.data.error) {
+        this.logger.debug('Last.fm artist.getTopTags error', {
+          error: response.data.error,
+          message: response.data.message,
+          artist,
+        });
+        return [];
+      }
+
+      const toptags = response.data.toptags?.tag;
+      if (!Array.isArray(toptags)) {
+        return [];
+      }
+
+      return toptags.map((tag: { name: string; count: string | number }) => ({
+        name: tag.name,
+        count:
+          typeof tag.count === 'string' ? parseInt(tag.count, 10) : tag.count,
+      }));
+    } catch {
+      this.logger.debug('Error getting artist top tags', { artist });
+      return [];
+    }
+  }
 }

@@ -23,6 +23,17 @@
   --sidebar-width-collapsed: 64px;
   --warning-text: #856404;
   --info-text: #0c5460;
+  /* Chart multi-color palette */
+  --chart-color-1: #1db954;
+  --chart-color-2: #1e90ff;
+  --chart-color-3: #ff6b6b;
+  --chart-color-4: #ffd43b;
+  --chart-color-5: #a855f7;
+  --chart-color-6: #f97316;
+  --chart-color-7: #06b6d4;
+  --chart-color-8: #ec4899;
+  --chart-color-9: #84cc16;
+  --chart-color-10: #6366f1;
 }
 
 /* Dark Mode Styles */
@@ -48,6 +59,17 @@
   --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   --warning-text: #ffeaa7;
   --info-text: #81ecec;
+  /* Chart multi-color palette (same as light for vivid contrast on dark bg) */
+  --chart-color-1: #1db954;
+  --chart-color-2: #4da6ff;
+  --chart-color-3: #ff6b6b;
+  --chart-color-4: #ffd43b;
+  --chart-color-5: #c084fc;
+  --chart-color-6: #fb923c;
+  --chart-color-7: #22d3ee;
+  --chart-color-8: #f472b6;
+  --chart-color-9: #a3e635;
+  --chart-color-10: #818cf8;
 }
 
 /* Global Styles */
@@ -4169,6 +4191,402 @@ body {
 
 .calendar-heatmap-legend-label {
   margin: 0 4px;
+}
+
+/* Heatmap clickable cells */
+.heatmap-cell-clickable {
+  cursor: pointer;
+  transition: outline 0.15s;
+}
+
+.heatmap-cell-clickable:hover {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 1px;
+}
+
+.heatmap-cell-clickable:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 1px;
+}
+
+.heatmap-cell-selected {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 1px;
+}
+
+/* Heatmap Day Detail panel */
+@keyframes heatmap-detail-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.heatmap-day-detail {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-top: 1rem;
+  animation: heatmap-detail-slide-down 0.2s ease-out;
+}
+
+.heatmap-day-detail:focus {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.heatmap-day-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.heatmap-day-detail-date {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.heatmap-day-detail-count {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.heatmap-day-detail-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0 0.25rem;
+  border-radius: 4px;
+}
+
+.heatmap-day-detail-close:hover {
+  color: var(--text-primary);
+}
+
+.heatmap-day-detail-close:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.heatmap-day-detail-empty {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.heatmap-day-detail-albums {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.heatmap-day-detail-album {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.heatmap-day-detail-cover {
+  width: 50px;
+  height: 50px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.heatmap-day-detail-cover-placeholder {
+  background: var(--bg-secondary);
+}
+
+.heatmap-day-detail-album-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.heatmap-day-detail-album-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.heatmap-day-detail-album-artist {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.heatmap-day-detail-album-plays {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ============================================
+   Listening Patterns Section (Feature 14)
+   ============================================ */
+
+.listening-patterns-section {
+  margin-bottom: 1.5rem;
+}
+
+.listening-patterns-section h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.listening-patterns-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .listening-patterns-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.polar-chart-container,
+.day-of-week-chart-container {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.polar-chart-container h3,
+.day-of-week-chart-container h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.polar-chart-wrapper,
+.day-of-week-chart-wrapper {
+  margin-bottom: 0.5rem;
+}
+
+.listening-insight-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0.5rem 0 0 0;
+  line-height: 1.4;
+}
+
+.listening-insight-text strong {
+  color: var(--text-primary);
+}
+
+.listening-insight-skeleton {
+  margin-top: 0.75rem;
+}
+
+/* Day of week bar colors */
+.day-of-week-bar {
+  fill: var(--accent-color);
+}
+
+.day-of-week-bar-peak {
+  fill: var(--accent-color);
+  stroke: var(--text-primary);
+  stroke-width: 1;
+}
+
+/* ============================================
+   On This Day Section (Feature 14)
+   ============================================ */
+
+.on-this-day-container {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.on-this-day-container h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.on-this-day-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.on-this-day-year-card {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.on-this-day-year-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.on-this-day-year-label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.on-this-day-year-ago {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.on-this-day-year-scrobbles {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.on-this-day-albums {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.on-this-day-album {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.on-this-day-album-cover {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.on-this-day-album-cover-placeholder {
+  background: var(--bg-secondary);
+}
+
+.on-this-day-album-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.on-this-day-album-title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.on-this-day-album-artist {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.on-this-day-album-plays {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Genre Treemap (Your Music DNA)
+   ========================================================================== */
+
+.genre-treemap-container {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.genre-treemap-header {
+  margin-bottom: 1rem;
+}
+
+.genre-treemap-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.genre-treemap-description {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0.25rem 0 0 0;
+}
+
+.genre-treemap-chart {
+  margin-top: 0.5rem;
+}
+
+/* Screen-reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Music DNA section layout */
+.music-dna-section {
+  margin-top: 1.5rem;
+}
+
+.music-dna-section h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 /* Top Lists Row */
@@ -10573,7 +10991,293 @@ body {
    ========================================================================== */
 .btn:focus-visible,
 .nav-link:focus-visible,
-.settings-tab:focus-visible,
+.settings-tab:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+/* ============================================
+   Heatmap Click-to-Expand (Feature 14)
+   ============================================ */
+
+.heatmap-cell-clickable {
+  cursor: pointer;
+  transition: outline 0.15s ease;
+}
+
+.heatmap-cell-clickable:hover {
+  outline: 2px solid var(--accent-color);
+  outline-offset: -1px;
+}
+
+.heatmap-cell-selected {
+  outline: 2px solid var(--text-primary);
+  outline-offset: -1px;
+}
+
+.heatmap-day-detail {
+  margin-top: 1rem;
+  padding: 1.25rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.heatmap-day-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.heatmap-day-detail-date {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.heatmap-day-detail-count {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.heatmap-day-detail-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+
+.heatmap-day-detail-close:hover {
+  color: var(--text-primary);
+}
+
+.heatmap-day-detail-empty {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.heatmap-day-detail-albums {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.heatmap-day-detail-album {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.heatmap-day-detail-cover {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.heatmap-day-detail-cover-placeholder {
+  background: var(--border-color);
+}
+
+.heatmap-day-detail-album-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.heatmap-day-detail-album-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.heatmap-day-detail-album-artist {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.heatmap-day-detail-album-plays {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ============================================
+   On This Day (Feature 14)
+   ============================================ */
+
+.on-this-day-container {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.on-this-day-container h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.on-this-day-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.on-this-day-year-card {
+  padding: 1rem;
+  background: var(--bg-primary, var(--card-bg));
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.on-this-day-year-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.on-this-day-year-label {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent-color);
+}
+
+.on-this-day-year-ago {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.on-this-day-year-scrobbles {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+.on-this-day-albums {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.on-this-day-album {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.on-this-day-album-cover {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.on-this-day-album-cover-placeholder {
+  background: var(--border-color);
+}
+
+.on-this-day-album-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.on-this-day-album-title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.on-this-day-album-artist {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.on-this-day-album-plays {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ============================================
+   Genre Treemap (Feature 14)
+   ============================================ */
+
+.genre-treemap-container {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.genre-treemap-header {
+  margin-bottom: 0.75rem;
+}
+
+.genre-treemap-header h3 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.genre-treemap-description {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.genre-treemap-chart {
+  margin-bottom: 0.5rem;
+}
+
+/* Screen reader only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .history-tab:focus-visible,
 .sidebar-toggle:focus-visible,
 .search-clear:focus-visible,

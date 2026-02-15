@@ -1,11 +1,18 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 
 import { CalendarHeatmapData } from '../../../shared/types';
 
 interface CalendarHeatmapProps {
+  /** Array of { date, count } entries for days with scrobble activity */
   data: CalendarHeatmapData[];
+  /** Year to display (controls which 365/366 day grid is rendered) */
   year: number;
+  /** Callback when user clicks a year navigation button */
   onYearChange?: (year: number) => void;
+  /** Callback when user clicks a heatmap cell; receives YYYY-MM-DD string, or empty string to deselect */
+  onDayClick?: (date: string) => void;
+  /** Currently selected date (YYYY-MM-DD) for highlighting; drives the drill-down detail panel */
+  selectedDate?: string;
 }
 
 /**
@@ -15,6 +22,8 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
   data,
   year,
   onYearChange,
+  onDayClick,
+  selectedDate,
 }) => {
   // Create a map for quick lookup
   const dataMap = useMemo(() => {
@@ -142,6 +151,24 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
 
   const dayLabels = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
 
+  const handleCellClick = useCallback(
+    (date: string, count: number) => {
+      if (!onDayClick || count <= 0) return;
+      onDayClick(selectedDate === date ? '' : date);
+    },
+    [onDayClick, selectedDate]
+  );
+
+  const handleCellKeyDown = useCallback(
+    (e: React.KeyboardEvent, date: string, count: number) => {
+      if ((e.key === 'Enter' || e.key === ' ') && count > 0 && onDayClick) {
+        e.preventDefault();
+        onDayClick(selectedDate === date ? '' : date);
+      }
+    },
+    [onDayClick, selectedDate]
+  );
+
   const currentYear = new Date().getFullYear();
   const availableYears = [currentYear - 2, currentYear - 1, currentYear];
 
@@ -160,6 +187,7 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
             className='calendar-heatmap-year-select'
             value={year}
             onChange={e => onYearChange(parseInt(e.target.value))}
+            aria-label='Select heatmap year'
           >
             {availableYears.map(y => (
               <option key={y} value={y}>
@@ -195,17 +223,41 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
           <div className='calendar-heatmap-grid'>
             {weeks.map((week, weekIndex) => (
               <div key={weekIndex} className='calendar-heatmap-week'>
-                {week.map((day, dayIndex) => (
-                  <div
-                    key={`${weekIndex}-${dayIndex}`}
-                    className={`calendar-heatmap-cell ${getColorClass(day.count)}`}
-                    title={
-                      day.date
-                        ? `${day.date}: ${day.count} scrobble${day.count !== 1 ? 's' : ''}`
-                        : ''
-                    }
-                  />
-                ))}
+                {week.map((day, dayIndex) => {
+                  const isClickable = day.count > 0 && onDayClick;
+                  const isSelected =
+                    selectedDate === day.date && day.date !== '';
+                  return (
+                    <div
+                      key={`${weekIndex}-${dayIndex}`}
+                      className={`calendar-heatmap-cell ${getColorClass(day.count)}${isClickable ? ' heatmap-cell-clickable' : ''}${isSelected ? ' heatmap-cell-selected' : ''}`}
+                      title={
+                        day.date
+                          ? `${day.date}: ${day.count} scrobble${day.count !== 1 ? 's' : ''}`
+                          : ''
+                      }
+                      onClick={
+                        isClickable
+                          ? () => handleCellClick(day.date, day.count)
+                          : undefined
+                      }
+                      onKeyDown={
+                        isClickable
+                          ? e => handleCellKeyDown(e, day.date, day.count)
+                          : undefined
+                      }
+                      role={isClickable ? 'button' : undefined}
+                      tabIndex={isClickable ? 0 : undefined}
+                      aria-label={
+                        isClickable
+                          ? `${day.date}: ${day.count} scrobble${day.count !== 1 ? 's' : ''}. Click for details.`
+                          : undefined
+                      }
+                      aria-expanded={isSelected ? true : undefined}
+                      data-date={isClickable ? day.date : undefined}
+                    />
+                  );
+                })}
               </div>
             ))}
           </div>

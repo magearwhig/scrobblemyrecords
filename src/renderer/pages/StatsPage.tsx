@@ -1,13 +1,18 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   AlbumPlayCount,
   ArtistPlayCount,
   CalendarHeatmapData,
+  DateAlbumsResult,
   DateRange,
+  DayOfWeekDistributionData,
   DustyCornerAlbum,
+  GenreData,
+  HourlyDistributionData,
   ListeningHours,
   MilestoneInfo,
+  OnThisDayResult,
   ScrobbleCounts,
   SourceBreakdownItem,
   StreakInfo,
@@ -16,10 +21,15 @@ import {
   TrackPlayCount,
 } from '../../shared/types';
 import { CalendarHeatmap } from '../components/stats/CalendarHeatmap';
+import { DayOfWeekChart } from '../components/stats/DayOfWeekChart';
 import { DustyCornersSection } from '../components/stats/DustyCornersSection';
+import { GenreTreemap } from '../components/stats/GenreTreemap';
+import { HeatmapDayDetail } from '../components/stats/HeatmapDayDetail';
+import { HourlyPolarChart } from '../components/stats/HourlyPolarChart';
 import { ListeningHoursCard } from '../components/stats/ListeningHoursCard';
 import { ListeningTimeline } from '../components/stats/ListeningTimeline';
 import { MilestoneProgress } from '../components/stats/MilestoneProgress';
+import { OnThisDay } from '../components/stats/OnThisDay';
 import { PeriodStatCard } from '../components/stats/PeriodStatCard';
 import { RankingsOverTime } from '../components/stats/RankingsOverTime';
 import { SourcePieChart } from '../components/stats/SourcePieChart';
@@ -74,6 +84,9 @@ export const StatsPage: React.FC = () => {
   const [milestones, setMilestones] = useState<MilestoneInfo | null>(null);
   const [heatmapData, setHeatmapData] = useState<CalendarHeatmapData[]>([]);
   const [heatmapYear, setHeatmapYear] = useState(new Date().getFullYear());
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedDateData, setSelectedDateData] =
+    useState<DateAlbumsResult | null>(null);
   const [topArtists, setTopArtists] = useState<ArtistPlayCount[]>([]);
   const [topAlbums, setTopAlbums] = useState<AlbumPlayCount[]>([]);
   const [topTracks, setTopTracks] = useState<TrackPlayCount[]>([]);
@@ -100,6 +113,37 @@ export const StatsPage: React.FC = () => {
   const [listeningHours, setListeningHours] = useState<ListeningHours | null>(
     null
   );
+
+  // Listening patterns (lazy loaded)
+  const [hourlyData, setHourlyData] = useState<HourlyDistributionData[]>([]);
+  const [hourlyPeakHour, setHourlyPeakHour] = useState(0);
+  const [hourlyInsight, setHourlyInsight] = useState('');
+  const [hourlyLoading, setHourlyLoading] = useState(false);
+  const [dayOfWeekData, setDayOfWeekData] = useState<
+    DayOfWeekDistributionData[]
+  >([]);
+  const [dayOfWeekPeakDay, setDayOfWeekPeakDay] = useState(0);
+  const [dayOfWeekWeekdayAvg, setDayOfWeekWeekdayAvg] = useState(0);
+  const [dayOfWeekWeekendAvg, setDayOfWeekWeekendAvg] = useState(0);
+  const [dayOfWeekInsight, setDayOfWeekInsight] = useState('');
+  const [dayOfWeekLoading, setDayOfWeekLoading] = useState(false);
+  const listeningPatternsRef = useRef<HTMLElement>(null);
+  const listeningPatternsFetched = useRef(false);
+
+  // On This Day (lazy loaded)
+  const [onThisDayData, setOnThisDayData] = useState<OnThisDayResult | null>(
+    null
+  );
+  const [onThisDayLoading, setOnThisDayLoading] = useState(false);
+  const onThisDayRef = useRef<HTMLElement>(null);
+  const onThisDayFetched = useRef(false);
+
+  // Genre Treemap (lazy loaded)
+  const [genreData, setGenreData] = useState<GenreData[]>([]);
+  const [genreTotalArtists, setGenreTotalArtists] = useState(0);
+  const [genreLoading, setGenreLoading] = useState(false);
+  const genreRef = useRef<HTMLElement>(null);
+  const genreFetched = useRef(false);
 
   // Fetch and merge album cover images into album list
   const enrichAlbumsWithImages = useCallback(
@@ -230,6 +274,131 @@ export const StatsPage: React.FC = () => {
     loadInitialData();
   }, [enrichAlbumsWithImages, enrichArtistsWithImages]);
 
+  // Lazy load listening patterns when section scrolls into view
+  useEffect(() => {
+    const node = listeningPatternsRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && !listeningPatternsFetched.current) {
+          listeningPatternsFetched.current = true;
+
+          // Fetch hourly distribution
+          setHourlyLoading(true);
+          statsApi
+            .getHourlyDistribution()
+            .then(res => {
+              if (res.success && res.data) {
+                setHourlyData(res.data.distribution);
+                setHourlyPeakHour(res.data.peakHour);
+                setHourlyInsight(res.data.insight);
+              }
+            })
+            .catch(err => {
+              logger.error('Failed to load hourly distribution', err);
+            })
+            .finally(() => {
+              setHourlyLoading(false);
+            });
+
+          // Fetch day-of-week distribution
+          setDayOfWeekLoading(true);
+          statsApi
+            .getDayOfWeekDistribution()
+            .then(res => {
+              if (res.success && res.data) {
+                setDayOfWeekData(res.data.distribution);
+                setDayOfWeekPeakDay(res.data.peakDay);
+                setDayOfWeekWeekdayAvg(res.data.weekdayAvg);
+                setDayOfWeekWeekendAvg(res.data.weekendAvg);
+                setDayOfWeekInsight(res.data.insight);
+              }
+            })
+            .catch(err => {
+              logger.error('Failed to load day-of-week distribution', err);
+            })
+            .finally(() => {
+              setDayOfWeekLoading(false);
+            });
+        }
+      },
+      // Trigger when 10% of the section is visible. A low threshold ensures
+      // data starts loading before the user fully scrolls to the section,
+      // reducing perceived latency. A threshold of 0 would trigger too early
+      // (e.g., 1px visible), while 0.5+ would delay loading noticeably.
+      { threshold: 0.1 }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [loading]);
+
+  // Lazy load On This Day when section scrolls into view
+  useEffect(() => {
+    const node = onThisDayRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && !onThisDayFetched.current) {
+          onThisDayFetched.current = true;
+          setOnThisDayLoading(true);
+          statsApi
+            .getOnThisDay()
+            .then(res => {
+              if (res.success && res.data) {
+                setOnThisDayData(res.data);
+              }
+            })
+            .catch(err => {
+              logger.error('Failed to load On This Day data', err);
+            })
+            .finally(() => {
+              setOnThisDayLoading(false);
+            });
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [loading]);
+
+  // Lazy load Genre Treemap when section scrolls into view
+  useEffect(() => {
+    const node = genreRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && !genreFetched.current) {
+          genreFetched.current = true;
+          setGenreLoading(true);
+          statsApi
+            .getGenreDistribution()
+            .then(res => {
+              if (res.success && res.data) {
+                setGenreData(res.data.genres);
+                setGenreTotalArtists(res.data.totalArtistsAnalyzed);
+              }
+            })
+            .catch(err => {
+              logger.error('Failed to load genre distribution', err);
+            })
+            .finally(() => {
+              setGenreLoading(false);
+            });
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [loading]);
+
   // Handle artist period change
   const handleArtistPeriodChange = useCallback(
     async (period: Period, dateRange?: DateRange) => {
@@ -295,11 +464,31 @@ export const StatsPage: React.FC = () => {
   // Handle heatmap year change
   const handleYearChange = useCallback(async (year: number) => {
     setHeatmapYear(year);
+    setSelectedDate('');
+    setSelectedDateData(null);
     try {
       const res = await statsApi.getHeatmap(year);
       if (res.success) setHeatmapData(res.data!);
     } catch (err) {
       logger.error('Failed to load heatmap', err);
+    }
+  }, []);
+
+  // Handle heatmap day click (drill-down)
+  const handleDayClick = useCallback(async (date: string) => {
+    if (!date) {
+      setSelectedDate('');
+      setSelectedDateData(null);
+      return;
+    }
+    setSelectedDate(date);
+    try {
+      const res = await statsApi.getHeatmapDate(date);
+      if (res.success && res.data) {
+        setSelectedDateData(res.data);
+      }
+    } catch (err) {
+      logger.error('Failed to load heatmap date detail', err);
     }
   }, []);
 
@@ -440,6 +629,65 @@ export const StatsPage: React.FC = () => {
           data={heatmapData}
           year={heatmapYear}
           onYearChange={handleYearChange}
+          onDayClick={handleDayClick}
+          selectedDate={selectedDate}
+        />
+        {selectedDate && selectedDateData && (
+          <HeatmapDayDetail
+            date={selectedDateData.date}
+            albums={selectedDateData.albums}
+            totalScrobbles={selectedDateData.totalScrobbles}
+            onClose={() => {
+              const dateToFocus = selectedDate;
+              setSelectedDate('');
+              setSelectedDateData(null);
+              // Return focus to the triggering heatmap cell
+              requestAnimationFrame(() => {
+                const cell = document.querySelector<HTMLElement>(
+                  `.calendar-heatmap-cell[data-date="${dateToFocus}"]`
+                );
+                cell?.focus();
+              });
+            }}
+          />
+        )}
+      </section>
+
+      {/* Listening Patterns (lazy loaded on scroll) */}
+      <section
+        className='listening-patterns-section'
+        ref={listeningPatternsRef}
+      >
+        <h2>Listening Patterns</h2>
+        <div className='listening-patterns-grid'>
+          <HourlyPolarChart
+            data={hourlyData}
+            peakHour={hourlyPeakHour}
+            insight={hourlyInsight}
+            loading={hourlyLoading}
+          />
+          <DayOfWeekChart
+            data={dayOfWeekData}
+            peakDay={dayOfWeekPeakDay}
+            weekdayAvg={dayOfWeekWeekdayAvg}
+            weekendAvg={dayOfWeekWeekendAvg}
+            insight={dayOfWeekInsight}
+            loading={dayOfWeekLoading}
+          />
+        </div>
+      </section>
+
+      {/* On This Day (lazy loaded on scroll) */}
+      <section className='stats-section' ref={onThisDayRef}>
+        <OnThisDay data={onThisDayData} loading={onThisDayLoading} />
+      </section>
+
+      {/* Genre Treemap (lazy loaded on scroll) */}
+      <section className='stats-section' ref={genreRef}>
+        <GenreTreemap
+          data={genreData}
+          totalArtists={genreTotalArtists}
+          loading={genreLoading}
         />
       </section>
 

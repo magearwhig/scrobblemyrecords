@@ -5,7 +5,7 @@ Active plans and feature specs. Completed plans are in `done/`.
 | Plan | Status |
 |------|--------|
 | collection-analytics-plan.md | Planned -- Feature 13, 5 phases |
-| listening-pattern-visualizations-plan.md | Planned -- Feature 14, 5 phases |
+| done/listening-pattern-visualizations-plan.md | Complete -- Feature 14, all 6 capabilities implemented |
 | button-system-consolidation.md | Planned -- migrate 3 button systems to Button.tsx, 4 phases |
 | done/mapping-resolution-plan.md | Complete -- Feature 16, all 6 phases implemented |
 | tech-debt.md | Active -- 37 open items, phased action plan |

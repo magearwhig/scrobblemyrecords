@@ -162,4 +162,143 @@ describe('CalendarHeatmap', () => {
       screen.getByRole('option', { name: String(currentYear - 2) })
     ).toBeInTheDocument();
   });
+
+  describe('click-to-expand interaction', () => {
+    const mockOnDayClick = jest.fn();
+
+    it('should fire onDayClick when a cell with count > 0 is clicked', async () => {
+      // Arrange
+      render(
+        <CalendarHeatmap
+          data={mockData}
+          year={currentYear}
+          onYearChange={mockOnYearChange}
+          onDayClick={mockOnDayClick}
+        />
+      );
+
+      // Act - find a clickable button cell and click it
+      const buttons = screen.getAllByRole('button');
+      // Filter to heatmap cell buttons (not the year select)
+      const cellButtons = buttons.filter(b =>
+        b.getAttribute('aria-label')?.includes('scrobble')
+      );
+      expect(cellButtons.length).toBeGreaterThan(0);
+      await user.click(cellButtons[0]);
+
+      // Assert
+      expect(mockOnDayClick).toHaveBeenCalledTimes(1);
+      expect(mockOnDayClick).toHaveBeenCalledWith(
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
+      );
+    });
+
+    it('should toggle selection when clicking the same cell twice', async () => {
+      // Arrange
+      render(
+        <CalendarHeatmap
+          data={mockData}
+          year={currentYear}
+          onYearChange={mockOnYearChange}
+          onDayClick={mockOnDayClick}
+          selectedDate={`${currentYear}-01-01`}
+        />
+      );
+
+      // Act - click the already-selected cell
+      const buttons = screen.getAllByRole('button');
+      const selectedButton = buttons.find(b =>
+        b.getAttribute('aria-label')?.includes(`${currentYear}-01-01`)
+      );
+      expect(selectedButton).toBeDefined();
+      await user.click(selectedButton!);
+
+      // Assert - should call with empty string to deselect
+      expect(mockOnDayClick).toHaveBeenCalledWith('');
+    });
+
+    it('should support keyboard activation with Enter key', async () => {
+      // Arrange
+      render(
+        <CalendarHeatmap
+          data={mockData}
+          year={currentYear}
+          onYearChange={mockOnYearChange}
+          onDayClick={mockOnDayClick}
+        />
+      );
+
+      // Act - find a clickable cell, focus it, press Enter
+      const buttons = screen.getAllByRole('button');
+      const cellButtons = buttons.filter(b =>
+        b.getAttribute('aria-label')?.includes('scrobble')
+      );
+      cellButtons[0].focus();
+      await user.keyboard('{Enter}');
+
+      // Assert
+      expect(mockOnDayClick).toHaveBeenCalled();
+    });
+
+    it('should support keyboard activation with Space key', async () => {
+      // Arrange
+      render(
+        <CalendarHeatmap
+          data={mockData}
+          year={currentYear}
+          onYearChange={mockOnYearChange}
+          onDayClick={mockOnDayClick}
+        />
+      );
+
+      // Act
+      const buttons = screen.getAllByRole('button');
+      const cellButtons = buttons.filter(b =>
+        b.getAttribute('aria-label')?.includes('scrobble')
+      );
+      cellButtons[0].focus();
+      await user.keyboard('{ }');
+
+      // Assert
+      expect(mockOnDayClick).toHaveBeenCalled();
+    });
+
+    it('should mark selected cell with aria-expanded', () => {
+      // Arrange & Act
+      render(
+        <CalendarHeatmap
+          data={mockData}
+          year={currentYear}
+          onYearChange={mockOnYearChange}
+          onDayClick={mockOnDayClick}
+          selectedDate={`${currentYear}-01-15`}
+        />
+      );
+
+      // Assert - find the selected button
+      const buttons = screen.getAllByRole('button');
+      const selectedButton = buttons.find(b =>
+        b.getAttribute('aria-label')?.includes(`${currentYear}-01-15`)
+      );
+      expect(selectedButton).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('should not render clickable cells when onDayClick is not provided', () => {
+      // Arrange & Act
+      render(
+        <CalendarHeatmap
+          data={mockData}
+          year={currentYear}
+          onYearChange={mockOnYearChange}
+        />
+      );
+
+      // Assert - no heatmap cell buttons should exist
+      const buttons = screen.queryAllByRole('button');
+      const cellButtons = buttons.filter(b =>
+        b.getAttribute('aria-label')?.includes('scrobble')
+      );
+      expect(cellButtons.length).toBe(0);
+    });
+  });
 });

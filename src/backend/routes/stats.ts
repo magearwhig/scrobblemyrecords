@@ -15,7 +15,9 @@ import {
 import { AnalyticsService } from '../services/analyticsService';
 import { artistMappingService } from '../services/artistMappingService';
 import { AuthService } from '../services/authService';
+import { GenreAnalysisService } from '../services/genreAnalysisService';
 import { HistoryIndexMergeService } from '../services/historyIndexMergeService';
+import { ImageService } from '../services/imageService';
 import { MappingService } from '../services/mappingService';
 import { RankingsService } from '../services/rankingsService';
 import { ScrobbleHistoryStorage } from '../services/scrobbleHistoryStorage';
@@ -38,7 +40,9 @@ export default function createStatsRouter(
   analyticsService?: AnalyticsService,
   rankingsService?: RankingsService,
   mappingService?: MappingService,
-  historyIndexMergeService?: HistoryIndexMergeService
+  historyIndexMergeService?: HistoryIndexMergeService,
+  imageService?: ImageService,
+  genreAnalysisService?: GenreAnalysisService
 ) {
   const router = express.Router();
   const logger = createLogger('StatsRoutes');
@@ -1304,6 +1308,55 @@ export default function createStatsRouter(
   });
 
   // ============================================
+  // Listening Patterns (Hourly & Day-of-Week)
+  // ============================================
+
+  /**
+   * GET /api/v1/stats/hourly-distribution
+   * Get scrobble distribution by hour of day (0-23)
+   */
+  router.get('/hourly-distribution', async (_req: Request, res: Response) => {
+    try {
+      const data = await statsService.getHourlyDistribution();
+
+      res.json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      logger.error('Error getting hourly distribution', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * GET /api/v1/stats/day-of-week-distribution
+   * Get scrobble distribution by day of week (0=Sunday through 6=Saturday)
+   */
+  router.get(
+    '/day-of-week-distribution',
+    async (_req: Request, res: Response) => {
+      try {
+        const data = await statsService.getDayOfWeekDistribution();
+
+        res.json({
+          success: true,
+          data,
+        });
+      } catch (error) {
+        logger.error('Error getting day-of-week distribution', error);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+  );
+
+  // ============================================
   // Rankings Over Time
   // ============================================
 
@@ -1359,6 +1412,164 @@ export default function createStatsRouter(
       });
     } catch (error) {
       logger.error('Error getting rankings over time', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // ============================================
+  // Heatmap Date Detail
+  // ============================================
+
+  /**
+   * GET /api/v1/stats/heatmap/:date
+   * Get albums played on a specific date (heatmap drill-down).
+   * Date must be in YYYY-MM-DD format.
+   */
+  router.get('/heatmap/:date', async (req: Request, res: Response) => {
+    try {
+      const dateStr = req.params.date;
+
+      // Validate date format
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid date format. Expected YYYY-MM-DD',
+        });
+      }
+
+      const result = await statsService.getAlbumsForDate(dateStr);
+
+      // Enrich with images if ImageService is available
+      if (imageService) {
+        await Promise.all(
+          result.albums.map(async album => {
+            const coverUrl = await imageService.getAlbumCover(
+              album.artist,
+              album.album
+            );
+            if (coverUrl) {
+              album.coverUrl = coverUrl;
+            }
+          })
+        );
+      }
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      logger.error('Error getting albums for date', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // ============================================
+  // On This Day
+  // ============================================
+
+  /**
+   * GET /api/v1/stats/on-this-day
+   * Get what was listened to on this month/day across all years.
+   * Optional query params: month (1-12), day (1-31). Defaults to today.
+   */
+  router.get('/on-this-day', async (req: Request, res: Response) => {
+    try {
+      const now = new Date();
+      const month = req.query.month
+        ? parseInt(req.query.month as string)
+        : now.getMonth() + 1;
+      const day = req.query.day
+        ? parseInt(req.query.day as string)
+        : now.getDate();
+
+      // Validate ranges
+      if (isNaN(month) || month < 1 || month > 12) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid month. Must be between 1 and 12',
+        });
+      }
+
+      if (isNaN(day) || day < 1 || day > 31) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid day. Must be between 1 and 31',
+        });
+      }
+
+      const result = await statsService.getOnThisDay(month, day);
+
+      // Enrich with images if ImageService is available
+      if (imageService) {
+        for (const yearEntry of result.years) {
+          await Promise.all(
+            yearEntry.albums.map(async album => {
+              const coverUrl = await imageService.getAlbumCover(
+                album.artist,
+                album.album
+              );
+              if (coverUrl) {
+                album.coverUrl = coverUrl;
+              }
+            })
+          );
+        }
+      }
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      logger.error('Error getting on-this-day data', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // ============================================
+  // Genre Analysis
+  // ============================================
+
+  /**
+   * GET /api/v1/stats/genres
+   * Get genre distribution based on Last.fm artist tags.
+   * Query params:
+   *   limit: number (default: 50) - Top N artists to analyze
+   *   maxTags: number (default: 10) - Max genres to return
+   */
+  router.get('/genres', async (_req: Request, res: Response) => {
+    try {
+      if (!genreAnalysisService) {
+        return res.status(501).json({
+          success: false,
+          error: 'Genre analysis service not available',
+        });
+      }
+
+      const limit = parseInt(_req.query.limit as string) || 50;
+      const maxTags = parseInt(_req.query.maxTags as string) || 10;
+
+      const data = await genreAnalysisService.getGenreDistribution(
+        limit,
+        maxTags
+      );
+
+      res.json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      logger.error('Error getting genre distribution', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

@@ -30,6 +30,7 @@ const WrappedSlideshow: React.FC<WrappedSlideshowProps> = ({
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const slides = useMemo(() => {
+    // Last.fm-only slides (always included)
     const slideList: React.ReactNode[] = [
       <TotalScrobblesSlide key='total' stats={data.listening} />,
       <TopArtistsSlide key='artists' artists={data.listening.topArtists} />,
@@ -46,14 +47,34 @@ const WrappedSlideshow: React.FC<WrappedSlideshowProps> = ({
         startDate={data.startDate}
         endDate={data.endDate}
       />,
-      <RecordsAddedSlide key='records' collection={data.collection} />,
-      <MostPlayedAdditionSlide
-        key='most-played'
-        collection={data.collection}
-      />,
-      <CollectionCoverageSlide key='coverage' crossSource={data.crossSource} />,
-      <VinylVsDigitalSlide key='vinyl' crossSource={data.crossSource} />,
     ];
+
+    // Discogs-dependent slides (conditionally included based on data availability)
+    if (
+      data.collection.recordsAdded > 0 ||
+      data.collection.recordsList.length > 0
+    ) {
+      slideList.push(
+        <RecordsAddedSlide key='records' collection={data.collection} />
+      );
+    }
+    if (data.collection.mostPlayedNewAddition !== null) {
+      slideList.push(
+        <MostPlayedAdditionSlide
+          key='most-played'
+          collection={data.collection}
+        />
+      );
+    }
+    if (data.crossSource.totalCollectionSize > 0) {
+      slideList.push(
+        <CollectionCoverageSlide
+          key='coverage'
+          crossSource={data.crossSource}
+        />,
+        <VinylVsDigitalSlide key='vinyl' crossSource={data.crossSource} />
+      );
+    }
 
     return slideList;
   }, [data]);

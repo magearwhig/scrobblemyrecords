@@ -33,6 +33,7 @@ import { BackupService } from './backend/services/backupService';
 import { CleanupService } from './backend/services/cleanupService';
 import { DiscardPileService } from './backend/services/discardPileService';
 import { DiscogsService } from './backend/services/discogsService';
+import { GenreAnalysisService } from './backend/services/genreAnalysisService';
 import { HiddenItemService } from './backend/services/hiddenItemService';
 import { HiddenReleasesService } from './backend/services/hiddenReleasesService';
 import { HistoryIndexMergeService } from './backend/services/historyIndexMergeService';
@@ -314,6 +315,11 @@ const releaseTrackingService = new ReleaseTrackingService(
 );
 const backupService = new BackupService(fileStorage, 'data');
 const discardPileService = new DiscardPileService(fileStorage);
+const genreAnalysisService = new GenreAnalysisService(
+  lastfmService,
+  historyStorage,
+  fileStorage
+);
 const wrappedService = new WrappedService(
   statsService,
   historyStorage,
@@ -540,7 +546,9 @@ async function startServer() {
         analyticsService,
         rankingsService,
         mappingService,
-        historyIndexMergeService
+        historyIndexMergeService,
+        imageService,
+        genreAnalysisService
       )
     );
 

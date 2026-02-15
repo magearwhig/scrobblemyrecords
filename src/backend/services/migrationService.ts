@@ -154,6 +154,16 @@ export class MigrationService {
     });
 
     // ============================================
+    // Genre Analysis Cache
+    // ============================================
+    this.register('artist-tags-cache', {
+      path: 'cache/artist-tags.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    // ============================================
     // Wishlist Files (already have schemaVersion)
     // ============================================
     this.register('wishlist-settings', {
@@ -263,6 +273,16 @@ export class MigrationService {
 
     this.register('release-collection-artists-cache', {
       path: 'releases/collection-artists-cache.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    // ============================================
+    // Genre Analysis Cache (Feature 14)
+    // ============================================
+    this.register('artist-tags-cache', {
+      path: 'cache/artist-tags.json',
       currentVersion: 1,
       migrations: [],
       optional: true,

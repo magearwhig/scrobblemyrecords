@@ -527,7 +527,17 @@ export class ScrobbleHistoryStorage {
   }
 
   /**
-   * Get listening patterns by hour of day
+   * Get listening patterns by hour of day.
+   *
+   * Returns a Map keyed by hour (0-23) with scrobble counts as values.
+   * Hours with zero scrobbles may be absent from the Map.
+   *
+   * Caching: The distribution is computed during getIndex() and cached in
+   * `cachedHourlyDist`. Subsequent calls return the cached result in O(1).
+   * The cache is invalidated when the index cache expires (CACHE_TTL = 1 minute).
+   *
+   * Fallback: If the cache wasn't populated during index load (edge case),
+   * a full O(n) scan of all plays is performed.
    */
   async getHourlyDistribution(): Promise<Map<number, number>> {
     if (this.cachedHourlyDist) {
@@ -557,7 +567,14 @@ export class ScrobbleHistoryStorage {
   }
 
   /**
-   * Get listening patterns by day of week (0 = Sunday, 6 = Saturday)
+   * Get listening patterns by day of week.
+   *
+   * Returns a Map keyed by day index (0 = Sunday, 6 = Saturday, matching
+   * JavaScript's Date.getDay()) with scrobble counts as values.
+   * Days with zero scrobbles may be absent from the Map.
+   *
+   * Caching: Same strategy as getHourlyDistribution() -- computed during
+   * getIndex() and cached in `cachedDayOfWeekDist` with 1-minute TTL.
    */
   async getDayOfWeekDistribution(): Promise<Map<number, number>> {
     if (this.cachedDayOfWeekDist) {

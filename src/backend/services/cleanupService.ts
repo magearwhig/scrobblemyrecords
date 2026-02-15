@@ -11,9 +11,11 @@
  * - Versions cache (wishlist): 7 days max age
  * - Seller inventory cache: 7 days max age (based on file mtime)
  * - Collection artists cache (releases): 24 hours max age (uses fetchedAt timestamp)
+ * - Artist tags cache (genre analysis): 30 days max age per entry (uses fetchedAt timestamp)
  */
 
 import {
+  ArtistTagsCacheStore,
   CollectionArtistsCacheStore,
   SellerMatchesStore,
   VersionsCache,
@@ -46,6 +48,7 @@ export interface CleanupReport {
   versionsCacheEntriesRemoved: number;
   inventoryCacheFilesRemoved: number;
   collectionArtistsCacheCleared: boolean;
+  artistTagsEntriesRemoved: number;
   errors: string[];
   durationMs: number;
 }
@@ -59,6 +62,7 @@ export class CleanupService {
   private readonly VERSIONS_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
   private readonly INVENTORY_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
   private readonly COLLECTION_ARTISTS_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+  private readonly ARTIST_TAGS_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
   constructor(storage: FileStorage) {
     this.storage = storage;
@@ -77,6 +81,7 @@ export class CleanupService {
       versionsCacheEntriesRemoved: 0,
       inventoryCacheFilesRemoved: 0,
       collectionArtistsCacheCleared: false,
+      artistTagsEntriesRemoved: 0,
       errors: [],
       durationMs: 0,
     };
@@ -130,6 +135,15 @@ export class CleanupService {
         await this.cleanupCollectionArtistsCache();
     } catch (e) {
       const msg = `Collection artists cache cleanup failed: ${e instanceof Error ? e.message : String(e)}`;
+      report.errors.push(msg);
+      log.error(msg);
+    }
+
+    // Artist tags cache (genre analysis)
+    try {
+      report.artistTagsEntriesRemoved = await this.cleanupArtistTagsCache();
+    } catch (e) {
+      const msg = `Artist tags cache cleanup failed: ${e instanceof Error ? e.message : String(e)}`;
       report.errors.push(msg);
       log.error(msg);
     }
@@ -313,6 +327,35 @@ export class CleanupService {
   }
 
   /**
+   * Clean up expired entries from the artist tags cache.
+   * Removes per-artist entries where fetchedAt is older than 30 days.
+   *
+   * @returns Number of entries removed
+   */
+  async cleanupArtistTagsCache(): Promise<number> {
+    const cutoff = nowUnixMs() - this.ARTIST_TAGS_CACHE_MAX_AGE_MS;
+    const filePath = 'cache/artist-tags.json';
+
+    const cache = await this.storage.readJSON<ArtistTagsCacheStore>(filePath);
+    if (!cache?.tags) return 0;
+
+    let removed = 0;
+    for (const key of Object.keys(cache.tags)) {
+      if (cache.tags[key].fetchedAt < cutoff) {
+        delete cache.tags[key];
+        removed++;
+      }
+    }
+
+    if (removed > 0) {
+      await this.storage.writeJSONWithBackup(filePath, cache);
+      log.debug(`Removed ${removed} expired entries from artist tags cache`);
+    }
+
+    return removed;
+  }
+
+  /**
    * Get the retention period settings (for testing/debugging).
    */
   getRetentionSettings(): {
@@ -321,6 +364,7 @@ export class CleanupService {
     versionsCacheMaxAgeMs: number;
     inventoryCacheMaxAgeMs: number;
     collectionArtistsCacheMaxAgeMs: number;
+    artistTagsCacheMaxAgeMs: number;
   } {
     return {
       imageCacheMaxAgeMs: this.IMAGE_CACHE_MAX_AGE_MS,
@@ -328,6 +372,7 @@ export class CleanupService {
       versionsCacheMaxAgeMs: this.VERSIONS_CACHE_MAX_AGE_MS,
       inventoryCacheMaxAgeMs: this.INVENTORY_CACHE_MAX_AGE_MS,
       collectionArtistsCacheMaxAgeMs: this.COLLECTION_ARTISTS_CACHE_MAX_AGE_MS,
+      artistTagsCacheMaxAgeMs: this.ARTIST_TAGS_CACHE_MAX_AGE_MS,
     };
   }
 }

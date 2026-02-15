@@ -22,6 +22,19 @@ global.ResizeObserver = class ResizeObserver {
   disconnect() {}
 } as unknown as typeof globalThis.ResizeObserver;
 
+// Mock IntersectionObserver (not available in jsdom)
+global.IntersectionObserver = class IntersectionObserver {
+  readonly root: Element | null = null;
+  readonly rootMargin: string = '';
+  readonly thresholds: ReadonlyArray<number> = [];
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords(): IntersectionObserverEntry[] {
+    return [];
+  }
+} as unknown as typeof globalThis.IntersectionObserver;
+
 // Mock console methods to reduce noise in tests
 global.console = {
   ...console,
