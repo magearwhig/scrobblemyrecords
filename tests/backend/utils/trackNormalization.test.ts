@@ -88,6 +88,43 @@ describe('normalizeForMatching', () => {
     });
   });
 
+  describe('Discogs disambiguation numbers', () => {
+    it('strips (2) from artist name', () => {
+      expect(normalizeForMatching('Nirvana (2)')).toBe('nirvana');
+    });
+
+    it('strips (3) from artist name', () => {
+      expect(normalizeForMatching('Bush (3)')).toBe('bush');
+    });
+
+    it('strips (5) from artist name', () => {
+      expect(normalizeForMatching('Tool (5)')).toBe('tool');
+    });
+
+    it('strips (12) from artist name', () => {
+      expect(normalizeForMatching('Common (12)')).toBe('common');
+    });
+
+    it('does not strip disambiguation from middle of string', () => {
+      // "Part 2" in an album title should not be affected
+      expect(normalizeForMatching('Album Part (2) Songs')).toBe(
+        'album part (2) songs'
+      );
+    });
+
+    it('matches Discogs artist with Last.fm artist after stripping', () => {
+      const discogs = normalizeForMatching('Nirvana (2)');
+      const lastfm = normalizeForMatching('Nirvana');
+      expect(discogs).toBe(lastfm);
+    });
+
+    it('matches Discogs artist with Last.fm artist for Tool', () => {
+      const discogs = normalizeForMatching('Tool (2)');
+      const lastfm = normalizeForMatching('Tool');
+      expect(discogs).toBe(lastfm);
+    });
+  });
+
   describe('featuring variations', () => {
     it('removes feat. at end', () => {
       expect(normalizeForMatching('Song feat. Artist')).toBe('song');
@@ -167,6 +204,15 @@ describe('normalizeForMatching', () => {
       const original = normalizeForMatching('Gentlemen');
       const anniversary = normalizeForMatching('Gentlemen at 21');
       expect(original).toBe(anniversary);
+    });
+
+    it('handles Discogs artist with disambiguation and album with edition', () => {
+      const discogsArtist = normalizeForMatching('Nirvana (2)');
+      const discogsAlbum = normalizeForMatching('Nevermind (Remastered)');
+      const lastfmArtist = normalizeForMatching('Nirvana');
+      const lastfmAlbum = normalizeForMatching('Nevermind');
+      expect(discogsArtist).toBe(lastfmArtist);
+      expect(discogsAlbum).toBe(lastfmAlbum);
     });
   });
 });

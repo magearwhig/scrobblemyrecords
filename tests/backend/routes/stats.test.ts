@@ -451,7 +451,8 @@ describe('Stats Routes', () => {
         'custom',
         10,
         1704067200,
-        1706745600
+        1706745600,
+        [] // Empty collection from loadCollection (no cached data)
       );
     });
 

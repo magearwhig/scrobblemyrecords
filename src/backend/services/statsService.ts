@@ -460,7 +460,8 @@ export class StatsService {
       | 'custom',
     limit: number = 10,
     startDate?: number,
-    endDate?: number
+    endDate?: number,
+    collection?: CollectionItem[]
   ): Promise<AlbumPlayCount[]> {
     const index = await this.historyStorage.getIndex();
     if (!index) {
@@ -483,12 +484,7 @@ export class StatsService {
     }
 
     // Count plays per album in the period
-    const albumCounts: Array<{
-      artist: string;
-      album: string;
-      playCount: number;
-      lastPlayed: number;
-    }> = [];
+    const albumCounts: AlbumPlayCount[] = [];
 
     for (const [key, albumHistory] of Object.entries(index.albums)) {
       const [artist, album] = key.split('|');
@@ -517,10 +513,55 @@ export class StatsService {
       }
     }
 
-    // Sort by play count and return
-    return albumCounts
+    // Sort by play count and take top results
+    const result = albumCounts
       .sort((a, b) => b.playCount - a.playCount)
       .slice(0, limit);
+
+    // Enrich with collection info if collection is provided
+    if (collection && collection.length > 0) {
+      const collectionByFuzzyKey = new Map<string, CollectionItem>();
+
+      for (const item of collection) {
+        let searchArtist = item.release.artist;
+        let searchAlbum = item.release.title;
+
+        if (this.mappingService) {
+          const albumMapping =
+            await this.mappingService.getAlbumMappingForCollection(
+              item.release.artist,
+              item.release.title
+            );
+          if (albumMapping) {
+            searchArtist = albumMapping.historyArtist;
+            searchAlbum = albumMapping.historyAlbum;
+          }
+        }
+
+        const fuzzyKey = this.historyStorage.fuzzyNormalizeKey(
+          searchArtist,
+          searchAlbum
+        );
+        collectionByFuzzyKey.set(fuzzyKey, item);
+      }
+
+      for (const album of result) {
+        const fuzzyKey = this.historyStorage.fuzzyNormalizeKey(
+          album.artist,
+          album.album
+        );
+        const collectionItem = collectionByFuzzyKey.get(fuzzyKey);
+        if (collectionItem) {
+          album.inCollection = true;
+          album.collectionReleaseId = collectionItem.release.id;
+          if (collectionItem.release.cover_image) {
+            album.coverUrl = collectionItem.release.cover_image;
+          }
+        }
+      }
+    }
+
+    return result;
   }
 
   /**

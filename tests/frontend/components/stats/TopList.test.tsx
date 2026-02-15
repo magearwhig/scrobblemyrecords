@@ -367,4 +367,116 @@ describe('TopList', () => {
       expect(screen.getByText('3')).toBeInTheDocument();
     });
   });
+
+  describe('Owned badge', () => {
+    it('should show Owned badge when album has inCollection flag from API', () => {
+      const albumsWithCollection: AlbumPlayCount[] = [
+        {
+          artist: 'Nirvana',
+          album: 'Nevermind',
+          playCount: 100,
+          lastPlayed: Date.now() / 1000,
+          inCollection: true,
+        },
+      ];
+
+      render(
+        <TopList
+          title='Top Albums'
+          type='albums'
+          data={albumsWithCollection}
+          currentPeriod='month'
+          onPeriodChange={mockOnPeriodChange}
+        />
+      );
+
+      expect(screen.getByText('Owned')).toBeInTheDocument();
+    });
+
+    it('should not show Owned badge when inCollection is false', () => {
+      const albumsWithoutCollection: AlbumPlayCount[] = [
+        {
+          artist: 'Nirvana',
+          album: 'Nevermind',
+          playCount: 100,
+          lastPlayed: Date.now() / 1000,
+          inCollection: false,
+        },
+      ];
+
+      render(
+        <TopList
+          title='Top Albums'
+          type='albums'
+          data={albumsWithoutCollection}
+          currentPeriod='month'
+          onPeriodChange={mockOnPeriodChange}
+        />
+      );
+
+      expect(screen.queryByText('Owned')).not.toBeInTheDocument();
+    });
+
+    it('should not show Owned badge when inCollection is undefined and no collectionMap', () => {
+      const albums: AlbumPlayCount[] = [
+        {
+          artist: 'Nirvana',
+          album: 'Nevermind',
+          playCount: 100,
+          lastPlayed: Date.now() / 1000,
+        },
+      ];
+
+      render(
+        <TopList
+          title='Top Albums'
+          type='albums'
+          data={albums}
+          currentPeriod='month'
+          onPeriodChange={mockOnPeriodChange}
+        />
+      );
+
+      expect(screen.queryByText('Owned')).not.toBeInTheDocument();
+    });
+
+    it('should show Owned badge from collectionMap fallback when inCollection not set', () => {
+      const albums: AlbumPlayCount[] = [
+        {
+          artist: 'Radiohead',
+          album: 'OK Computer',
+          playCount: 50,
+          lastPlayed: Date.now() / 1000,
+        },
+      ];
+
+      const collectionMap = new Map();
+      collectionMap.set('radiohead|ok computer', {
+        id: 123,
+        date_added: '2024-01-15T00:00:00Z',
+        release: {
+          id: 123,
+          title: 'OK Computer',
+          artist: 'Radiohead',
+          year: 1997,
+          format: ['CD'],
+          label: ['Parlophone'],
+          resource_url: 'https://api.discogs.com/releases/123',
+        },
+      });
+
+      render(
+        <TopList
+          title='Top Albums'
+          type='albums'
+          data={albums}
+          currentPeriod='month'
+          onPeriodChange={mockOnPeriodChange}
+          collectionMap={collectionMap}
+        />
+      );
+
+      expect(screen.getByText('Owned')).toBeInTheDocument();
+    });
+  });
 });

@@ -243,18 +243,19 @@ export default function createStatsRouter(
           artists: DashboardTopArtist[];
           albums: DashboardTopAlbum[];
         }> => {
+          // Load collection for enrichment (cover images + inCollection)
+          const collection = username ? await loadCollection(username) : [];
+
           const [topArtists, topAlbums] = await Promise.all([
             statsService.getTopArtists('month', 5),
-            statsService.getTopAlbums('month', 5),
+            statsService.getTopAlbums(
+              'month',
+              5,
+              undefined,
+              undefined,
+              collection.length > 0 ? collection : undefined
+            ),
           ]);
-
-          // Get cover images for top albums from collection
-          const collection = username ? await loadCollection(username) : [];
-          const collectionMap = new Map<string, CollectionItem>();
-          for (const item of collection) {
-            const key = `${item.release.artist.toLowerCase()}|${item.release.title.toLowerCase()}`;
-            collectionMap.set(key, item);
-          }
 
           return {
             artists: topArtists.map(a => ({
@@ -262,16 +263,12 @@ export default function createStatsRouter(
               playCount: a.playCount,
               imageUrl: null, // Artist images would require Last.fm API call
             })),
-            albums: topAlbums.map(a => {
-              const key = `${a.artist.toLowerCase()}|${a.album.toLowerCase()}`;
-              const collectionItem = collectionMap.get(key);
-              return {
-                artist: a.artist,
-                album: a.album,
-                playCount: a.playCount,
-                coverUrl: collectionItem?.release.cover_image || null,
-              };
-            }),
+            albums: topAlbums.map(a => ({
+              artist: a.artist,
+              album: a.album,
+              playCount: a.playCount,
+              coverUrl: a.coverUrl || null,
+            })),
           };
         })(),
       ]);
@@ -517,11 +514,24 @@ export default function createStatsRouter(
         });
       }
 
+      // Load collection for inCollection enrichment (optional, non-blocking)
+      let collection: CollectionItem[] | undefined;
+      try {
+        const settings = await authService.getUserSettings();
+        const username = settings.discogs.username;
+        if (username) {
+          collection = await loadCollection(username);
+        }
+      } catch {
+        // Collection loading is optional — skip enrichment if it fails
+      }
+
       const topAlbums = await statsService.getTopAlbums(
         period,
         limit,
         startDate,
-        endDate
+        endDate,
+        collection
       );
 
       res.json({

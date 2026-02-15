@@ -73,6 +73,16 @@ describe('StatsService', () => {
         matchType: 'none',
       }),
       getTotalScrobbles: jest.fn().mockResolvedValue(0),
+      fuzzyNormalizeKey: jest
+        .fn()
+        .mockImplementation((artist: string, album: string) => {
+          const norm = (s: string) =>
+            s
+              .replace(/\s*\(\d+\)\s*$/g, '')
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, '');
+          return `${norm(artist)}|${norm(album)}`;
+        }),
     } as unknown as jest.Mocked<ScrobbleHistoryStorage>;
 
     statsService = new StatsService(mockFileStorage, mockHistoryStorage);
@@ -433,6 +443,183 @@ describe('StatsService', () => {
       // Only Kid A should be in this month
       expect(topAlbums).toHaveLength(1);
       expect(topAlbums[0].album).toBe('Kid A');
+    });
+  });
+
+  describe('getTopAlbums collection enrichment', () => {
+    it('should set inCollection when album matches collection item', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'radiohead|ok computer': {
+            lastPlayed: now,
+            playCount: 50,
+            plays: Array.from({ length: 50 }, () => ({ timestamp: now })),
+          },
+        })
+      );
+      mockHistoryStorage.fuzzyNormalizeKey.mockImplementation(
+        (artist: string, album: string) => {
+          return `${artist.toLowerCase().replace(/[^a-z0-9]/g, '')}|${album.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+        }
+      );
+
+      const collection = [
+        createMockCollectionItem({
+          artist: 'Radiohead',
+          title: 'OK Computer',
+          id: 456,
+        }),
+      ];
+
+      const topAlbums = await statsService.getTopAlbums(
+        'all',
+        10,
+        undefined,
+        undefined,
+        collection
+      );
+
+      expect(topAlbums).toHaveLength(1);
+      expect(topAlbums[0].inCollection).toBe(true);
+      expect(topAlbums[0].collectionReleaseId).toBe(456);
+    });
+
+    it('should not set inCollection when album is not in collection', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'radiohead|ok computer': {
+            lastPlayed: now,
+            playCount: 50,
+            plays: Array.from({ length: 50 }, () => ({ timestamp: now })),
+          },
+        })
+      );
+      mockHistoryStorage.fuzzyNormalizeKey.mockImplementation(
+        (artist: string, album: string) => {
+          return `${artist.toLowerCase().replace(/[^a-z0-9]/g, '')}|${album.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+        }
+      );
+
+      const collection = [
+        createMockCollectionItem({
+          artist: 'Pink Floyd',
+          title: 'The Wall',
+        }),
+      ];
+
+      const topAlbums = await statsService.getTopAlbums(
+        'all',
+        10,
+        undefined,
+        undefined,
+        collection
+      );
+
+      expect(topAlbums).toHaveLength(1);
+      expect(topAlbums[0].inCollection).toBeUndefined();
+    });
+
+    it('should match Discogs disambiguation artist via fuzzy key', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'nirvana|nevermind': {
+            lastPlayed: now,
+            playCount: 100,
+            plays: Array.from({ length: 100 }, () => ({ timestamp: now })),
+          },
+        })
+      );
+      mockHistoryStorage.fuzzyNormalizeKey.mockImplementation(
+        (artist: string, album: string) => {
+          // Simulate fuzzy normalization that strips disambiguation numbers
+          const norm = (s: string) =>
+            s
+              .replace(/\s*\(\d+\)\s*$/g, '')
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, '');
+          return `${norm(artist)}|${norm(album)}`;
+        }
+      );
+
+      // Discogs has "Nirvana (2)" but Last.fm history has "nirvana"
+      const collection = [
+        createMockCollectionItem({
+          artist: 'Nirvana (2)',
+          title: 'Nevermind',
+          id: 789,
+        }),
+      ];
+
+      const topAlbums = await statsService.getTopAlbums(
+        'all',
+        10,
+        undefined,
+        undefined,
+        collection
+      );
+
+      expect(topAlbums).toHaveLength(1);
+      expect(topAlbums[0].inCollection).toBe(true);
+      expect(topAlbums[0].collectionReleaseId).toBe(789);
+    });
+
+    it('should set coverUrl from collection item', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'radiohead|ok computer': {
+            lastPlayed: now,
+            playCount: 50,
+            plays: Array.from({ length: 50 }, () => ({ timestamp: now })),
+          },
+        })
+      );
+      mockHistoryStorage.fuzzyNormalizeKey.mockImplementation(
+        (artist: string, album: string) => {
+          return `${artist.toLowerCase().replace(/[^a-z0-9]/g, '')}|${album.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+        }
+      );
+
+      const collection = [
+        createMockCollectionItem({
+          artist: 'Radiohead',
+          title: 'OK Computer',
+          coverImage: 'https://example.com/ok-computer-cover.jpg',
+        }),
+      ];
+
+      const topAlbums = await statsService.getTopAlbums(
+        'all',
+        10,
+        undefined,
+        undefined,
+        collection
+      );
+
+      expect(topAlbums[0].coverUrl).toBe(
+        'https://example.com/ok-computer-cover.jpg'
+      );
+    });
+
+    it('should work without collection parameter (backward compatible)', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'radiohead|ok computer': {
+            lastPlayed: now,
+            playCount: 50,
+            plays: Array.from({ length: 50 }, () => ({ timestamp: now })),
+          },
+        })
+      );
+
+      const topAlbums = await statsService.getTopAlbums('all', 10);
+
+      expect(topAlbums).toHaveLength(1);
+      expect(topAlbums[0].inCollection).toBeUndefined();
     });
   });
 

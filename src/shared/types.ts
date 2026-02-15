@@ -466,6 +466,8 @@ export interface AlbumPlayCount {
   playCount: number;
   lastPlayed: number;
   coverUrl?: string;
+  inCollection?: boolean;
+  collectionReleaseId?: number;
 }
 
 export interface TrackPlayCount {

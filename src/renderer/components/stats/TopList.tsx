@@ -282,19 +282,22 @@ export const TopList: React.FC<TopListProps> = ({
                     ) : isAlbumData(item) ? (
                       <>
                         <div className='top-list-name'>
-                          {item.album}
-                          {collectionMap &&
-                            collectionMap.has(
-                              `${normalizeForMatching(item.artist)}|${normalizeForMatching(item.album)}`
-                            ) && (
-                              <Badge
-                                variant='success'
-                                size='small'
-                                className='top-list-owned-badge'
-                              >
-                                Owned
-                              </Badge>
-                            )}
+                          <span className='top-list-name-text'>
+                            {item.album}
+                          </span>
+                          {((item as AlbumPlayCount).inCollection ||
+                            (collectionMap &&
+                              collectionMap.has(
+                                `${normalizeForMatching(item.artist)}|${normalizeForMatching(item.album)}`
+                              ))) && (
+                            <Badge
+                              variant='success'
+                              size='small'
+                              className='top-list-owned-badge'
+                            >
+                              Owned
+                            </Badge>
+                          )}
                         </div>
                         <div className='top-list-artist'>
                           <ArtistLink artist={item.artist} />
@@ -302,7 +305,9 @@ export const TopList: React.FC<TopListProps> = ({
                       </>
                     ) : (
                       <div className='top-list-name'>
-                        <ArtistLink artist={item.artist} />
+                        <span className='top-list-name-text'>
+                          <ArtistLink artist={item.artist} />
+                        </span>
                         {collectionArtistCounts &&
                           (() => {
                             const count = collectionArtistCounts.get(

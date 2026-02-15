@@ -4732,9 +4732,17 @@ body {
   font-size: 0.9rem;
   font-weight: 500;
   color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.top-list-name-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .top-list-artist {
@@ -10263,7 +10271,7 @@ body {
 /* --- Top List "Owned" badge (inline with album/artist name) --- */
 .top-list-owned-badge {
   margin-left: 0.5rem;
-  vertical-align: middle;
+  flex-shrink: 0;
 }
 
 /* --- Seller Match "Never listened" indicator --- */

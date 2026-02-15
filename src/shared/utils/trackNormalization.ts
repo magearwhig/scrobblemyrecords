@@ -16,6 +16,9 @@ export function normalizeForMatching(str: string): string {
   return (
     str
       .toLowerCase()
+      // Strip Discogs disambiguation numbers: "(2)", "(3)", etc. at end of string
+      // These are numeric suffixes Discogs uses to distinguish different artists with the same name
+      .replace(/\s*\(\d+\)\s*$/g, '')
       // Remove [Explicit], [Clean], [Remastered], [Deluxe], etc.
       .replace(
         /\s*\[(explicit|clean|remaster(ed)?|deluxe|deluxe edition|special edition|expanded|expanded edition|anniversary|anniversary edition|bonus tracks?|vinyl|lp|cd|digital|limited|limited edition)\]\s*/gi,
