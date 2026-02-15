@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-3209%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-3762%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 

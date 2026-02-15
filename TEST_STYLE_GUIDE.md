@@ -549,14 +549,14 @@ Tests must be completely isolated to support parallel execution.
 ### Target Coverage
 
 **Enforced thresholds** (jest.config.js):
-- **Statements**: 60%
-- **Branches**: 55%
-- **Functions**: 60%
-- **Lines**: 60%
+- **Statements**: 72%
+- **Branches**: 60%
+- **Functions**: 65%
+- **Lines**: 73%
 
 **Aspirational target**: 90% (see `.plan/tech-debt.md` for improvement plan)
 
-The 60% thresholds are the current enforced baseline. They will be raised incrementally as test coverage improves. Do not lower these thresholds.
+These thresholds are the current enforced baseline (raised from 50-63% in February 2026). They will be raised incrementally as test coverage improves. Do not lower these thresholds.
 
 ### Coverage Exclusions
 

@@ -1867,4 +1867,773 @@ describe('ReleaseTrackingService', () => {
       expect(artists[0].name).toBe('New Artist');
     });
   });
+
+  describe('getTrackedReleases', () => {
+    it('should return empty array when no releases file exists', async () => {
+      // Arrange
+      mockFileStorage.readJSON.mockResolvedValue(null);
+
+      // Act
+      const releases = await service.getTrackedReleases();
+
+      // Assert
+      expect(releases).toEqual([]);
+    });
+
+    it('should return stored releases', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Album 1',
+            artistName: 'Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-15',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      // Act
+      const releases = await service.getTrackedReleases();
+
+      // Assert
+      expect(releases).toHaveLength(1);
+      expect(releases[0].mbid).toBe('rg-1');
+    });
+
+    it('should return empty array if schema version is wrong', async () => {
+      // Arrange
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 2,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'should-not-see',
+            title: 'Test',
+            artistName: 'Test',
+            artistMbid: 'test',
+            releaseDate: '2024-01-01',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      });
+
+      // Act
+      const releases = await service.getTrackedReleases();
+
+      // Assert
+      expect(releases).toEqual([]);
+    });
+
+    it('should return empty array on read error', async () => {
+      // Arrange
+      mockFileStorage.readJSON.mockRejectedValue(new Error('Read error'));
+
+      // Act
+      const releases = await service.getTrackedReleases();
+
+      // Assert
+      expect(releases).toEqual([]);
+    });
+  });
+
+  describe('fetchMissingCoverArt', () => {
+    it('should return 0 if no releases need cover art', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Album',
+            artistName: 'Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-01',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+            coverArtUrl: 'https://example.com/cover.jpg',
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      // Act
+      const count = await service.fetchMissingCoverArt();
+
+      // Assert
+      expect(count).toBe(0);
+      expect(mockMusicBrainzService.getCoverArtUrl).not.toHaveBeenCalled();
+    });
+
+    it('should fetch cover art for releases without it', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Album 1',
+            artistName: 'Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-01',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+          {
+            mbid: 'rg-2',
+            title: 'Album 2',
+            artistName: 'Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-02',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+      mockMusicBrainzService.getCoverArtUrl
+        .mockResolvedValueOnce('https://example.com/cover1.jpg')
+        .mockResolvedValueOnce('https://example.com/cover2.jpg');
+
+      // Act
+      const count = await service.fetchMissingCoverArt();
+
+      // Assert
+      expect(count).toBe(2);
+      expect(mockMusicBrainzService.getCoverArtUrl).toHaveBeenCalledTimes(2);
+      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+    });
+
+    it('should handle partial success when some cover art is not found', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Album 1',
+            artistName: 'Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-01',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+          {
+            mbid: 'rg-2',
+            title: 'Album 2',
+            artistName: 'Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-02',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+      mockMusicBrainzService.getCoverArtUrl
+        .mockResolvedValueOnce('https://example.com/cover1.jpg')
+        .mockResolvedValueOnce(null);
+
+      // Act
+      const count = await service.fetchMissingCoverArt();
+
+      // Assert
+      expect(count).toBe(1);
+      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+    });
+
+    it('should not save if no cover art was found', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Album',
+            artistName: 'Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-01',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+      mockMusicBrainzService.getCoverArtUrl.mockResolvedValue(null);
+
+      // Act
+      const count = await service.fetchMissingCoverArt();
+
+      // Assert
+      expect(count).toBe(0);
+      expect(mockFileStorage.writeJSON).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('checkVinylAvailability', () => {
+    it('should return 0 if no releases need checking', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Album',
+            artistName: 'Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-01',
+            releaseType: 'album',
+            vinylStatus: 'available',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      // Act
+      const count = await service.checkVinylAvailability();
+
+      // Assert
+      expect(count).toBe(0);
+      expect(mockWishlistService.searchForRelease).not.toHaveBeenCalled();
+    });
+
+    it('should check vinyl availability for releases with unknown status', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'OK Computer',
+            artistName: 'Radiohead',
+            artistMbid: 'artist-mbid',
+            releaseDate: '1997-05-21',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      mockWishlistService.searchForRelease.mockResolvedValue([
+        {
+          masterId: 100,
+          releaseId: 200,
+          title: 'OK Computer',
+          artist: 'Radiohead',
+          year: 1997,
+          formats: ['Vinyl'],
+        },
+      ]);
+      mockWishlistService.getMasterVersions.mockResolvedValue([
+        {
+          releaseId: 1,
+          title: 'OK Computer',
+          format: ['Vinyl', 'LP'],
+          label: 'Test Label',
+          country: 'US',
+          year: 1997,
+          hasVinyl: true,
+          marketplaceStats: {
+            lowestPrice: 25.99,
+            numForSale: 50,
+            currency: 'USD',
+            lastFetched: Date.now(),
+          },
+        },
+      ]);
+
+      // Act
+      const count = await service.checkVinylAvailability();
+
+      // Assert
+      expect(count).toBe(1);
+      expect(mockWishlistService.searchForRelease).toHaveBeenCalledWith(
+        'Radiohead',
+        'OK Computer'
+      );
+      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+    });
+
+    it('should mark release as not-found if no search results', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Rare Album',
+            artistName: 'Obscure Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-01',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+      mockWishlistService.searchForRelease.mockResolvedValue([]);
+
+      // Act
+      await service.checkVinylAvailability();
+
+      // Assert
+      const savedStore = mockFileStorage.writeJSON.mock
+        .calls[0][1] as TrackedReleasesStore;
+      expect(savedStore.releases[0].vinylStatus).toBe('not-found');
+    });
+
+    it('should mark release as cd-only if no vinyl versions', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Album',
+            artistName: 'Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-01',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      mockWishlistService.searchForRelease.mockResolvedValue([
+        {
+          masterId: 100,
+          releaseId: 200,
+          title: 'Album',
+          artist: 'Artist',
+          formats: ['CD'],
+        },
+      ]);
+      mockWishlistService.getMasterVersions.mockResolvedValue([
+        {
+          releaseId: 1,
+          title: 'Album',
+          format: ['CD'],
+          label: 'Test Label',
+          country: 'US',
+          year: 2024,
+          hasVinyl: false,
+        },
+      ]);
+
+      // Act
+      await service.checkVinylAvailability();
+
+      // Assert
+      const savedStore = mockFileStorage.writeJSON.mock
+        .calls[0][1] as TrackedReleasesStore;
+      expect(savedStore.releases[0].vinylStatus).toBe('cd-only');
+    });
+
+    it('should set vinyl price range when vinyl is available', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Album',
+            artistName: 'Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-01',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      mockWishlistService.searchForRelease.mockResolvedValue([
+        {
+          masterId: 100,
+          releaseId: 200,
+          title: 'Album',
+          artist: 'Artist',
+          formats: ['Vinyl'],
+        },
+      ]);
+      mockWishlistService.getMasterVersions.mockResolvedValue([
+        {
+          releaseId: 1,
+          title: 'Album',
+          format: ['Vinyl', 'LP'],
+          label: 'Test Label',
+          country: 'US',
+          year: 2024,
+          hasVinyl: true,
+          marketplaceStats: {
+            lowestPrice: 19.99,
+            numForSale: 25,
+            currency: 'USD',
+            lastFetched: Date.now(),
+          },
+        },
+        {
+          releaseId: 2,
+          title: 'Album',
+          format: ['Vinyl', 'LP'],
+          label: 'Test Label',
+          country: 'US',
+          year: 2024,
+          hasVinyl: true,
+          marketplaceStats: {
+            lowestPrice: 29.99,
+            numForSale: 10,
+            currency: 'USD',
+            lastFetched: Date.now(),
+          },
+        },
+      ]);
+
+      // Act
+      await service.checkVinylAvailability();
+
+      // Assert
+      const savedStore = mockFileStorage.writeJSON.mock
+        .calls[0][1] as TrackedReleasesStore;
+      expect(savedStore.releases[0].vinylStatus).toBe('available');
+      expect(savedStore.releases[0].vinylPriceRange).toEqual({
+        min: 19.99,
+        max: 29.99,
+        currency: 'USD',
+      });
+    });
+
+    it('should handle errors gracefully and mark status as unknown', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Album',
+            artistName: 'Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-01',
+            releaseType: 'album',
+            vinylStatus: 'checking',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+      mockWishlistService.searchForRelease.mockRejectedValue(
+        new Error('API error')
+      );
+
+      // Act
+      await service.checkVinylAvailability();
+
+      // Assert
+      const savedStore = mockFileStorage.writeJSON.mock
+        .calls[0][1] as TrackedReleasesStore;
+      expect(savedStore.releases[0].vinylStatus).toBe('unknown');
+    });
+  });
+
+  describe('checkSingleReleaseVinyl', () => {
+    it('should return null if release not found', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      // Act
+      const result = await service.checkSingleReleaseVinyl('non-existent');
+
+      // Assert
+      expect(result).toBeNull();
+    });
+
+    it('should check vinyl availability for a single release', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'In Rainbows',
+            artistName: 'Radiohead',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2007-10-10',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      mockWishlistService.searchForRelease.mockResolvedValue([
+        {
+          masterId: 42,
+          releaseId: 100,
+          title: 'In Rainbows',
+          artist: 'Radiohead',
+          year: 2007,
+          formats: ['Vinyl'],
+        },
+      ]);
+      mockWishlistService.getMasterVersions.mockResolvedValue([
+        {
+          releaseId: 1,
+          title: 'In Rainbows',
+          format: ['Vinyl', 'LP'],
+          label: 'Test Label',
+          country: 'US',
+          year: 2007,
+          hasVinyl: true,
+          marketplaceStats: {
+            lowestPrice: 30.0,
+            numForSale: 15,
+            currency: 'USD',
+            lastFetched: Date.now(),
+          },
+        },
+      ]);
+
+      // Act
+      const result = await service.checkSingleReleaseVinyl('rg-1');
+
+      // Assert
+      expect(result).not.toBeNull();
+      expect(result?.vinylStatus).toBe('available');
+      expect(result?.discogsMasterId).toBe(42);
+      expect(result?.discogsUrl).toBe('https://www.discogs.com/master/42');
+      expect(result?.vinylCheckedAt).toBeDefined();
+      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+    });
+
+    it('should mark as not-found if no Discogs results', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Rare Album',
+            artistName: 'Obscure Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-01',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+      mockWishlistService.searchForRelease.mockResolvedValue([]);
+
+      // Act
+      const result = await service.checkSingleReleaseVinyl('rg-1');
+
+      // Assert
+      expect(result?.vinylStatus).toBe('not-found');
+      expect(result?.vinylCheckedAt).toBeDefined();
+    });
+
+    it('should prefer exact artist and title match', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Discovery',
+            artistName: 'Daft Punk',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2001-03-12',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      mockWishlistService.searchForRelease.mockResolvedValue([
+        {
+          masterId: 1,
+          releaseId: 10,
+          title: 'Wrong Album',
+          artist: 'Wrong Artist',
+          formats: [],
+        },
+        {
+          masterId: 2,
+          releaseId: 20,
+          title: 'Discovery',
+          artist: 'Daft Punk',
+          year: 2001,
+          formats: ['Vinyl'],
+        },
+      ]);
+      mockWishlistService.getMasterVersions.mockResolvedValue([
+        {
+          releaseId: 1,
+          title: 'Discovery',
+          format: ['Vinyl', 'LP'],
+          label: 'Test Label',
+          country: 'US',
+          year: 2001,
+          hasVinyl: true,
+        },
+      ]);
+
+      // Act
+      const result = await service.checkSingleReleaseVinyl('rg-1');
+
+      // Assert
+      expect(result?.discogsMasterId).toBe(2);
+      expect(mockWishlistService.getMasterVersions).toHaveBeenCalledWith(2);
+    });
+
+    it('should mark as not-found if no matching artist', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Album',
+            artistName: 'Correct Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-01',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+
+      mockWishlistService.searchForRelease.mockResolvedValue([
+        {
+          masterId: 1,
+          releaseId: 10,
+          title: 'Album',
+          artist: 'Wrong Artist',
+          formats: [],
+        },
+      ]);
+
+      // Act
+      const result = await service.checkSingleReleaseVinyl('rg-1');
+
+      // Assert
+      expect(result?.vinylStatus).toBe('not-found');
+      expect(mockWishlistService.getMasterVersions).not.toHaveBeenCalled();
+    });
+
+    it('should handle errors and mark status as unknown', async () => {
+      // Arrange
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'Album',
+            artistName: 'Artist',
+            artistMbid: 'artist-mbid',
+            releaseDate: '2024-01-01',
+            releaseType: 'album',
+            vinylStatus: 'checking',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+      mockWishlistService.searchForRelease.mockRejectedValue(
+        new Error('Network error')
+      );
+
+      // Act
+      const result = await service.checkSingleReleaseVinyl('rg-1');
+
+      // Assert
+      expect(result?.vinylStatus).toBe('unknown');
+    });
+  });
 });

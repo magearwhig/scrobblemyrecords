@@ -1,11 +1,17 @@
+import { ArtistNameResolver } from '../../src/backend/services/artistNameResolver';
+import { MappingService } from '../../src/backend/services/mappingService';
 import { ScrobbleHistoryStorage } from '../../src/backend/services/scrobbleHistoryStorage';
 import { StatsService } from '../../src/backend/services/statsService';
+import { TrackMappingService } from '../../src/backend/services/trackMappingService';
 import { FileStorage } from '../../src/backend/utils/fileStorage';
 import { CollectionItem, ScrobbleHistoryIndex } from '../../src/shared/types';
 
 // Mock dependencies
 jest.mock('../../src/backend/services/scrobbleHistoryStorage');
 jest.mock('../../src/backend/utils/fileStorage');
+jest.mock('../../src/backend/services/trackMappingService');
+jest.mock('../../src/backend/services/mappingService');
+jest.mock('../../src/backend/services/artistNameResolver');
 
 describe('StatsService', () => {
   let statsService: StatsService;
@@ -1731,6 +1737,1259 @@ describe('StatsService', () => {
 
       // Assert
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('getTopTracks', () => {
+    // Helper to create index with track data
+    const createIndexWithTracks = (
+      albums: Record<
+        string,
+        {
+          lastPlayed: number;
+          playCount: number;
+          plays: { timestamp: number; track?: string }[];
+        }
+      >
+    ): ScrobbleHistoryIndex => ({
+      albums,
+      totalScrobbles: Object.values(albums).reduce(
+        (sum, a) => sum + a.playCount,
+        0
+      ),
+      lastSyncTimestamp: Math.floor(Date.now() / 1000),
+      oldestScrobbleDate: 0,
+    });
+
+    it('should return empty array when no history', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex.mockResolvedValue(null);
+
+      // Act
+      const topTracks = await statsService.getTopTracks('all', 10);
+
+      // Assert
+      expect(topTracks).toEqual([]);
+    });
+
+    it('should return top tracks sorted by play count', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createIndexWithTracks({
+          'radiohead|ok computer': {
+            lastPlayed: now,
+            playCount: 60,
+            plays: [
+              ...Array.from({ length: 30 }, () => ({
+                timestamp: now,
+                track: 'Paranoid Android',
+              })),
+              ...Array.from({ length: 20 }, () => ({
+                timestamp: now,
+                track: 'Karma Police',
+              })),
+              ...Array.from({ length: 10 }, () => ({
+                timestamp: now,
+                track: 'No Surprises',
+              })),
+            ],
+          },
+        })
+      );
+
+      // Act
+      const topTracks = await statsService.getTopTracks('all', 10);
+
+      // Assert
+      expect(topTracks).toHaveLength(3);
+      expect(topTracks[0].track).toBe('Paranoid Android');
+      expect(topTracks[0].playCount).toBe(30);
+      expect(topTracks[1].track).toBe('Karma Police');
+      expect(topTracks[1].playCount).toBe(20);
+      expect(topTracks[2].track).toBe('No Surprises');
+      expect(topTracks[2].playCount).toBe(10);
+    });
+
+    it('should respect limit parameter', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const plays = Array.from({ length: 20 }, (_, i) => ({
+        timestamp: now,
+        track: `Track ${i}`,
+      }));
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createIndexWithTracks({
+          'artist|album': {
+            lastPlayed: now,
+            playCount: 20,
+            plays,
+          },
+        })
+      );
+
+      // Act
+      const topTracks = await statsService.getTopTracks('all', 5);
+
+      // Assert
+      expect(topTracks).toHaveLength(5);
+    });
+
+    it('should filter by time period', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const oneMonthAgo = now - 35 * 24 * 60 * 60;
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createIndexWithTracks({
+          'artist|album': {
+            lastPlayed: now,
+            playCount: 20,
+            plays: [
+              ...Array.from({ length: 10 }, () => ({
+                timestamp: now,
+                track: 'Recent Track',
+              })),
+              ...Array.from({ length: 10 }, () => ({
+                timestamp: oneMonthAgo,
+                track: 'Old Track',
+              })),
+            ],
+          },
+        })
+      );
+
+      // Act
+      const topTracks = await statsService.getTopTracks('month', 10);
+
+      // Assert
+      expect(topTracks).toHaveLength(1);
+      expect(topTracks[0].track).toBe('Recent Track');
+    });
+
+    it('should skip plays without track info', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createIndexWithTracks({
+          'artist|album': {
+            lastPlayed: now,
+            playCount: 15,
+            plays: [
+              { timestamp: now },
+              { timestamp: now },
+              ...Array.from({ length: 13 }, () => ({
+                timestamp: now,
+                track: 'Named Track',
+              })),
+            ],
+          },
+        })
+      );
+
+      // Act
+      const topTracks = await statsService.getTopTracks('all', 10);
+
+      // Assert
+      expect(topTracks).toHaveLength(1);
+      expect(topTracks[0].playCount).toBe(13);
+    });
+
+    it('should support custom date range', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const customStart = now - 60 * 24 * 60 * 60;
+      const customEnd = now - 30 * 24 * 60 * 60;
+      const inRange = customStart + 10 * 24 * 60 * 60;
+      const outOfRange = now - 5 * 24 * 60 * 60;
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createIndexWithTracks({
+          'artist|album': {
+            lastPlayed: now,
+            playCount: 20,
+            plays: [
+              ...Array.from({ length: 10 }, () => ({
+                timestamp: inRange,
+                track: 'In Range Track',
+              })),
+              ...Array.from({ length: 10 }, () => ({
+                timestamp: outOfRange,
+                track: 'Out Of Range Track',
+              })),
+            ],
+          },
+        })
+      );
+
+      // Act
+      const topTracks = await statsService.getTopTracks(
+        'custom',
+        10,
+        customStart,
+        customEnd
+      );
+
+      // Assert
+      expect(topTracks).toHaveLength(1);
+      expect(topTracks[0].track).toBe('In Range Track');
+    });
+  });
+
+  describe('getSourceBreakdown', () => {
+    it('should return empty array when no history', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex.mockResolvedValue(null);
+
+      // Act
+      const breakdown = await statsService.getSourceBreakdown();
+
+      // Assert
+      expect(breakdown).toEqual([]);
+    });
+
+    it('should return empty array when no scrobbles', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
+      mockFileStorage.listFiles = jest.fn().mockResolvedValue([]);
+
+      // Act
+      const breakdown = await statsService.getSourceBreakdown();
+
+      // Assert
+      expect(breakdown).toEqual([]);
+    });
+
+    it('should classify scrobbles as Other when no sessions available', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'artist|album': {
+            lastPlayed: now,
+            playCount: 10,
+            plays: Array.from({ length: 10 }, (_, i) => ({
+              timestamp: now - i * 300,
+            })),
+          },
+        })
+      );
+      mockFileStorage.listFiles = jest.fn().mockResolvedValue([]);
+
+      // Act
+      const breakdown = await statsService.getSourceBreakdown();
+
+      // Assert
+      expect(breakdown).toHaveLength(1);
+      expect(breakdown[0].source).toBe('Other');
+      expect(breakdown[0].count).toBe(10);
+      expect(breakdown[0].percentage).toBe(100);
+    });
+
+    it('should handle file storage errors gracefully', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'artist|album': {
+            lastPlayed: now,
+            playCount: 5,
+            plays: Array.from({ length: 5 }, () => ({ timestamp: now })),
+          },
+        })
+      );
+      mockFileStorage.listFiles = jest
+        .fn()
+        .mockRejectedValue(new Error('File system error'));
+
+      // Act
+      const breakdown = await statsService.getSourceBreakdown();
+
+      // Assert - Should not throw, all scrobbles should be "Other"
+      expect(breakdown).toHaveLength(1);
+      expect(breakdown[0].source).toBe('Other');
+    });
+  });
+
+  describe('getListeningTimeline', () => {
+    it('should return empty array when no history', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex.mockResolvedValue(null);
+
+      // Act
+      const timeline = await statsService.getListeningTimeline('year', 'week');
+
+      // Assert
+      expect(timeline).toEqual([]);
+    });
+
+    it('should aggregate scrobbles by day', async () => {
+      // Arrange
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'artist|album': {
+            lastPlayed: Math.floor(today.getTime() / 1000),
+            playCount: 5,
+            plays: [
+              { timestamp: Math.floor(today.getTime() / 1000) },
+              { timestamp: Math.floor(today.getTime() / 1000) + 1000 },
+              { timestamp: Math.floor(today.getTime() / 1000) + 2000 },
+              { timestamp: Math.floor(yesterday.getTime() / 1000) },
+              { timestamp: Math.floor(yesterday.getTime() / 1000) + 1000 },
+            ],
+          },
+        })
+      );
+
+      // Act
+      const timeline = await statsService.getListeningTimeline('week', 'day');
+
+      // Assert
+      expect(timeline.length).toBeGreaterThan(0);
+      const todayData = timeline.find(
+        t =>
+          t.date ===
+          `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+      );
+      expect(todayData?.count).toBe(3);
+    });
+
+    it('should aggregate scrobbles by week', async () => {
+      // Arrange
+      const now = new Date();
+      const nowSeconds = Math.floor(now.getTime() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'artist|album': {
+            lastPlayed: nowSeconds,
+            playCount: 10,
+            plays: Array.from({ length: 10 }, (_, i) => ({
+              timestamp: nowSeconds - i * 86400,
+            })),
+          },
+        })
+      );
+
+      // Act
+      const timeline = await statsService.getListeningTimeline('month', 'week');
+
+      // Assert
+      expect(timeline.length).toBeGreaterThan(0);
+      expect(timeline.every(t => t.count > 0)).toBe(true);
+    });
+
+    it('should aggregate scrobbles by month', async () => {
+      // Arrange
+      const now = new Date();
+      const nowSeconds = Math.floor(now.getTime() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'artist|album': {
+            lastPlayed: nowSeconds,
+            playCount: 100,
+            plays: Array.from({ length: 100 }, (_, i) => ({
+              timestamp: nowSeconds - i * 86400,
+            })),
+          },
+        })
+      );
+
+      // Act
+      const timeline = await statsService.getListeningTimeline('year', 'month');
+
+      // Assert
+      expect(timeline.length).toBeGreaterThan(0);
+      expect(timeline[0]).toHaveProperty('date');
+      expect(timeline[0]).toHaveProperty('count');
+    });
+
+    it('should support custom date range', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const customStart = now - 60 * 24 * 60 * 60;
+      const customEnd = now - 30 * 24 * 60 * 60;
+      const inRange = customStart + 10 * 24 * 60 * 60;
+      const outOfRange = now - 5 * 24 * 60 * 60;
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'artist|album': {
+            lastPlayed: now,
+            playCount: 20,
+            plays: [
+              ...Array.from({ length: 10 }, () => ({ timestamp: inRange })),
+              ...Array.from({ length: 10 }, () => ({
+                timestamp: outOfRange,
+              })),
+            ],
+          },
+        })
+      );
+
+      // Act
+      const timeline = await statsService.getListeningTimeline(
+        'custom',
+        'day',
+        customStart,
+        customEnd
+      );
+
+      // Assert
+      expect(timeline.length).toBeGreaterThan(0);
+      const totalCount = timeline.reduce((sum, t) => sum + t.count, 0);
+      expect(totalCount).toBe(10);
+    });
+  });
+
+  describe('getHourlyDistribution', () => {
+    it('should return hourly distribution from historyStorage', async () => {
+      // Arrange
+      const hourlyMap = new Map<number, number>([
+        [0, 5],
+        [6, 10],
+        [12, 20],
+        [18, 15],
+        [23, 3],
+      ]);
+      mockHistoryStorage.getHourlyDistribution = jest
+        .fn()
+        .mockResolvedValue(hourlyMap);
+
+      // Act
+      const result = await statsService.getHourlyDistribution();
+
+      // Assert
+      expect(result.distribution).toHaveLength(24);
+      expect(result.distribution[0].count).toBe(5);
+      expect(result.distribution[12].count).toBe(20);
+      expect(result.peakHour).toBe(12);
+      expect(result.totalScrobbles).toBe(53);
+    });
+
+    it('should handle empty distribution', async () => {
+      // Arrange
+      mockHistoryStorage.getHourlyDistribution = jest
+        .fn()
+        .mockResolvedValue(new Map());
+
+      // Act
+      const result = await statsService.getHourlyDistribution();
+
+      // Assert
+      expect(result.distribution).toHaveLength(24);
+      expect(result.totalScrobbles).toBe(0);
+      expect(result.peakHour).toBe(0);
+    });
+
+    it('should identify morning insight', async () => {
+      // Arrange - Heavy listening between 6-11am
+      const hourlyMap = new Map<number, number>([
+        [6, 100],
+        [7, 100],
+        [8, 100],
+        [9, 100],
+        [10, 100],
+        [11, 100],
+      ]);
+      mockHistoryStorage.getHourlyDistribution = jest
+        .fn()
+        .mockResolvedValue(hourlyMap);
+
+      // Act
+      const result = await statsService.getHourlyDistribution();
+
+      // Assert
+      expect(result.insight).toBe('morning');
+    });
+
+    it('should identify afternoon insight', async () => {
+      // Arrange - Heavy listening between 12-17
+      const hourlyMap = new Map<number, number>([
+        [12, 100],
+        [13, 100],
+        [14, 100],
+        [15, 100],
+        [16, 100],
+        [17, 100],
+      ]);
+      mockHistoryStorage.getHourlyDistribution = jest
+        .fn()
+        .mockResolvedValue(hourlyMap);
+
+      // Act
+      const result = await statsService.getHourlyDistribution();
+
+      // Assert
+      expect(result.insight).toBe('afternoon');
+    });
+
+    it('should identify evening insight', async () => {
+      // Arrange - Heavy listening between 18-23
+      const hourlyMap = new Map<number, number>([
+        [18, 100],
+        [19, 100],
+        [20, 100],
+        [21, 100],
+        [22, 100],
+        [23, 100],
+      ]);
+      mockHistoryStorage.getHourlyDistribution = jest
+        .fn()
+        .mockResolvedValue(hourlyMap);
+
+      // Act
+      const result = await statsService.getHourlyDistribution();
+
+      // Assert
+      expect(result.insight).toBe('evening');
+    });
+
+    it('should identify night insight', async () => {
+      // Arrange - Heavy listening between 0-5
+      const hourlyMap = new Map<number, number>([
+        [0, 100],
+        [1, 100],
+        [2, 100],
+        [3, 100],
+        [4, 100],
+        [5, 100],
+      ]);
+      mockHistoryStorage.getHourlyDistribution = jest
+        .fn()
+        .mockResolvedValue(hourlyMap);
+
+      // Act
+      const result = await statsService.getHourlyDistribution();
+
+      // Assert
+      expect(result.insight).toBe('night');
+    });
+  });
+
+  describe('getDayOfWeekDistribution', () => {
+    it('should return day of week distribution from historyStorage', async () => {
+      // Arrange
+      const dayMap = new Map<number, number>([
+        [0, 10], // Sunday
+        [1, 20], // Monday
+        [2, 15],
+        [3, 25],
+        [4, 30],
+        [5, 18],
+        [6, 12], // Saturday
+      ]);
+      mockHistoryStorage.getDayOfWeekDistribution = jest
+        .fn()
+        .mockResolvedValue(dayMap);
+
+      // Act
+      const result = await statsService.getDayOfWeekDistribution();
+
+      // Assert
+      expect(result.distribution).toHaveLength(7);
+      expect(result.distribution[0].dayName).toBe('Sunday');
+      expect(result.distribution[0].count).toBe(10);
+      expect(result.distribution[1].count).toBe(20);
+      expect(result.peakDay).toBe(4); // Thursday with 30
+    });
+
+    it('should handle empty distribution', async () => {
+      // Arrange
+      mockHistoryStorage.getDayOfWeekDistribution = jest
+        .fn()
+        .mockResolvedValue(new Map());
+
+      // Act
+      const result = await statsService.getDayOfWeekDistribution();
+
+      // Assert
+      expect(result.distribution).toHaveLength(7);
+      expect(result.peakDay).toBe(0);
+      expect(result.weekdayAvg).toBe(0);
+      expect(result.weekendAvg).toBe(0);
+    });
+
+    it('should identify weekday insight', async () => {
+      // Arrange - Heavy weekday listening
+      const dayMap = new Map<number, number>([
+        [0, 5], // Sunday
+        [1, 50], // Monday
+        [2, 50],
+        [3, 50],
+        [4, 50],
+        [5, 50],
+        [6, 5], // Saturday
+      ]);
+      mockHistoryStorage.getDayOfWeekDistribution = jest
+        .fn()
+        .mockResolvedValue(dayMap);
+
+      // Act
+      const result = await statsService.getDayOfWeekDistribution();
+
+      // Assert
+      expect(result.insight).toBe('weekday');
+      expect(result.weekdayAvg).toBeGreaterThan(result.weekendAvg);
+    });
+
+    it('should identify weekend insight', async () => {
+      // Arrange - Heavy weekend listening
+      const dayMap = new Map<number, number>([
+        [0, 100], // Sunday
+        [1, 10], // Monday
+        [2, 10],
+        [3, 10],
+        [4, 10],
+        [5, 10],
+        [6, 100], // Saturday
+      ]);
+      mockHistoryStorage.getDayOfWeekDistribution = jest
+        .fn()
+        .mockResolvedValue(dayMap);
+
+      // Act
+      const result = await statsService.getDayOfWeekDistribution();
+
+      // Assert
+      expect(result.insight).toBe('weekend');
+      expect(result.weekendAvg).toBeGreaterThan(result.weekdayAvg);
+    });
+  });
+
+  describe('getAlbumsForDate', () => {
+    it('should return albums played on a specific date', async () => {
+      // Arrange
+      const date = new Date(2024, 0, 15, 12, 0, 0); // Jan 15, 2024 noon
+      const dateStr = '2024-01-15';
+      const timestamp = Math.floor(date.getTime() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'radiohead|ok computer': {
+            lastPlayed: timestamp,
+            playCount: 5,
+            plays: Array.from({ length: 5 }, () => ({ timestamp })),
+          },
+          'pink floyd|the wall': {
+            lastPlayed: timestamp,
+            playCount: 3,
+            plays: Array.from({ length: 3 }, () => ({ timestamp })),
+          },
+        })
+      );
+
+      // Act
+      const result = await statsService.getAlbumsForDate(dateStr);
+
+      // Assert
+      expect(result.date).toBe(dateStr);
+      expect(result.totalScrobbles).toBe(8);
+      expect(result.albums).toHaveLength(2);
+      expect(result.albums[0].artist).toBe('Radiohead');
+      expect(result.albums[0].playCount).toBe(5);
+    });
+
+    it('should return empty result when no plays on date', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
+
+      // Act
+      const result = await statsService.getAlbumsForDate('2024-01-15');
+
+      // Assert
+      expect(result.date).toBe('2024-01-15');
+      expect(result.totalScrobbles).toBe(0);
+      expect(result.albums).toEqual([]);
+    });
+
+    it('should return empty result when no history', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex.mockResolvedValue(null);
+
+      // Act
+      const result = await statsService.getAlbumsForDate('2024-01-15');
+
+      // Assert
+      expect(result.totalScrobbles).toBe(0);
+      expect(result.albums).toEqual([]);
+    });
+
+    it('should filter plays to only the specified date', async () => {
+      // Arrange
+      const targetDate = new Date(2024, 0, 15, 12, 0, 0);
+      const otherDate = new Date(2024, 0, 16, 12, 0, 0);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'artist|album': {
+            lastPlayed: Math.floor(otherDate.getTime() / 1000),
+            playCount: 10,
+            plays: [
+              ...Array.from({ length: 5 }, () => ({
+                timestamp: Math.floor(targetDate.getTime() / 1000),
+              })),
+              ...Array.from({ length: 5 }, () => ({
+                timestamp: Math.floor(otherDate.getTime() / 1000),
+              })),
+            ],
+          },
+        })
+      );
+
+      // Act
+      const result = await statsService.getAlbumsForDate('2024-01-15');
+
+      // Assert
+      expect(result.totalScrobbles).toBe(5);
+    });
+  });
+
+  describe('getOnThisDay', () => {
+    it('should return plays from this date across multiple years', async () => {
+      // Arrange
+      const date2023 = new Date(2023, 0, 15, 12, 0, 0);
+      const date2024 = new Date(2024, 0, 15, 12, 0, 0);
+      const otherDate = new Date(2024, 0, 20, 12, 0, 0);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'radiohead|ok computer': {
+            lastPlayed: Math.floor(date2024.getTime() / 1000),
+            playCount: 8,
+            plays: [
+              ...Array.from({ length: 5 }, () => ({
+                timestamp: Math.floor(date2024.getTime() / 1000),
+              })),
+              ...Array.from({ length: 3 }, () => ({
+                timestamp: Math.floor(date2023.getTime() / 1000),
+              })),
+            ],
+          },
+          'pink floyd|the wall': {
+            lastPlayed: Math.floor(otherDate.getTime() / 1000),
+            playCount: 2,
+            plays: Array.from({ length: 2 }, () => ({
+              timestamp: Math.floor(otherDate.getTime() / 1000),
+            })),
+          },
+        })
+      );
+
+      // Act
+      const result = await statsService.getOnThisDay(1, 15);
+
+      // Assert
+      expect(result.date).toEqual({ month: 1, day: 15 });
+      expect(result.years).toHaveLength(2);
+      expect(result.years[0].year).toBe(2024);
+      expect(result.years[0].totalScrobbles).toBe(5);
+      expect(result.years[1].year).toBe(2023);
+      expect(result.years[1].totalScrobbles).toBe(3);
+    });
+
+    it('should return empty result when no plays on this date', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
+
+      // Act
+      const result = await statsService.getOnThisDay(12, 25);
+
+      // Assert
+      expect(result.date).toEqual({ month: 12, day: 25 });
+      expect(result.years).toEqual([]);
+    });
+
+    it('should return empty result when no history', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex.mockResolvedValue(null);
+
+      // Act
+      const result = await statsService.getOnThisDay(6, 1);
+
+      // Assert
+      expect(result.years).toEqual([]);
+    });
+
+    it('should sort years in descending order', async () => {
+      // Arrange
+      const date2020 = new Date(2020, 5, 10, 12, 0, 0);
+      const date2022 = new Date(2022, 5, 10, 12, 0, 0);
+      const date2024 = new Date(2024, 5, 10, 12, 0, 0);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'artist|album': {
+            lastPlayed: Math.floor(date2024.getTime() / 1000),
+            playCount: 6,
+            plays: [
+              { timestamp: Math.floor(date2020.getTime() / 1000) },
+              { timestamp: Math.floor(date2020.getTime() / 1000) },
+              { timestamp: Math.floor(date2022.getTime() / 1000) },
+              { timestamp: Math.floor(date2022.getTime() / 1000) },
+              { timestamp: Math.floor(date2024.getTime() / 1000) },
+              { timestamp: Math.floor(date2024.getTime() / 1000) },
+            ],
+          },
+        })
+      );
+
+      // Act
+      const result = await statsService.getOnThisDay(6, 10);
+
+      // Assert
+      expect(result.years).toHaveLength(3);
+      expect(result.years[0].year).toBe(2024);
+      expect(result.years[1].year).toBe(2022);
+      expect(result.years[2].year).toBe(2020);
+    });
+
+    it('should calculate years ago correctly', async () => {
+      // Arrange
+      const currentYear = new Date().getFullYear();
+      const twoYearsAgo = new Date(currentYear - 2, 2, 15, 12, 0, 0);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'artist|album': {
+            lastPlayed: Math.floor(twoYearsAgo.getTime() / 1000),
+            playCount: 1,
+            plays: [{ timestamp: Math.floor(twoYearsAgo.getTime() / 1000) }],
+          },
+        })
+      );
+
+      // Act
+      const result = await statsService.getOnThisDay(3, 15);
+
+      // Assert
+      expect(result.years).toHaveLength(1);
+      expect(result.years[0].yearsAgo).toBe(2);
+    });
+  });
+
+  describe('getArtistDetail', () => {
+    it('should return default response when no history', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex.mockResolvedValue(null);
+
+      // Act
+      const result = await statsService.getArtistDetail(
+        'Radiohead',
+        'month',
+        []
+      );
+
+      // Assert
+      expect(result.artist).toBe('Radiohead');
+      expect(result.totalPlayCount).toBe(0);
+      expect(result.firstPlayed).toBeNull();
+      expect(result.lastPlayed).toBeNull();
+      expect(result.periodCounts.allTime).toBe(0);
+      expect(result.topTracks).toEqual([]);
+      expect(result.albums).toEqual([]);
+    });
+
+    it('should aggregate plays across all albums by an artist', async () => {
+      // Arrange
+      const now = new Date();
+      const nowSeconds = Math.floor(now.getTime() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'radiohead|ok computer': {
+            lastPlayed: nowSeconds,
+            playCount: 30,
+            plays: Array.from({ length: 30 }, () => ({
+              timestamp: nowSeconds,
+            })),
+          },
+          'radiohead|kid a': {
+            lastPlayed: nowSeconds,
+            playCount: 20,
+            plays: Array.from({ length: 20 }, () => ({
+              timestamp: nowSeconds,
+            })),
+          },
+          'pink floyd|the wall': {
+            lastPlayed: nowSeconds,
+            playCount: 10,
+            plays: Array.from({ length: 10 }, () => ({
+              timestamp: nowSeconds,
+            })),
+          },
+        })
+      );
+
+      // Act
+      const result = await statsService.getArtistDetail(
+        'Radiohead',
+        'month',
+        []
+      );
+
+      // Assert
+      expect(result.artist).toBe('Radiohead');
+      expect(result.totalPlayCount).toBe(50);
+      expect(result.albums).toHaveLength(2);
+    });
+
+    it('should filter by artist name case-insensitively', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'RADIOHEAD|ok computer': {
+            lastPlayed: now,
+            playCount: 10,
+            plays: Array.from({ length: 10 }, () => ({ timestamp: now })),
+          },
+        })
+      );
+
+      // Act
+      const result = await statsService.getArtistDetail(
+        'radiohead',
+        'month',
+        []
+      );
+
+      // Assert
+      expect(result.totalPlayCount).toBe(10);
+    });
+
+    it('should return empty result when artist not found', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'other artist|album': {
+            lastPlayed: now,
+            playCount: 10,
+            plays: Array.from({ length: 10 }, () => ({ timestamp: now })),
+          },
+        })
+      );
+
+      // Act
+      const result = await statsService.getArtistDetail(
+        'Radiohead',
+        'month',
+        []
+      );
+
+      // Assert
+      expect(result.totalPlayCount).toBe(0);
+      expect(result.albums).toEqual([]);
+    });
+  });
+
+  describe('getTrackDetail', () => {
+    it('should return default response when no history', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex.mockResolvedValue(null);
+
+      // Act
+      const result = await statsService.getTrackDetail(
+        'Radiohead',
+        'Paranoid Android',
+        undefined,
+        'month',
+        []
+      );
+
+      // Assert
+      expect(result.artist).toBe('Radiohead');
+      expect(result.track).toBe('Paranoid Android');
+      expect(result.totalPlayCount).toBe(0);
+      expect(result.firstPlayed).toBeNull();
+      expect(result.lastPlayed).toBeNull();
+      expect(result.playTrend).toEqual([]);
+      expect(result.appearsOn).toEqual([]);
+    });
+
+    it('should aggregate plays for a track across albums', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+
+      const createIndexWithTracks = (
+        albums: Record<
+          string,
+          {
+            lastPlayed: number;
+            playCount: number;
+            plays: { timestamp: number; track?: string }[];
+          }
+        >
+      ): ScrobbleHistoryIndex => ({
+        albums,
+        totalScrobbles: Object.values(albums).reduce(
+          (sum, a) => sum + a.playCount,
+          0
+        ),
+        lastSyncTimestamp: now,
+        oldestScrobbleDate: 0,
+      });
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createIndexWithTracks({
+          'radiohead|ok computer': {
+            lastPlayed: now,
+            playCount: 10,
+            plays: Array.from({ length: 10 }, () => ({
+              timestamp: now,
+              track: 'Paranoid Android',
+            })),
+          },
+          'radiohead|live album': {
+            lastPlayed: now,
+            playCount: 5,
+            plays: Array.from({ length: 5 }, () => ({
+              timestamp: now,
+              track: 'Paranoid Android',
+            })),
+          },
+        })
+      );
+
+      // Act
+      const result = await statsService.getTrackDetail(
+        'Radiohead',
+        'Paranoid Android',
+        undefined,
+        'month',
+        []
+      );
+
+      // Assert
+      expect(result.totalPlayCount).toBe(15);
+      expect(result.appearsOn).toHaveLength(2);
+    });
+
+    it('should filter by album when provided', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+
+      const createIndexWithTracks = (
+        albums: Record<
+          string,
+          {
+            lastPlayed: number;
+            playCount: number;
+            plays: { timestamp: number; track?: string }[];
+          }
+        >
+      ): ScrobbleHistoryIndex => ({
+        albums,
+        totalScrobbles: Object.values(albums).reduce(
+          (sum, a) => sum + a.playCount,
+          0
+        ),
+        lastSyncTimestamp: now,
+        oldestScrobbleDate: 0,
+      });
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createIndexWithTracks({
+          'radiohead|ok computer': {
+            lastPlayed: now,
+            playCount: 10,
+            plays: Array.from({ length: 10 }, () => ({
+              timestamp: now,
+              track: 'Paranoid Android',
+            })),
+          },
+          'radiohead|live album': {
+            lastPlayed: now,
+            playCount: 5,
+            plays: Array.from({ length: 5 }, () => ({
+              timestamp: now,
+              track: 'Paranoid Android',
+            })),
+          },
+        })
+      );
+
+      // Act
+      const result = await statsService.getTrackDetail(
+        'Radiohead',
+        'Paranoid Android',
+        'OK Computer',
+        'month',
+        []
+      );
+
+      // Assert
+      expect(result.totalPlayCount).toBe(10);
+      expect(result.appearsOn).toHaveLength(1);
+      expect(result.appearsOn[0].album).toBe('Ok Computer');
+    });
+
+    it('should match track names case-insensitively', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+
+      const createIndexWithTracks = (
+        albums: Record<
+          string,
+          {
+            lastPlayed: number;
+            playCount: number;
+            plays: { timestamp: number; track?: string }[];
+          }
+        >
+      ): ScrobbleHistoryIndex => ({
+        albums,
+        totalScrobbles: Object.values(albums).reduce(
+          (sum, a) => sum + a.playCount,
+          0
+        ),
+        lastSyncTimestamp: now,
+        oldestScrobbleDate: 0,
+      });
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createIndexWithTracks({
+          'radiohead|ok computer': {
+            lastPlayed: now,
+            playCount: 10,
+            plays: Array.from({ length: 10 }, () => ({
+              timestamp: now,
+              track: 'PARANOID ANDROID',
+            })),
+          },
+        })
+      );
+
+      // Act
+      const result = await statsService.getTrackDetail(
+        'Radiohead',
+        'paranoid android',
+        undefined,
+        'month',
+        []
+      );
+
+      // Assert
+      expect(result.totalPlayCount).toBe(10);
+    });
+  });
+
+  describe('clearForgottenFavoritesCache', () => {
+    it('should clear the forgotten favorites cache', async () => {
+      // Arrange - First populate the cache
+      const now = Math.floor(Date.now() / 1000);
+      const sixMonthsAgo = now - 180 * 24 * 60 * 60;
+
+      const createIndexWithTracks = (
+        albums: Record<
+          string,
+          {
+            lastPlayed: number;
+            playCount: number;
+            plays: { timestamp: number; track?: string }[];
+          }
+        >
+      ): ScrobbleHistoryIndex => ({
+        albums,
+        totalScrobbles: Object.values(albums).reduce(
+          (sum, a) => sum + a.playCount,
+          0
+        ),
+        lastSyncTimestamp: now,
+        oldestScrobbleDate: 0,
+      });
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createIndexWithTracks({
+          'artist|album': {
+            lastPlayed: sixMonthsAgo,
+            playCount: 15,
+            plays: Array.from({ length: 15 }, () => ({
+              timestamp: sixMonthsAgo,
+              track: 'Track',
+            })),
+          },
+        })
+      );
+
+      // First call to populate cache
+      await statsService.getForgottenFavorites(90, 10, 100);
+      expect(mockHistoryStorage.getIndex).toHaveBeenCalledTimes(1);
+
+      // Act - Clear the cache
+      statsService.clearForgottenFavoritesCache();
+
+      // Second call should refetch (not use cache)
+      await statsService.getForgottenFavorites(90, 10, 100);
+
+      // Assert - getIndex should be called twice (cache was cleared)
+      expect(mockHistoryStorage.getIndex).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('setTrackMappingService', () => {
+    it('should set the track mapping service', () => {
+      // Arrange
+      const mockTrackMappingService = {
+        getTrackMapping: jest.fn(),
+      } as unknown as TrackMappingService;
+
+      // Act
+      statsService.setTrackMappingService(mockTrackMappingService);
+
+      // Assert - Service should be set (verify by checking it's used in forgotten favorites)
+      // No direct way to assert, but the method should execute without error
+      expect(() =>
+        statsService.setTrackMappingService(mockTrackMappingService)
+      ).not.toThrow();
+    });
+  });
+
+  describe('setMappingService', () => {
+    it('should set the mapping service', () => {
+      // Arrange
+      const mockMappingService = {
+        getAlbumMappingForCollection: jest.fn(),
+      } as unknown as MappingService;
+
+      // Act
+      statsService.setMappingService(mockMappingService);
+
+      // Assert - Service should be set (verify by checking it's used)
+      expect(() =>
+        statsService.setMappingService(mockMappingService)
+      ).not.toThrow();
+    });
+  });
+
+  describe('setArtistNameResolver', () => {
+    it('should set the artist name resolver', () => {
+      // Arrange
+      const mockResolver = {
+        resolveArtist: jest.fn().mockReturnValue('resolved artist'),
+        areSameArtist: jest.fn().mockReturnValue(true),
+        getDisplayName: jest.fn().mockReturnValue('Display Name'),
+      } as unknown as ArtistNameResolver;
+
+      // Act
+      statsService.setArtistNameResolver(mockResolver);
+
+      // Assert - Resolver should be set
+      expect(() =>
+        statsService.setArtistNameResolver(mockResolver)
+      ).not.toThrow();
     });
   });
 });

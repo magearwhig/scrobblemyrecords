@@ -23,11 +23,19 @@ Consolidated from multiple audits (January–February 2026). Items completed in 
 
 README and `dev_prompt.md` specify 90% coverage target but Jest config enforces lower thresholds. This is a known gap being addressed incrementally.
 
-**Current State:**
-- `jest.config.js` thresholds: branches 50%, functions 57%, lines 63%, statements 63%
-- Actual coverage: branches 52.72%, functions 59.06%, lines 65.52%, statements 65.15%
+**Current State (February 2026):**
+- `jest.config.js` thresholds: branches 60%, functions 65%, lines 73%, statements 72%
+- Actual coverage: branches 62.76%, functions 67.36%, lines 75.17%, statements 74.81%
 - Target: 90%
-- All 122 test suites pass (3209 tests), zero flaky failures
+- All 145 test suites pass (3762 tests), zero flaky failures
+
+**Coverage Push (February 2026):**
+Added 553 new tests across 26 new test files and 4 enhanced test files:
+- 7 frontend page tests (NewReleases, SellerMatches, Sellers, DiscardPile, Suggestions, Marketplace, WhatToPlay)
+- 11 frontend component tests (SettingsBackup, BackupImport, ForgottenFavorites, NewReleasesTab, NewReleaseCard, MissingAlbums, DustyCornersContainer, ForgottenFavoritesContainer, DiscardFilterBar, DiscardStatsBar, DiscardItemCard)
+- 4 utility/hook tests (spotifyUtils, useDiscardPileSelection, useCollectionLookup, safeJsonParse)
+- 4 backend service test expansions (lastfmService, statsService, discogsService, releaseTrackingService)
+- Raised thresholds from 50/57/63/63 to 60/65/73/72 (with 2% safety margin)
 
 **Improvement Plan:**
 1. Current baseline prevents regression
@@ -39,8 +47,11 @@ README and `dev_prompt.md` specify 90% coverage target but Jest config enforces 
 - [x] Fix broken test mocks for `discogsService` and `sellerMonitoringService` (getDiscogsAxios singleton)
 - [x] Raise `jest.config.js` thresholds from 48–60% to 50/57/63/63%
 - [x] Fix flaky test timeouts (async leak in server.ts, maxWorkers, testTimeout)
-- [ ] Continue adding tests for `imageService` and other low-coverage services
-- [ ] Prioritize coverage for critical paths: `authService`, `lastfmService`, scrobble routes
+- [x] Write comprehensive tests for lastfmService, statsService, discogsService, releaseTrackingService
+- [x] Write tests for all near-zero-coverage frontend pages and components
+- [x] Write tests for spotifyUtils, useDiscardPileSelection, useCollectionLookup, safeJsonParse
+- [x] Raise `jest.config.js` thresholds to 60/65/73/72%
+- [ ] Continue adding tests for `suggestions.ts` route (still at ~46% coverage)
 - [ ] Continue raising `jest.config.js` thresholds incrementally toward 90%
 - [ ] Add coverage report to CI output for visibility
 - [ ] Consider separate thresholds for backend vs frontend

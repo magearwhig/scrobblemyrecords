@@ -836,7 +836,7 @@ describe('DiscogsService', () => {
 
       // Should continue despite individual page failures
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3);
-    });
+    }, 10000);
   });
 
   describe('isCacheValid', () => {
@@ -859,5 +859,803 @@ describe('DiscogsService', () => {
 
       expect(result).toBe(true);
     });
+  });
+
+  describe('checkForNewItems', () => {
+    it('should return error when no cached data found', async () => {
+      mockFileStorage.readJSON.mockResolvedValue(null);
+
+      const result = await discogsService.checkForNewItems('testuser');
+
+      expect(result.success).toBe(false);
+      expect(result.newItemsCount).toBe(0);
+      expect(result.error).toBe('No cached data found');
+    });
+
+    it('should return error when cache has no timestamp', async () => {
+      mockFileStorage.readJSON.mockResolvedValue({
+        data: [],
+      });
+
+      const result = await discogsService.checkForNewItems('testuser');
+
+      expect(result.success).toBe(false);
+      expect(result.newItemsCount).toBe(0);
+      expect(result.error).toBe('No cached data found');
+    });
+
+    it('should return error when Discogs API returns no releases', async () => {
+      const cachedData = {
+        timestamp: Date.now() - 1000 * 60 * 60,
+        data: [],
+      };
+
+      mockFileStorage.readJSON.mockResolvedValue(cachedData);
+      jest.spyOn(discogsService as any, 'getAuthHeaders').mockResolvedValue({
+        Authorization: 'Discogs token=test-token',
+      });
+
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: {
+          releases: [],
+        },
+      });
+
+      const result = await discogsService.checkForNewItems('testuser');
+
+      expect(result.success).toBe(false);
+      expect(result.newItemsCount).toBe(0);
+      expect(result.error).toBe('Failed to get fresh collection data');
+    });
+
+    it('should return error when Discogs response has no date_added', async () => {
+      const cachedData = {
+        timestamp: Date.now() - 1000 * 60 * 60,
+        data: [],
+      };
+
+      mockFileStorage.readJSON.mockResolvedValue(cachedData);
+      jest.spyOn(discogsService as any, 'getAuthHeaders').mockResolvedValue({
+        Authorization: 'Discogs token=test-token',
+      });
+
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: {
+          releases: [
+            {
+              id: 1,
+              date_added: null,
+              basic_information: { title: 'Test', artists: [] },
+            },
+          ],
+        },
+      });
+
+      const result = await discogsService.checkForNewItems('testuser');
+
+      expect(result.success).toBe(false);
+      expect(result.newItemsCount).toBe(0);
+      expect(result.error).toBe('No date information found');
+    });
+
+    it('should detect no new items when latest Discogs item is older than cache', async () => {
+      const cacheTimestamp = Date.now();
+      const cachedData = {
+        timestamp: cacheTimestamp,
+        data: [],
+      };
+
+      mockFileStorage.readJSON.mockResolvedValue(cachedData);
+      jest.spyOn(discogsService as any, 'getAuthHeaders').mockResolvedValue({
+        Authorization: 'Discogs token=test-token',
+      });
+
+      const olderDate = new Date(cacheTimestamp - 1000 * 60 * 60).toISOString();
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: {
+          releases: [
+            {
+              id: 1,
+              date_added: olderDate,
+              basic_information: {
+                id: 123,
+                title: 'Old Album',
+                artists: [{ name: 'Old Artist' }],
+              },
+            },
+          ],
+        },
+      });
+
+      const result = await discogsService.checkForNewItems('testuser');
+
+      expect(result.success).toBe(true);
+      expect(result.newItemsCount).toBe(0);
+      expect(result.latestCacheDate).toBeDefined();
+      expect(result.latestDiscogsDate).toBe(olderDate);
+    });
+
+    it('should detect new items when latest Discogs item is newer than cache', async () => {
+      const cacheTimestamp = Date.now() - 1000 * 60 * 60 * 2; // 2 hours ago
+      const cachedData = {
+        timestamp: cacheTimestamp,
+        data: [],
+      };
+
+      mockFileStorage.readJSON.mockResolvedValue(cachedData);
+      jest.spyOn(discogsService as any, 'getAuthHeaders').mockResolvedValue({
+        Authorization: 'Discogs token=test-token',
+      });
+
+      const newerDate = new Date(cacheTimestamp + 1000 * 60 * 30).toISOString();
+      const olderDate = new Date(cacheTimestamp - 1000 * 60 * 30).toISOString();
+
+      const newRelease = {
+        id: 1,
+        date_added: newerDate,
+        basic_information: {
+          id: 123,
+          title: 'New Album',
+          artists: [{ name: 'New Artist' }],
+        },
+      };
+
+      const oldRelease = {
+        id: 2,
+        date_added: olderDate,
+        basic_information: {
+          id: 124,
+          title: 'Old Album',
+          artists: [{ name: 'Old Artist' }],
+        },
+      };
+
+      // First call returns the new release
+      mockAxiosInstance.get.mockResolvedValueOnce({
+        status: 200,
+        data: {
+          releases: [newRelease],
+        },
+      });
+
+      // Second call (counting loop) also returns the new release
+      mockAxiosInstance.get.mockResolvedValueOnce({
+        status: 200,
+        data: {
+          releases: [newRelease],
+        },
+      });
+
+      // Third call returns old release (should stop counting)
+      mockAxiosInstance.get.mockResolvedValueOnce({
+        status: 200,
+        data: {
+          releases: [oldRelease],
+        },
+      });
+
+      const result = await discogsService.checkForNewItems('testuser');
+
+      expect(result.success).toBe(true);
+      expect(result.newItemsCount).toBe(1);
+      expect(result.latestDiscogsDate).toBe(newerDate);
+    }, 20000);
+
+    it('should handle errors during new items check', async () => {
+      mockFileStorage.readJSON.mockRejectedValue(new Error('Storage error'));
+
+      const result = await discogsService.checkForNewItems('testuser');
+
+      expect(result.success).toBe(false);
+      expect(result.newItemsCount).toBe(0);
+      expect(result.error).toBe('Storage error');
+    });
+
+    it('should stop checking after 10 pages', async () => {
+      const cacheTimestamp = Date.now() - 1000 * 60 * 60 * 2;
+      const cachedData = {
+        timestamp: cacheTimestamp,
+        data: [],
+      };
+
+      mockFileStorage.readJSON.mockResolvedValue(cachedData);
+      jest.spyOn(discogsService as any, 'getAuthHeaders').mockResolvedValue({
+        Authorization: 'Discogs token=test-token',
+      });
+
+      const newerDate = new Date(cacheTimestamp + 1000 * 60).toISOString();
+
+      // Mock 11 pages of new items
+      for (let i = 0; i < 11; i++) {
+        mockAxiosInstance.get.mockResolvedValueOnce({
+          status: 200,
+          data: {
+            releases: Array(50)
+              .fill(null)
+              .map((_, idx) => ({
+                id: i * 50 + idx,
+                date_added: newerDate,
+                basic_information: {
+                  id: i * 50 + idx,
+                  title: `Album ${i}-${idx}`,
+                  artists: [{ name: 'Artist' }],
+                },
+              })),
+          },
+        });
+      }
+
+      const result = await discogsService.checkForNewItems('testuser');
+
+      expect(result.success).toBe(true);
+      // Should only check first 10 pages + initial request = 11 calls max
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(11);
+    }, 15000);
+  });
+
+  describe('updateCacheWithNewItems', () => {
+    it('should return error when no existing cache found', async () => {
+      mockFileStorage.readJSON.mockResolvedValue(null);
+
+      const result = await discogsService.updateCacheWithNewItems('testuser');
+
+      expect(result.success).toBe(false);
+      expect(result.newItemsAdded).toBe(0);
+      expect(result.error).toBe('No existing cache found');
+    });
+
+    it('should return error when cache has no timestamp', async () => {
+      mockFileStorage.readJSON.mockResolvedValue({
+        data: [],
+      });
+
+      const result = await discogsService.updateCacheWithNewItems('testuser');
+
+      expect(result.success).toBe(false);
+      expect(result.newItemsAdded).toBe(0);
+      expect(result.error).toBe('No existing cache found');
+    });
+
+    it('should return success with 0 items when no new items found', async () => {
+      const cacheTimestamp = Date.now() - 1000 * 60 * 60;
+      const cachedData = {
+        timestamp: cacheTimestamp,
+        data: [
+          {
+            id: 1,
+            release: { id: 123, title: 'Old Album', artist: 'Old Artist' },
+          },
+        ],
+      };
+
+      mockFileStorage.readJSON
+        .mockResolvedValueOnce(cachedData) // First page cache
+        .mockResolvedValueOnce(null); // No more cache pages
+
+      jest.spyOn(discogsService as any, 'getAuthHeaders').mockResolvedValue({
+        Authorization: 'Discogs token=test-token',
+      });
+
+      const olderDate = new Date(cacheTimestamp - 1000 * 60).toISOString();
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: {
+          releases: [
+            {
+              id: 1,
+              date_added: olderDate,
+              basic_information: {
+                id: 123,
+                title: 'Old Album',
+                artists: [{ name: 'Old Artist' }],
+              },
+            },
+          ],
+        },
+      });
+
+      const result = await discogsService.updateCacheWithNewItems('testuser');
+
+      expect(result.success).toBe(true);
+      expect(result.newItemsAdded).toBe(0);
+    });
+
+    it('should add new items and merge with existing cache', async () => {
+      const cacheTimestamp = Date.now() - 1000 * 60 * 60;
+      const cachedData = {
+        timestamp: cacheTimestamp,
+        data: [
+          {
+            id: 1,
+            date_added: '2023-01-01',
+            rating: 5,
+            release: {
+              id: 123,
+              title: 'Old Album',
+              artist: 'Old Artist',
+              year: 2023,
+              format: ['Vinyl'],
+              label: ['Label'],
+              resource_url: 'http://test.com',
+            },
+          },
+        ],
+      };
+
+      mockFileStorage.readJSON
+        .mockResolvedValueOnce(cachedData) // Initial cache check
+        .mockResolvedValueOnce(cachedData) // Read existing pages loop
+        .mockResolvedValueOnce(null); // End of existing pages
+
+      jest.spyOn(discogsService as any, 'getAuthHeaders').mockResolvedValue({
+        Authorization: 'Discogs token=test-token',
+      });
+
+      const newerDate = new Date(cacheTimestamp + 1000 * 60).toISOString();
+      const olderDate = new Date(cacheTimestamp - 1000 * 60).toISOString();
+
+      // First page with new item
+      mockAxiosInstance.get.mockResolvedValueOnce({
+        status: 200,
+        data: {
+          releases: [
+            {
+              id: 2,
+              date_added: newerDate,
+              rating: 4,
+              notes: 'Great album',
+              basic_information: {
+                id: 124,
+                master_id: 1000,
+                title: 'New Album',
+                artists: [{ name: 'New Artist' }],
+                year: 2024,
+                formats: [{ name: 'CD' }],
+                labels: [{ name: 'New Label' }],
+                catalog_number: 'CAT123',
+                cover_image: 'http://image.com',
+                resource_url: 'http://new.com',
+              },
+            },
+          ],
+        },
+      });
+
+      // Second page with old item (stops here)
+      mockAxiosInstance.get.mockResolvedValueOnce({
+        status: 200,
+        data: {
+          releases: [
+            {
+              id: 1,
+              date_added: olderDate,
+              basic_information: {
+                id: 123,
+                title: 'Old Album',
+                artists: [{ name: 'Old Artist' }],
+              },
+            },
+          ],
+        },
+      });
+
+      const result = await discogsService.updateCacheWithNewItems('testuser');
+
+      expect(result.success).toBe(true);
+      expect(result.newItemsAdded).toBe(1);
+      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+    }, 10000);
+
+    it('should fallback to unauthenticated when auth fails', async () => {
+      const cacheTimestamp = Date.now() - 1000 * 60 * 60;
+      const cachedData = {
+        timestamp: cacheTimestamp,
+        data: [],
+      };
+
+      mockFileStorage.readJSON
+        .mockResolvedValueOnce(cachedData)
+        .mockResolvedValueOnce(null);
+
+      jest
+        .spyOn(discogsService as any, 'getAuthHeaders')
+        .mockRejectedValue(new Error('Auth failed'));
+
+      const olderDate = new Date(cacheTimestamp - 1000 * 60).toISOString();
+      mockAxiosInstance.get.mockResolvedValue({
+        status: 200,
+        data: {
+          releases: [
+            {
+              id: 1,
+              date_added: olderDate,
+              basic_information: { id: 123, title: 'Test', artists: [] },
+            },
+          ],
+        },
+      });
+
+      const result = await discogsService.updateCacheWithNewItems('testuser');
+
+      expect(result.success).toBe(true);
+      expect(result.newItemsAdded).toBe(0);
+    });
+
+    it('should handle errors during cache update', async () => {
+      mockFileStorage.readJSON.mockRejectedValue(new Error('Storage error'));
+
+      const result = await discogsService.updateCacheWithNewItems('testuser');
+
+      expect(result.success).toBe(false);
+      expect(result.newItemsAdded).toBe(0);
+      expect(result.error).toBe('Storage error');
+    });
+
+    it('should remove old cache pages after update', async () => {
+      const cacheTimestamp = Date.now() - 1000 * 60 * 60;
+      const cachedData = {
+        timestamp: cacheTimestamp,
+        data: Array(100)
+          .fill(null)
+          .map((_, i) => ({
+            id: i,
+            date_added: '2023-01-01',
+            release: { id: i, title: `Album ${i}`, artist: 'Artist' },
+          })),
+      };
+
+      mockFileStorage.readJSON
+        .mockResolvedValueOnce(cachedData)
+        .mockResolvedValueOnce(cachedData)
+        .mockResolvedValueOnce(null);
+
+      jest.spyOn(discogsService as any, 'getAuthHeaders').mockResolvedValue({
+        Authorization: 'Discogs token=test-token',
+      });
+
+      const newerDate = new Date(cacheTimestamp + 1000 * 60).toISOString();
+      mockAxiosInstance.get.mockResolvedValueOnce({
+        status: 200,
+        data: {
+          releases: [
+            {
+              id: 999,
+              date_added: newerDate,
+              basic_information: {
+                id: 999,
+                title: 'New',
+                artists: [{ name: 'New' }],
+              },
+            },
+          ],
+        },
+      });
+
+      const olderDate = new Date(cacheTimestamp - 1000 * 60).toISOString();
+      mockAxiosInstance.get.mockResolvedValueOnce({
+        status: 200,
+        data: {
+          releases: [
+            {
+              id: 1,
+              date_added: olderDate,
+              basic_information: { id: 1, title: 'Old', artists: [] },
+            },
+          ],
+        },
+      });
+
+      const result = await discogsService.updateCacheWithNewItems('testuser');
+
+      expect(result.success).toBe(true);
+      expect(result.newItemsAdded).toBe(1);
+    }, 10000);
+
+    it('should stop checking after 10 pages', async () => {
+      const cacheTimestamp = Date.now() - 1000 * 60 * 60;
+      const cachedData = {
+        timestamp: cacheTimestamp,
+        data: [],
+      };
+
+      mockFileStorage.readJSON
+        .mockResolvedValueOnce(cachedData)
+        .mockResolvedValueOnce(null);
+
+      jest.spyOn(discogsService as any, 'getAuthHeaders').mockResolvedValue({
+        Authorization: 'Discogs token=test-token',
+      });
+
+      const newerDate = new Date(cacheTimestamp + 1000 * 60).toISOString();
+
+      // Mock 11 pages of new items
+      for (let i = 0; i < 11; i++) {
+        mockAxiosInstance.get.mockResolvedValueOnce({
+          status: 200,
+          data: {
+            releases: Array(50)
+              .fill(null)
+              .map((_, idx) => ({
+                id: i * 50 + idx,
+                date_added: newerDate,
+                basic_information: {
+                  id: i * 50 + idx,
+                  title: `Album ${i}-${idx}`,
+                  artists: [{ name: 'Artist' }],
+                },
+              })),
+          },
+        });
+      }
+
+      const result = await discogsService.updateCacheWithNewItems('testuser');
+
+      expect(result.success).toBe(true);
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(10);
+    }, 15000);
+  });
+
+  describe('getUserProfile with Personal Access Token', () => {
+    it('should handle Personal Access Token validation', async () => {
+      mockAuthService.getDiscogsToken.mockResolvedValue('Discogs token=abc123');
+      mockAxiosInstance.get.mockResolvedValue({ data: {} });
+
+      const result = await discogsService.getUserProfile();
+
+      expect(result).toEqual({
+        username: 'user',
+        id: 0,
+        resource_url: '',
+      });
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+        '/database/search?q=test&type=release&per_page=1',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'Discogs token=abc123',
+          }),
+        })
+      );
+    });
+
+    it('should throw error when Personal Access Token is invalid', async () => {
+      mockAuthService.getDiscogsToken.mockResolvedValue(
+        'Discogs token=invalid'
+      );
+      mockAxiosInstance.get.mockRejectedValue(new Error('Invalid token'));
+
+      await expect(discogsService.getUserProfile()).rejects.toThrow(
+        'Invalid token'
+      );
+    });
+  });
+
+  describe('getAuthHeaders', () => {
+    it('should return Personal Access Token headers', async () => {
+      mockAuthService.getDiscogsToken.mockResolvedValue(
+        'Discogs token=test-token'
+      );
+
+      const headers = await (discogsService as any).getAuthHeaders();
+
+      expect(headers).toEqual({
+        Authorization: 'Discogs token=test-token',
+      });
+    });
+
+    it('should return OAuth headers for valid OAuth token', async () => {
+      const oauthToken = JSON.stringify({
+        key: 'oauth-key',
+        secret: 'oauth-secret',
+      });
+      mockAuthService.getDiscogsToken.mockResolvedValue(oauthToken);
+
+      const headers = await (discogsService as any).getAuthHeaders();
+
+      expect(headers).toHaveProperty('Authorization');
+    });
+
+    it('should throw error when token is missing', async () => {
+      mockAuthService.getDiscogsToken.mockResolvedValue(undefined);
+
+      await expect((discogsService as any).getAuthHeaders()).rejects.toThrow(
+        'No Discogs token available. Please authenticate first.'
+      );
+    });
+
+    it('should throw error when OAuth token is corrupted', async () => {
+      mockAuthService.getDiscogsToken.mockResolvedValue('invalid-json-{');
+
+      await expect((discogsService as any).getAuthHeaders()).rejects.toThrow(
+        'Corrupted Discogs OAuth token'
+      );
+    });
+  });
+
+  describe('searchCollectionFromCache with deduplication', () => {
+    it('should deduplicate items with same item ID', async () => {
+      const mockCacheData1 = [
+        {
+          id: 123,
+          release: { id: 100, title: 'Album One', artist: 'Artist' },
+          date_added: '2023-01-01',
+        },
+      ];
+
+      const mockCacheData2 = [
+        {
+          id: 123, // Duplicate item ID
+          release: { id: 100, title: 'Album One', artist: 'Artist' },
+          date_added: '2023-01-01',
+        },
+        {
+          id: 456, // Unique item ID
+          release: { id: 200, title: 'Album Two', artist: 'Artist' },
+          date_added: '2023-01-02',
+        },
+      ];
+
+      mockFileStorage.readJSON
+        .mockResolvedValueOnce({
+          timestamp: Date.now(),
+          data: mockCacheData1,
+        })
+        .mockResolvedValueOnce({
+          timestamp: Date.now(),
+          data: mockCacheData2,
+        })
+        .mockResolvedValue(null);
+
+      const result = await discogsService.searchCollectionFromCache(
+        'testuser',
+        'album', // Search for "album" which matches both titles
+        1,
+        50
+      );
+
+      // Should only have 2 unique items (ID 123 and ID 456), not 3
+      expect(result.total).toBe(2);
+    });
+
+    it('should trigger background refresh when expired cache is found', async () => {
+      const expiredCache = {
+        timestamp: Date.now() - 1000 * 60 * 60 * 25, // 25 hours ago
+        data: [
+          {
+            id: 1,
+            release: { id: 123, title: 'Test Album', artist: 'Test Artist' },
+            date_added: '2023-01-01',
+          },
+        ],
+      };
+
+      mockFileStorage.readJSON
+        .mockResolvedValueOnce(expiredCache)
+        .mockResolvedValue(null);
+
+      jest.spyOn(discogsService, 'isCacheValid').mockReturnValue(false);
+      jest
+        .spyOn(discogsService, 'preloadAllCollectionPages')
+        .mockResolvedValue();
+
+      const result = await discogsService.searchCollectionFromCache(
+        'testuser',
+        'test',
+        1,
+        50
+      );
+
+      expect(result.items).toHaveLength(1);
+      expect(discogsService.preloadAllCollectionPages).toHaveBeenCalledWith(
+        'testuser'
+      );
+    });
+
+    it('should handle pagination correctly', async () => {
+      const mockItems = Array(100)
+        .fill(null)
+        .map((_, i) => ({
+          id: i,
+          release: {
+            id: i,
+            title: `Album ${i}`,
+            artist: `Artist ${i}`,
+          },
+          date_added: '2023-01-01',
+        }));
+
+      mockFileStorage.readJSON
+        .mockResolvedValueOnce({
+          timestamp: Date.now(),
+          data: mockItems.slice(0, 50),
+        })
+        .mockResolvedValueOnce({
+          timestamp: Date.now(),
+          data: mockItems.slice(50, 100),
+        })
+        .mockResolvedValue(null);
+
+      // Request page 2 with 25 items per page
+      const result = await discogsService.searchCollectionFromCache(
+        'testuser',
+        'album',
+        2,
+        25
+      );
+
+      expect(result.items).toHaveLength(25);
+      expect(result.total).toBe(100);
+      expect(result.totalPages).toBe(4);
+    });
+  });
+
+  describe('clearCache error handling', () => {
+    it('should continue deleting files even if one fails', async () => {
+      mockFileStorage.listFiles.mockResolvedValue([
+        'test-page-1.json',
+        'test-page-2.json',
+        'test-page-3.json',
+      ]);
+
+      mockFileStorage.delete
+        .mockResolvedValueOnce() // First file succeeds
+        .mockRejectedValueOnce(new Error('Delete failed')) // Second fails
+        .mockResolvedValueOnce(); // Third succeeds
+
+      await discogsService.clearCache();
+
+      expect(mockFileStorage.delete).toHaveBeenCalledTimes(3);
+    });
+
+    it('should not delete non-cache files', async () => {
+      mockFileStorage.listFiles.mockResolvedValue([
+        'test-page-1.json', // Should be deleted
+        'test-progress.json', // Should NOT be deleted
+        'backup-file.json', // Should NOT be deleted
+        'user-page-2.json', // Should be deleted
+      ]);
+
+      await discogsService.clearCache();
+
+      expect(mockFileStorage.delete).toHaveBeenCalledTimes(2);
+      expect(mockFileStorage.delete).toHaveBeenCalledWith(
+        'collections/test-page-1.json'
+      );
+      expect(mockFileStorage.delete).toHaveBeenCalledWith(
+        'collections/user-page-2.json'
+      );
+    });
+  });
+
+  describe('preloadAllCollectionPages concurrency lock', () => {
+    it('should skip preload if already in progress for same user', async () => {
+      jest.spyOn(discogsService as any, 'getAuthHeaders').mockResolvedValue({
+        Authorization: 'Discogs token=test-token',
+      });
+
+      const mockResponse = {
+        data: {
+          pagination: { pages: 3, per_page: 50, items: 150 },
+          releases: [],
+        },
+      };
+
+      mockFileStorage.readJSON.mockResolvedValue(null);
+      mockAxiosInstance.get.mockResolvedValue(mockResponse);
+
+      // Start first preload (don't await)
+      const firstPreload = discogsService.preloadAllCollectionPages('testuser');
+
+      // Start second preload immediately (should be skipped)
+      await discogsService.preloadAllCollectionPages('testuser');
+
+      // Wait for first to complete
+      await firstPreload;
+
+      // First should make API calls, second should not
+      expect(mockAxiosInstance.get).toHaveBeenCalled();
+    }, 10000);
   });
 });

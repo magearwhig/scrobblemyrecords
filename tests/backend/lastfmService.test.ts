@@ -906,4 +906,830 @@ describe('LastFmService', () => {
       process.env.LASTFM_SECRET = originalSecret;
     });
   });
+
+  describe('resubmitTracks', () => {
+    const mockTracks = [
+      { artist: 'Artist 1', track: 'Track 1', timestamp: 1234567890 },
+      { artist: 'Artist 2', track: 'Track 2', timestamp: 1234567891 },
+    ];
+
+    beforeEach(() => {
+      process.env.LASTFM_SECRET = 'testsecret';
+    });
+
+    afterEach(() => {
+      delete process.env.LASTFM_SECRET;
+    });
+
+    it('should resubmit all tracks successfully', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        sessionKey: 'testsession',
+      });
+
+      const mockResponse = {
+        data: {
+          scrobbles: {
+            '@attr': {
+              accepted: 1,
+              ignored: 0,
+            },
+          },
+        },
+      };
+
+      mockAxiosInstance.post.mockResolvedValue(mockResponse);
+
+      const result = await lastfmService.resubmitTracks(mockTracks);
+
+      expect(result).toEqual({
+        success: 2,
+        failed: 0,
+        ignored: 0,
+        errors: [],
+      });
+    });
+
+    it('should handle partial failures', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        sessionKey: 'testsession',
+      });
+
+      mockAxiosInstance.post
+        .mockResolvedValueOnce({
+          data: {
+            scrobbles: {
+              '@attr': { accepted: 1, ignored: 0 },
+            },
+          },
+        })
+        .mockRejectedValueOnce(new Error('Network error'));
+
+      const result = await lastfmService.resubmitTracks(mockTracks);
+
+      expect(result).toEqual({
+        success: 1,
+        failed: 1,
+        ignored: 0,
+        errors: ['Artist 2 - Track 2: Network error'],
+      });
+    });
+
+    it('should handle all failures', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        sessionKey: 'testsession',
+      });
+
+      mockAxiosInstance.post.mockRejectedValue(new Error('Network error'));
+
+      const result = await lastfmService.resubmitTracks(mockTracks);
+
+      expect(result).toEqual({
+        success: 0,
+        failed: 2,
+        ignored: 0,
+        errors: [
+          'Artist 1 - Track 1: Network error',
+          'Artist 2 - Track 2: Network error',
+        ],
+      });
+    });
+
+    it('should handle empty array', async () => {
+      const result = await lastfmService.resubmitTracks([]);
+
+      expect(result).toEqual({
+        success: 0,
+        failed: 0,
+        ignored: 0,
+        errors: [],
+      });
+    });
+  });
+
+  describe('getScrobbleHistory', () => {
+    it('should return sessions sorted by timestamp', async () => {
+      const mockFiles = ['session-123.json', 'session-456.json'];
+      const mockSession1 = {
+        id: '123',
+        tracks: [],
+        timestamp: 1000000,
+        status: 'completed',
+      };
+      const mockSession2 = {
+        id: '456',
+        tracks: [],
+        timestamp: 2000000,
+        status: 'completed',
+      };
+
+      mockFileStorage.listFiles.mockResolvedValue(mockFiles);
+      mockFileStorage.readJSON
+        .mockResolvedValueOnce(mockSession1)
+        .mockResolvedValueOnce(mockSession2);
+
+      const result = await lastfmService.getScrobbleHistory();
+
+      expect(mockFileStorage.listFiles).toHaveBeenCalledWith('scrobbles');
+      expect(result).toEqual([mockSession2, mockSession1]);
+    });
+
+    it('should handle empty list', async () => {
+      mockFileStorage.listFiles.mockResolvedValue([]);
+
+      const result = await lastfmService.getScrobbleHistory();
+
+      expect(result).toEqual([]);
+    });
+
+    it('should handle errors and return empty array', async () => {
+      mockFileStorage.listFiles.mockRejectedValue(
+        new Error('File system error')
+      );
+
+      const result = await lastfmService.getScrobbleHistory();
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getUserInfo', () => {
+    it('should get user info successfully', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        sessionKey: 'testsession',
+      });
+
+      const mockResponse = {
+        data: {
+          user: {
+            name: 'testuser',
+            playcount: '1000',
+            url: 'https://last.fm/user/testuser',
+          },
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(mockResponse);
+
+      const result = await lastfmService.getUserInfo();
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('', {
+        params: {
+          method: 'user.getInfo',
+          api_key: 'testkey',
+          sk: 'testsession',
+          format: 'json',
+        },
+      });
+
+      expect(result).toEqual({
+        name: 'testuser',
+        playcount: '1000',
+        url: 'https://last.fm/user/testuser',
+      });
+    });
+
+    it('should throw error when credentials are missing', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({});
+
+      await expect(lastfmService.getUserInfo()).rejects.toThrow(
+        'Last.fm credentials not configured'
+      );
+    });
+
+    it('should handle API error', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        sessionKey: 'testsession',
+      });
+
+      const errorResponse = {
+        data: {
+          error: 9,
+          message: 'Invalid session key',
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(errorResponse);
+
+      await expect(lastfmService.getUserInfo()).rejects.toThrow(
+        'Invalid session key'
+      );
+    });
+  });
+
+  describe('getRecentScrobbles', () => {
+    it('should get recent scrobbles successfully', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        username: 'testuser',
+      });
+
+      const mockResponse = {
+        data: {
+          recenttracks: {
+            track: [
+              {
+                name: 'Track 1',
+                artist: { '#text': 'Artist 1' },
+              },
+              {
+                name: 'Track 2',
+                artist: { '#text': 'Artist 2' },
+              },
+            ],
+          },
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(mockResponse);
+
+      const result = await lastfmService.getRecentScrobbles(10);
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('', {
+        params: {
+          method: 'user.getRecentTracks',
+          api_key: 'testkey',
+          user: 'testuser',
+          limit: '10',
+          format: 'json',
+        },
+      });
+
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe('Track 1');
+    });
+
+    it('should throw error when credentials are missing', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({});
+
+      await expect(lastfmService.getRecentScrobbles()).rejects.toThrow(
+        'Last.fm credentials not configured'
+      );
+    });
+
+    it('should handle API error', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        username: 'testuser',
+      });
+
+      const errorResponse = {
+        data: {
+          error: 6,
+          message: 'User not found',
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(errorResponse);
+
+      await expect(lastfmService.getRecentScrobbles()).rejects.toThrow(
+        'User not found'
+      );
+    });
+  });
+
+  describe('getTopTracks', () => {
+    it('should get top tracks with default params', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        username: 'testuser',
+      });
+
+      const mockResponse = {
+        data: {
+          toptracks: {
+            track: [
+              {
+                name: 'Track 1',
+                artist: { name: 'Artist 1' },
+                playcount: '100',
+              },
+            ],
+          },
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(mockResponse);
+
+      const result = await lastfmService.getTopTracks();
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('', {
+        params: {
+          method: 'user.getTopTracks',
+          api_key: 'testkey',
+          user: 'testuser',
+          period: '7day',
+          limit: '10',
+          format: 'json',
+        },
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Track 1');
+    });
+
+    it('should get top tracks with custom params', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        username: 'testuser',
+      });
+
+      const mockResponse = {
+        data: {
+          toptracks: {
+            track: [],
+          },
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(mockResponse);
+
+      await lastfmService.getTopTracks('1month', 50);
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('', {
+        params: {
+          method: 'user.getTopTracks',
+          api_key: 'testkey',
+          user: 'testuser',
+          period: '1month',
+          limit: '50',
+          format: 'json',
+        },
+      });
+    });
+
+    it('should throw error when credentials are missing', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({});
+
+      await expect(lastfmService.getTopTracks()).rejects.toThrow(
+        'Last.fm credentials not configured'
+      );
+    });
+
+    it('should handle API error', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        username: 'testuser',
+      });
+
+      const errorResponse = {
+        data: {
+          error: 6,
+          message: 'User not found',
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(errorResponse);
+
+      await expect(lastfmService.getTopTracks()).rejects.toThrow(
+        'User not found'
+      );
+    });
+  });
+
+  describe('getTopArtists', () => {
+    it('should get top artists successfully', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        username: 'testuser',
+      });
+
+      const mockResponse = {
+        data: {
+          topartists: {
+            artist: [
+              {
+                name: 'Artist 1',
+                playcount: '100',
+                url: 'https://last.fm/artist/1',
+              },
+            ],
+          },
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(mockResponse);
+
+      const result = await lastfmService.getTopArtists();
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('', {
+        params: {
+          method: 'user.getTopArtists',
+          api_key: 'testkey',
+          user: 'testuser',
+          period: '7day',
+          limit: '10',
+          format: 'json',
+        },
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Artist 1');
+    });
+
+    it('should handle API error', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        username: 'testuser',
+      });
+
+      const errorResponse = {
+        data: {
+          error: 6,
+          message: 'User not found',
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(errorResponse);
+
+      await expect(lastfmService.getTopArtists()).rejects.toThrow(
+        'User not found'
+      );
+    });
+  });
+
+  describe('getLibraryArtists', () => {
+    it('should get library artists with pagination data', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        username: 'testuser',
+      });
+
+      const mockResponse = {
+        data: {
+          artists: {
+            artist: [
+              {
+                name: 'Artist 1',
+                playcount: '100',
+                url: 'https://last.fm/artist/1',
+              },
+            ],
+            '@attr': {
+              total: '500',
+              page: '1',
+              perPage: '50',
+              totalPages: '10',
+            },
+          },
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(mockResponse);
+
+      const result = await lastfmService.getLibraryArtists(50, 1);
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('', {
+        params: {
+          method: 'library.getArtists',
+          api_key: 'testkey',
+          user: 'testuser',
+          limit: '50',
+          page: '1',
+          format: 'json',
+        },
+      });
+
+      expect(result.artists).toHaveLength(1);
+      expect(result.total).toBe(500);
+      expect(result.page).toBe(1);
+      expect(result.perPage).toBe(50);
+      expect(result.totalPages).toBe(10);
+    });
+
+    it('should handle API error', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        username: 'testuser',
+      });
+
+      const errorResponse = {
+        data: {
+          error: 6,
+          message: 'User not found',
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(errorResponse);
+
+      await expect(lastfmService.getLibraryArtists()).rejects.toThrow(
+        'User not found'
+      );
+    });
+  });
+
+  describe('getAlbumInfo', () => {
+    it('should get album info successfully', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+      });
+
+      const mockResponse = {
+        data: {
+          album: {
+            name: 'Test Album',
+            artist: 'Test Artist',
+            image: [{ size: 'large', '#text': 'http://image.url' }],
+            playcount: 1000,
+          },
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(mockResponse);
+
+      const result = await lastfmService.getAlbumInfo(
+        'Test Artist',
+        'Test Album'
+      );
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('', {
+        params: {
+          method: 'album.getInfo',
+          api_key: 'testkey',
+          artist: 'Test Artist',
+          album: 'Test Album',
+          format: 'json',
+        },
+      });
+
+      expect(result).toEqual({
+        name: 'Test Album',
+        artist: 'Test Artist',
+        image: [{ size: 'large', '#text': 'http://image.url' }],
+        playcount: 1000,
+      });
+    });
+
+    it('should return null when no API key', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({});
+
+      const result = await lastfmService.getAlbumInfo(
+        'Test Artist',
+        'Test Album'
+      );
+
+      expect(result).toBe(null);
+    });
+
+    it('should return null on API error', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+      });
+
+      const errorResponse = {
+        data: {
+          error: 6,
+          message: 'Album not found',
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(errorResponse);
+
+      const result = await lastfmService.getAlbumInfo(
+        'Test Artist',
+        'Test Album'
+      );
+
+      expect(result).toBe(null);
+    });
+  });
+
+  describe('getArtistInfo', () => {
+    it('should get artist info successfully', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+      });
+
+      const mockResponse = {
+        data: {
+          artist: {
+            name: 'Test Artist',
+            image: [{ size: 'large', '#text': 'http://image.url' }],
+            stats: {
+              listeners: '10000',
+              playcount: '50000',
+            },
+          },
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(mockResponse);
+
+      const result = await lastfmService.getArtistInfo('Test Artist');
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('', {
+        params: {
+          method: 'artist.getInfo',
+          api_key: 'testkey',
+          artist: 'Test Artist',
+          format: 'json',
+        },
+      });
+
+      expect(result).toEqual({
+        name: 'Test Artist',
+        image: [{ size: 'large', '#text': 'http://image.url' }],
+        stats: {
+          listeners: '10000',
+          playcount: '50000',
+        },
+      });
+    });
+
+    it('should return null when no API key', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({});
+
+      const result = await lastfmService.getArtistInfo('Test Artist');
+
+      expect(result).toBe(null);
+    });
+
+    it('should return null on API error', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+      });
+
+      const errorResponse = {
+        data: {
+          error: 6,
+          message: 'Artist not found',
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(errorResponse);
+
+      const result = await lastfmService.getArtistInfo('Test Artist');
+
+      expect(result).toBe(null);
+    });
+  });
+
+  describe('getArtistPlaycount', () => {
+    it('should find artist and return playcount', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        username: 'testuser',
+      });
+
+      const mockResponse = {
+        data: {
+          artists: {
+            artist: [
+              {
+                name: 'Test Artist',
+                playcount: '500',
+                url: 'https://last.fm/artist/test',
+              },
+            ],
+            '@attr': {
+              total: '1',
+              page: '1',
+              perPage: '100',
+              totalPages: '1',
+            },
+          },
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(mockResponse);
+
+      const result = await lastfmService.getArtistPlaycount('Test Artist');
+
+      expect(result).toBe(500);
+    });
+
+    it('should return null when artist not found', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        username: 'testuser',
+      });
+
+      const mockResponse = {
+        data: {
+          artists: {
+            artist: [
+              {
+                name: 'Other Artist',
+                playcount: '500',
+                url: 'https://last.fm/artist/other',
+              },
+            ],
+            '@attr': {
+              total: '1',
+              page: '1',
+              perPage: '100',
+              totalPages: '1',
+            },
+          },
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(mockResponse);
+
+      const result = await lastfmService.getArtistPlaycount('Test Artist');
+
+      expect(result).toBe(null);
+    });
+
+    it('should return null on error', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        username: 'testuser',
+      });
+
+      mockAxiosInstance.get.mockRejectedValue(new Error('Network error'));
+
+      const result = await lastfmService.getArtistPlaycount('Test Artist');
+
+      expect(result).toBe(null);
+    });
+  });
+
+  describe('getArtistTopTags', () => {
+    it('should get artist top tags successfully', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+      });
+
+      const mockResponse = {
+        data: {
+          toptags: {
+            tag: [
+              { name: 'rock', count: '100' },
+              { name: 'alternative', count: 50 },
+            ],
+          },
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(mockResponse);
+
+      const result = await lastfmService.getArtistTopTags('Test Artist');
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('', {
+        params: {
+          method: 'artist.getTopTags',
+          api_key: 'testkey',
+          artist: 'Test Artist',
+          format: 'json',
+        },
+      });
+
+      expect(result).toEqual([
+        { name: 'rock', count: 100 },
+        { name: 'alternative', count: 50 },
+      ]);
+    });
+
+    it('should return empty array when no API key', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({});
+
+      const result = await lastfmService.getArtistTopTags('Test Artist');
+
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array on API error', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+      });
+
+      const errorResponse = {
+        data: {
+          error: 6,
+          message: 'Artist not found',
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(errorResponse);
+
+      const result = await lastfmService.getArtistTopTags('Test Artist');
+
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array when toptags is not an array', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+      });
+
+      const mockResponse = {
+        data: {
+          toptags: {
+            tag: null,
+          },
+        },
+      };
+
+      mockAxiosInstance.get.mockResolvedValue(mockResponse);
+
+      const result = await lastfmService.getArtistTopTags('Test Artist');
+
+      expect(result).toEqual([]);
+    });
+  });
 });
