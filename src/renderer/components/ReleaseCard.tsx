@@ -2,6 +2,8 @@ import React from 'react';
 
 import { TrackedRelease } from '../../shared/types';
 
+import { Button, IconButton } from './ui/Button';
+
 interface ReleaseCardProps {
   release: TrackedRelease;
   formatReleaseDate: (dateStr: string | null) => string;
@@ -58,12 +60,13 @@ const ReleaseCard: React.FC<ReleaseCardProps> = ({
         <div className='release-actions'>
           {(release.vinylStatus === 'unknown' ||
             release.vinylStatus === 'not-found') && (
-            <button
-              className='btn btn-secondary btn-sm'
+            <Button
+              variant='secondary'
+              size='small'
               onClick={() => onCheckVinyl(release.mbid, release.title)}
             >
               Check Vinyl
-            </button>
+            </Button>
           )}
           {release.vinylStatus === 'checking' && (
             <span className='checking-status'>Checking...</span>
@@ -73,7 +76,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = ({
               href={release.discogsUrl}
               target='_blank'
               rel='noopener noreferrer'
-              className='btn btn-secondary btn-sm'
+              className='button button--secondary button--small'
             >
               View on Discogs
             </a>
@@ -81,12 +84,12 @@ const ReleaseCard: React.FC<ReleaseCardProps> = ({
           {release.vinylStatus === 'available' &&
             !release.inWishlist &&
             release.discogsMasterId && (
-              <button
-                className='btn btn-primary btn-sm'
+              <Button
+                size='small'
                 onClick={() => onAddToWishlist(release.mbid, release.title)}
               >
                 Add to Wishlist
-              </button>
+              </Button>
             )}
           {release.inWishlist && (
             <span className='in-wishlist'>&#10003; In Wishlist</span>
@@ -94,22 +97,24 @@ const ReleaseCard: React.FC<ReleaseCardProps> = ({
         </div>
 
         <div className='release-hide-actions'>
-          <button
-            className='btn-icon btn-hide'
+          <IconButton
+            icon={<>&#10005;</>}
+            aria-label='Hide this release'
+            variant='ghost'
+            size='small'
             onClick={() => onHide(release)}
             title='Hide this release'
-          >
-            &#10005;
-          </button>
-          <button
-            className='btn-icon btn-exclude'
+          />
+          <IconButton
+            icon={<>&#128683;</>}
+            aria-label={`Exclude ${release.artistName} from release tracking`}
+            variant='ghost'
+            size='small'
             onClick={() =>
               onExcludeArtist(release.artistName, release.artistMbid)
             }
             title={`Exclude ${release.artistName} from release tracking`}
-          >
-            &#128683;
-          </button>
+          />
         </div>
       </div>
     </div>

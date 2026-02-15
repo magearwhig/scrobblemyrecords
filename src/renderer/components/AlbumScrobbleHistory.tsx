@@ -5,6 +5,7 @@ import { useNotifications } from '../hooks/useNotifications';
 import { getApiService } from '../services/api';
 
 import { Modal, ModalFooter } from './ui';
+import { Button } from './ui/Button';
 
 interface AlbumHistoryData {
   found: boolean;
@@ -279,13 +280,12 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
                 placeholder='Search for artist or album...'
                 className='mapping-search-input'
               />
-              <button
-                className='btn'
+              <Button
                 onClick={handleSearch}
                 disabled={searchLoading || !searchQuery.trim()}
               >
                 {searchLoading ? 'Searching...' : 'Search'}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -326,9 +326,9 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
           </div>
 
           <ModalFooter>
-            <button className='btn btn-secondary' onClick={closeMappingModal}>
+            <Button variant='secondary' onClick={closeMappingModal}>
               Cancel
-            </button>
+            </Button>
           </ModalFooter>
         </Modal>
       </>
@@ -458,15 +458,14 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
               onKeyDown={e => e.key === 'Enter' && handleSearch()}
               disabled={searchLoading || mappingInProgress}
             />
-            <button
-              className='btn btn-primary'
+            <Button
               onClick={handleSearch}
               disabled={
                 !searchQuery.trim() || searchLoading || mappingInProgress
               }
             >
               {searchLoading ? 'Searching...' : 'Search'}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -515,9 +514,9 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
         </div>
 
         <ModalFooter>
-          <button className='btn btn-secondary' onClick={closeMappingModal}>
+          <Button variant='secondary' onClick={closeMappingModal}>
             Cancel
-          </button>
+          </Button>
         </ModalFooter>
       </Modal>
     </>

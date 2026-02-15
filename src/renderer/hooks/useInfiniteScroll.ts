@@ -76,7 +76,6 @@ export function useInfiniteScroll({
   useEffect(() => {
     if (!enabled || !sentinelRef.current) return;
 
-    // eslint-disable-next-line no-undef
     const observer = new IntersectionObserver(
       entries => {
         const [entry] = entries;

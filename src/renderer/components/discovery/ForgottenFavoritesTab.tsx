@@ -12,6 +12,7 @@ import ApiService from '../../services/api';
 import { createLogger } from '../../utils/logger';
 import { playTrackOnSpotify } from '../../utils/spotifyUtils';
 import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
 import { Modal, ModalSection } from '../ui/Modal';
 
 const logger = createLogger('ForgottenFavoritesTab');
@@ -344,9 +345,9 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
       {forgottenError && (
         <div className='message error'>
           <p>{forgottenError}</p>
-          <button className='btn btn-small' onClick={loadForgottenFavorites}>
+          <Button size='small' onClick={loadForgottenFavorites}>
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
@@ -368,20 +369,20 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
               tracks
             </div>
             <div className='forgotten-export-buttons'>
-              <button
-                className='btn btn-small'
+              <Button
+                size='small'
                 onClick={copyAllTracksToClipboard}
                 title='Copy all tracks to clipboard'
               >
                 Copy All
-              </button>
-              <button
-                className='btn btn-small'
+              </Button>
+              <Button
+                size='small'
                 onClick={exportTracksToCSV}
                 title='Export to CSV file'
               >
                 Export CSV
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -432,8 +433,9 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
                     </span>
                   </div>
                   <div className='missing-item-actions'>
-                    <button
-                      className='btn btn-small btn-icon'
+                    <Button
+                      variant='outline'
+                      size='small'
                       onClick={() =>
                         playTrackOnSpotify(
                           track.artist,
@@ -444,9 +446,10 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
                       title='Play on Spotify'
                     >
                       ▶️
-                    </button>
-                    <button
-                      className='btn btn-small btn-icon'
+                    </Button>
+                    <Button
+                      variant='outline'
+                      size='small'
                       onClick={() =>
                         openLink(
                           `https://www.last.fm/music/${encodeURIComponent(track.artist)}/_/${encodeURIComponent(track.track)}`
@@ -455,29 +458,31 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
                       title='View track on Last.fm'
                     >
                       Last.fm
-                    </button>
-                    <button
-                      className='btn btn-small'
+                    </Button>
+                    <Button
+                      size='small'
                       onClick={() => copyTrackToClipboard(track)}
                       title='Copy to clipboard'
                     >
                       Copy
-                    </button>
-                    <button
-                      className='btn btn-small btn-secondary'
+                    </Button>
+                    <Button
+                      variant='secondary'
+                      size='small'
                       onClick={() => openTrackMappingModal(track)}
                       title='Map this track to local cache'
                     >
                       Map
-                    </button>
+                    </Button>
                     {collectionItem && (
-                      <button
-                        className='btn btn-small btn-success'
+                      <Button
+                        variant='success'
+                        size='small'
                         onClick={() => navigateToAlbum(collectionItem)}
                         aria-label={`Go to ${track.album} in your collection`}
                       >
                         Go to Album
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -563,12 +568,12 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
                             {result.playCount} plays
                           </div>
                         </div>
-                        <button
-                          className='btn btn-small'
+                        <Button
+                          size='small'
                           onClick={() => createTrackMapping(result)}
                         >
                           Map to This
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </div>

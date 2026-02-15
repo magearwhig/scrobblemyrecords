@@ -498,127 +498,6 @@ body {
   color: var(--text-primary);
 }
 
-/* Buttons */
-.btn {
-  background: var(--accent-color);
-  color: white;
-  border: 1px solid var(--accent-color);
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-decoration: none;
-  display: inline-block;
-  text-align: center;
-}
-
-.btn:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
-}
-
-.btn:disabled {
-  background: var(--text-muted);
-  border-color: var(--text-muted);
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: var(--text-secondary);
-  color: white;
-}
-
-.btn-secondary:hover {
-  background: var(--text-muted);
-}
-
-.btn-danger {
-  background: var(--error-color);
-}
-
-.btn-danger:hover {
-  background: #c82333;
-}
-
-.btn-small {
-  padding: 0.25rem 0.75rem;
-  font-size: 0.75rem;
-}
-
-.btn-outline {
-  background: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-}
-
-.btn-outline:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--text-secondary);
-  color: var(--text-primary);
-}
-
-.btn-outline:disabled {
-  background: transparent;
-  color: var(--text-muted);
-  border-color: var(--border-color);
-  cursor: not-allowed;
-}
-
-/* Special styles for filter buttons (side/disc selection) */
-.btn-filter {
-  transition: all 0.2s ease;
-  font-weight: 500;
-  position: relative;
-}
-
-.btn-filter:focus {
-  outline: 2px solid var(--accent-color);
-  outline-offset: 2px;
-}
-
-.btn-filter.btn-outline:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.btn-filter.btn-primary {
-  box-shadow: 0 2px 4px rgba(29, 185, 84, 0.3);
-}
-
-.btn-filter.btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(29, 185, 84, 0.4);
-}
-
-/* Dark mode adjustments for filter buttons */
-.dark-mode .btn-filter.btn-outline:hover {
-  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
-}
-
-/* High contrast mode support for accessibility */
-@media (prefers-contrast: high) {
-  .btn-filter.btn-outline {
-    border-width: 2px;
-  }
-
-  .btn-filter.btn-primary {
-    border-width: 2px;
-  }
-}
-
-/* Reduced motion support for accessibility */
-@media (prefers-reduced-motion: reduce) {
-  .btn-filter {
-    transition: none;
-  }
-
-  .btn-filter:hover {
-    transform: none;
-  }
-}
-
 /* Forms */
 .form-group {
   margin-bottom: 1rem;
@@ -955,17 +834,6 @@ body {
   line-height: 1;
 }
 
-.btn-outline-warning {
-  background: transparent;
-  border: 1px solid var(--accent-warning, #f59e0b);
-  color: var(--accent-warning, #f59e0b);
-}
-
-.btn-outline-warning:hover {
-  background: var(--accent-warning, #f59e0b);
-  color: white;
-}
-
 .discard-pile-indicator {
   display: block;
   padding: 0.25rem;
@@ -1218,11 +1086,6 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-}
-
-.sync-button-group .btn-link {
-  font-size: 0.8125rem;
-  padding: 0.25rem 0.5rem;
 }
 
 /* ============================================
@@ -1885,31 +1748,6 @@ body {
 .forgotten-collection-badge {
   margin-left: 0.5rem;
   vertical-align: middle;
-}
-
-.btn-success {
-  background: var(--success-color);
-  color: white;
-  border: 1px solid var(--success-color);
-}
-
-.btn-success:hover {
-  opacity: 0.9;
-}
-
-/* Icon Buttons for external links */
-.btn-icon {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  padding: 0.25rem 0.5rem;
-}
-
-.btn-icon:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border-color: var(--text-muted);
 }
 
 /* Base Modal Styles */
@@ -5671,7 +5509,7 @@ body {
   gap: 0.5rem;
 }
 
-.wishlist-card-actions .btn {
+.wishlist-card-actions .button {
   flex: 1;
 }
 
@@ -8246,7 +8084,7 @@ body {
   margin-top: auto;
 }
 
-.discard-item-card .item-actions .btn {
+.discard-item-card .item-actions .button {
   flex: 1;
   min-width: fit-content;
 }
@@ -10989,7 +10827,6 @@ body {
 /* ==========================================================================
    Focus-visible styles for keyboard accessibility (WAI-ARIA)
    ========================================================================== */
-.btn:focus-visible,
 .nav-link:focus-visible,
 .settings-tab:focus-visible {
   outline: 2px solid var(--accent-color);

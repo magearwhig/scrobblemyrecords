@@ -5,6 +5,7 @@ import {
   BackupImportOptions,
 } from '../../../shared/types';
 import ApiService from '../../services/api';
+import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 
 interface BackupImportDialogProps {
@@ -111,20 +112,12 @@ const BackupImportDialog: React.FC<BackupImportDialogProps> = ({
       size='medium'
       footer={
         <>
-          <button
-            className='btn btn-secondary'
-            onClick={onClose}
-            disabled={loading}
-          >
+          <Button variant='secondary' onClick={onClose} disabled={loading}>
             Cancel
-          </button>
-          <button
-            className='btn btn-primary'
-            onClick={handleImport}
-            disabled={loading || !preview.valid}
-          >
+          </Button>
+          <Button onClick={handleImport} disabled={loading || !preview.valid}>
             {loading ? 'Importing...' : 'Import'}
-          </button>
+          </Button>
         </>
       }
     >

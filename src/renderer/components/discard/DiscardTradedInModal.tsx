@@ -2,6 +2,7 @@ import React from 'react';
 
 import { DiscardPileItem } from '../../../shared/types';
 import { Modal, ModalFooter } from '../ui';
+import { Button } from '../ui/Button';
 
 interface DiscardTradedInModalProps {
   isOpen: boolean;
@@ -44,12 +45,12 @@ const DiscardTradedInModal: React.FC<DiscardTradedInModalProps> = ({
         ))}
       </div>
       <ModalFooter>
-        <button className='btn btn-secondary' onClick={onClose}>
+        <Button variant='secondary' onClick={onClose}>
           Cancel
-        </button>
-        <button className='btn btn-outline-warning' onClick={onConfirm}>
+        </Button>
+        <Button variant='warning' onClick={onConfirm}>
           Trade In {items.length} Record{items.length !== 1 ? 's' : ''}
-        </button>
+        </Button>
       </ModalFooter>
     </Modal>
   );

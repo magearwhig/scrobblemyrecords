@@ -14,6 +14,7 @@ import ArtistLink from './ArtistLink';
 import SyncStatusBar from './SyncStatusBar';
 import TrackLink from './TrackLink';
 import { Badge } from './ui/Badge';
+import { Button, IconButton } from './ui/Button';
 
 interface AlbumHistoryItem {
   artist: string;
@@ -430,8 +431,9 @@ const LastFmHistoryTab: React.FC = () => {
         <div className='card'>
           <div className='error-message'>
             {error}
-            <button
-              className='btn btn-small ml-1'
+            <Button
+              size='small'
+              className='ml-1'
               onClick={
                 viewMode === 'albums'
                   ? loadAlbums
@@ -441,7 +443,7 @@ const LastFmHistoryTab: React.FC = () => {
               }
             >
               Retry
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -465,12 +467,9 @@ const LastFmHistoryTab: React.FC = () => {
                 <p>
                   No {itemType} found matching "{debouncedSearch}"
                 </p>
-                <button
-                  className='btn btn-secondary'
-                  onClick={() => setSearchQuery('')}
-                >
+                <Button variant='secondary' onClick={() => setSearchQuery('')}>
                   Clear Search
-                </button>
+                </Button>
               </>
             ) : (
               <>
@@ -671,8 +670,11 @@ const LastFmHistoryTab: React.FC = () => {
                         </Badge>
                       </button>
                     ) : (
-                      <button
-                        className='btn btn-small btn-icon'
+                      <IconButton
+                        icon='▶️'
+                        aria-label='Play on Spotify'
+                        variant='outline'
+                        size='small'
                         onClick={() =>
                           playTrackOnSpotify(
                             track.artist,
@@ -681,9 +683,7 @@ const LastFmHistoryTab: React.FC = () => {
                           )
                         }
                         title='Play on Spotify'
-                      >
-                        ▶️
-                      </button>
+                      />
                     )}
                   </div>
                 </div>
@@ -788,37 +788,41 @@ const LastFmHistoryTab: React.FC = () => {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className='card lastfm-history-pagination'>
-          <button
-            className='btn btn-small btn-secondary'
+          <Button
+            variant='secondary'
+            size='small'
             onClick={() => setPage(1)}
             disabled={page === 1 || loading}
           >
             First
-          </button>
-          <button
-            className='btn btn-small btn-secondary'
+          </Button>
+          <Button
+            variant='secondary'
+            size='small'
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1 || loading}
           >
             Previous
-          </button>
+          </Button>
           <span className='lastfm-history-page-info'>
             Page {page} of {totalPages}
           </span>
-          <button
-            className='btn btn-small btn-secondary'
+          <Button
+            variant='secondary'
+            size='small'
             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
             disabled={page === totalPages || loading}
           >
             Next
-          </button>
-          <button
-            className='btn btn-small btn-secondary'
+          </Button>
+          <Button
+            variant='secondary'
+            size='small'
             onClick={() => setPage(totalPages)}
             disabled={page === totalPages || loading}
           >
             Last
-          </button>
+          </Button>
         </div>
       )}
     </div>

@@ -2,6 +2,8 @@ import React from 'react';
 
 import { createLogger } from '../utils/logger';
 
+import { Button } from './ui/Button';
+
 const log = createLogger('ErrorBoundary');
 
 interface ErrorBoundaryProps {
@@ -54,15 +56,13 @@ class ErrorBoundary extends React.Component<
               </pre>
             )}
             <div className='error-boundary-actions'>
-              <button className='btn btn-primary' onClick={this.handleRetry}>
-                Try Again
-              </button>
-              <button
-                className='btn btn-secondary'
+              <Button onClick={this.handleRetry}>Try Again</Button>
+              <Button
+                variant='secondary'
                 onClick={() => window.location.reload()}
               >
                 Reload Page
-              </button>
+              </Button>
             </div>
           </div>
         </div>

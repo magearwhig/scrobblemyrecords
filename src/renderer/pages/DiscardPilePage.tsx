@@ -15,6 +15,7 @@ import DiscardItemCard from '../components/discard/DiscardItemCard';
 import DiscardStatsBar from '../components/discard/DiscardStatsBar';
 import DiscardTradedInModal from '../components/discard/DiscardTradedInModal';
 import { Modal, ModalFooter } from '../components/ui';
+import { Button } from '../components/ui/Button';
 import { ListItemSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -499,9 +500,9 @@ const DiscardPilePage: React.FC = () => {
         <h1>Discard Pile</h1>
         <div className='alert alert-error'>
           {error}
-          <button onClick={loadData} className='btn btn-secondary ml-2'>
+          <Button variant='secondary' className='ml-2' onClick={loadData}>
             Retry
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -525,15 +526,15 @@ const DiscardPilePage: React.FC = () => {
       )}
 
       <div className='discard-pile-actions'>
-        <button
-          className='btn btn-secondary'
+        <Button
+          variant='secondary'
           onClick={handleRefreshValues}
           disabled={refreshing || items.length === 0}
         >
           {refreshing ? 'Refreshing...' : 'Refresh Marketplace Values'}
-        </button>
-        <button
-          className={`btn ${selectionMode ? 'btn-primary' : 'btn-secondary'}`}
+        </Button>
+        <Button
+          variant={selectionMode ? 'primary' : 'secondary'}
           onClick={toggleSelectionMode}
           disabled={items.length === 0}
           aria-label={
@@ -541,7 +542,7 @@ const DiscardPilePage: React.FC = () => {
           }
         >
           {selectionMode ? 'Cancel Selection' : 'Select Items'}
-        </button>
+        </Button>
       </div>
 
       <DiscardFilterBar
@@ -594,20 +595,20 @@ const DiscardPilePage: React.FC = () => {
               </span>
             </div>
             <div className='floating-action-bar-actions'>
-              <button
-                className='btn btn-outline-warning'
+              <Button
+                variant='warning'
                 onClick={() => setBulkTradedInModalOpen(true)}
                 aria-label={`Trade in ${selectedIds.size} selected items`}
               >
                 Trade In ({selectedIds.size})
-              </button>
-              <button
-                className='btn btn-secondary'
+              </Button>
+              <Button
+                variant='secondary'
                 onClick={clearSelection}
                 aria-label='Clear selection'
               >
                 Clear
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -839,12 +840,10 @@ const DiscardPilePage: React.FC = () => {
             />
           </div>
           <ModalFooter>
-            <button className='btn btn-secondary' onClick={closeEditModal}>
+            <Button variant='secondary' onClick={closeEditModal}>
               Cancel
-            </button>
-            <button className='btn btn-primary' onClick={handleSaveEdit}>
-              Save Changes
-            </button>
+            </Button>
+            <Button onClick={handleSaveEdit}>Save Changes</Button>
           </ModalFooter>
         </Modal>
       )}
@@ -876,17 +875,17 @@ const DiscardPilePage: React.FC = () => {
             />
           </div>
           <ModalFooter>
-            <button
-              className='btn btn-secondary'
+            <Button
+              variant='secondary'
               onClick={() =>
                 setSoldModal({ isOpen: false, item: null, salePrice: '' })
               }
             >
               Cancel
-            </button>
-            <button className='btn btn-success' onClick={handleMarkAsSold}>
+            </Button>
+            <Button variant='success' onClick={handleMarkAsSold}>
               Mark as Sold
-            </button>
+            </Button>
           </ModalFooter>
         </Modal>
       )}
@@ -920,8 +919,8 @@ const DiscardPilePage: React.FC = () => {
             />
           </div>
           <ModalFooter>
-            <button
-              className='btn btn-secondary'
+            <Button
+              variant='secondary'
               onClick={() =>
                 setListedModal({
                   isOpen: false,
@@ -931,14 +930,13 @@ const DiscardPilePage: React.FC = () => {
               }
             >
               Cancel
-            </button>
-            <button
-              className='btn btn-primary'
+            </Button>
+            <Button
               onClick={handleMarkAsListed}
               disabled={!listedModal.marketplaceUrl}
             >
               Mark as Listed
-            </button>
+            </Button>
           </ModalFooter>
         </Modal>
       )}

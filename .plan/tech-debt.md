@@ -387,8 +387,9 @@ All components wrapped with `React.memo`. Inline styles replaced with CSS classe
 | ~~L10~~ | ~~No focus trap in modals + dead state~~ | ~~Low~~ | ~~DONE~~ |
 | ~~L11~~ | ~~Centralize route identifiers~~ | ~~Low~~ | ~~DONE~~ |
 | ~~L12~~ | ~~Sidebar reorganization~~ | ~~Low~~ | ~~DONE~~ |
+| ~~M20~~ | ~~Button system consolidation (.btn → Button.tsx)~~ | ~~Medium~~ | ~~DONE~~ |
 
-**Total open**: 1 item (C1 — ongoing coverage improvement) -- 38 completed/resolved (February 2026)
+**Total open**: 1 item (C1 — ongoing coverage improvement) -- 39 completed/resolved (February 2026)
 
 ---
 
@@ -436,6 +437,24 @@ All 10 items completed: H1, H3, H2, H6 (size limit), M15, L1, L5, M1 (ESLint + b
 | ~~5~~ | ~~Legacy auth endpoints — verified as actively used~~ | ~~L2~~ N/A |
 | ~~6~~ | ~~Add structured logging + request metrics~~ | ~~L9~~ DONE |
 | 7 | Continue raising coverage toward 90% | C1 (ongoing) |
+
+---
+
+### ~~M20. Button system consolidation -- dual .btn / Button.tsx classes~~ DONE
+
+**Completed:** February 2026. Migrated all ~290 `.btn` CSS class instances across 54 files to the `Button.tsx` component system and removed the legacy `.btn` CSS rules from `styles.css`.
+
+**What was done:**
+- **Phase A:** Aligned `Button.tsx` `--small` sizing (padding: `0.25rem 0.75rem`, font-size: `0.75rem`) to match `.btn-small` compact sizing. Added `warning` variant to `ButtonVariant` type. Added `.button--filter` CSS effects (transform, box-shadow) with dark mode, high contrast, and reduced motion support.
+- **Phase B:** Migrated all 54 files from `<button className="btn ...">` to `<Button variant="..." size="...">` and `<IconButton>`. Variant mapping: `.btn` → primary, `.btn-secondary` → secondary, `.btn-danger` → danger, `.btn-success` → success, `.btn-outline` → outline, `.btn-outline-warning` → warning, `.btn-link` → ghost. Filter buttons use `className="button--filter"`.
+- **Phase C:** All `.btn-icon` usage absorbed by `<IconButton>` with required `aria-label`.
+- **Phase D:** Removed all `.btn*` CSS rules from `styles.css` (~120 lines) and `.btn-icon` rules from `NewReleasesPage.css`. Updated `.wishlist-card-actions .btn` and `.discard-item-card .item-actions .btn` selectors to target `.button`. Removed `.btn:focus-visible` from combined selector.
+- **Tests:** Updated 5 test files (ScrobblePage, LastFmHistoryTab, CollectionPage, ReleaseDetailsPage, SettingsConnectionsSection) to use `getByRole('button', ...)` instead of `getByText(...)` for disabled state checks. Updated class name assertions from `btn-primary`/`btn-outline` to `button--primary`/`button--outline`. Added warning variant test to Button.test.tsx.
+- **Verification:** TypeScript compiles clean, 0 lint errors, all tests pass, build succeeds.
+
+**Result:** Zero `.btn` CSS classes remain in TSX files. Zero `.btn*` CSS rules remain in stylesheets. Single unified button system via `Button.tsx`.
+
+**Files:** `Button.tsx`, `Button.css`, `styles.css`, `NewReleasesPage.css`, 54 migrated TSX files, 6 test files.
 
 ---
 

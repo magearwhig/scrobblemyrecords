@@ -12,6 +12,7 @@ import { getApiService } from '../../services/api';
 import { createLogger } from '../../utils/logger';
 import MissingAlbumsTab from '../discovery/MissingAlbumsTab';
 import { EmptyState, ListItemSkeleton, Modal, ModalFooter } from '../ui';
+import { Button } from '../ui/Button';
 
 const logger = createLogger('MissingAlbumsContainer');
 
@@ -306,13 +307,12 @@ const MissingAlbumsContainer: React.FC = () => {
               placeholder='Search by artist or album...'
               className='mapping-search-input'
             />
-            <button
-              className='btn'
+            <Button
               onClick={handleSearch}
               disabled={searchLoading || !searchQuery.trim()}
             >
               {searchLoading ? 'Searching...' : 'Search'}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -376,9 +376,9 @@ const MissingAlbumsContainer: React.FC = () => {
         </div>
 
         <ModalFooter>
-          <button className='btn btn-secondary' onClick={closeMappingModal}>
+          <Button variant='secondary' onClick={closeMappingModal}>
             Cancel
-          </button>
+          </Button>
         </ModalFooter>
       </Modal>
     </>

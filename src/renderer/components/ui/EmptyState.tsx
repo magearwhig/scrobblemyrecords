@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { Button } from './Button';
 import './EmptyState.css';
 
 export interface EmptyStateAction {
@@ -61,13 +62,13 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       {actions && actions.length > 0 && (
         <div className='empty-state-actions'>
           {actions.map((action, index) => (
-            <button
+            <Button
               key={index}
-              className={`btn ${action.variant === 'secondary' ? 'btn-secondary' : ''}`}
+              variant={action.variant === 'secondary' ? 'secondary' : 'primary'}
               onClick={action.onClick}
             >
               {action.label}
-            </button>
+            </Button>
           ))}
         </div>
       )}

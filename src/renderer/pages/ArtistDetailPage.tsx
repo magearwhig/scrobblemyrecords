@@ -4,6 +4,7 @@ import { ArtistDetailResponse } from '../../shared/types';
 import PlayTrendChart from '../components/PlayTrendChart';
 import TrackLink from '../components/TrackLink';
 import { Badge } from '../components/ui/Badge';
+import { IconButton } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton } from '../components/ui/Skeleton';
 import { ROUTES } from '../routes';
@@ -344,16 +345,15 @@ const ArtistDetailPage: React.FC = () => {
                   <span className='detail-page-track-count'>
                     {track.playCount.toLocaleString()}
                   </span>
-                  <button
-                    className='btn btn-small btn-icon'
+                  <IconButton
+                    icon={<>&#9654;</>}
+                    size='small'
                     onClick={() =>
                       playTrackOnSpotify(data.artist, track.track, track.album)
                     }
                     aria-label={`Play ${track.track} on Spotify`}
                     title={`Play ${track.track} on Spotify`}
-                  >
-                    &#9654;
-                  </button>
+                  />
                 </li>
               ))}
             </ul>
@@ -397,14 +397,13 @@ const ArtistDetailPage: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <button
-                    className='btn btn-small btn-icon'
+                  <IconButton
+                    icon={<>&#9654;</>}
+                    size='small'
                     onClick={() => playAlbumOnSpotify(data.artist, album.album)}
                     aria-label={`Play ${album.album} on Spotify`}
                     title={`Play ${album.album} on Spotify`}
-                  >
-                    &#9654;
-                  </button>
+                  />
                 </div>
               ))}
             </div>

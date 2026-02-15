@@ -6,6 +6,7 @@ import {
 } from '../../../shared/types';
 import { useApp } from '../../context/AppContext';
 import { getApiService } from '../../services/api';
+import { Button } from '../ui/Button';
 import { ProgressBar } from '../ui/ProgressBar';
 
 import { NewReleaseCard } from './NewReleaseCard';
@@ -292,12 +293,13 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
             <div className='sync-progress-actions'>
               <span className='sync-percent'>{overallProgress}%</span>
               {autoContinue && (
-                <button
-                  className='btn btn-sm btn-ghost'
+                <Button
+                  variant='ghost'
+                  size='small'
                   onClick={handleStopAutoContinue}
                 >
                   Stop
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -306,29 +308,21 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
             <span className='continue-hint'>
               {totalMasters - lastCheckedIndex} masters remaining
             </span>
-            <button
-              className='btn btn-secondary'
+            <Button
+              variant='secondary'
               onClick={() => handleCheckNow(false)}
               disabled={isSyncing}
             >
               Check Next Batch
-            </button>
-            <button
-              className='btn btn-primary'
-              onClick={() => handleCheckNow(true)}
-              disabled={isSyncing}
-            >
+            </Button>
+            <Button onClick={() => handleCheckNow(true)} disabled={isSyncing}>
               Check All Remaining
-            </button>
+            </Button>
           </div>
         ) : (
-          <button
-            className='btn btn-primary'
-            onClick={() => handleCheckNow(false)}
-            disabled={isSyncing}
-          >
+          <Button onClick={() => handleCheckNow(false)} disabled={isSyncing}>
             Check Now
-          </button>
+          </Button>
         )}
       </div>
 
@@ -336,12 +330,9 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
       {(error || syncStatus?.status === 'error') && (
         <div className='new-releases-error'>
           <span>{error || syncStatus?.error}</span>
-          <button
-            className='btn btn-sm btn-ghost'
-            onClick={() => handleCheckNow()}
-          >
+          <Button variant='ghost' size='small' onClick={() => handleCheckNow()}>
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
@@ -379,13 +370,14 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
 
         {/* Dismiss All button - only show when there are non-dismissed releases */}
         {releases.filter(r => !r.dismissed).length > 0 && (
-          <button
-            className='btn btn-sm btn-secondary'
+          <Button
+            variant='secondary'
+            size='small'
             onClick={handleDismissAll}
             disabled={isSyncing}
           >
             Dismiss All ({releases.filter(r => !r.dismissed).length})
-          </button>
+          </Button>
         )}
       </div>
 

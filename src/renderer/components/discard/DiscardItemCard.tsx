@@ -5,6 +5,7 @@ import {
   DiscardReason,
   DiscardStatus,
 } from '../../../shared/types';
+import { Button } from '../ui/Button';
 
 const REASON_LABELS: Record<DiscardReason, string> = {
   selling: 'For Sale',
@@ -144,63 +145,69 @@ const DiscardItemCard: React.FC<DiscardItemCardProps> = ({
       )}
 
       <div className='item-actions'>
-        <button
-          className='btn btn-small btn-secondary'
+        <Button
+          variant='secondary'
+          size='small'
           onClick={() => onEdit(item)}
           aria-label={`Edit ${item.artist} - ${item.title}`}
         >
           Edit
-        </button>
+        </Button>
         {item.status === 'marked' && (
           <>
-            <button
-              className='btn btn-small btn-primary'
+            <Button
+              size='small'
               onClick={() => onListed(item)}
               aria-label={`Mark ${item.artist} - ${item.title} as listed`}
             >
               Listed
-            </button>
-            <button
-              className='btn btn-small btn-success'
+            </Button>
+            <Button
+              variant='success'
+              size='small'
               onClick={() => onSold(item)}
               aria-label={`Mark ${item.artist} - ${item.title} as sold`}
             >
               Sold
-            </button>
-            <button
-              className='btn btn-small btn-outline-warning'
+            </Button>
+            <Button
+              variant='warning'
+              size='small'
               onClick={() => onTradedIn(item)}
               aria-label={`Mark ${item.artist} - ${item.title} as traded in`}
             >
               Traded In
-            </button>
+            </Button>
           </>
         )}
         {item.status === 'listed' && (
           <>
-            <button
-              className='btn btn-small btn-success'
+            <Button
+              variant='success'
+              size='small'
               onClick={() => onSold(item)}
               aria-label={`Mark ${item.artist} - ${item.title} as sold`}
             >
               Sold
-            </button>
-            <button
-              className='btn btn-small btn-outline-warning'
+            </Button>
+            <Button
+              variant='warning'
+              size='small'
               onClick={() => onTradedIn(item)}
               aria-label={`Mark ${item.artist} - ${item.title} as traded in`}
             >
               Traded In
-            </button>
+            </Button>
           </>
         )}
-        <button
-          className='btn btn-small btn-danger'
+        <Button
+          variant='danger'
+          size='small'
           onClick={() => onRemove(item)}
           aria-label={`Remove ${item.artist} - ${item.title}`}
         >
           Remove
-        </button>
+        </Button>
       </div>
     </div>
   );

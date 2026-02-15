@@ -2,6 +2,8 @@ import React from 'react';
 
 import { ScrobbleSession, ScrobbleTrack } from '../../shared/types';
 
+import { Button } from './ui/Button';
+
 interface UniqueAlbum {
   album: string;
   artist: string;
@@ -101,33 +103,31 @@ const ScrobbleSessionCard: React.FC<ScrobbleSessionCardProps> = ({
         </div>
 
         <div className='history-session-actions'>
-          <button
-            className='btn btn-small btn-secondary'
-            onClick={onToggleDetails}
-          >
+          <Button variant='secondary' size='small' onClick={onToggleDetails}>
             {isExpanded ? 'Hide Details' : 'View Details'}
-          </button>
+          </Button>
 
           {(session.status === 'pending' || session.status === 'failed') && (
             <>
-              <button
-                className='btn btn-small btn-danger'
+              <Button
+                variant='danger'
+                size='small'
                 onClick={() => onDelete(session.id)}
                 disabled={actionLoading === `delete-${session.id}`}
               >
                 {actionLoading === `delete-${session.id}`
                   ? 'Deleting...'
                   : 'Delete'}
-              </button>
-              <button
-                className='btn btn-small'
+              </Button>
+              <Button
+                size='small'
                 onClick={() => onResubmit(session.id)}
                 disabled={actionLoading === `resubmit-${session.id}`}
               >
                 {actionLoading === `resubmit-${session.id}`
                   ? 'Resubmitting...'
                   : 'Resubmit'}
-              </button>
+              </Button>
             </>
           )}
         </div>

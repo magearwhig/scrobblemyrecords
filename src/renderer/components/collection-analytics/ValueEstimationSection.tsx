@@ -14,6 +14,7 @@ import {
 } from '../../../shared/types';
 import { collectionAnalyticsApi } from '../../services/statsApi';
 import { createLogger } from '../../utils/logger';
+import { Button } from '../ui/Button';
 import { ProgressBar } from '../ui/ProgressBar';
 
 const log = createLogger('ValueEstimationSection');
@@ -173,13 +174,9 @@ const ValueEstimationSection: React.FC = () => {
               </div>
             </div>
           ) : (
-            <button
-              className='btn'
-              onClick={handleStartScan}
-              disabled={scanning}
-            >
+            <Button onClick={handleStartScan} disabled={scanning}>
               Scan Collection Value
-            </button>
+            </Button>
           )}
           {scanStatus.status === 'error' && scanStatus.error && (
             <p className='analytics-scan-info'>{scanStatus.error}</p>
@@ -236,15 +233,15 @@ const ValueEstimationSection: React.FC = () => {
               : 'All items have pricing data'}
             {estimation.mixedCurrencies && ' (mixed currencies detected)'}
           </div>
-          <button
-            className='btn btn-small'
+          <Button
+            size='small'
             onClick={handleStartScan}
             disabled={scanning || scanStatus.status === 'scanning'}
           >
             {scanning || scanStatus.status === 'scanning'
               ? 'Scanning...'
               : 'Rescan Values'}
-          </button>
+          </Button>
         </div>
         {(scanning || scanStatus.status === 'scanning') && (
           <div className='analytics-scan-progress'>

@@ -10,6 +10,7 @@ import {
 import { MissingAlbumsTab, MissingArtistsTab } from '../components/discovery';
 import SyncStatusBar from '../components/SyncStatusBar';
 import { Modal, ModalFooter } from '../components/ui';
+import { Button } from '../components/ui/Button';
 import { AlbumCardSkeleton, ListItemSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -377,9 +378,9 @@ const DiscoveryPage: React.FC = () => {
       {error && (
         <div className='message error'>
           <p>{error}</p>
-          <button className='btn btn-small' onClick={loadData}>
+          <Button size='small' onClick={loadData}>
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
@@ -472,13 +473,12 @@ const DiscoveryPage: React.FC = () => {
               placeholder='Search by artist or album...'
               className='mapping-search-input'
             />
-            <button
-              className='btn'
+            <Button
               onClick={handleSearch}
               disabled={searchLoading || !searchQuery.trim()}
             >
               {searchLoading ? 'Searching...' : 'Search'}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -530,9 +530,9 @@ const DiscoveryPage: React.FC = () => {
         </div>
 
         <ModalFooter>
-          <button className='btn btn-secondary' onClick={closeMappingModal}>
+          <Button variant='secondary' onClick={closeMappingModal}>
             Cancel
-          </button>
+          </Button>
         </ModalFooter>
       </Modal>
     </div>

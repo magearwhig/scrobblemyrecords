@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import ApiService from '../../services/api';
 import { createLogger } from '../../utils/logger';
+import { Button } from '../ui/Button';
 
 const log = createLogger('SettingsConnectionsSection');
 
@@ -392,13 +393,12 @@ const SettingsConnectionsSection: React.FC<SettingsConnectionsSectionProps> = ({
           already configured.
         </p>
 
-        <button
-          className='btn'
+        <Button
           onClick={handleDiscogsAuth}
           disabled={loading === 'discogs' || authStatus.discogs.authenticated}
         >
           {loading === 'discogs' ? 'Connecting...' : 'Connect to Discogs'}
-        </button>
+        </Button>
 
         {/* Manual Token Entry */}
         <div className='alternative-method-section'>
@@ -455,8 +455,7 @@ const SettingsConnectionsSection: React.FC<SettingsConnectionsSectionProps> = ({
             </small>
           </div>
 
-          <button
-            className='btn'
+          <Button
             onClick={() => {
               handleDiscogsPersonalTokenAuth();
             }}
@@ -470,7 +469,7 @@ const SettingsConnectionsSection: React.FC<SettingsConnectionsSectionProps> = ({
             {loading === 'discogs-personal'
               ? 'Authenticating...'
               : 'Submit Personal Token'}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -493,13 +492,12 @@ const SettingsConnectionsSection: React.FC<SettingsConnectionsSectionProps> = ({
           configured.
         </p>
 
-        <button
-          className='btn'
+        <Button
           onClick={handleLastfmAuth}
           disabled={loading === 'lastfm' || authStatus.lastfm.authenticated}
         >
           {loading === 'lastfm' ? 'Connecting...' : 'Connect to Last.fm'}
-        </button>
+        </Button>
 
         {/* Manual Token Entry */}
         <div className='alternative-method-section'>
@@ -522,8 +520,7 @@ const SettingsConnectionsSection: React.FC<SettingsConnectionsSectionProps> = ({
             />
           </div>
 
-          <button
-            className='btn'
+          <Button
             onClick={handleLastfmManualAuth}
             disabled={
               loading === 'lastfm-manual' ||
@@ -534,7 +531,7 @@ const SettingsConnectionsSection: React.FC<SettingsConnectionsSectionProps> = ({
             {loading === 'lastfm-manual'
               ? 'Authenticating...'
               : 'Submit Last.fm Token'}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -542,13 +539,13 @@ const SettingsConnectionsSection: React.FC<SettingsConnectionsSectionProps> = ({
       <div className='card'>
         <h3>Clear Authentication</h3>
         <p>Remove all stored authentication data and start over.</p>
-        <button
-          className='btn btn-danger'
+        <Button
+          variant='danger'
           onClick={handleClearAuth}
           disabled={loading === 'clear'}
         >
           {loading === 'clear' ? 'Clearing...' : 'Clear All Authentication'}
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -22,8 +22,8 @@
 
 /* Size variants */
 .button--small {
-  padding: 0.4rem 0.75rem;
-  font-size: 0.8rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
   border-radius: 6px;
 }
 
@@ -98,6 +98,18 @@
   border-color: var(--text-secondary);
 }
 
+/* Warning variant (outline style with warning color) */
+.button--warning {
+  background: transparent;
+  color: var(--accent-warning, #f59e0b);
+  border-color: var(--accent-warning, #f59e0b);
+}
+
+.button--warning:hover:not(:disabled) {
+  background: var(--accent-warning, #f59e0b);
+  color: white;
+}
+
 /* Ghost variant (no border) */
 .button--ghost {
   background: transparent;
@@ -150,6 +162,11 @@
   border-right-color: transparent;
 }
 
+.button--warning .button-spinner {
+  border-color: var(--accent-warning, #f59e0b);
+  border-right-color: transparent;
+}
+
 @keyframes button-spin {
   to {
     transform: rotate(360deg);
@@ -181,6 +198,25 @@
   line-height: 1.2;
 }
 
+/* Filter button effects (lift and shadow on hover, used for disc/side toggles) */
+.button--filter {
+  position: relative;
+}
+
+.button--filter.button--outline:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.button--filter.button--primary {
+  box-shadow: 0 2px 4px rgba(29, 185, 84, 0.3);
+}
+
+.button--filter.button--primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(29, 185, 84, 0.4);
+}
+
 /* Dark mode adjustments */
 .dark-mode .button--outline:hover:not(:disabled) {
   background: var(--bg-hover);
@@ -188,4 +224,27 @@
 
 .dark-mode .button--ghost:hover:not(:disabled) {
   background: var(--bg-hover);
+}
+
+.dark-mode .button--filter.button--outline:hover:not(:disabled) {
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
+}
+
+/* Accessibility: high contrast for filter buttons */
+@media (prefers-contrast: high) {
+  .button--filter.button--outline,
+  .button--filter.button--primary {
+    border-width: 2px;
+  }
+}
+
+/* Accessibility: reduced motion for filter buttons */
+@media (prefers-reduced-motion: reduce) {
+  .button--filter {
+    transition: none;
+  }
+
+  .button--filter:hover {
+    transform: none;
+  }
 }

@@ -449,7 +449,7 @@ describe('LastFmHistoryTab', () => {
         expect(screen.getByText('Next')).toBeInTheDocument();
       });
 
-      await user.click(screen.getByText('Next'));
+      await user.click(screen.getByRole('button', { name: /Next/ }));
 
       await waitFor(() => {
         expect(mockApi.getAlbumHistoryPaginated).toHaveBeenCalledWith(
@@ -475,9 +475,9 @@ describe('LastFmHistoryTab', () => {
       jest.advanceTimersByTime(300);
 
       await waitFor(() => {
-        const prevButton = screen.getByText('Previous');
+        const prevButton = screen.getByRole('button', { name: /Previous/ });
         expect(prevButton).toBeDisabled();
-        expect(screen.getByText('First')).toBeDisabled();
+        expect(screen.getByRole('button', { name: /First/ })).toBeDisabled();
       });
     });
   });

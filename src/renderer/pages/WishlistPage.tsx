@@ -11,6 +11,7 @@ import {
   VinylStatus,
 } from '../../shared/types';
 import { Modal } from '../components/ui';
+import { Button } from '../components/ui/Button';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import {
   AlbumCardSkeleton,
@@ -556,8 +557,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
         <div className='page-header'>
           <h2>Wishlist</h2>
           <div className='page-header-actions'>
-            <button
-              className='btn btn-primary'
+            <Button
               onClick={() => handleSync(false)}
               disabled={
                 syncStarting ||
@@ -571,9 +571,9 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
                     syncStatus?.status === 'checking_vinyl'
                   ? 'Syncing...'
                   : 'Sync Wishlist'}
-            </button>
-            <button
-              className='btn btn-secondary'
+            </Button>
+            <Button
+              variant='secondary'
               onClick={() => handleSync(true)}
               disabled={
                 syncStarting ||
@@ -583,14 +583,13 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
               title='Re-check vinyl availability for all items (slower, makes more API calls)'
             >
               Refresh All
-            </button>
+            </Button>
           </div>
         </div>
       )}
       {embedded && (
         <div className='wishlist-actions'>
-          <button
-            className='btn btn-primary'
+          <Button
             onClick={() => handleSync(false)}
             disabled={
               syncStarting ||
@@ -604,9 +603,9 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
                   syncStatus?.status === 'checking_vinyl'
                 ? 'Syncing...'
                 : 'Sync Wishlist'}
-          </button>
-          <button
-            className='btn btn-secondary'
+          </Button>
+          <Button
+            variant='secondary'
             onClick={() => handleSync(true)}
             disabled={
               syncStarting ||
@@ -616,7 +615,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
             title='Re-check vinyl availability for all items (slower, makes more API calls)'
           >
             Refresh All
-          </button>
+          </Button>
         </div>
       )}
 
@@ -748,13 +747,12 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
       activeTab === 'monitoring' ? (
         <>
           <div className='monitoring-actions'>
-            <button
-              className='btn btn-primary'
+            <Button
               onClick={handleCheckLocalVinyl}
               disabled={checkingLocalVinyl || localWantItems.length === 0}
             >
               {checkingLocalVinyl ? 'Checking...' : 'Check for Vinyl'}
-            </button>
+            </Button>
             <span className='monitoring-info'>
               Albums added from Discovery page. Click "Check for Vinyl" to see
               if any are now available on vinyl.
@@ -806,8 +804,8 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
                   </div>
                   <div className='wishlist-card-actions'>
                     {item.vinylStatus === 'has_vinyl' && item.masterId && (
-                      <button
-                        className='btn btn-small btn-primary'
+                      <Button
+                        size='small'
                         onClick={() => {
                           const url = `https://www.discogs.com/sell/list?master_id=${item.masterId}&format=Vinyl`;
                           window.open(url, '_blank', 'noopener,noreferrer');
@@ -815,15 +813,16 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
                         title='Browse vinyl on Discogs Marketplace'
                       >
                         Shop
-                      </button>
+                      </Button>
                     )}
-                    <button
-                      className='btn btn-small btn-danger'
+                    <Button
+                      variant='danger'
+                      size='small'
                       onClick={() => handleRemoveFromLocalWant(item.id)}
                       title='Stop monitoring this album'
                     >
                       Remove
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -922,8 +921,9 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
                           : 'N/A'}
                       </td>
                       <td>
-                        <button
-                          className='btn btn-small btn-secondary'
+                        <Button
+                          variant='secondary'
+                          size='small'
                           onClick={() =>
                             window.open(
                               `https://www.discogs.com/release/${version.releaseId}`,
@@ -932,7 +932,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
                           }
                         >
                           View
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   ))}

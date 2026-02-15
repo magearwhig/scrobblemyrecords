@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { SuggestionResult, SuggestionFactors } from '../../shared/types';
 import { createLogger } from '../utils/logger';
 
+import { Button } from './ui/Button';
+
 const logger = createLogger('SuggestionCard');
 
 interface SuggestionCardProps {
@@ -150,23 +152,21 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
         )}
 
         <div className='suggestion-card-actions'>
-          <button className='btn btn-small' onClick={handleViewInCollection}>
+          <Button size='small' onClick={handleViewInCollection}>
             View in Collection
-          </button>
-          <button
-            className='btn btn-small btn-secondary'
-            onClick={handleViewDetails}
-          >
+          </Button>
+          <Button variant='secondary' size='small' onClick={handleViewDetails}>
             Details
-          </button>
+          </Button>
           {onDismiss && (
-            <button
-              className='btn btn-small btn-secondary'
+            <Button
+              variant='secondary'
+              size='small'
               onClick={() => onDismiss(album.id)}
               title='Dismiss this suggestion'
             >
               Not now
-            </button>
+            </Button>
           )}
         </div>
       </div>

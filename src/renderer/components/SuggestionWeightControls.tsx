@@ -2,6 +2,8 @@ import React from 'react';
 
 import { SuggestionWeights } from '../../shared/types';
 
+import { Button } from './ui/Button';
+
 interface WeightControlsProps {
   weights: SuggestionWeights;
   onChange: (weights: SuggestionWeights) => void;
@@ -69,12 +71,9 @@ const SuggestionWeightControls: React.FC<WeightControlsProps> = ({
   if (collapsed && onToggleCollapsed) {
     return (
       <div className='weight-controls weight-controls-collapsed'>
-        <button
-          className='btn btn-small btn-secondary'
-          onClick={onToggleCollapsed}
-        >
+        <Button variant='secondary' size='small' onClick={onToggleCollapsed}>
           Show Weight Controls
-        </button>
+        </Button>
       </div>
     );
   }
@@ -84,20 +83,22 @@ const SuggestionWeightControls: React.FC<WeightControlsProps> = ({
       <div className='weight-controls-header'>
         <h3>Suggestion Weights</h3>
         <div className='weight-controls-actions'>
-          <button
-            className='btn btn-small btn-secondary'
+          <Button
+            variant='secondary'
+            size='small'
             onClick={onReset}
             title='Reset all weights to defaults'
           >
             Reset
-          </button>
+          </Button>
           {onToggleCollapsed && (
-            <button
-              className='btn btn-small btn-secondary'
+            <Button
+              variant='secondary'
+              size='small'
               onClick={onToggleCollapsed}
             >
               Hide
-            </button>
+            </Button>
           )}
         </div>
       </div>

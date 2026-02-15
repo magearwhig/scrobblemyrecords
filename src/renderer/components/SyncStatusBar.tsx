@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SyncStatus } from '../../shared/types';
 import { getApiService } from '../services/api';
 
+import { Button } from './ui/Button';
 import { ProgressBar } from './ui/ProgressBar';
 
 interface SyncStatusBarProps {
@@ -159,9 +160,9 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
     return (
       <div className='sync-status-bar sync-status-error'>
         <span className='error-text'>{error}</span>
-        <button className='btn btn-small' onClick={() => fetchStatus()}>
+        <Button size='small' onClick={() => fetchStatus()}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -191,12 +192,13 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
 
     return (
       <div className='sync-status-compact sync-status-empty'>
-        <button
-          className='btn btn-small btn-link'
+        <Button
+          variant='ghost'
+          size='small'
           onClick={() => handleStartSync(false)}
         >
           Sync history to enable suggestions
-        </button>
+        </Button>
       </div>
     );
   }
@@ -223,12 +225,9 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
             </div>
             <ProgressBar value={syncStatus.progress} size='small' animated />
           </div>
-          <button
-            className='btn btn-small btn-secondary'
-            onClick={handlePauseSync}
-          >
+          <Button variant='secondary' size='small' onClick={handlePauseSync}>
             Pause
-          </button>
+          </Button>
         </>
       )}
 
@@ -241,9 +240,9 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
               {syncStatus.scrobblesFetched.toLocaleString()} scrobbles)
             </span>
           </div>
-          <button className='btn btn-small' onClick={handleResumeSync}>
+          <Button size='small' onClick={handleResumeSync}>
             Resume
-          </button>
+          </Button>
         </>
       )}
 
@@ -258,22 +257,24 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
             Last synced: {formatLastSync(storageStats?.lastSync || null)}
           </span>
           <div className='sync-button-group'>
-            <button
-              className='btn btn-small btn-secondary'
+            <Button
+              variant='secondary'
+              size='small'
               onClick={() => handleStartSync(true)}
               disabled={isStartingSync}
               title='Fetch new scrobbles since last sync'
             >
               {isStartingSync ? 'Syncing...' : 'Refresh'}
-            </button>
-            <button
-              className='btn btn-small btn-link'
+            </Button>
+            <Button
+              variant='ghost'
+              size='small'
               onClick={() => handleStartSync(false)}
               disabled={isStartingSync}
               title='Re-fetch all scrobbles (use if you edited scrobbles on Last.fm)'
             >
               Full Re-sync
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -290,22 +291,24 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
                 Last synced: {formatLastSync(storageStats.lastSync)}
               </span>
               <div className='sync-button-group'>
-                <button
-                  className='btn btn-small btn-secondary'
+                <Button
+                  variant='secondary'
+                  size='small'
                   onClick={() => handleStartSync(true)}
                   disabled={isStartingSync}
                   title='Fetch new scrobbles since last sync'
                 >
                   {isStartingSync ? 'Syncing...' : 'Sync New'}
-                </button>
-                <button
-                  className='btn btn-small btn-link'
+                </Button>
+                <Button
+                  variant='ghost'
+                  size='small'
                   onClick={() => handleStartSync(false)}
                   disabled={isStartingSync}
                   title='Re-fetch all scrobbles (use if you edited scrobbles on Last.fm)'
                 >
                   Full Re-sync
-                </button>
+                </Button>
               </div>
             </>
           ) : (
@@ -314,13 +317,13 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
               <span className='sync-detail'>
                 Sync your Last.fm history to enable intelligent suggestions
               </span>
-              <button
-                className='btn btn-small'
+              <Button
+                size='small'
                 onClick={() => handleStartSync(false)}
                 disabled={isStartingSync}
               >
                 {isStartingSync ? 'Starting...' : 'Start Full Sync'}
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -331,13 +334,13 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
           <span className='error-text'>
             {syncStatus.error || 'Sync failed'}
           </span>
-          <button
-            className='btn btn-small'
+          <Button
+            size='small'
             onClick={() => handleStartSync(false)}
             disabled={isStartingSync}
           >
             {isStartingSync ? 'Retrying...' : 'Retry'}
-          </button>
+          </Button>
         </div>
       )}
     </div>

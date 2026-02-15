@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { MissingAlbum } from '../../../shared/types';
+import { Button } from '../ui/Button';
 
 type AlbumSortOption = 'plays' | 'artist' | 'album' | 'recent';
 
@@ -140,37 +141,41 @@ const MissingAlbumsTab: React.FC<MissingAlbumsTabProps> = ({
                 <span>Last: {formatDate(album.lastPlayed)}</span>
               </div>
               <div className='missing-item-actions'>
-                <button
-                  className='btn btn-small btn-icon'
+                <Button
+                  variant='outline'
+                  size='small'
                   onClick={() =>
                     openLink(getLastFmAlbumUrl(album.artist, album.album))
                   }
                   title='View album on Last.fm'
                 >
                   Last.fm
-                </button>
-                <button
-                  className='btn btn-small btn-icon'
+                </Button>
+                <Button
+                  variant='outline'
+                  size='small'
                   onClick={() =>
                     openLink(getDiscogsAlbumUrl(album.artist, album.album))
                   }
                   title='Search album on Discogs'
                 >
                   Discogs
-                </button>
-                <button
-                  className='btn btn-small btn-secondary'
+                </Button>
+                <Button
+                  variant='secondary'
+                  size='small'
                   onClick={() => openAlbumMapping(album)}
                   title='Map to collection item'
                 >
                   Map
-                </button>
-                <button
-                  className={`btn btn-small ${
+                </Button>
+                <Button
+                  variant={
                     addedToWantList.has(`${album.artist}:${album.album}`)
-                      ? 'btn-success'
-                      : 'btn-primary'
-                  }`}
+                      ? 'success'
+                      : 'primary'
+                  }
+                  size='small'
                   onClick={() => handleAddToWantList(album)}
                   disabled={
                     addingToWantList.has(`${album.artist}:${album.album}`) ||
@@ -183,14 +188,15 @@ const MissingAlbumsTab: React.FC<MissingAlbumsTabProps> = ({
                     : addedToWantList.has(`${album.artist}:${album.album}`)
                       ? 'Monitoring'
                       : 'Monitor'}
-                </button>
-                <button
-                  className='btn btn-small btn-link'
+                </Button>
+                <Button
+                  variant='ghost'
+                  size='small'
                   onClick={() => handleHideAlbum(album)}
                   title='Hide from discovery (e.g., podcasts)'
                 >
                   Hide
-                </button>
+                </Button>
               </div>
             </div>
           ))}

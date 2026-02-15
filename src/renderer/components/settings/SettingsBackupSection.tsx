@@ -8,6 +8,7 @@ import {
 } from '../../../shared/types';
 import ApiService from '../../services/api';
 import { createLogger } from '../../utils/logger';
+import { Button } from '../ui/Button';
 
 import BackupImportDialog from './BackupImportDialog';
 
@@ -336,13 +337,9 @@ const SettingsBackupSection: React.FC<SettingsBackupSectionProps> = ({
           <div className='success-message'>{exportSuccess}</div>
         )}
 
-        <button
-          className='btn btn-primary'
-          onClick={handleExport}
-          disabled={exportLoading}
-        >
+        <Button onClick={handleExport} disabled={exportLoading}>
           {exportLoading ? 'Exporting...' : 'Export Backup'}
-        </button>
+        </Button>
       </div>
 
       {/* Import Backup */}
@@ -360,12 +357,12 @@ const SettingsBackupSection: React.FC<SettingsBackupSectionProps> = ({
           style={{ display: 'none' }}
         />
 
-        <button
-          className='btn btn-secondary'
+        <Button
+          variant='secondary'
           onClick={() => fileInputRef.current?.click()}
         >
           Choose Backup File...
-        </button>
+        </Button>
       </div>
 
       {/* Auto-Backup Settings */}
@@ -451,20 +448,16 @@ const SettingsBackupSection: React.FC<SettingsBackupSectionProps> = ({
             )}
 
             <div className='button-group'>
-              <button
-                className='btn btn-primary'
-                onClick={handleSaveSettings}
-                disabled={settingsLoading}
-              >
+              <Button onClick={handleSaveSettings} disabled={settingsLoading}>
                 {settingsLoading ? 'Saving...' : 'Save Settings'}
-              </button>
-              <button
-                className='btn btn-secondary'
+              </Button>
+              <Button
+                variant='secondary'
                 onClick={handleRunAutoBackup}
                 disabled={settingsLoading}
               >
                 Backup Now
-              </button>
+              </Button>
             </div>
           </>
         )}
@@ -480,12 +473,13 @@ const SettingsBackupSection: React.FC<SettingsBackupSectionProps> = ({
                   <span className='backup-meta'>
                     {formatDate(backup.createdAt)} ({formatBytes(backup.size)})
                   </span>
-                  <button
-                    className='btn btn-danger btn-small'
+                  <Button
+                    variant='danger'
+                    size='small'
                     onClick={() => handleDeleteAutoBackup(backup.filename)}
                   >
                     Delete
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>

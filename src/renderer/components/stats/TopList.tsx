@@ -15,6 +15,7 @@ import {
 } from '../../utils/spotifyUtils';
 import ArtistLink from '../ArtistLink';
 import TrackLink from '../TrackLink';
+import { IconButton } from '../ui/Button';
 
 import DateRangePicker from './DateRangePicker';
 
@@ -320,8 +321,12 @@ export const TopList: React.FC<TopListProps> = ({
                       </div>
                     )}
                   </div>
-                  <button
-                    className='btn btn-small btn-icon top-list-play-btn'
+                  <IconButton
+                    icon={<>▶️</>}
+                    aria-label='Play on Spotify'
+                    variant='ghost'
+                    size='small'
+                    className='top-list-play-btn'
                     onClick={() => {
                       if (isTrackData(item)) {
                         playTrackOnSpotify(item.artist, item.track, item.album);
@@ -330,9 +335,7 @@ export const TopList: React.FC<TopListProps> = ({
                       }
                     }}
                     title='Play on Spotify'
-                  >
-                    ▶️
-                  </button>
+                  />
                   <div className='top-list-count'>
                     {item.playCount.toLocaleString()}
                   </div>

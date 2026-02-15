@@ -35,6 +35,21 @@ describe('Button', () => {
 
     rerender(<Button variant='ghost'>Ghost</Button>);
     expect(screen.getByRole('button')).toHaveClass('button--ghost');
+
+    rerender(<Button variant='warning'>Warning</Button>);
+    expect(screen.getByRole('button')).toHaveClass('button--warning');
+  });
+
+  it('renders warning variant with loading spinner', () => {
+    render(
+      <Button variant='warning' loading>
+        Warning Loading
+      </Button>
+    );
+    const button = screen.getByRole('button');
+    expect(button).toHaveClass('button--warning', 'button--loading');
+    expect(button).toBeDisabled();
+    expect(button.querySelector('.button-spinner')).toBeInTheDocument();
   });
 
   it('renders different sizes', () => {

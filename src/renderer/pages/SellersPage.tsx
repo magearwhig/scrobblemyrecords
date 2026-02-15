@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { MonitoredSeller, SellerScanStatus } from '../../shared/types';
 import SellerCard from '../components/SellerCard';
 import { Modal, ModalFooter } from '../components/ui';
+import { Button } from '../components/ui/Button';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { ListItemSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
@@ -314,9 +315,7 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
         {!embedded && <h1>Local Sellers</h1>}
         <div className='error-state'>
           <p>{error}</p>
-          <button className='btn' onClick={loadSellers}>
-            Try Again
-          </button>
+          <Button onClick={loadSellers}>Try Again</Button>
         </div>
       </div>
     );
@@ -334,14 +333,13 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
               You need items in your Discogs wishlist or local want list before
               scanning seller inventories.
             </p>
-            <button
-              className='btn'
+            <Button
               onClick={() => {
                 window.location.hash = 'marketplace?tab=wishlist';
               }}
             >
               Go to Wishlist
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -362,12 +360,10 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
 
       {/* Header actions */}
       <div className='sellers-header'>
-        <button className='btn' onClick={() => setAddDialogOpen(true)}>
-          + Add Seller
-        </button>
+        <Button onClick={() => setAddDialogOpen(true)}>+ Add Seller</Button>
         <div className='sellers-scan-buttons'>
-          <button
-            className='btn btn-secondary'
+          <Button
+            variant='secondary'
             onClick={() => handleTriggerScan(false)}
             disabled={
               scanStatus?.status === 'scanning' ||
@@ -383,9 +379,10 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
                   scanStatus?.status === 'matching'
                 ? 'Scanning...'
                 : 'Check for New'}
-          </button>
-          <button
-            className='btn btn-outline btn-small'
+          </Button>
+          <Button
+            variant='outline'
+            size='small'
             onClick={() => handleTriggerScan(true)}
             disabled={
               scanStatus?.status === 'scanning' ||
@@ -396,7 +393,7 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
             title='Re-fetch ALL inventory pages from Discogs API (slow)'
           >
             Full Inventory Refresh
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -435,8 +432,8 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
             )}
           </div>
           <div className='sellers-cache-actions'>
-            <button
-              className='btn btn-small'
+            <Button
+              size='small'
               onClick={handleRefreshCache}
               disabled={
                 refreshingCache ||
@@ -446,7 +443,7 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
               title='Fetch all release IDs for wishlist masters from Discogs'
             >
               {refreshingCache ? 'Building Cache...' : 'Build/Refresh Cache'}
-            </button>
+            </Button>
             {cacheStats.lastUpdated > 0 && (
               <span className='sellers-cache-updated'>
                 Last updated: {formatRelativeTime(cacheStats.lastUpdated)}
@@ -551,9 +548,9 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
               Add local record shops by their Discogs username to monitor their
               inventories for items on your wishlist.
             </p>
-            <button className='btn' onClick={() => setAddDialogOpen(true)}>
+            <Button onClick={() => setAddDialogOpen(true)}>
               + Add Your First Seller
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
@@ -608,34 +605,33 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
         </div>
         {addError && <div className='form-error'>{addError}</div>}
         <ModalFooter>
-          <button
-            className='btn btn-secondary'
+          <Button
+            variant='secondary'
             onClick={() => setAddDialogOpen(false)}
             disabled={addingInProgress}
           >
             Cancel
-          </button>
-          <button
-            className='btn'
+          </Button>
+          <Button
             onClick={handleAddSeller}
             disabled={addingInProgress || !newSellerUsername.trim()}
           >
             {addingInProgress ? 'Adding...' : 'Add Seller'}
-          </button>
+          </Button>
         </ModalFooter>
       </Modal>
 
       {/* View all matches link */}
       {sellers.some(s => (s.matchCount || 0) > 0) && (
         <div className='sellers-view-all'>
-          <button
-            className='btn btn-outline'
+          <Button
+            variant='outline'
             onClick={() => {
               window.location.hash = 'marketplace?tab=matches';
             }}
           >
             View All Matches
-          </button>
+          </Button>
         </div>
       )}
     </div>

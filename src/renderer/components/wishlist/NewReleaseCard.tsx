@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { WishlistNewRelease } from '../../../shared/types';
+import { Button } from '../ui/Button';
 
 interface Props {
   release: WishlistNewRelease;
@@ -130,14 +131,12 @@ export const NewReleaseCard: React.FC<Props> = ({ release, onDismiss }) => {
       </div>
 
       <div className='new-release-card-actions'>
-        <button
-          className='btn btn-primary btn-sm'
-          onClick={handleViewOnDiscogs}
-        >
+        <Button size='small' onClick={handleViewOnDiscogs}>
           View on Discogs
-        </button>
-        <button
-          className='btn btn-ghost btn-sm'
+        </Button>
+        <Button
+          variant='ghost'
+          size='small'
           onClick={() => onDismiss(release.id)}
           title={release.dismissed ? 'Already dismissed' : 'Dismiss'}
           aria-label={
@@ -145,7 +144,7 @@ export const NewReleaseCard: React.FC<Props> = ({ release, onDismiss }) => {
           }
         >
           {release.dismissed ? '\u2713' : '\u2715'}
-        </button>
+        </Button>
       </div>
     </div>
   );

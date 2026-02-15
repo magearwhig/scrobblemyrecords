@@ -2,6 +2,8 @@ import React from 'react';
 
 import { MonitoredSeller } from '../../shared/types';
 
+import { Button } from './ui/Button';
+
 interface SellerCardProps {
   seller: MonitoredSeller;
   formatRelativeTime: (timestamp: number) => string;
@@ -36,22 +38,23 @@ const SellerCard: React.FC<SellerCardProps> = ({
       </div>
       <div className='seller-card-actions'>
         {(seller.matchCount || 0) > 0 && (
-          <button
-            className='btn btn-small'
+          <Button
+            size='small'
             onClick={() => {
               window.location.hash = `marketplace?tab=matches&seller=${encodeURIComponent(seller.username)}`;
             }}
           >
             View Matches
-          </button>
+          </Button>
         )}
-        <button
-          className='btn btn-small btn-danger'
+        <Button
+          variant='danger'
+          size='small'
           onClick={() => onRemove(seller.username)}
           disabled={removing}
         >
           {removing ? 'Removing...' : 'Remove'}
-        </button>
+        </Button>
       </div>
     </div>
   );

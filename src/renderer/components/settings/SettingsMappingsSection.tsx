@@ -11,6 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useConfirmModal } from '../../hooks/useConfirmModal';
 import ApiService from '../../services/api';
 import { createLogger } from '../../utils/logger';
+import { Button } from '../ui/Button';
 
 const logger = createLogger('SettingsMappingsSection');
 
@@ -536,32 +537,32 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
           {error && (
             <div className='error-message'>
               {error}
-              <button className='btn btn-small' onClick={clearMessages}>
+              <Button size='small' onClick={clearMessages}>
                 Dismiss
-              </button>
+              </Button>
             </div>
           )}
 
           {success && (
             <div className='message success'>
               {success}
-              <button className='btn btn-small' onClick={clearMessages}>
+              <Button size='small' onClick={clearMessages}>
                 Dismiss
-              </button>
+              </Button>
             </div>
           )}
 
           {/* Import/Export Controls */}
           <div className='settings-actions-row'>
-            <button
-              className='btn btn-secondary'
+            <Button
+              variant='secondary'
               onClick={handleExportMappings}
               disabled={loading || mappings.length === 0}
             >
               Export Mappings
-            </button>
+            </Button>
 
-            <label className='btn btn-secondary settings-import-btn'>
+            <label className='button button--secondary button--medium settings-import-btn'>
               Import Mappings
               <input
                 type='file'
@@ -571,13 +572,13 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
               />
             </label>
 
-            <button
-              className='btn btn-danger'
+            <Button
+              variant='danger'
               onClick={handleClearMappings}
               disabled={loading || mappings.length === 0}
             >
               Clear All
-            </button>
+            </Button>
           </div>
 
           {/* Add New Mapping */}
@@ -648,13 +649,9 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                   onKeyPress={e => e.key === 'Enter' && handleAddMapping()}
                 />
               </div>
-              <button
-                className='btn'
-                onClick={handleAddMapping}
-                disabled={loading}
-              >
+              <Button onClick={handleAddMapping} disabled={loading}>
                 Add Mapping
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -712,8 +709,8 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                         </div>
                       </div>
                       <div className='settings-suggestion-actions'>
-                        <button
-                          className='btn btn-small'
+                        <Button
+                          size='small'
                           onClick={() =>
                             handleQuickAddMapping(
                               suggestion.artist,
@@ -723,9 +720,10 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                           title={`Map to "${suggestion.suggestedMapping}"`}
                         >
                           Map to &quot;{suggestion.suggestedMapping}&quot;
-                        </button>
-                        <button
-                          className='btn btn-small btn-secondary'
+                        </Button>
+                        <Button
+                          variant='secondary'
+                          size='small'
                           onClick={() => {
                             setNewMapping({
                               discogsName: suggestion.artist,
@@ -738,7 +736,7 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                           title='Customize mapping'
                         >
                           Custom
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -799,25 +797,27 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                     <div className='settings-mapping-actions'>
                       {editingMapping === mapping.discogsName ? (
                         <>
-                          <button
-                            className='btn btn-small'
+                          <Button
+                            size='small'
                             onClick={() =>
                               handleUpdateMapping(mapping.discogsName)
                             }
                           >
                             Save
-                          </button>
-                          <button
-                            className='btn btn-small btn-secondary'
+                          </Button>
+                          <Button
+                            variant='secondary'
+                            size='small'
                             onClick={cancelEditing}
                           >
                             Cancel
-                          </button>
+                          </Button>
                         </>
                       ) : (
                         <>
-                          <button
-                            className='btn btn-small btn-secondary'
+                          <Button
+                            variant='secondary'
+                            size='small'
                             onClick={() =>
                               startEditing(
                                 mapping.discogsName,
@@ -826,15 +826,16 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                             }
                           >
                             Edit
-                          </button>
-                          <button
-                            className='btn btn-small btn-danger'
+                          </Button>
+                          <Button
+                            variant='danger'
+                            size='small'
                             onClick={() =>
                               handleDeleteMapping(mapping.discogsName)
                             }
                           >
                             Delete
-                          </button>
+                          </Button>
                         </>
                       )}
                     </div>
@@ -899,8 +900,9 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                             {mapping.collectionAlbum}
                           </div>
                         </div>
-                        <button
-                          className='btn btn-small btn-danger'
+                        <Button
+                          variant='danger'
+                          size='small'
                           onClick={() =>
                             handleDeleteDiscoveryAlbumMapping(
                               mapping.historyArtist,
@@ -909,7 +911,7 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                           }
                         >
                           Delete
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -944,8 +946,9 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                             {mapping.collectionArtist}
                           </div>
                         </div>
-                        <button
-                          className='btn btn-small btn-danger'
+                        <Button
+                          variant='danger'
+                          size='small'
                           onClick={() =>
                             handleDeleteDiscoveryArtistMapping(
                               mapping.historyArtist
@@ -953,7 +956,7 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                           }
                         >
                           Delete
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -1025,8 +1028,9 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                         {new Date(mapping.createdAt).toLocaleDateString()}
                       </div>
                     </div>
-                    <button
-                      className='btn btn-small btn-danger'
+                    <Button
+                      variant='danger'
+                      size='small'
                       onClick={() =>
                         handleDeleteTrackMapping(
                           mapping.historyArtist,
@@ -1036,7 +1040,7 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                       }
                     >
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -1117,14 +1121,15 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                         on {new Date(mapping.confirmedAt).toLocaleDateString()}
                       </div>
                     </div>
-                    <button
-                      className='btn btn-small btn-danger'
+                    <Button
+                      variant='danger'
+                      size='small'
                       onClick={() =>
                         handleDeleteMbidMapping(mapping.discogsArtistName)
                       }
                     >
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>

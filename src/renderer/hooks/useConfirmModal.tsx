@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
 
+import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 
 interface ConfirmState {
@@ -58,12 +59,12 @@ export function useConfirmModal() {
       size='small'
       footer={
         <>
-          <button className='btn btn-secondary' onClick={handleClose}>
+          <Button variant='secondary' onClick={handleClose}>
             {state.cancelLabel}
-          </button>
-          <button className='btn btn-primary' onClick={handleConfirm} autoFocus>
+          </Button>
+          <Button onClick={handleConfirm} autoFocus>
             {state.confirmLabel}
-          </button>
+          </Button>
         </>
       }
     >

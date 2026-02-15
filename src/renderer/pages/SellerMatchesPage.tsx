@@ -7,6 +7,7 @@ import {
   SellerMatch,
 } from '../../shared/types';
 import MatchCard from '../components/MatchCard';
+import { Button } from '../components/ui/Button';
 import { AlbumCardSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
@@ -296,9 +297,7 @@ const SellerMatchesPage: React.FC<SellerMatchesPageProps> = ({
         {!embedded && <h1>Wishlist Matches</h1>}
         <div className='error-state'>
           <p>{error}</p>
-          <button className='btn' onClick={loadData}>
-            Try Again
-          </button>
+          <Button onClick={loadData}>Try Again</Button>
         </div>
       </div>
     );
@@ -327,14 +326,15 @@ const SellerMatchesPage: React.FC<SellerMatchesPageProps> = ({
       {/* Back link - hidden when embedded in Marketplace tabs */}
       {!embedded && (
         <div className='seller-matches-back'>
-          <button
-            className='btn btn-outline btn-small'
+          <Button
+            variant='outline'
+            size='small'
             onClick={() => {
               window.location.hash = 'marketplace?tab=sellers';
             }}
           >
             &larr; Back to Sellers
-          </button>
+          </Button>
         </div>
       )}
 
@@ -392,12 +392,9 @@ const SellerMatchesPage: React.FC<SellerMatchesPageProps> = ({
                 : "Your monitored sellers don't currently have any of your wishlist items. Try scanning again or adding more sellers."}
             </p>
             {filterSeller && (
-              <button
-                className='btn btn-outline'
-                onClick={() => setFilterSeller(null)}
-              >
+              <Button variant='outline' onClick={() => setFilterSeller(null)}>
                 Show All Sellers
-              </button>
+              </Button>
             )}
           </div>
         </div>

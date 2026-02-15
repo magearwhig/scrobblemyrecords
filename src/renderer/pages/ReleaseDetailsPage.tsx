@@ -9,6 +9,7 @@ import {
 import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import AlbumScrobbleHistory from '../components/AlbumScrobbleHistory';
 import ArtistLink from '../components/ArtistLink';
+import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { useApp } from '../context/AppContext';
@@ -733,12 +734,13 @@ const ReleaseDetailsPage: React.FC = () => {
       <div className='card'>
         <div className='error-message'>
           {error}
-          <button
-            className='btn btn-small release-details-button-margin-left'
+          <Button
+            size='small'
+            className='release-details-button-margin-left'
             onClick={() => (window.location.hash = '#collection')}
           >
             Back to Collection
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -749,12 +751,13 @@ const ReleaseDetailsPage: React.FC = () => {
       <div className='card'>
         <div className='error-message'>
           No release data available
-          <button
-            className='btn btn-small release-details-button-margin-left'
+          <Button
+            size='small'
+            className='release-details-button-margin-left'
             onClick={() => (window.location.hash = '#collection')}
           >
             Back to Collection
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -770,23 +773,21 @@ const ReleaseDetailsPage: React.FC = () => {
         size='small'
         footer={
           <>
-            <button
-              className='btn btn-outline'
+            <Button
+              variant='outline'
               onClick={() => setShowDisambiguationWarning(false)}
             >
               Cancel
-            </button>
-            <button
-              className='btn btn-secondary'
+            </Button>
+            <Button
+              variant='secondary'
               onClick={() =>
                 navigateToMappingWithArtist(disambiguationArtists[0])
               }
             >
               Create Mapping
-            </button>
-            <button className='btn btn-primary' onClick={proceedWithScrobble}>
-              Continue Anyway
-            </button>
+            </Button>
+            <Button onClick={proceedWithScrobble}>Continue Anyway</Button>
           </>
         }
       >
@@ -818,12 +819,13 @@ const ReleaseDetailsPage: React.FC = () => {
       <div className='card'>
         <div className='release-details-header-container'>
           <h2>Release Details</h2>
-          <button
-            className='btn btn-small btn-secondary'
+          <Button
+            variant='secondary'
+            size='small'
             onClick={() => (window.location.hash = '#collection')}
           >
             Back to Collection
-          </button>
+          </Button>
         </div>
 
         <div className='release-details-main-content'>
@@ -864,15 +866,17 @@ const ReleaseDetailsPage: React.FC = () => {
 
             {/* Play on Spotify button */}
             <div className='release-details-button-container'>
-              <button
-                className='btn btn-small btn-icon release-details-button-margin-right'
+              <Button
+                variant='outline'
+                size='small'
+                className='release-details-button-margin-right'
                 onClick={() =>
                   playAlbumOnSpotify(release.artist, release.title)
                 }
                 title='Play on Spotify'
               >
                 ▶️ Play on Spotify
-              </button>
+              </Button>
             </div>
 
             {/* Discard pile button */}
@@ -883,12 +887,14 @@ const ReleaseDetailsPage: React.FC = () => {
                     📦 In Discard Pile
                   </span>
                 ) : (
-                  <button
-                    className='btn btn-small btn-outline-warning release-details-discard-button'
+                  <Button
+                    variant='warning'
+                    size='small'
+                    className='release-details-discard-button'
                     onClick={handleOpenDiscardModal}
                   >
                     📦 Add to Discard Pile
-                  </button>
+                  </Button>
                 )}
               </div>
             )}
@@ -975,7 +981,7 @@ const ReleaseDetailsPage: React.FC = () => {
                   href={getLastfmProfileUrl()}
                   target='_blank'
                   rel='noopener noreferrer'
-                  className='btn btn-small'
+                  className='button button--primary button--small'
                 >
                   View on Last.fm
                 </a>
@@ -990,18 +996,17 @@ const ReleaseDetailsPage: React.FC = () => {
               Tracks ({selectedTracks.size} selected)
             </h4>
             <div className='release-details-tracks-buttons'>
-              <button
-                className='btn btn-small'
+              <Button
+                size='small'
                 onClick={handleSelectAllTracks}
                 disabled={!release.tracklist?.length}
               >
                 {selectedTracks.size === (release.tracklist?.length || 0)
                   ? 'Deselect All'
                   : 'Select All'}
-              </button>
+              </Button>
 
-              <button
-                className='btn btn-primary'
+              <Button
                 onClick={handleScrobble}
                 disabled={
                   selectedTracks.size === 0 ||
@@ -1012,7 +1017,7 @@ const ReleaseDetailsPage: React.FC = () => {
                 {scrobbling
                   ? 'Scrobbling...'
                   : `Scrobble ${selectedTracks.size} Track${selectedTracks.size !== 1 ? 's' : ''}`}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -1034,15 +1039,19 @@ const ReleaseDetailsPage: React.FC = () => {
                       </div>
                       <div className='release-details-selection-buttons'>
                         {Object.entries(discs).map(([discName, discSides]) => (
-                          <button
+                          <Button
                             key={discName}
-                            className={`btn btn-small btn-filter text-muted-sm ${isDiscSelected(discSides) ? 'btn-primary' : 'btn-outline'}`}
+                            variant={
+                              isDiscSelected(discSides) ? 'primary' : 'outline'
+                            }
+                            size='small'
+                            className='button--filter text-muted-sm'
                             onClick={() => handleDiscToggle(discSides)}
                             aria-pressed={isDiscSelected(discSides)}
                             aria-label={`${isDiscSelected(discSides) ? 'Deselect' : 'Select'} ${discName} with sides ${discSides.join(' and ')}`}
                           >
                             {discName} ({discSides.join('/')})
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     </div>
@@ -1057,15 +1066,19 @@ const ReleaseDetailsPage: React.FC = () => {
                       {sides.map(side => {
                         const sideTrackCount = getSideTrackIndices(side).length;
                         return (
-                          <button
+                          <Button
                             key={side}
-                            className={`btn btn-small btn-filter text-muted-sm ${isSideSelected(side) ? 'btn-primary' : 'btn-outline'}`}
+                            variant={
+                              isSideSelected(side) ? 'primary' : 'outline'
+                            }
+                            size='small'
+                            className='button--filter text-muted-sm'
                             onClick={() => handleSideToggle(side)}
                             aria-pressed={isSideSelected(side)}
                             aria-label={`${isSideSelected(side) ? 'Deselect' : 'Select'} side ${side} with ${sideTrackCount} track${sideTrackCount === 1 ? '' : 's'}`}
                           >
                             Side {side} ({sideTrackCount})
-                          </button>
+                          </Button>
                         );
                       })}
                     </div>
@@ -1103,8 +1116,10 @@ const ReleaseDetailsPage: React.FC = () => {
                     />
                     {startTime && (
                       <>
-                        <button
-                          className='btn btn-small btn-outline release-details-time-adjust-button'
+                        <Button
+                          variant='outline'
+                          size='small'
+                          className='release-details-time-adjust-button'
                           onClick={() => {
                             // Parse the datetime-local value and adjust in local time
                             const [datePart, timePart] = startTime.split('T');
@@ -1130,9 +1145,11 @@ const ReleaseDetailsPage: React.FC = () => {
                           title='Move back 5 minutes'
                         >
                           ← 5m
-                        </button>
-                        <button
-                          className='btn btn-small btn-outline release-details-time-adjust-button'
+                        </Button>
+                        <Button
+                          variant='outline'
+                          size='small'
+                          className='release-details-time-adjust-button'
                           onClick={() => {
                             // Parse the datetime-local value and adjust in local time
                             const [datePart, timePart] = startTime.split('T');
@@ -1158,14 +1175,15 @@ const ReleaseDetailsPage: React.FC = () => {
                           title='Move forward 5 minutes'
                         >
                           5m →
-                        </button>
+                        </Button>
                       </>
                     )}
                   </div>
                 </div>
                 <div className='release-details-auto-timing-buttons'>
-                  <button
-                    className='btn btn-small btn-secondary'
+                  <Button
+                    variant='secondary'
+                    size='small'
                     onClick={handleAutoTiming}
                     disabled={selectedTracks.size === 0}
                     title={
@@ -1175,15 +1193,16 @@ const ReleaseDetailsPage: React.FC = () => {
                     }
                   >
                     Auto Timing (Just Finished)
-                  </button>
+                  </Button>
                   {startTime && (
-                    <button
-                      className='btn btn-small btn-outline'
+                    <Button
+                      variant='outline'
+                      size='small'
                       onClick={() => setStartTime('')}
                       title='Clear custom timing'
                     >
                       Clear
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -1211,31 +1230,36 @@ const ReleaseDetailsPage: React.FC = () => {
           {!authStatus.lastfm.authenticated && (
             <div className='warning-message release-details-message-margin'>
               Please authenticate with Last.fm to scrobble tracks.
-              <button
-                className='btn btn-small release-details-button-margin-left'
+              <Button
+                size='small'
+                className='release-details-button-margin-left'
                 onClick={() =>
                   (window.location.hash = '#settings?tab=connections')
                 }
               >
                 Connect Last.fm
-              </button>
+              </Button>
             </div>
           )}
 
           {authStatus.lastfm.authenticated && (
             <div className='release-details-tracks-section'>
-              <button
-                className='btn btn-small btn-secondary release-details-button-margin-right'
+              <Button
+                variant='secondary'
+                size='small'
+                className='release-details-button-margin-right'
                 onClick={testLastfmConnection}
               >
                 Test Last.fm Connection
-              </button>
-              <button
-                className='btn btn-small btn-secondary release-details-button-margin-right'
+              </Button>
+              <Button
+                variant='secondary'
+                size='small'
+                className='release-details-button-margin-right'
                 onClick={getSessionKey}
               >
                 Get Session Key
-              </button>
+              </Button>
               {connectionTest && (
                 <div
                   className={`message ${connectionTest.success ? 'success' : 'warning'}`}
@@ -1303,8 +1327,10 @@ const ReleaseDetailsPage: React.FC = () => {
                 </div>
 
                 {/* Spotify play button */}
-                <button
-                  className='btn btn-small btn-icon release-details-spotify-button-margin'
+                <Button
+                  variant='outline'
+                  size='small'
+                  className='release-details-spotify-button-margin'
                   onClick={e => {
                     e.stopPropagation();
                     playTrackOnSpotify(
@@ -1316,7 +1342,7 @@ const ReleaseDetailsPage: React.FC = () => {
                   title='Play on Spotify'
                 >
                   ▶️
-                </button>
+                </Button>
 
                 {/* Track scrobble stats */}
                 {trackStats && trackStats.count > 0 && (
@@ -1542,20 +1568,19 @@ const ReleaseDetailsPage: React.FC = () => {
               </div>
             </div>
             <div className='modal-footer'>
-              <button
-                className='btn btn-secondary'
+              <Button
+                variant='secondary'
                 onClick={handleCloseDiscardModal}
                 disabled={addingToDiscard}
               >
                 Cancel
-              </button>
-              <button
-                className='btn btn-primary'
+              </Button>
+              <Button
                 onClick={handleAddToDiscardPile}
                 disabled={addingToDiscard}
               >
                 {addingToDiscard ? 'Adding...' : 'Add to Discard Pile'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

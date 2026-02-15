@@ -193,7 +193,9 @@ describe('ReleaseDetailsPage Auto Timing', () => {
     });
 
     // First deselect all tracks, then select specific ones
-    const deselectAllButton = screen.getByText('Deselect All');
+    const deselectAllButton = screen.getByRole('button', {
+      name: /Deselect All/,
+    });
     await user.click(deselectAllButton);
 
     await waitFor(() => {
@@ -210,7 +212,9 @@ describe('ReleaseDetailsPage Auto Timing', () => {
     });
 
     // Click auto timing button
-    const autoTimingButton = screen.getByText('Auto Timing (Just Finished)');
+    const autoTimingButton = screen.getByRole('button', {
+      name: /Auto Timing \(Just Finished\)/,
+    });
     await user.click(autoTimingButton);
 
     // Check if the datetime-local input has been populated with any value (timing calculation should have worked)
@@ -237,7 +241,9 @@ describe('ReleaseDetailsPage Auto Timing', () => {
     });
 
     // First deselect all tracks
-    const deselectAllButton = screen.getByText('Deselect All');
+    const deselectAllButton = screen.getByRole('button', {
+      name: /Deselect All/,
+    });
     await user.click(deselectAllButton);
 
     await waitFor(() => {
@@ -259,18 +265,22 @@ describe('ReleaseDetailsPage Auto Timing', () => {
     });
 
     // First deselect all tracks, then select one track
-    const deselectAllButton = screen.getByText('Deselect All');
+    const deselectAllButton = screen.getByRole('button', {
+      name: /Deselect All/,
+    });
     await user.click(deselectAllButton);
 
     // Select one track
     const trackContainers = screen.getAllByRole('checkbox');
     await user.click(trackContainers[0]); // Track 1
 
-    const autoTimingButton = screen.getByText('Auto Timing (Just Finished)');
+    const autoTimingButton = screen.getByRole('button', {
+      name: /Auto Timing \(Just Finished\)/,
+    });
     await user.click(autoTimingButton);
 
     // Clear button should appear
-    const clearButton = screen.getByText('Clear');
+    const clearButton = screen.getByRole('button', { name: /Clear/ });
     expect(clearButton).toBeInTheDocument();
 
     // Click clear button
@@ -292,7 +302,9 @@ describe('ReleaseDetailsPage Auto Timing', () => {
     });
 
     // First deselect all tracks, then select one track
-    const deselectAllButton = screen.getByText('Deselect All');
+    const deselectAllButton = screen.getByRole('button', {
+      name: /Deselect All/,
+    });
     await user.click(deselectAllButton);
 
     // Select a track
@@ -305,7 +317,9 @@ describe('ReleaseDetailsPage Auto Timing', () => {
     ).toBeInTheDocument();
 
     // Use auto timing
-    const autoTimingButton = screen.getByText('Auto Timing (Just Finished)');
+    const autoTimingButton = screen.getByRole('button', {
+      name: /Auto Timing \(Just Finished\)/,
+    });
     await user.click(autoTimingButton);
 
     // Should show auto timing message
@@ -369,15 +383,15 @@ describe('ReleaseDetailsPage Side Selection', () => {
     expect(screen.getByText('Select by Side')).toBeInTheDocument();
 
     // Should show individual side buttons
-    expect(screen.getByText('Side A (2)')).toBeInTheDocument();
-    expect(screen.getByText('Side B (2)')).toBeInTheDocument();
-    expect(screen.getByText('Side C (2)')).toBeInTheDocument();
-    expect(screen.getByText('Side D (2)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /side A/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /side B/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /side C/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /side D/i })).toBeInTheDocument();
 
     // Should show disc buttons for multi-disc album
     expect(screen.getByText('By Disc:')).toBeInTheDocument();
-    expect(screen.getByText('Disc 1 (A/B)')).toBeInTheDocument();
-    expect(screen.getByText('Disc 2 (C/D)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Disc 1/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Disc 2/i })).toBeInTheDocument();
   });
 
   it('should select/deselect tracks when side button is clicked', async () => {
@@ -398,7 +412,7 @@ describe('ReleaseDetailsPage Side Selection', () => {
     expect(screen.getByText('Tracks (8 selected)')).toBeInTheDocument();
 
     // Click "Side A" button to deselect side A
-    const sideAButton = screen.getByText('Side A (2)');
+    const sideAButton = screen.getByRole('button', { name: /side A/i });
     await user.click(sideAButton);
 
     // Should now have 6 tracks selected (8 - 2 from side A)
@@ -433,7 +447,7 @@ describe('ReleaseDetailsPage Side Selection', () => {
     expect(screen.getByText('Tracks (8 selected)')).toBeInTheDocument();
 
     // Click "Disc 1" button to deselect disc 1 (sides A & B)
-    const disc1Button = screen.getByText('Disc 1 (A/B)');
+    const disc1Button = screen.getByRole('button', { name: /Disc 1/i });
     await user.click(disc1Button);
 
     // Should now have 4 tracks selected (8 - 4 from disc 1)
@@ -472,17 +486,17 @@ describe('ReleaseDetailsPage Side Selection', () => {
       ).toBeInTheDocument();
     });
 
-    const sideAButton = screen.getByText('Side A (2)');
+    const sideAButton = screen.getByRole('button', { name: /side A/i });
 
     // Initially selected - should have primary styling
-    expect(sideAButton).toHaveClass('btn-primary');
+    expect(sideAButton).toHaveClass('button--primary');
 
     // Click to deselect
     await user.click(sideAButton);
 
     // Should now have outline styling
     await waitFor(() => {
-      expect(sideAButton).toHaveClass('btn-outline');
+      expect(sideAButton).toHaveClass('button--outline');
     });
   });
 });
@@ -634,7 +648,9 @@ describe('ReleaseDetailsPage Scrobble Progress and Results', () => {
     });
 
     // Select tracks and start scrobbling
-    const scrobbleButton = screen.getByText('Scrobble 3 Tracks');
+    const scrobbleButton = screen.getByRole('button', {
+      name: /Scrobble 3 Tracks/,
+    });
     await user.click(scrobbleButton);
 
     // Wait for progress to be displayed
@@ -674,7 +690,9 @@ describe('ReleaseDetailsPage Scrobble Progress and Results', () => {
     });
 
     // Select tracks and start scrobbling
-    const scrobbleButton = screen.getByText('Scrobble 3 Tracks');
+    const scrobbleButton = screen.getByRole('button', {
+      name: /Scrobble 3 Tracks/,
+    });
     await user.click(scrobbleButton);
 
     // Wait for results to be displayed
@@ -718,7 +736,9 @@ describe('ReleaseDetailsPage Scrobble Progress and Results', () => {
     });
 
     // Select tracks and start scrobbling
-    const scrobbleButton = screen.getByText('Scrobble 3 Tracks');
+    const scrobbleButton = screen.getByRole('button', {
+      name: /Scrobble 3 Tracks/,
+    });
     await user.click(scrobbleButton);
 
     // Wait for results to be displayed
@@ -767,7 +787,9 @@ describe('ReleaseDetailsPage Scrobble Progress and Results', () => {
     });
 
     // Select tracks and start scrobbling
-    const scrobbleButton = screen.getByText('Scrobble 3 Tracks');
+    const scrobbleButton = screen.getByRole('button', {
+      name: /Scrobble 3 Tracks/,
+    });
     await user.click(scrobbleButton);
 
     // Wait for results to be displayed
@@ -814,7 +836,9 @@ describe('ReleaseDetailsPage Last.fm Connection Testing', () => {
       message: 'Connection successful',
     });
 
-    const testButton = screen.getByText('Test Last.fm Connection');
+    const testButton = screen.getByRole('button', {
+      name: /Test Last\.fm Connection/,
+    });
     await user.click(testButton);
 
     await waitFor(() => {
@@ -838,7 +862,9 @@ describe('ReleaseDetailsPage Last.fm Connection Testing', () => {
       new Error('Connection failed')
     );
 
-    const testButton = screen.getByText('Test Last.fm Connection');
+    const testButton = screen.getByRole('button', {
+      name: /Test Last\.fm Connection/,
+    });
     await user.click(testButton);
 
     await waitFor(() => {
@@ -862,7 +888,9 @@ describe('ReleaseDetailsPage Last.fm Connection Testing', () => {
       sessionKey: 'test-session-key-123',
     });
 
-    const sessionKeyButton = screen.getByText('Get Session Key');
+    const sessionKeyButton = screen.getByRole('button', {
+      name: /Get Session Key/,
+    });
     await user.click(sessionKeyButton);
 
     await waitFor(() => {
@@ -885,7 +913,9 @@ describe('ReleaseDetailsPage Last.fm Connection Testing', () => {
       new Error('Session key error')
     );
 
-    const sessionKeyButton = screen.getByText('Get Session Key');
+    const sessionKeyButton = screen.getByRole('button', {
+      name: /Get Session Key/,
+    });
     await user.click(sessionKeyButton);
 
     await waitFor(() => {
@@ -902,7 +932,9 @@ describe('ReleaseDetailsPage Last.fm Connection Testing', () => {
 
     mockApiService.getLastfmSessionKey.mockRejectedValue('String error');
 
-    const sessionKeyButton = screen.getByText('Get Session Key');
+    const sessionKeyButton = screen.getByRole('button', {
+      name: /Get Session Key/,
+    });
     await user.click(sessionKeyButton);
 
     await waitFor(() => {
@@ -920,7 +952,9 @@ describe('ReleaseDetailsPage Last.fm Connection Testing', () => {
     expect(
       screen.getByText('Please authenticate with Last.fm to scrobble tracks.')
     ).toBeInTheDocument();
-    expect(screen.getByText('Connect Last.fm')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Connect Last\.fm/ })
+    ).toBeInTheDocument();
 
     // Should not show Last.fm connection buttons
     expect(
@@ -974,7 +1008,9 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
     expect(screen.getByText('Tracks (3 selected)')).toBeInTheDocument();
 
     // Deselect all tracks first
-    const deselectAllButton = screen.getByText('Deselect All');
+    const deselectAllButton = screen.getByRole('button', {
+      name: /Deselect All/,
+    });
     await user.click(deselectAllButton);
 
     await waitFor(() => {
@@ -1028,7 +1064,9 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
     });
 
     // Deselect all tracks first
-    const deselectAllButton = screen.getByText('Deselect All');
+    const deselectAllButton = screen.getByRole('button', {
+      name: /Deselect All/,
+    });
     await user.click(deselectAllButton);
 
     await waitFor(() => {
@@ -1060,24 +1098,32 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
 
     // Initially all tracks should be selected
     expect(screen.getByText('Tracks (3 selected)')).toBeInTheDocument();
-    expect(screen.getByText('Deselect All')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Deselect All/ })
+    ).toBeInTheDocument();
 
     // Deselect all
-    const deselectAllButton = screen.getByText('Deselect All');
+    const deselectAllButton = screen.getByRole('button', {
+      name: /Deselect All/,
+    });
     await user.click(deselectAllButton);
 
     await waitFor(() => {
       expect(screen.getByText('Tracks (0 selected)')).toBeInTheDocument();
-      expect(screen.getByText('Select All')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Select All/ })
+      ).toBeInTheDocument();
     });
 
     // Select all
-    const selectAllButton = screen.getByText('Select All');
+    const selectAllButton = screen.getByRole('button', { name: /Select All/ });
     await user.click(selectAllButton);
 
     await waitFor(() => {
       expect(screen.getByText('Tracks (3 selected)')).toBeInTheDocument();
-      expect(screen.getByText('Deselect All')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Deselect All/ })
+      ).toBeInTheDocument();
     });
   });
 
@@ -1089,11 +1135,15 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
     });
 
     // Initially scrobble button should be enabled
-    const scrobbleButton = screen.getByText('Scrobble 3 Tracks');
+    const scrobbleButton = screen.getByRole('button', {
+      name: /Scrobble 3 Tracks/,
+    });
     expect(scrobbleButton).not.toBeDisabled();
 
     // Deselect all tracks
-    const deselectAllButton = screen.getByText('Deselect All');
+    const deselectAllButton = screen.getByRole('button', {
+      name: /Deselect All/,
+    });
     await user.click(deselectAllButton);
 
     await waitFor(() => {
@@ -1101,7 +1151,9 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
     });
 
     // Scrobble button should be disabled
-    const disabledScrobbleButton = screen.getByText('Scrobble 0 Tracks');
+    const disabledScrobbleButton = screen.getByRole('button', {
+      name: /Scrobble 0 Tracks/,
+    });
     expect(disabledScrobbleButton).toBeDisabled();
   });
 
@@ -1113,7 +1165,9 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
     });
 
     // Deselect all tracks, then select one
-    const deselectAllButton = screen.getByText('Deselect All');
+    const deselectAllButton = screen.getByRole('button', {
+      name: /Deselect All/,
+    });
     await user.click(deselectAllButton);
 
     const checkboxes = screen.getAllByRole('checkbox');

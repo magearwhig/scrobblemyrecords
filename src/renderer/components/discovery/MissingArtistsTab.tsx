@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { MissingArtist } from '../../../shared/types';
+import { Button } from '../ui/Button';
 
 type ArtistSortOption = 'plays' | 'artist' | 'albums' | 'recent';
 
@@ -83,34 +84,38 @@ const MissingArtistsTab: React.FC<MissingArtistsTabProps> = ({
                 <span>Last: {formatDate(artist.lastPlayed)}</span>
               </div>
               <div className='missing-item-actions'>
-                <button
-                  className='btn btn-small btn-icon'
+                <Button
+                  variant='outline'
+                  size='small'
                   onClick={() => openLink(getLastFmArtistUrl(artist.artist))}
                   title='View artist on Last.fm'
                 >
                   Last.fm
-                </button>
-                <button
-                  className='btn btn-small btn-icon'
+                </Button>
+                <Button
+                  variant='outline'
+                  size='small'
                   onClick={() => openLink(getDiscogsArtistUrl(artist.artist))}
                   title='Search artist on Discogs'
                 >
                   Discogs
-                </button>
-                <button
-                  className='btn btn-small btn-secondary'
+                </Button>
+                <Button
+                  variant='secondary'
+                  size='small'
                   onClick={() => openArtistMapping(artist)}
                   title='Map to collection artist'
                 >
                   Map
-                </button>
-                <button
-                  className='btn btn-small btn-link'
+                </Button>
+                <Button
+                  variant='ghost'
+                  size='small'
                   onClick={() => handleHideArtist(artist)}
                   title='Hide from discovery (e.g., podcasts)'
                 >
                   Hide
-                </button>
+                </Button>
               </div>
             </div>
           ))}

@@ -36,6 +36,7 @@ import { SourcePieChart } from '../components/stats/SourcePieChart';
 import { StatCard } from '../components/stats/StatCard';
 import { StreakCard } from '../components/stats/StreakCard';
 import { TopList } from '../components/stats/TopList';
+import { Button } from '../components/ui/Button';
 import { StatsPageSkeleton } from '../components/ui/Skeleton';
 import { useCollectionLookup } from '../hooks/useCollectionLookup';
 import { imagesApi, statsApi } from '../services/statsApi';
@@ -538,7 +539,7 @@ export const StatsPage: React.FC = () => {
         <div className='stats-error'>
           <h2>Error Loading Stats</h2>
           <p>{error}</p>
-          <button onClick={() => window.location.reload()}>Retry</button>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
         </div>
       </div>
     );
@@ -735,14 +736,15 @@ export const StatsPage: React.FC = () => {
       <section className='stats-section'>
         <DustyCornersSection albums={dustyCorners} loading={dustyLoading} />
         {dustyCorners.length > 0 && (
-          <button
-            className='btn btn-outline btn-small'
+          <Button
+            variant='outline'
+            size='small'
             onClick={() => {
               window.location.hash = 'what-to-play?tab=dusty';
             }}
           >
             View all in What to Play
-          </button>
+          </Button>
         )}
       </section>
 

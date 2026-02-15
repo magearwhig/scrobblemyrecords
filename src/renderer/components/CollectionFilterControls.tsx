@@ -1,5 +1,7 @@
 import React from 'react';
 
+import { Button } from './ui/Button';
+
 interface FilterOptions {
   formats: string[];
   years: { min: number; max: number };
@@ -105,12 +107,14 @@ const CollectionFilterControls: React.FC<CollectionFilterControlsProps> = ({
 
       {/* Clear Filters Button */}
       {hasActiveFilters && (
-        <button
-          className='btn btn-small btn-outline collection-filter-clear-btn'
+        <Button
+          variant='outline'
+          size='small'
+          className='collection-filter-clear-btn'
           onClick={onClearFilters}
         >
           Clear Filters
-        </button>
+        </Button>
       )}
 
       {/* Filter Results Count */}

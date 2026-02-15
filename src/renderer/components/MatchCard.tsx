@@ -3,6 +3,8 @@ import React from 'react';
 import { SellerMatch } from '../../shared/types';
 import { formatRelativeTime as formatRelativeTimeUtil } from '../utils/dateUtils';
 
+import { Button } from './ui/Button';
+
 interface MatchCardProps {
   match: SellerMatch;
   formatPrice: (price: number, currency: string) => string;
@@ -97,32 +99,34 @@ const MatchCard: React.FC<MatchCardProps> = ({
       </div>
       <div className='seller-match-actions'>
         {match.status === 'sold' && (
-          <button
-            className='btn btn-small btn-outline'
+          <Button
+            variant='outline'
+            size='small'
             onClick={() => onVerify(match.id)}
             disabled={verifying}
             title='Check if still available on Discogs'
           >
             {verifying ? '...' : 'Refresh'}
-          </button>
+          </Button>
         )}
         {match.status !== 'seen' && match.status !== 'sold' && (
-          <button
-            className='btn btn-small btn-outline'
+          <Button
+            variant='outline'
+            size='small'
             onClick={() => onMarkAsSeen(match.id)}
             disabled={markingAsSeen}
           >
             {markingAsSeen ? '...' : 'Mark as Seen'}
-          </button>
+          </Button>
         )}
-        <a
-          href={match.listingUrl}
-          target='_blank'
-          rel='noopener noreferrer'
-          className='btn btn-small'
+        <Button
+          size='small'
+          onClick={() =>
+            window.open(match.listingUrl, '_blank', 'noopener,noreferrer')
+          }
         >
           View on Discogs
-        </a>
+        </Button>
       </div>
     </div>
   );

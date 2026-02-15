@@ -142,7 +142,9 @@ describe('SettingsConnectionsSection', () => {
     it('disables Submit Personal Token button when fields are empty', () => {
       renderWithProviders();
 
-      const submitButton = screen.getByText('Submit Personal Token');
+      const submitButton = screen.getByRole('button', {
+        name: /Submit Personal Token/,
+      });
       expect(submitButton).toBeDisabled();
     });
 
@@ -159,7 +161,9 @@ describe('SettingsConnectionsSection', () => {
       await user.clear(usernameInput);
       await user.type(usernameInput, 'test_user');
 
-      const submitButton = screen.getByText('Submit Personal Token');
+      const submitButton = screen.getByRole('button', {
+        name: /Submit Personal Token/,
+      });
       expect(submitButton).not.toBeDisabled();
     });
 
@@ -182,7 +186,9 @@ describe('SettingsConnectionsSection', () => {
       await user.clear(usernameInput);
       await user.type(usernameInput, 'test_user');
 
-      const submitButton = screen.getByText('Submit Personal Token');
+      const submitButton = screen.getByRole('button', {
+        name: /Submit Personal Token/,
+      });
       await user.click(submitButton);
 
       await waitFor(() => {
@@ -216,7 +222,9 @@ describe('SettingsConnectionsSection', () => {
       await user.clear(usernameInput);
       await user.type(usernameInput, 'test_user');
 
-      const submitButton = screen.getByText('Submit Personal Token');
+      const submitButton = screen.getByRole('button', {
+        name: /Submit Personal Token/,
+      });
       await user.click(submitButton);
 
       await waitFor(() => {
@@ -248,7 +256,9 @@ describe('SettingsConnectionsSection', () => {
     it('disables Submit Last.fm Token button when field is empty', () => {
       renderWithProviders();
 
-      const submitButton = screen.getByText('Submit Last.fm Token');
+      const submitButton = screen.getByRole('button', {
+        name: /Submit Last\.fm Token/,
+      });
       expect(submitButton).toBeDisabled();
     });
 
@@ -259,7 +269,9 @@ describe('SettingsConnectionsSection', () => {
       await user.clear(tokenInput);
       await user.type(tokenInput, 'lastfm_token');
 
-      const submitButton = screen.getByText('Submit Last.fm Token');
+      const submitButton = screen.getByRole('button', {
+        name: /Submit Last\.fm Token/,
+      });
       expect(submitButton).not.toBeDisabled();
     });
 
@@ -278,7 +290,9 @@ describe('SettingsConnectionsSection', () => {
       await user.clear(tokenInput);
       await user.type(tokenInput, 'valid_token');
 
-      const submitButton = screen.getByText('Submit Last.fm Token');
+      const submitButton = screen.getByRole('button', {
+        name: /Submit Last\.fm Token/,
+      });
       await user.click(submitButton);
 
       await waitFor(() => {
@@ -305,7 +319,9 @@ describe('SettingsConnectionsSection', () => {
       await user.clear(tokenInput);
       await user.type(tokenInput, 'expired_token');
 
-      const submitButton = screen.getByText('Submit Last.fm Token');
+      const submitButton = screen.getByRole('button', {
+        name: /Submit Last\.fm Token/,
+      });
       await user.click(submitButton);
 
       await waitFor(() => {
@@ -324,7 +340,9 @@ describe('SettingsConnectionsSection', () => {
 
       renderWithProviders({ discogs: true, lastfm: true });
 
-      const clearButton = screen.getByText('Clear All Authentication');
+      const clearButton = screen.getByRole('button', {
+        name: /Clear All Authentication/,
+      });
       await user.click(clearButton);
 
       await waitFor(() => {
@@ -345,7 +363,9 @@ describe('SettingsConnectionsSection', () => {
 
       renderWithProviders({ discogs: true, lastfm: true });
 
-      const clearButton = screen.getByText('Clear All Authentication');
+      const clearButton = screen.getByRole('button', {
+        name: /Clear All Authentication/,
+      });
       await user.click(clearButton);
 
       await waitFor(() => {
@@ -358,14 +378,18 @@ describe('SettingsConnectionsSection', () => {
     it('disables Connect to Discogs button when already authenticated', () => {
       renderWithProviders({ discogs: true, lastfm: false });
 
-      const connectButton = screen.getByText('Connect to Discogs');
+      const connectButton = screen.getByRole('button', {
+        name: /Connect to Discogs/,
+      });
       expect(connectButton).toBeDisabled();
     });
 
     it('disables Connect to Last.fm button when already authenticated', () => {
       renderWithProviders({ discogs: false, lastfm: true });
 
-      const connectButton = screen.getByText('Connect to Last.fm');
+      const connectButton = screen.getByRole('button', {
+        name: /Connect to Last\.fm/,
+      });
       expect(connectButton).toBeDisabled();
     });
   });

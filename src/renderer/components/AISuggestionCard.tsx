@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { AISuggestion } from '../../shared/types';
 import { createLogger } from '../utils/logger';
 
+import { Button } from './ui/Button';
+
 const logger = createLogger('AISuggestionCard');
 
 interface AISuggestionCardProps {
@@ -76,9 +78,9 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
           <span className='ai-suggestion-empty-icon'>🤖</span>
           <p>No AI suggestion available</p>
           {onRefresh && (
-            <button className='btn btn-small' onClick={onRefresh}>
+            <Button size='small' onClick={onRefresh}>
               Try Again
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -143,24 +145,22 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
         )}
 
         <div className='ai-suggestion-actions'>
-          <button className='btn btn-small' onClick={handleViewInCollection}>
+          <Button size='small' onClick={handleViewInCollection}>
             View in Collection
-          </button>
-          <button
-            className='btn btn-small btn-secondary'
-            onClick={handleViewDetails}
-          >
+          </Button>
+          <Button variant='secondary' size='small' onClick={handleViewDetails}>
             Details
-          </button>
+          </Button>
           {onRefresh && (
-            <button
-              className='btn btn-small btn-secondary'
+            <Button
+              variant='secondary'
+              size='small'
               onClick={onRefresh}
               title='Get another AI suggestion'
               aria-label='Get another AI suggestion'
             >
               🔄
-            </button>
+            </Button>
           )}
         </div>
       </div>

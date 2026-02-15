@@ -9,6 +9,7 @@ import {
 } from '../../shared/types';
 import ReleaseCard from '../components/ReleaseCard';
 import { Modal, ModalFooter } from '../components/ui';
+import { Button } from '../components/ui/Button';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -486,8 +487,8 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
               )}
             </span>
           )}
-          <button
-            className='btn btn-secondary'
+          <Button
+            variant='secondary'
             onClick={handleFetchCovers}
             disabled={
               fetchingCovers ||
@@ -497,14 +498,13 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
             title='Fetch missing cover art from Cover Art Archive'
           >
             {fetchingCovers ? 'Fetching...' : 'Fetch Covers'}
-          </button>
-          <button
-            className='btn btn-primary'
+          </Button>
+          <Button
             onClick={handleSync}
             disabled={syncStarting || syncStatus?.status === 'syncing'}
           >
             {syncStatus?.status === 'syncing' ? 'Syncing...' : 'Sync Releases'}
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -773,18 +773,15 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
         )}
 
         <ModalFooter>
-          <button
-            className='btn btn-secondary'
-            onClick={handleSkipDisambiguation}
-          >
+          <Button variant='secondary' onClick={handleSkipDisambiguation}>
             Skip for Now
-          </button>
-          <button
-            className='btn btn-warning'
+          </Button>
+          <Button
+            variant='warning'
             onClick={() => handleResolveDisambiguation(null)}
           >
             None of These
-          </button>
+          </Button>
         </ModalFooter>
       </Modal>
     </div>

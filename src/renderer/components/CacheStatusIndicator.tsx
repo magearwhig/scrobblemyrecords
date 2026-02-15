@@ -1,5 +1,7 @@
 import React from 'react';
 
+import { Button } from './ui/Button';
+
 interface CacheProgress {
   status: 'loading' | 'completed' | 'failed';
   currentPage?: number;
@@ -118,17 +120,18 @@ const CacheStatusIndicator: React.FC<CacheStatusIndicatorProps> = ({
 
       {/* Action Buttons */}
       <div className='collection-cache-actions'>
-        <button
-          className='btn btn-small btn-secondary'
+        <Button
+          variant='secondary'
+          size='small'
           onClick={onCheckForNewItems}
           disabled={loading || checkingForNewItems || updatingWithNewItems}
           title='Check if new items have been added to your Discogs collection'
         >
           {checkingForNewItems ? 'Checking...' : 'Check for New Items'}
-        </button>
+        </Button>
         {newItemsResult && newItemsResult.newItemsCount > 0 && (
-          <button
-            className='btn btn-small btn-primary'
+          <Button
+            size='small'
             onClick={onUpdateWithNewItems}
             disabled={loading || checkingForNewItems || updatingWithNewItems}
             title='Add only the new items to your cache without refreshing everything'
@@ -136,24 +139,26 @@ const CacheStatusIndicator: React.FC<CacheStatusIndicatorProps> = ({
             {updatingWithNewItems
               ? 'Adding...'
               : `Update with New Items (${newItemsResult.newItemsCount})`}
-          </button>
+          </Button>
         )}
-        <button
-          className='btn btn-small btn-secondary'
+        <Button
+          variant='secondary'
+          size='small'
           onClick={onForceReload}
           disabled={loading || updatingWithNewItems}
           title='Force reload the entire cache from Discogs'
         >
           Force Reload
-        </button>
-        <button
-          className='btn btn-small btn-secondary'
+        </Button>
+        <Button
+          variant='secondary'
+          size='small'
           onClick={onClearCache}
           disabled={loading || updatingWithNewItems}
           title='Clear the local cache'
         >
           Clear Cache
-        </button>
+        </Button>
       </div>
     </div>
   );

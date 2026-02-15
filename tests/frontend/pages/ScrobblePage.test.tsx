@@ -430,14 +430,18 @@ describe('ScrobblePage', () => {
       });
 
       // Deselect all
-      const selectAllButton = screen.getByText('Deselect All');
+      const selectAllButton = screen.getByRole('button', {
+        name: /Deselect All/,
+      });
       await user.click(selectAllButton);
 
       expect(screen.getByText('0 selected')).toBeInTheDocument();
       expect(screen.getByText('Select All')).toBeInTheDocument();
 
       // Select all again
-      const selectAllButtonNew = screen.getByText('Select All');
+      const selectAllButtonNew = screen.getByRole('button', {
+        name: /Select All/,
+      });
       await user.click(selectAllButtonNew);
 
       expect(screen.getByText('3 selected')).toBeInTheDocument();
@@ -563,10 +567,14 @@ describe('ScrobblePage', () => {
       });
 
       // Deselect all tracks
-      const deselectAllButton = screen.getByText('Deselect All');
+      const deselectAllButton = screen.getByRole('button', {
+        name: /Deselect All/,
+      });
       await user.click(deselectAllButton);
 
-      const scrobbleButton = screen.getByText('Scrobble 0 Tracks');
+      const scrobbleButton = screen.getByRole('button', {
+        name: /Scrobble 0 Tracks/,
+      });
       expect(scrobbleButton).toBeDisabled();
     });
 
@@ -582,7 +590,9 @@ describe('ScrobblePage', () => {
         expect(screen.getByText('Scrobble 2 Tracks')).toBeInTheDocument();
       });
 
-      const scrobbleButton = screen.getByText('Scrobble 2 Tracks');
+      const scrobbleButton = screen.getByRole('button', {
+        name: /Scrobble 2 Tracks/,
+      });
       await user.click(scrobbleButton);
 
       await waitFor(() => {
@@ -614,7 +624,9 @@ describe('ScrobblePage', () => {
         expect(screen.getByText('Scrobble 2 Tracks')).toBeInTheDocument();
       });
 
-      const scrobbleButton = screen.getByText('Scrobble 2 Tracks');
+      const scrobbleButton = screen.getByRole('button', {
+        name: /Scrobble 2 Tracks/,
+      });
       await user.click(scrobbleButton);
 
       expect(screen.getByText('Scrobbling...')).toBeInTheDocument();
@@ -637,7 +649,9 @@ describe('ScrobblePage', () => {
         expect(screen.getByText('Scrobble 2 Tracks')).toBeInTheDocument();
       });
 
-      const scrobbleButton = screen.getByText('Scrobble 2 Tracks');
+      const scrobbleButton = screen.getByRole('button', {
+        name: /Scrobble 2 Tracks/,
+      });
       await user.click(scrobbleButton);
 
       await waitFor(() => {
@@ -661,7 +675,9 @@ describe('ScrobblePage', () => {
         expect(screen.getByText('Scrobble 2 Tracks')).toBeInTheDocument();
       });
 
-      const scrobbleButton = screen.getByText('Scrobble 2 Tracks');
+      const scrobbleButton = screen.getByRole('button', {
+        name: /Scrobble 2 Tracks/,
+      });
       await user.click(scrobbleButton);
 
       await waitFor(() => {
@@ -691,11 +707,15 @@ describe('ScrobblePage', () => {
       });
 
       // Deselect all tracks
-      const deselectAllButton = screen.getByText('Deselect All');
+      const deselectAllButton = screen.getByRole('button', {
+        name: /Deselect All/,
+      });
       await user.click(deselectAllButton);
 
       // Check that the scrobble button is disabled when no tracks are selected
-      const scrobbleButton = screen.getByText('Scrobble 0 Tracks');
+      const scrobbleButton = screen.getByRole('button', {
+        name: /Scrobble 0 Tracks/,
+      });
       expect(scrobbleButton).toBeDisabled();
 
       // Verify scrobbleBatch isn't called since button is disabled
@@ -744,7 +764,9 @@ describe('ScrobblePage', () => {
         { timeout: 10000 }
       );
 
-      const backButton = screen.getByText('Back to Collection');
+      const backButton = screen.getByRole('button', {
+        name: /Back to Collection/,
+      });
       await user.click(backButton);
 
       expect(mockHistoryBack).toHaveBeenCalled();
@@ -769,10 +791,14 @@ describe('ScrobblePage', () => {
         { timeout: 10000 }
       );
 
-      const scrobbleButton = screen.getByText('Scrobble 1 Tracks');
+      const scrobbleButton = screen.getByRole('button', {
+        name: /Scrobble 1 Tracks/,
+      });
       await user.click(scrobbleButton);
 
-      const backButton = screen.getByText('Back to Collection');
+      const backButton = screen.getByRole('button', {
+        name: /Back to Collection/,
+      });
       expect(backButton).toBeDisabled();
     }, 15000);
   });
@@ -829,7 +855,9 @@ describe('ScrobblePage', () => {
         { timeout: 15000 }
       );
 
-      const scrobbleButton = screen.getByText('Scrobble 3 Tracks');
+      const scrobbleButton = screen.getByRole('button', {
+        name: /Scrobble 3 Tracks/,
+      });
       await user.click(scrobbleButton);
 
       expect(screen.getByText('Scrobbling Progress')).toBeInTheDocument();

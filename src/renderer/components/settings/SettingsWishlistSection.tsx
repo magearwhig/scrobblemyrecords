@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import ApiService from '../../services/api';
 import { createLogger } from '../../utils/logger';
+import { Button } from '../ui/Button';
 
 const logger = createLogger('SettingsWishlistSection');
 
@@ -151,18 +152,18 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
           {wishlistError && (
             <div className='error-message'>
               {wishlistError}
-              <button className='btn btn-small' onClick={clearWishlistMessages}>
+              <Button size='small' onClick={clearWishlistMessages}>
                 Dismiss
-              </button>
+              </Button>
             </div>
           )}
 
           {wishlistSuccess && (
             <div className='message success'>
               {wishlistSuccess}
-              <button className='btn btn-small' onClick={clearWishlistMessages}>
+              <Button size='small' onClick={clearWishlistMessages}>
                 Dismiss
-              </button>
+              </Button>
             </div>
           )}
 
@@ -261,13 +262,12 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
                 </span>
               </div>
 
-              <button
-                className='btn'
+              <Button
                 onClick={handleSaveWishlistSettings}
                 disabled={wishlistLoading}
               >
                 Save Settings
-              </button>
+              </Button>
             </div>
           ) : (
             <div className='settings-empty-state'>
@@ -277,14 +277,13 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
                     Please authenticate with Discogs to configure wishlist
                     settings.
                   </p>
-                  <button
-                    className='btn'
+                  <Button
                     onClick={() => {
                       window.location.hash = 'settings?tab=connections';
                     }}
                   >
                     Connect Discogs
-                  </button>
+                  </Button>
                 </>
               ) : (
                 <p>Unable to load wishlist settings. Please try again.</p>
@@ -310,18 +309,18 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
           {sellerError && (
             <div className='error-message'>
               {sellerError}
-              <button className='btn btn-small' onClick={clearSellerMessages}>
+              <Button size='small' onClick={clearSellerMessages}>
                 Dismiss
-              </button>
+              </Button>
             </div>
           )}
 
           {sellerSuccess && (
             <div className='message success'>
               {sellerSuccess}
-              <button className='btn btn-small' onClick={clearSellerMessages}>
+              <Button size='small' onClick={clearSellerMessages}>
                 Dismiss
-              </button>
+              </Button>
             </div>
           )}
 
@@ -343,13 +342,13 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
                     value={quickAddUsername}
                     onChange={e => setQuickAddUsername(e.target.value)}
                   />
-                  <button
-                    className='btn btn-secondary'
+                  <Button
+                    variant='secondary'
                     onClick={handleQuickAddSeller}
                     disabled={sellerLoading || !quickAddUsername.trim()}
                   >
                     Add
-                  </button>
+                  </Button>
                 </div>
                 <span className='form-hint'>
                   Add a seller by their Discogs Marketplace username
@@ -421,22 +420,21 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
               </div>
 
               <div className='settings-actions-row'>
-                <button
-                  className='btn'
+                <Button
                   onClick={handleSaveSellerSettings}
                   disabled={sellerLoading}
                 >
                   Save Settings
-                </button>
+                </Button>
 
-                <button
-                  className='btn btn-outline'
+                <Button
+                  variant='outline'
                   onClick={() => {
                     window.location.hash = 'marketplace?tab=sellers';
                   }}
                 >
                   Manage Sellers &rarr;
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
@@ -447,14 +445,13 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
                     Please authenticate with Discogs to configure seller
                     monitoring.
                   </p>
-                  <button
-                    className='btn'
+                  <Button
                     onClick={() => {
                       window.location.hash = 'settings?tab=connections';
                     }}
                   >
                     Connect Discogs
-                  </button>
+                  </Button>
                 </>
               ) : (
                 <p>Unable to load seller settings. Please try again.</p>

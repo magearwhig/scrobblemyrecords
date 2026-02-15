@@ -10,6 +10,7 @@ import AISuggestionCard from '../components/AISuggestionCard';
 import SuggestionCard from '../components/SuggestionCard';
 import SuggestionWeightControls from '../components/SuggestionWeightControls';
 import SyncStatusBar from '../components/SyncStatusBar';
+import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { AlbumCardSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
@@ -198,15 +199,15 @@ const SuggestionsPage: React.FC<SuggestionsPageProps> = ({
       <div className='suggestions-header'>
         {!embedded && <h1>Play Suggestions</h1>}
         <div className='suggestions-actions'>
-          <button
-            className='btn btn-secondary'
+          <Button
+            variant='secondary'
             onClick={() => setShowWeightControls(!showWeightControls)}
           >
             {showWeightControls ? 'Hide Weights' : 'Adjust Weights'}
-          </button>
-          <button className='btn' onClick={handleRefresh} disabled={loading}>
+          </Button>
+          <Button onClick={handleRefresh} disabled={loading}>
             {loading ? 'Loading...' : 'Refresh'}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -222,22 +223,18 @@ const SuggestionsPage: React.FC<SuggestionsPageProps> = ({
           {savingSettings && (
             <span className='saving-indicator'>Saving...</span>
           )}
-          <button
-            className='btn btn-small'
-            onClick={loadSuggestions}
-            disabled={loading}
-          >
+          <Button size='small' onClick={loadSuggestions} disabled={loading}>
             Apply Changes
-          </button>
+          </Button>
         </div>
       )}
 
       {error && (
         <div className='message error'>
           <p>{error}</p>
-          <button className='btn btn-small' onClick={loadSuggestions}>
+          <Button size='small' onClick={loadSuggestions}>
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
@@ -252,13 +249,13 @@ const SuggestionsPage: React.FC<SuggestionsPageProps> = ({
             {aiError ? (
               <div className='ai-suggestion-error'>
                 <p>{aiError}</p>
-                <button
-                  className='btn btn-small'
+                <Button
+                  size='small'
                   onClick={loadAISuggestion}
                   disabled={aiLoading}
                 >
                   Retry
-                </button>
+                </Button>
               </div>
             ) : (
               <AISuggestionCard

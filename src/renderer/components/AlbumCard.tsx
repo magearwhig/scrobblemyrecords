@@ -4,6 +4,7 @@ import { CollectionItem, DiscogsRelease } from '../../shared/types';
 import { formatRelativeTime } from '../utils/dateUtils';
 
 import ArtistLink from './ArtistLink';
+import { Button } from './ui/Button';
 
 interface AlbumCardProps {
   item: CollectionItem;
@@ -103,30 +104,32 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
       </div>
 
       <div className='album-card-actions'>
-        <button
-          className={`btn btn-small ${selected ? 'btn-secondary' : ''}`}
+        <Button
+          size='small'
+          variant={selected ? 'secondary' : 'primary'}
           onClick={e => {
             e.stopPropagation();
             onSelect();
           }}
         >
           {selected ? '✓ Selected' : 'Select'}
-        </button>
+        </Button>
 
-        <button
-          className='btn btn-small btn-secondary'
+        <Button
+          variant='secondary'
+          size='small'
           onClick={e => {
             e.stopPropagation();
             onViewDetails(release);
           }}
         >
           View Details
-        </button>
+        </Button>
 
         {onAddToDiscardPile && !isInDiscardPile && (
-          <button
-            type='button'
-            className='btn btn-small btn-outline-warning'
+          <Button
+            variant='warning'
+            size='small'
             onClick={e => {
               e.preventDefault();
               e.stopPropagation();
@@ -135,7 +138,7 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
             title='Add to discard pile'
           >
             📦 Discard
-          </button>
+          </Button>
         )}
 
         {isInDiscardPile && (

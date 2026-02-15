@@ -362,7 +362,7 @@ describe('CollectionPage', () => {
         expect(screen.getByText('API Error')).toBeInTheDocument();
       });
 
-      const retryButton = screen.getByText('Retry');
+      const retryButton = screen.getByRole('button', { name: /Retry/ });
       await userEvent.click(retryButton);
 
       await waitFor(() => {
@@ -432,10 +432,10 @@ describe('CollectionPage', () => {
         expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const sortOrderButton = screen.getByText('↑');
+      const sortOrderButton = screen.getByRole('button', { name: /↑/ });
       await userEvent.click(sortOrderButton);
 
-      expect(screen.getByText('↓')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /↓/ })).toBeInTheDocument();
     });
   });
 
@@ -460,7 +460,9 @@ describe('CollectionPage', () => {
         expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const selectAllButton = screen.getByText('Select All');
+      const selectAllButton = screen.getByRole('button', {
+        name: /^Select All$/,
+      });
       await userEvent.click(selectAllButton);
 
       const deselectButtons = screen.getAllByText('Deselect');
@@ -479,8 +481,12 @@ describe('CollectionPage', () => {
 
       // Floating action bar should appear with selection count and buttons
       expect(screen.getByText('1 album selected')).toBeInTheDocument();
-      expect(screen.getByText('Scrobble')).toBeInTheDocument();
-      expect(screen.getByText('Clear Selection')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /^Scrobble$/ })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Clear Selection/ })
+      ).toBeInTheDocument();
     });
 
     it('navigates to scrobble page when scrobble button is clicked', async () => {
@@ -493,7 +499,7 @@ describe('CollectionPage', () => {
       const selectButtons = screen.getAllByText('Select');
       await userEvent.click(selectButtons[0]);
 
-      const scrobbleButton = screen.getByText('Scrobble');
+      const scrobbleButton = screen.getByRole('button', { name: /^Scrobble$/ });
       await userEvent.click(scrobbleButton);
 
       expect(window.location.hash).toBe('#scrobble');
@@ -513,12 +519,16 @@ describe('CollectionPage', () => {
       expect(screen.getByText('1 album selected')).toBeInTheDocument();
 
       // Click Clear Selection
-      const clearButton = screen.getByText('Clear Selection');
+      const clearButton = screen.getByRole('button', {
+        name: /Clear Selection/,
+      });
       await userEvent.click(clearButton);
 
       // Floating action bar should disappear
       expect(screen.queryByText('1 album selected')).not.toBeInTheDocument();
-      expect(screen.queryByText('Clear Selection')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /Clear Selection/ })
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -530,9 +540,15 @@ describe('CollectionPage', () => {
         expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      expect(screen.getByText('Check for New Items')).toBeInTheDocument();
-      expect(screen.getByText('Force Reload')).toBeInTheDocument();
-      expect(screen.getByText('Clear Cache')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Check for New Items/ })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Force Reload/ })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Clear Cache/ })
+      ).toBeInTheDocument();
     });
 
     it('allows checking for new items', async () => {
@@ -542,7 +558,9 @@ describe('CollectionPage', () => {
         expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const checkButton = screen.getByText('Check for New Items');
+      const checkButton = screen.getByRole('button', {
+        name: /Check for New Items/,
+      });
       await userEvent.click(checkButton);
 
       await waitFor(() => {
@@ -564,7 +582,9 @@ describe('CollectionPage', () => {
         expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const checkButton = screen.getByText('Check for New Items');
+      const checkButton = screen.getByRole('button', {
+        name: /Check for New Items/,
+      });
       await userEvent.click(checkButton);
 
       await waitFor(() => {
@@ -581,7 +601,9 @@ describe('CollectionPage', () => {
         expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const forceReloadButton = screen.getByText('Force Reload');
+      const forceReloadButton = screen.getByRole('button', {
+        name: /Force Reload/,
+      });
       await userEvent.click(forceReloadButton);
 
       await waitFor(() => {
@@ -599,7 +621,7 @@ describe('CollectionPage', () => {
         expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const clearButton = screen.getByText('Clear Cache');
+      const clearButton = screen.getByRole('button', { name: /Clear Cache/ });
       await userEvent.click(clearButton);
 
       await waitFor(() => {
@@ -740,7 +762,9 @@ describe('CollectionPage', () => {
         expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const checkButton = screen.getByText('Check for New Items');
+      const checkButton = screen.getByRole('button', {
+        name: /Check for New Items/,
+      });
       await userEvent.click(checkButton);
 
       await waitFor(() => {
@@ -757,7 +781,9 @@ describe('CollectionPage', () => {
         expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const checkButton = screen.getByText('Check for New Items');
+      const checkButton = screen.getByRole('button', {
+        name: /Check for New Items/,
+      });
       await userEvent.click(checkButton);
 
       await waitFor(() => {
@@ -782,7 +808,9 @@ describe('CollectionPage', () => {
         expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const checkButton = screen.getByText('Check for New Items');
+      const checkButton = screen.getByRole('button', {
+        name: /Check for New Items/,
+      });
       await userEvent.click(checkButton);
 
       await waitFor(() => {
@@ -791,7 +819,9 @@ describe('CollectionPage', () => {
         ).toBeInTheDocument();
       });
 
-      const updateButton = screen.getByText('Update with New Items (5)');
+      const updateButton = screen.getByRole('button', {
+        name: /Update with New Items \(5\)/,
+      });
       await userEvent.click(updateButton);
 
       await waitFor(() => {
@@ -814,7 +844,9 @@ describe('CollectionPage', () => {
         expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const checkButton = screen.getByText('Check for New Items');
+      const checkButton = screen.getByRole('button', {
+        name: /Check for New Items/,
+      });
       await userEvent.click(checkButton);
 
       await waitFor(() => {
@@ -823,7 +855,9 @@ describe('CollectionPage', () => {
         ).toBeInTheDocument();
       });
 
-      const updateButton = screen.getByText('Update with New Items (5)');
+      const updateButton = screen.getByRole('button', {
+        name: /Update with New Items \(5\)/,
+      });
       await userEvent.click(updateButton);
 
       await waitFor(() => {
@@ -1015,7 +1049,7 @@ describe('CollectionPage', () => {
         ).toBeInTheDocument();
       });
 
-      const nextButton = screen.getByText('Next');
+      const nextButton = screen.getByRole('button', { name: /Next/ });
       await userEvent.click(nextButton);
 
       await waitFor(() => {
@@ -1061,7 +1095,7 @@ describe('CollectionPage', () => {
       await userEvent.click(searchButton);
 
       await waitFor(() => {
-        const nextButton = screen.getByText('Next');
+        const nextButton = screen.getByRole('button', { name: /Next/ });
         expect(nextButton).toBeDisabled();
       });
     });
@@ -1089,7 +1123,9 @@ describe('CollectionPage', () => {
         expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const checkButton = screen.getByText('Check for New Items');
+      const checkButton = screen.getByRole('button', {
+        name: /Check for New Items/,
+      });
       await userEvent.click(checkButton);
 
       await waitFor(() => {
@@ -1098,7 +1134,9 @@ describe('CollectionPage', () => {
         ).toBeInTheDocument();
       });
 
-      const updateButton = screen.getByText('Update with New Items (3)');
+      const updateButton = screen.getByRole('button', {
+        name: /Update with New Items \(3\)/,
+      });
       await userEvent.click(updateButton);
 
       // Verify that the update operation completed successfully by checking that getEntireCollection was called
@@ -1129,7 +1167,9 @@ describe('CollectionPage', () => {
         expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
       });
 
-      const checkButton = screen.getByText('Check for New Items');
+      const checkButton = screen.getByRole('button', {
+        name: /Check for New Items/,
+      });
       await userEvent.click(checkButton);
 
       await waitFor(() => {
@@ -1138,7 +1178,9 @@ describe('CollectionPage', () => {
         ).toBeInTheDocument();
       });
 
-      const updateButton = screen.getByText('Update with New Items (3)');
+      const updateButton = screen.getByRole('button', {
+        name: /Update with New Items \(3\)/,
+      });
       await userEvent.click(updateButton);
 
       await waitFor(() => {

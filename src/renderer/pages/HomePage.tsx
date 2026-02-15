@@ -12,6 +12,7 @@ import {
 import { StatType } from '../components/dashboard/StatDetailsModal';
 import { CalendarHeatmap } from '../components/stats/CalendarHeatmap';
 import { MilestoneProgress } from '../components/stats/MilestoneProgress';
+import { Button } from '../components/ui/Button';
 import { StatCardSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -180,13 +181,9 @@ const HomePage: React.FC = () => {
             Connect your Discogs and Last.fm accounts to start tracking your
             vinyl listening habits.
           </p>
-          <button
-            type='button'
-            className='btn'
-            onClick={() => navigate('/settings')}
-          >
+          <Button type='button' onClick={() => navigate('/settings')}>
             Connect Accounts
-          </button>
+          </Button>
         </div>
 
         <div className='dashboard-section'>
@@ -236,9 +233,9 @@ const HomePage: React.FC = () => {
           <div className='dashboard-error-icon'>⚠️</div>
           <h2>Unable to load dashboard</h2>
           <p>{dashboardError}</p>
-          <button type='button' className='btn' onClick={loadDashboardData}>
+          <Button type='button' onClick={loadDashboardData}>
             Try Again
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -364,13 +361,9 @@ const HomePage: React.FC = () => {
               Start scrobbling your vinyl collection to see your listening
               activity here.
             </p>
-            <button
-              type='button'
-              className='btn'
-              onClick={() => navigate('/collection')}
-            >
+            <Button type='button' onClick={() => navigate('/collection')}>
               Browse Collection
-            </button>
+            </Button>
           </div>
         )}
 

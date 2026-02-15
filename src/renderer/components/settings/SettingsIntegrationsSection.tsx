@@ -6,6 +6,7 @@ import { useConfirmModal } from '../../hooks/useConfirmModal';
 import ApiService from '../../services/api';
 import { createLogger } from '../../utils/logger';
 import SyncStatusBar from '../SyncStatusBar';
+import { Button } from '../ui/Button';
 
 const logger = createLogger('SettingsIntegrationsSection');
 
@@ -302,18 +303,18 @@ const SettingsIntegrationsSection: React.FC<
             {syncError && (
               <div className='error-message'>
                 {syncError}
-                <button className='btn btn-small' onClick={clearSyncMessages}>
+                <Button size='small' onClick={clearSyncMessages}>
                   Dismiss
-                </button>
+                </Button>
               </div>
             )}
 
             {syncSuccess && (
               <div className='message success'>
                 {syncSuccess}
-                <button className='btn btn-small' onClick={clearSyncMessages}>
+                <Button size='small' onClick={clearSyncMessages}>
                   Dismiss
-                </button>
+                </Button>
               </div>
             )}
 
@@ -379,24 +380,23 @@ const SettingsIntegrationsSection: React.FC<
               </div>
 
               <div className='settings-sync-actions'>
-                <button
-                  className='btn'
+                <Button
                   onClick={() => handleStartSync(true)}
                   disabled={syncLoading || syncData?.sync.status === 'syncing'}
                   title='Fetch new scrobbles since last sync'
                 >
                   {syncLoading ? 'Starting...' : 'Sync New'}
-                </button>
-                <button
-                  className='btn btn-secondary'
+                </Button>
+                <Button
+                  variant='secondary'
                   onClick={() => handleStartSync(false)}
                   disabled={syncLoading || syncData?.sync.status === 'syncing'}
                   title='Re-fetch all scrobbles from Last.fm'
                 >
                   Full Re-sync
-                </button>
-                <button
-                  className='btn btn-danger'
+                </Button>
+                <Button
+                  variant='danger'
                   onClick={handleClearHistoryIndex}
                   disabled={
                     syncLoading ||
@@ -405,7 +405,7 @@ const SettingsIntegrationsSection: React.FC<
                   }
                 >
                   Clear Index
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -425,14 +425,13 @@ const SettingsIntegrationsSection: React.FC<
             <p>
               Please authenticate with Last.fm to sync your scrobble history.
             </p>
-            <button
-              className='btn'
+            <Button
               onClick={() => {
                 window.location.hash = 'settings?tab=connections';
               }}
             >
               Connect Last.fm
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -456,14 +455,14 @@ const SettingsIntegrationsSection: React.FC<
               Visit the Collection page to see cache status and manually refresh
               if needed.
             </p>
-            <button
-              className='btn btn-secondary'
+            <Button
+              variant='secondary'
               onClick={() => {
                 window.location.hash = '#collection';
               }}
             >
               Go to Collection
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -484,18 +483,18 @@ const SettingsIntegrationsSection: React.FC<
           {aiError && (
             <div className='error-message'>
               {aiError}
-              <button className='btn btn-small' onClick={clearAIMessages}>
+              <Button size='small' onClick={clearAIMessages}>
                 Dismiss
-              </button>
+              </Button>
             </div>
           )}
 
           {aiSuccess && (
             <div className='message success'>
               {aiSuccess}
-              <button className='btn btn-small' onClick={clearAIMessages}>
+              <Button size='small' onClick={clearAIMessages}>
                 Dismiss
-              </button>
+              </Button>
             </div>
           )}
 
@@ -510,13 +509,14 @@ const SettingsIntegrationsSection: React.FC<
                   : aiStatus?.error || 'Ollama is not connected'}
               </span>
             </div>
-            <button
-              className='btn btn-small btn-secondary'
+            <Button
+              variant='secondary'
+              size='small'
               onClick={handleTestAIConnection}
               disabled={aiLoading}
             >
               {aiLoading ? 'Testing...' : 'Test Connection'}
-            </button>
+            </Button>
           </div>
 
           <div className='settings-ai-controls'>
@@ -594,13 +594,9 @@ const SettingsIntegrationsSection: React.FC<
                 </span>
               </div>
 
-              <button
-                className='btn'
-                onClick={handleSaveAISettings}
-                disabled={aiLoading}
-              >
+              <Button onClick={handleSaveAISettings} disabled={aiLoading}>
                 Save Settings
-              </button>
+              </Button>
             </div>
           )}
 

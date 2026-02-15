@@ -8,6 +8,7 @@ import {
 } from '../../../shared/types';
 import ApiService from '../../services/api';
 import { createLogger } from '../../utils/logger';
+import { Button } from '../ui/Button';
 
 const logger = createLogger('SettingsFiltersSection');
 
@@ -148,18 +149,18 @@ const SettingsFiltersSection: React.FC<SettingsFiltersSectionProps> = ({
           {error && (
             <div className='error-message'>
               {error}
-              <button className='btn btn-small' onClick={clearMessages}>
+              <Button size='small' onClick={clearMessages}>
                 Dismiss
-              </button>
+              </Button>
             </div>
           )}
 
           {success && (
             <div className='message success'>
               {success}
-              <button className='btn btn-small' onClick={clearMessages}>
+              <Button size='small' onClick={clearMessages}>
                 Dismiss
-              </button>
+              </Button>
             </div>
           )}
 
@@ -197,15 +198,16 @@ const SettingsFiltersSection: React.FC<SettingsFiltersSectionProps> = ({
                             {new Date(item.hiddenAt).toLocaleDateString()}
                           </span>
                         </div>
-                        <button
-                          className='btn btn-small btn-secondary'
+                        <Button
+                          variant='secondary'
+                          size='small'
                           onClick={() =>
                             handleUnhideAlbum(item.artist, item.album)
                           }
                           title='Unhide this album'
                         >
                           Unhide
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -239,13 +241,14 @@ const SettingsFiltersSection: React.FC<SettingsFiltersSectionProps> = ({
                             {new Date(item.hiddenAt).toLocaleDateString()}
                           </span>
                         </div>
-                        <button
-                          className='btn btn-small btn-secondary'
+                        <Button
+                          variant='secondary'
+                          size='small'
                           onClick={() => handleUnhideArtist(item.artist)}
                           title='Unhide this artist'
                         >
                           Unhide
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -308,15 +311,16 @@ const SettingsFiltersSection: React.FC<SettingsFiltersSectionProps> = ({
                             {new Date(item.hiddenAt).toLocaleDateString()}
                           </span>
                         </div>
-                        <button
-                          className='btn btn-small btn-secondary'
+                        <Button
+                          variant='secondary'
+                          size='small'
                           onClick={() =>
                             handleUnhideRelease(item.mbid, item.title)
                           }
                           title='Unhide this release'
                         >
                           Unhide
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -350,13 +354,14 @@ const SettingsFiltersSection: React.FC<SettingsFiltersSectionProps> = ({
                             {new Date(item.excludedAt).toLocaleDateString()}
                           </span>
                         </div>
-                        <button
-                          className='btn btn-small btn-secondary'
+                        <Button
+                          variant='secondary'
+                          size='small'
                           onClick={() => handleIncludeArtist(item.artistName)}
                           title='Include this artist in release tracking'
                         >
                           Include
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </div>

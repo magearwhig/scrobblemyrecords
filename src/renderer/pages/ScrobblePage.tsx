@@ -5,6 +5,7 @@ import {
   ScrobbleTrack,
   ScrobbleProgress,
 } from '../../shared/types';
+import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { ListItemSkeleton } from '../components/ui/Skeleton';
@@ -274,9 +275,13 @@ const ScrobblePage: React.FC = () => {
           Please authenticate with both Discogs and Last.fm to scrobble tracks.
         </p>
         <div className='scrobble-margin-top'>
-          <a href='#settings?tab=connections' className='btn'>
+          <Button
+            onClick={() => {
+              window.location.hash = 'settings?tab=connections';
+            }}
+          >
             Connect Accounts
-          </a>
+          </Button>
         </div>
       </div>
     );
@@ -291,9 +296,13 @@ const ScrobblePage: React.FC = () => {
           and select some albums first.
         </p>
         <div className='scrobble-margin-top'>
-          <a href='#collection' className='btn'>
+          <Button
+            onClick={() => {
+              window.location.hash = 'collection';
+            }}
+          >
             Browse Collection
-          </a>
+          </Button>
         </div>
       </div>
     );
@@ -309,23 +318,21 @@ const ScrobblePage: React.FC = () => {
         size='small'
         footer={
           <>
-            <button
-              className='btn btn-outline'
+            <Button
+              variant='outline'
               onClick={() => setShowDisambiguationWarning(false)}
             >
               Cancel
-            </button>
-            <button
-              className='btn btn-secondary'
+            </Button>
+            <Button
+              variant='secondary'
               onClick={() =>
                 navigateToMappingWithArtist(disambiguationArtists[0])
               }
             >
               Create Mapping
-            </button>
-            <button className='btn btn-primary' onClick={proceedWithScrobble}>
-              Continue Anyway
-            </button>
+            </Button>
+            <Button onClick={proceedWithScrobble}>Continue Anyway</Button>
           </>
         }
       >
@@ -418,15 +425,15 @@ const ScrobblePage: React.FC = () => {
             <div className='scrobble-tracks-header'>
               <h3>Tracks ({preparedTracks.length})</h3>
               <div className='scrobble-tracks-controls'>
-                <button
-                  className='btn btn-small'
+                <Button
+                  size='small'
                   onClick={handleSelectAll}
                   disabled={scrobbling}
                 >
                   {selectedTracks.size === preparedTracks.length
                     ? 'Deselect All'
                     : 'Select All'}
-                </button>
+                </Button>
                 <span className='scrobble-selected-count'>
                   {selectedTracks.size} selected
                 </span>
@@ -502,23 +509,22 @@ const ScrobblePage: React.FC = () => {
         )}
 
         <div className='scrobble-actions'>
-          <button
-            className='btn'
+          <Button
             onClick={handleScrobble}
             disabled={scrobbling || selectedTracks.size === 0}
           >
             {scrobbling
               ? 'Scrobbling...'
               : `Scrobble ${selectedTracks.size} Tracks`}
-          </button>
+          </Button>
 
-          <button
-            className='btn btn-secondary'
+          <Button
+            variant='secondary'
             onClick={() => window.history.back()}
             disabled={scrobbling}
           >
             Back to Collection
-          </button>
+          </Button>
         </div>
       </div>
     </div>

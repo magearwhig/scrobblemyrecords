@@ -7,6 +7,8 @@ import {
 } from '../../shared/types';
 import { formatRelativeTime } from '../utils/dateUtils';
 
+import { Button } from './ui/Button';
+
 interface WishlistItemCardProps {
   item: EnrichedWishlistItem;
   isMonitored: boolean;
@@ -78,21 +80,22 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
         )}
       </div>
       <div className='wishlist-card-actions'>
-        <button
-          className='btn btn-small btn-secondary'
+        <Button
+          variant='secondary'
+          size='small'
           onClick={() => onOpenVersions(item)}
           title='View all versions/pressings'
         >
           Versions
-        </button>
+        </Button>
         {item.vinylStatus === 'has_vinyl' && (
-          <button
-            className='btn btn-small btn-primary'
+          <Button
+            size='small'
             onClick={() => onOpenMarketplace(item)}
             title='Browse vinyl on Discogs Marketplace'
           >
             Shop
-          </button>
+          </Button>
         )}
       </div>
     </div>

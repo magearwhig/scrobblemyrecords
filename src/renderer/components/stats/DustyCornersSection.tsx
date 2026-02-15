@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { DustyCornerAlbum } from '../../../shared/types';
+import { Button, IconButton } from '../../components/ui/Button';
 import { playAlbumOnSpotify } from '../../utils/spotifyUtils';
 
 interface DustyCornersSectionProps {
@@ -147,16 +148,17 @@ export const DustyCornersSection: React.FC<DustyCornersSectionProps> = ({
               <div className='dusty-corners-last-played'>
                 {formatLastPlayed(album)}
               </div>
-              <button
-                className='btn btn-small btn-icon dusty-corners-play-btn'
+              <IconButton
+                icon={<>&#9654;</>}
+                size='small'
+                className='dusty-corners-play-btn'
                 onClick={e => {
                   e.stopPropagation();
                   playAlbumOnSpotify(album.artist, album.album);
                 }}
+                aria-label='Play on Spotify'
                 title='Play on Spotify'
-              >
-                ▶️
-              </button>
+              />
             </div>
           </div>
         ))}
@@ -165,15 +167,16 @@ export const DustyCornersSection: React.FC<DustyCornersSectionProps> = ({
       {!showAll && albums.length > 8 && (
         <div className='dusty-corners-more'>
           <span>+{albums.length - 8} more albums need some love</span>
-          <button
-            className='btn btn-small btn-outline'
+          <Button
+            variant='outline'
+            size='small'
             onClick={() => {
               window.location.hash = 'what-to-play?tab=dusty';
             }}
             aria-label='See all dusty corners in What to Play'
           >
             See all &rarr;
-          </button>
+          </Button>
         </div>
       )}
     </div>

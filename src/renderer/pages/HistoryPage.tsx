@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { ScrobbleSession, ScrobbleTrack } from '../../shared/types';
 import LastFmHistoryTab from '../components/LastFmHistoryTab';
 import ScrobbleSessionCard from '../components/ScrobbleSessionCard';
+import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { SessionCardSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
@@ -201,7 +202,10 @@ const HistoryPage: React.FC = () => {
           history.
         </p>
         <div className='history-auth-link-container'>
-          <a href='#settings?tab=connections' className='btn'>
+          <a
+            href='#settings?tab=connections'
+            className='button button--primary button--medium'
+          >
             Connect Last.fm
           </a>
         </div>
@@ -266,34 +270,37 @@ const HistoryPage: React.FC = () => {
               </div>
               <div className='history-sessions-actions'>
                 {authStatus.discogs.authenticated && (
-                  <button
-                    className='btn btn-small btn-secondary'
+                  <Button
+                    variant='secondary'
+                    size='small'
                     onClick={handleBackfillCovers}
                     disabled={backfillLoading || loading}
                     title='Add album covers to existing scrobble sessions using your Discogs collection'
                   >
                     {backfillLoading ? 'Backfilling...' : 'Backfill Covers'}
-                  </button>
+                  </Button>
                 )}
-                <button
-                  className='btn btn-small btn-secondary'
+                <Button
+                  variant='secondary'
+                  size='small'
                   onClick={loadHistory}
                   disabled={loading}
                 >
                   {loading ? 'Refreshing...' : 'Refresh'}
-                </button>
+                </Button>
               </div>
             </div>
 
             {error && (
               <div className='error-message'>
                 {error}
-                <button
-                  className='btn btn-small history-error-retry'
+                <Button
+                  size='small'
+                  className='history-error-retry'
                   onClick={loadHistory}
                 >
                   Retry
-                </button>
+                </Button>
               </div>
             )}
           </div>

@@ -13,6 +13,7 @@ import AlbumCard from '../components/AlbumCard';
 import CacheStatusIndicator from '../components/CacheStatusIndicator';
 import CollectionFilterControls from '../components/CollectionFilterControls';
 import SearchBar from '../components/SearchBar';
+import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import VirtualizedCollectionGrid from '../components/VirtualizedCollectionGrid';
 import { useApp } from '../context/AppContext';
@@ -1022,7 +1023,10 @@ const CollectionPage: React.FC = () => {
         <h2>Browse Collection</h2>
         <p>Please authenticate with Discogs first to browse your collection.</p>
         <div className='collection-not-authenticated'>
-          <a href='#settings?tab=connections' className='btn'>
+          <a
+            href='#settings?tab=connections'
+            className='button button--primary button--medium'
+          >
             Connect Discogs
           </a>
         </div>
@@ -1067,12 +1071,13 @@ const CollectionPage: React.FC = () => {
         {error && (
           <div className='error-message'>
             {error}
-            <button
-              className='btn btn-small ml-1'
+            <Button
+              size='small'
+              className='ml-1'
               onClick={() => loadCollection()}
             >
               Retry
-            </button>
+            </Button>
           </div>
         )}
 
@@ -1089,12 +1094,13 @@ const CollectionPage: React.FC = () => {
                 automatically preloading your complete collection in the
                 background.
               </p>
-              <button
-                className='btn btn-small collection-warning-button'
+              <Button
+                size='small'
+                className='collection-warning-button'
                 onClick={startPreloadingCollection}
               >
                 Start Preloading Now
-              </button>
+              </Button>
             </div>
           )}
 
@@ -1170,15 +1176,15 @@ const CollectionPage: React.FC = () => {
 
         <div className='collection-selection-controls'>
           <div className='collection-selection-group'>
-            <button
-              className='btn btn-small'
+            <Button
+              size='small'
               onClick={handleSelectAll}
               disabled={loading || filteredCollection.length === 0}
             >
               {selectedAlbums.size === filteredCollection.length
                 ? 'Deselect All'
                 : 'Select All'}
-            </button>
+            </Button>
             {selectedAlbums.size > 0 && (
               <span className='collection-selection-count'>
                 {selectedAlbums.size} selected
@@ -1190,26 +1196,26 @@ const CollectionPage: React.FC = () => {
             {isSearchMode ? (
               // Search mode: keep pagination
               <>
-                <button
-                  className='btn btn-small'
+                <Button
+                  size='small'
                   onClick={() => setSearchPage(Math.max(1, searchPage - 1))}
                   disabled={searchPage <= 1 || loading}
                 >
                   Previous
-                </button>
+                </Button>
                 <span className='collection-pagination-info'>
                   Page {searchPage} of {searchTotalPages} ({searchTotal}{' '}
                   results)
                 </span>
-                <button
-                  className='btn btn-small'
+                <Button
+                  size='small'
                   onClick={() =>
                     setSearchPage(Math.min(searchTotalPages, searchPage + 1))
                   }
                   disabled={searchPage >= searchTotalPages || loading}
                 >
                   Next
-                </button>
+                </Button>
               </>
             ) : (
               // Browse mode: show total count
@@ -1383,23 +1389,25 @@ const CollectionPage: React.FC = () => {
               </span>
             </div>
             <div className='floating-action-bar-actions'>
-              <button
-                className='btn btn-secondary btn-small'
+              <Button
+                variant='secondary'
+                size='small'
                 onClick={() => setSelectedAlbums(new Set())}
               >
                 Clear Selection
-              </button>
+              </Button>
               {selectedNotInDiscardCount > 0 && (
-                <button
-                  className='btn btn-small btn-outline-warning'
+                <Button
+                  variant='warning'
+                  size='small'
                   onClick={handleOpenBulkDiscardModal}
                   title={`Add ${selectedNotInDiscardCount} item${selectedNotInDiscardCount !== 1 ? 's' : ''} to discard pile`}
                 >
                   Discard ({selectedNotInDiscardCount})
-                </button>
+                </Button>
               )}
-              <button
-                className='btn btn-small'
+              <Button
+                size='small'
                 onClick={() => {
                   // Navigate to scrobble page with selected albums
                   const selectedItems = filteredCollection.filter(item =>
@@ -1414,7 +1422,7 @@ const CollectionPage: React.FC = () => {
                 }}
               >
                 Scrobble
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1427,20 +1435,16 @@ const CollectionPage: React.FC = () => {
         title='Add to Discard Pile'
         footer={
           <>
-            <button
-              className='btn btn-secondary'
+            <Button
+              variant='secondary'
               onClick={handleCloseDiscardModal}
               disabled={addingToDiscard}
             >
               Cancel
-            </button>
-            <button
-              className='btn btn-primary'
-              onClick={handleAddToDiscardPile}
-              disabled={addingToDiscard}
-            >
+            </Button>
+            <Button onClick={handleAddToDiscardPile} disabled={addingToDiscard}>
               {addingToDiscard ? 'Adding...' : 'Add to Discard Pile'}
-            </button>
+            </Button>
           </>
         }
       >
@@ -1644,22 +1648,21 @@ const CollectionPage: React.FC = () => {
         title='Add to Discard Pile'
         footer={
           <>
-            <button
-              className='btn btn-secondary'
+            <Button
+              variant='secondary'
               onClick={handleCloseBulkDiscardModal}
               disabled={bulkAddingToDiscard}
             >
               Cancel
-            </button>
-            <button
-              className='btn btn-primary'
+            </Button>
+            <Button
               onClick={handleBulkAddToDiscardPile}
               disabled={bulkAddingToDiscard}
             >
               {bulkAddingToDiscard
                 ? 'Adding...'
                 : `Add ${selectedNotInDiscardCount} to Discard Pile`}
-            </button>
+            </Button>
           </>
         }
       >
