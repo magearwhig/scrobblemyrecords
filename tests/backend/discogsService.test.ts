@@ -20,6 +20,10 @@ describe('DiscogsService', () => {
   let mockFileStorage: jest.Mocked<FileStorage>;
   let mockAxiosInstance: any;
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
 
@@ -1042,7 +1046,7 @@ describe('DiscogsService', () => {
       expect(result.success).toBe(true);
       expect(result.newItemsCount).toBe(1);
       expect(result.latestDiscogsDate).toBe(newerDate);
-    }, 20000);
+    });
 
     it('should handle errors during new items check', async () => {
       mockFileStorage.readJSON.mockRejectedValue(new Error('Storage error'));
@@ -1055,6 +1059,12 @@ describe('DiscogsService', () => {
     });
 
     it('should stop checking after 10 pages', async () => {
+      // Eliminate real rate-limiting delays to prevent timeouts
+      const origSetTimeout = global.setTimeout;
+      jest.spyOn(global, 'setTimeout').mockImplementation((fn: any) => {
+        return origSetTimeout(fn, 0);
+      });
+
       const cacheTimestamp = Date.now() - 1000 * 60 * 60 * 2;
       const cachedData = {
         timestamp: cacheTimestamp,
@@ -1093,7 +1103,7 @@ describe('DiscogsService', () => {
       expect(result.success).toBe(true);
       // Should only check first 10 pages + initial request = 11 calls max
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(11);
-    }, 15000);
+    });
   });
 
   describe('updateCacheWithNewItems', () => {
@@ -1247,7 +1257,7 @@ describe('DiscogsService', () => {
       expect(result.success).toBe(true);
       expect(result.newItemsAdded).toBe(1);
       expect(mockFileStorage.writeJSON).toHaveBeenCalled();
-    }, 10000);
+    });
 
     it('should fallback to unauthenticated when auth fails', async () => {
       const cacheTimestamp = Date.now() - 1000 * 60 * 60;
@@ -1352,9 +1362,15 @@ describe('DiscogsService', () => {
 
       expect(result.success).toBe(true);
       expect(result.newItemsAdded).toBe(1);
-    }, 10000);
+    });
 
     it('should stop checking after 10 pages', async () => {
+      // Eliminate real rate-limiting delays to prevent timeouts
+      const origSetTimeout = global.setTimeout;
+      jest.spyOn(global, 'setTimeout').mockImplementation((fn: any) => {
+        return origSetTimeout(fn, 0);
+      });
+
       const cacheTimestamp = Date.now() - 1000 * 60 * 60;
       const cachedData = {
         timestamp: cacheTimestamp,
@@ -1395,7 +1411,7 @@ describe('DiscogsService', () => {
 
       expect(result.success).toBe(true);
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(10);
-    }, 15000);
+    });
   });
 
   describe('getUserProfile with Personal Access Token', () => {

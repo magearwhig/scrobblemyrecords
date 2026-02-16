@@ -127,9 +127,9 @@ describe('HomePage Dashboard', () => {
   let mockApi: ReturnType<typeof createMockApiInstance>;
 
   beforeEach(() => {
+    jest.clearAllMocks();
     mockApi = createMockApiInstance();
     mockApiService.getApiService.mockReturnValue(mockApi as any);
-    // Note: Don't call jest.clearAllMocks() here as it resets the mock implementation
   });
 
   describe('Loading State', () => {

@@ -1,8 +1,11 @@
 import request from 'supertest';
 
-import app from '../../src/server';
+import app, { serverStartup } from '../../src/server';
 
 describe('API Routes', () => {
+  beforeAll(async () => {
+    await serverStartup;
+  });
   describe('GET /api/v1', () => {
     it('should return API information', async () => {
       const response = await request(app).get('/api/v1').expect(200);

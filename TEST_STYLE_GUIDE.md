@@ -597,6 +597,300 @@ If you must use snapshots:
 
 ---
 
+## Anti-Flakiness Patterns
+
+The patterns below were discovered during a systematic investigation into flaky test failures. Every test in this project should follow these rules to prevent intermittent failures, open-handle warnings, and CI timeouts.
+
+### 1. Express/Supertest Test Lifecycle
+
+Supertest creates an internal HTTP server for each request. Without explicit connection management, HTTP keep-alive leaves `TCPSERVERWRAP` handles open after tests complete, which Jest reports as leaked handles. This was the single largest source of flakiness (~43% of failures).
+
+**Required: Use shared test app factories**
+
+All route tests must use the helpers in `tests/utils/testHelpers.ts`:
+
+```typescript
+// ✅ Good — use createTestApp for standard route testing
+import { createTestApp } from '../../utils/testHelpers';
+
+const { app } = createTestApp({
+  mountPath: '/api/v1/backup',
+  routerFactory: (mocks) => createBackupRouter(mocks.backupService as BackupService),
+  mocks: { backupService: mockBackupService },
+});
+
+const response = await request(app).get('/api/v1/backup/preview');
+```
+
+```typescript
+// ✅ Good — use createMinimalApp when you need more control
+import { createMinimalApp } from '../../utils/testHelpers';
+
+const app = createMinimalApp();
+app.locals.discogsService = mockDiscogsService;
+app.use('/api/v1/collection', createCollectionRouter());
+```
+
+Both helpers automatically add the critical `Connection: close` middleware:
+
+```typescript
+app.use((_req, res, next) => {
+  res.set('Connection', 'close');
+  next();
+});
+```
+
+**Never call `app.listen()` in supertest tests.** Supertest manages its own server internally. Calling `listen()` creates a second server that won't be cleaned up.
+
+```typescript
+// ❌ Bad — creates orphaned server handles
+const server = app.listen(3000);
+await request(server).get('/api/v1/status');
+
+// ✅ Good — supertest handles everything
+await request(app).get('/api/v1/status');
+```
+
+### 2. Async Cleanup Requirements
+
+Dangling promises and un-awaited async operations cause "Cannot log after tests are done" warnings and non-deterministic failures.
+
+**Always `await` async operations — no fire-and-forget promises:**
+
+```typescript
+// ❌ Bad — promise floats, may resolve after test ends
+it('should save data', () => {
+  service.save(data); // Missing await!
+  expect(service.getState()).toBe('saving');
+});
+
+// ✅ Good — await the async work
+it('should save data', async () => {
+  await service.save(data);
+  expect(service.getState()).toBe('saved');
+});
+```
+
+**Use resolvable deferred promises for cancellation tests:**
+
+```typescript
+// ❌ Bad — never-resolving promise keeps handles open
+const neverResolves = new Promise(() => {});
+
+// ✅ Good — deferred promise that cleanup can resolve
+let resolve: () => void;
+const deferred = new Promise<void>((r) => { resolve = r; });
+
+afterEach(() => {
+  resolve(); // Ensure the promise settles
+});
+```
+
+**Destroy EventEmitter-based services in `afterEach`:**
+
+```typescript
+afterEach(() => {
+  service.destroy();         // Stop internal timers/listeners
+  service.removeAllListeners();
+});
+```
+
+**If production code auto-runs on import, await it in `beforeAll`:**
+
+```typescript
+// For modules like serverStartup that execute on import
+beforeAll(async () => {
+  await import('../../src/backend/serverStartup');
+});
+```
+
+### 3. Timer Management
+
+Real `setTimeout` delays are the fastest path to flaky, slow tests. Use Jest's fake timer API consistently.
+
+**Use the `useFakeTimers()` helper from `tests/utils/testHelpers.ts`:**
+
+```typescript
+import { useFakeTimers } from '../../utils/testHelpers';
+
+describe('polling service', () => {
+  let restoreTimers: () => void;
+
+  beforeEach(() => {
+    restoreTimers = useFakeTimers();
+  });
+
+  afterEach(() => {
+    restoreTimers(); // Always restores real timers
+  });
+
+  it('should poll at the configured interval', async () => {
+    startPolling();
+    await jest.advanceTimersByTimeAsync(5000);
+    expect(pollFn).toHaveBeenCalledTimes(5);
+  });
+});
+```
+
+**Never use real delays in tests:**
+
+```typescript
+// ❌ Bad — slow, non-deterministic, flaky in CI
+await new Promise((r) => setTimeout(r, 6000));
+
+// ✅ Good — instant, deterministic
+jest.useFakeTimers();
+jest.advanceTimersByTime(6000);
+```
+
+**Always restore real timers in `afterEach`** — forgetting this breaks subsequent tests that rely on real `setTimeout` (e.g., supertest request timeouts).
+
+### 4. Mock Isolation
+
+Leaked mock state between tests causes order-dependent failures that only appear intermittently.
+
+**Jest config handles cleanup automatically.** Our `jest.config.js` sets `clearMocks: true` and `restoreMocks: true` globally. You do not need manual `jest.clearAllMocks()` in every `beforeEach` — but if a test needs to re-setup mocks, clear them first.
+
+**Use `jest.spyOn()` instead of direct prototype mutation:**
+
+```typescript
+// ❌ Bad — mutates shared prototype, leaks to other tests
+Date.prototype.getTimezoneOffset = () => 300;
+
+// ✅ Good — spy is automatically restored by restoreMocks: true
+jest.spyOn(Date.prototype, 'getTimezoneOffset').mockReturnValue(300);
+```
+
+**Module-scope mock objects are shared — never mutate them in individual tests:**
+
+```typescript
+// ❌ Bad — mutates shared reference, affects other tests
+const mockService = { fetch: jest.fn() };
+it('test one', () => {
+  mockService.fetch = jest.fn().mockResolvedValue('a');
+});
+
+// ✅ Good — configure the existing mock per test
+const mockService = { fetch: jest.fn() };
+it('test one', () => {
+  mockService.fetch.mockResolvedValue('a');
+});
+```
+
+### 5. File System Isolation
+
+Parallel test workers sharing the same directory paths cause intermittent "ENOENT" or "EEXIST" errors.
+
+**Use unique directory names per test file:**
+
+```typescript
+import { uniqueTestDir, cleanupTestDir } from '../../utils/testHelpers';
+
+const testDir = uniqueTestDir('artist-mapping');
+
+beforeEach(() => {
+  fs.mkdirSync(testDir, { recursive: true });
+});
+
+afterEach(() => {
+  cleanupTestDir(testDir);
+});
+```
+
+**Save and restore `process.env.DATA_DIR` if modifying it:**
+
+```typescript
+let originalDataDir: string | undefined;
+
+beforeAll(() => {
+  originalDataDir = process.env.DATA_DIR;
+  process.env.DATA_DIR = uniqueTestDir('my-service');
+});
+
+afterAll(() => {
+  process.env.DATA_DIR = originalDataDir;
+});
+```
+
+**Prefer async `fs.rm()` in cleanup, but `cleanupTestDir()` (sync) is acceptable in `afterEach`:**
+
+```typescript
+// ✅ Good — using the shared helper
+afterEach(() => {
+  cleanupTestDir(testDir);
+});
+
+// ✅ Also good — async cleanup
+afterEach(async () => {
+  await fs.promises.rm(testDir, { recursive: true, force: true });
+});
+```
+
+### 6. Production Code Testability
+
+Some production code patterns make tests inherently fragile. When modifying production code, follow these guidelines to keep the test suite reliable.
+
+**Services with background timers should expose `destroy()` or `reset()`:**
+
+```typescript
+// In production code:
+class PollingService {
+  private timer: NodeJS.Timeout | null = null;
+
+  start() {
+    this.timer = setInterval(() => this.poll(), 5000);
+  }
+
+  destroy() {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+    this.removeAllListeners();
+  }
+}
+```
+
+**Singletons with counters should expose `reset()` for test use:**
+
+```typescript
+class RequestCounter {
+  private count = 0;
+  increment() { this.count++; }
+  getCount() { return this.count; }
+  reset() { this.count = 0; } // Enables clean test isolation
+}
+```
+
+**Avoid module-level side effects (auto-executing functions on import):**
+
+```typescript
+// ❌ Bad — side effect runs when any test imports this module
+const db = connectToDatabase();
+export default db;
+
+// ✅ Good — explicit initialization
+let db: Database | null = null;
+export function getDatabase() {
+  if (!db) db = connectToDatabase();
+  return db;
+}
+```
+
+### Quick Reference: Test Utilities
+
+All shared helpers live in `tests/utils/testHelpers.ts`:
+
+| Helper | Purpose |
+|--------|---------|
+| `createTestApp(options)` | Full Express test app with Connection: close, helmet, cors |
+| `createMinimalApp()` | Bare Express app with Connection: close — add your own middleware |
+| `uniqueTestDir(name)` | Collision-free temp directory path for file system tests |
+| `cleanupTestDir(path)` | Safe recursive directory removal (ignores missing dirs) |
+| `useFakeTimers()` | Installs fake timers, returns cleanup function |
+
+---
+
 ## Common Anti-Patterns to Avoid
 
 ### ❌ Testing Implementation Details

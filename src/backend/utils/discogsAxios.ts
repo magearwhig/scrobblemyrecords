@@ -74,3 +74,7 @@ export function getDiscogsAxios(): AxiosInstance {
 
   return sharedInstance;
 }
+
+export function resetDiscogsAxios(): void {
+  sharedInstance = null;
+}

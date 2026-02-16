@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as fsPromises from 'fs/promises';
 import * as path from 'path';
 
 // Set DATA_DIR before importing the service
@@ -7,8 +8,12 @@ const testDataDir = './test-data-artist-mapping';
 describe('ArtistMappingService', () => {
   // We need to reset the module for each test since it uses a singleton
   let artistMappingService: any;
+  let originalDataDir: string | undefined;
 
   beforeEach(() => {
+    // Save original DATA_DIR
+    originalDataDir = process.env.DATA_DIR;
+
     // Set env var before importing
     process.env.DATA_DIR = testDataDir;
 
@@ -27,14 +32,19 @@ describe('ArtistMappingService', () => {
     artistMappingService = module.artistMappingService;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     // Clean up test directory
     try {
-      fs.rmSync(testDataDir, { recursive: true, force: true });
+      await fsPromises.rm(testDataDir, { recursive: true, force: true });
     } catch {
       // Ignore errors
     }
-    delete process.env.DATA_DIR;
+    // Restore original DATA_DIR
+    if (originalDataDir !== undefined) {
+      process.env.DATA_DIR = originalDataDir;
+    } else {
+      delete process.env.DATA_DIR;
+    }
   });
 
   describe('getLastfmName', () => {

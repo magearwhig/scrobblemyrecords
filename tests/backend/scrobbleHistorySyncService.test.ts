@@ -56,6 +56,7 @@ describe('ScrobbleHistorySyncService', () => {
   });
 
   afterEach(async () => {
+    service.destroy();
     try {
       await fs.rm(testDataDir, { recursive: true, force: true });
     } catch {
@@ -550,8 +551,12 @@ describe('ScrobbleHistorySyncService', () => {
     });
 
     it('should not start if already syncing', async () => {
-      // Arrange - Start a sync that will hang
-      mockAxiosInstance.get.mockImplementation(() => new Promise(() => {}));
+      // Arrange - Start a sync that will hang, using a deferred promise we can resolve in cleanup
+      let resolveHangingRequest!: (value: unknown) => void;
+      const hangingPromise = new Promise(resolve => {
+        resolveHangingRequest = resolve;
+      });
+      mockAxiosInstance.get.mockImplementation(() => hangingPromise);
       const firstSync = service.startFullSync();
 
       // Small delay to ensure first sync starts
@@ -563,8 +568,21 @@ describe('ScrobbleHistorySyncService', () => {
       // Assert - Second sync should return immediately
       await secondSync;
 
-      // Cleanup
-      await service.clearIndex();
+      // Cleanup - resolve the hanging promise so firstSync can settle
+      resolveHangingRequest({
+        data: {
+          recenttracks: {
+            '@attr': { totalPages: '1', total: '0' },
+            track: [],
+          },
+        },
+      });
+      // Wait for firstSync to complete (it may throw due to empty tracks, that's fine)
+      try {
+        await firstSync;
+      } catch {
+        /* expected */
+      }
     });
 
     it('should update lastPlayed to most recent timestamp', async () => {

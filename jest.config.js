@@ -1,5 +1,7 @@
 module.exports = {
   maxWorkers: '50%',
+  openHandlesTimeout: 5000,
+  workerIdleMemoryLimit: '512MB',
   projects: [
     // Backend tests (Node.js environment)
     {
@@ -20,7 +22,9 @@ module.exports = {
         '!src/**/*.spec.ts'
       ],
       setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
-      testTimeout: 10000
+      testTimeout: 10000,
+      clearMocks: true,
+      restoreMocks: true
     },
     // Frontend tests (jsdom environment for React)
     {
@@ -46,7 +50,10 @@ module.exports = {
       setupFilesAfterEnv: ['<rootDir>/tests/setupReact.ts'],
       moduleNameMapper: {
         '\\.(css|less|scss|sass)$': 'identity-obj-proxy'
-      }
+      },
+      testTimeout: 10000,
+      clearMocks: true,
+      restoreMocks: true
     }
   ],
   coverageDirectory: 'coverage',

@@ -5,7 +5,7 @@ import { FileStorage } from '../../src/backend/utils/fileStorage';
 
 describe('FileStorage', () => {
   let fileStorage: FileStorage;
-  const testDataDir = './test-data';
+  const testDataDir = './test-data-file-storage';
 
   beforeEach(async () => {
     fileStorage = new FileStorage(testDataDir);

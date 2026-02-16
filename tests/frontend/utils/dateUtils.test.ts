@@ -122,6 +122,10 @@ describe('dateUtils', () => {
   });
 
   describe('getTimezoneOffset', () => {
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
     it('should return timezone offset string', () => {
       const result = getTimezoneOffset();
       expect(result).toMatch(/^UTC[+-]\d+(:?\d{2})?$/);
@@ -134,36 +138,24 @@ describe('dateUtils', () => {
     });
 
     it('should format hours without minutes when minutes are zero', () => {
-      // Mock timezone offset to be exactly on the hour
-      const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
-      Date.prototype.getTimezoneOffset = jest.fn().mockReturnValue(-300); // UTC+5
+      jest.spyOn(Date.prototype, 'getTimezoneOffset').mockReturnValue(-300); // UTC+5
 
       const result = getTimezoneOffset();
       expect(result).toBe('UTC+5');
-
-      Date.prototype.getTimezoneOffset = originalGetTimezoneOffset;
     });
 
     it('should format hours and minutes when minutes are not zero', () => {
-      // Mock timezone offset to have minutes
-      const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
-      Date.prototype.getTimezoneOffset = jest.fn().mockReturnValue(-270); // UTC+4:30 (4*60+30 = 270 minutes ahead)
+      jest.spyOn(Date.prototype, 'getTimezoneOffset').mockReturnValue(-270); // UTC+4:30 (4*60+30 = 270 minutes ahead)
 
       const result = getTimezoneOffset();
       expect(result).toBe('UTC+5:30');
-
-      Date.prototype.getTimezoneOffset = originalGetTimezoneOffset;
     });
 
     it('should handle negative offset correctly', () => {
-      // Mock timezone offset to be negative (behind UTC)
-      const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
-      Date.prototype.getTimezoneOffset = jest.fn().mockReturnValue(240); // UTC-4
+      jest.spyOn(Date.prototype, 'getTimezoneOffset').mockReturnValue(240); // UTC-4
 
       const result = getTimezoneOffset();
       expect(result).toBe('UTC-4');
-
-      Date.prototype.getTimezoneOffset = originalGetTimezoneOffset;
     });
   });
 

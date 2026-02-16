@@ -73,6 +73,16 @@ export class ScrobbleHistorySyncService extends EventEmitter {
   }
 
   /**
+   * Tear down the service, removing all listeners and aborting any in-flight sync.
+   */
+  destroy(): void {
+    this.removeAllListeners();
+    if (this.syncAbortController) {
+      this.syncAbortController.abort();
+    }
+  }
+
+  /**
    * Set the history storage instance for cache invalidation
    */
   setHistoryStorage(historyStorage: ScrobbleHistoryStorage): void {

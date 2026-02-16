@@ -44,3 +44,12 @@ global.console = {
   info: jest.fn(),
   debug: jest.fn(),
 };
+
+// Reset console mock call counts between tests to prevent cross-test pollution
+afterEach(() => {
+  (console.log as jest.Mock).mockClear();
+  (console.error as jest.Mock).mockClear();
+  (console.warn as jest.Mock).mockClear();
+  (console.info as jest.Mock).mockClear();
+  (console.debug as jest.Mock).mockClear();
+});

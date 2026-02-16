@@ -7,10 +7,6 @@ import Header from '../../../src/renderer/components/Header';
 import { AuthProvider } from '../../../src/renderer/context/AuthContext';
 import { AuthStatus } from '../../../src/shared/types';
 
-// Mock console.log to avoid noise in tests
-const mockConsoleLog = jest.fn();
-jest.spyOn(console, 'log').mockImplementation(mockConsoleLog);
-
 // Mock ThemeContext
 const mockToggleDarkMode = jest.fn();
 const mockUseTheme = {
@@ -49,7 +45,7 @@ const renderHeaderWithProviders = (
 
 describe('Header', () => {
   afterEach(() => {
-    mockConsoleLog.mockClear();
+    jest.clearAllMocks();
   });
 
   it('renders the application title and version', () => {

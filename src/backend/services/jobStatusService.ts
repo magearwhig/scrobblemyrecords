@@ -60,6 +60,11 @@ class JobStatusService {
     );
   }
 
+  reset(): void {
+    this.jobs.clear();
+    nextJobId = 1;
+  }
+
   private prune(): void {
     const cutoff = Date.now() - PRUNE_AGE_MS;
     for (const [id, job] of this.jobs) {

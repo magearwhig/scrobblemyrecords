@@ -57,6 +57,7 @@ describe('SellerMonitoringService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.resetModules();
+    jest.useFakeTimers();
 
     // Mock FileStorage
     mockFileStorage = new FileStorage('test') as jest.Mocked<FileStorage>;
@@ -100,6 +101,10 @@ describe('SellerMonitoringService', () => {
       mockAuthService,
       mockWishlistService
     );
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   describe('constructor', () => {
@@ -692,7 +697,7 @@ describe('SellerMonitoringService', () => {
       await sellerMonitoringService.startScan();
 
       // Give the background scan time to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await jest.advanceTimersByTimeAsync(100);
 
       expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
         'sellers/scan-status.json',
@@ -803,7 +808,7 @@ describe('SellerMonitoringService', () => {
 
       await sellerMonitoringService.startScan();
       // Wait longer due to API_CALL_DELAY_MS (200ms per API call)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await jest.advanceTimersByTimeAsync(500);
 
       expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
         'sellers/matches.json',
@@ -852,7 +857,7 @@ describe('SellerMonitoringService', () => {
 
       await sellerMonitoringService.startScan();
       // Wait longer due to API_CALL_DELAY_MS (200ms per API call)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await jest.advanceTimersByTimeAsync(500);
 
       expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
         'sellers/matches.json',
@@ -895,7 +900,7 @@ describe('SellerMonitoringService', () => {
       });
 
       await sellerMonitoringService.startScan();
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await jest.advanceTimersByTimeAsync(200);
 
       // Matches should be empty because CD is not vinyl
       const matchesCall = mockFileStorage.writeJSON.mock.calls.find(
@@ -1060,7 +1065,7 @@ describe('SellerMonitoringService', () => {
 
       await sellerMonitoringService.startScan();
       // Wait longer due to API_CALL_DELAY_MS (200ms per API call) - 2 releases to look up
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await jest.advanceTimersByTimeAsync(800);
 
       // Only item 1002 should be in matches (its master_id 12345 is in wishlist)
       const matchesCall = mockFileStorage.writeJSON.mock.calls.find(
@@ -1162,7 +1167,7 @@ describe('SellerMonitoringService', () => {
 
       await sellerMonitoringService.startScan();
       // Wait longer due to API_CALL_DELAY_MS (200ms per API call)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await jest.advanceTimersByTimeAsync(500);
 
       const matchesCall = mockFileStorage.writeJSON.mock.calls.find(
         call => call[0] === 'sellers/matches.json'
@@ -1238,11 +1243,11 @@ describe('SellerMonitoringService', () => {
 
       await sellerMonitoringService.startScan();
       // Wait for retry delay + scan completion
-      await new Promise(resolve => setTimeout(resolve, 6000));
+      await jest.advanceTimersByTimeAsync(6000);
 
       // Should have made 2 requests (1 failed, 1 succeeded)
       expect(requestCount).toBe(2);
-    }, 10000);
+    });
 
     it('should retry on 429 rate limit error', async () => {
       const now = Date.now();
@@ -1309,10 +1314,10 @@ describe('SellerMonitoringService', () => {
       });
 
       await sellerMonitoringService.startScan();
-      await new Promise(resolve => setTimeout(resolve, 6000));
+      await jest.advanceTimersByTimeAsync(6000);
 
       expect(requestCount).toBe(2);
-    }, 10000);
+    });
   });
 
   describe('partial scan progress', () => {
@@ -1403,14 +1408,14 @@ describe('SellerMonitoringService', () => {
 
       await sellerMonitoringService.startScan();
       // Wait for retries to complete
-      await new Promise(resolve => setTimeout(resolve, 25000));
+      await jest.advanceTimersByTimeAsync(25000);
 
       // Should have saved partial progress
       const partialProgressCall = mockFileStorage.writeJSON.mock.calls.find(
         call => call[0].includes('-partial.json')
       );
       expect(partialProgressCall).toBeDefined();
-    }, 30000);
+    });
 
     it('should resume from partial progress on next scan', async () => {
       const now = Date.now();
@@ -1518,7 +1523,7 @@ describe('SellerMonitoringService', () => {
       });
 
       await sellerMonitoringService.startScan();
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await jest.advanceTimersByTimeAsync(500);
 
       // Should have started from page 3 (continuing from lastCompletedPage 2)
       expect(requestedPage).toBe(3);
@@ -1608,7 +1613,7 @@ describe('SellerMonitoringService', () => {
       });
 
       await sellerMonitoringService.startScan();
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await jest.advanceTimersByTimeAsync(200);
 
       // Should have started from page 1 (stale progress ignored)
       expect(requestedPage).toBe(1);

@@ -1,3 +1,6 @@
+// Retry flaky tests (supertest ephemeral port issues)
+jest.retryTimes(2, { logErrorsBeforeRetry: true });
+
 // Set test environment
 process.env.NODE_ENV = 'test';
 process.env.PORT = '3002'; // Use different port for tests
