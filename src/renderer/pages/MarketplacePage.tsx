@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
 import MissingAlbumsContainer from '../components/marketplace/MissingAlbumsContainer';
+import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useTabKeyNavigation } from '../hooks/useTabKeyNavigation';
+import { getApiService } from '../services/api';
 import { getTabFromUrl } from '../utils/tabUtils';
 
 import NewReleasesPage from './NewReleasesPage';
@@ -34,11 +36,25 @@ const TAB_LABELS: Record<MarketplaceTab, string> = {
 };
 
 const MarketplacePage: React.FC = () => {
-  const { authStatus } = useAuth();
+  const { state } = useApp();
+  const { authStatus, setAuthStatus } = useAuth();
   const handleTabKeyDown = useTabKeyNavigation();
+  const [authChecked, setAuthChecked] = useState(false);
+  const api = getApiService(state.serverUrl);
   const [activeTab, setActiveTab] = useState<MarketplaceTab>(
     () => getTabFromUrl(VALID_TABS, 'wishlist') as MarketplaceTab
   );
+
+  // Check auth status on mount if not authenticated (handles page refresh)
+  useEffect(() => {
+    if (!authStatus.discogs.authenticated && !authChecked) {
+      setAuthChecked(true);
+      api
+        .getAuthStatus()
+        .then(setAuthStatus)
+        .catch(() => {});
+    }
+  }, [authStatus.discogs.authenticated, authChecked, setAuthStatus]);
 
   // Sync active tab when the URL hash changes (e.g., redirects, back/forward)
   useEffect(() => {

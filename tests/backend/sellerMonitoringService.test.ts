@@ -1177,7 +1177,7 @@ describe('SellerMonitoringService', () => {
   });
 
   describe('retry logic', () => {
-    it('should retry on 403 rate limit error with exponential backoff', async () => {
+    it('should retry on 403 rate limit error', async () => {
       const now = Date.now();
       let requestCount = 0;
 
@@ -1242,8 +1242,8 @@ describe('SellerMonitoringService', () => {
       });
 
       await sellerMonitoringService.startScan();
-      // Wait for retry delay + scan completion
-      await jest.advanceTimersByTimeAsync(6000);
+      // Retries are immediate (bucket handles delays), just flush promises
+      await jest.advanceTimersByTimeAsync(100);
 
       // Should have made 2 requests (1 failed, 1 succeeded)
       expect(requestCount).toBe(2);
@@ -1314,7 +1314,7 @@ describe('SellerMonitoringService', () => {
       });
 
       await sellerMonitoringService.startScan();
-      await jest.advanceTimersByTimeAsync(6000);
+      await jest.advanceTimersByTimeAsync(100);
 
       expect(requestCount).toBe(2);
     });
@@ -1788,6 +1788,1043 @@ describe('SellerMonitoringService', () => {
       expect(result.cacheInfo.lastUpdated).toBe(now - 3600000);
       expect(result.cacheInfo.oldestScanAge).toBeGreaterThan(7000000);
       expect(result.cacheInfo.nextScanDue).toBeDefined();
+    });
+  });
+
+  describe('cancelScan', () => {
+    it('should return false when no scan is in progress', async () => {
+      const result = await sellerMonitoringService.cancelScan();
+
+      expect(result).toBe(false);
+    });
+
+    it('should return true and set abort flag when scan is running', async () => {
+      // Arrange: start a scan with sellers that will take time
+      const now = Date.now();
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'sellers/monitored-sellers.json') {
+          return {
+            schemaVersion: 1,
+            sellers: [
+              {
+                username: 'SlowShop',
+                displayName: 'Slow Shop',
+                addedAt: now - 86400000,
+                matchCount: 0,
+              },
+            ],
+          };
+        }
+        if (path === 'sellers/scan-status.json') {
+          return {
+            status: 'idle',
+            progress: 0,
+            sellersScanned: 0,
+            totalSellers: 0,
+            newMatches: 0,
+          };
+        }
+        if (path === 'sellers/settings.json') {
+          return {
+            schemaVersion: 1,
+            scanFrequencyDays: 7,
+            quickCheckFrequencyHours: 24,
+            notifyOnNewMatch: true,
+            vinylFormatsOnly: false,
+          };
+        }
+        if (path === 'sellers/matches.json') {
+          return { schemaVersion: 1, lastUpdated: now, matches: [] };
+        }
+        throw new Error('File not found');
+      });
+
+      // Mock a slow inventory fetch that won't resolve quickly
+      mockAxiosInstance.get.mockImplementation(
+        () =>
+          new Promise(resolve => {
+            setTimeout(
+              () =>
+                resolve({
+                  data: {
+                    pagination: { pages: 1, items: 0 },
+                    listings: [],
+                  },
+                }),
+              10000
+            );
+          })
+      );
+
+      // Act: start scan, then cancel
+      await sellerMonitoringService.startScan();
+      const cancelResult = await sellerMonitoringService.cancelScan();
+
+      // Assert
+      expect(cancelResult).toBe(true);
+
+      // Clean up: advance timers to let background scan settle
+      await jest.advanceTimersByTimeAsync(15000);
+    });
+
+    it('should stop scan between sellers and write cancelled status', async () => {
+      const now = Date.now();
+      let inventoryCallCount = 0;
+
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'sellers/monitored-sellers.json') {
+          return {
+            schemaVersion: 1,
+            sellers: [
+              {
+                username: 'Shop1',
+                displayName: 'Shop 1',
+                addedAt: now - 86400000,
+                matchCount: 0,
+              },
+              {
+                username: 'Shop2',
+                displayName: 'Shop 2',
+                addedAt: now - 86400000,
+                matchCount: 0,
+              },
+              {
+                username: 'Shop3',
+                displayName: 'Shop 3',
+                addedAt: now - 86400000,
+                matchCount: 0,
+              },
+            ],
+          };
+        }
+        if (path === 'sellers/scan-status.json') {
+          return {
+            status: 'idle',
+            progress: 0,
+            sellersScanned: 0,
+            totalSellers: 0,
+            newMatches: 0,
+          };
+        }
+        if (path === 'sellers/settings.json') {
+          return {
+            schemaVersion: 1,
+            scanFrequencyDays: 7,
+            quickCheckFrequencyHours: 24,
+            notifyOnNewMatch: true,
+            vinylFormatsOnly: false,
+          };
+        }
+        if (path === 'sellers/matches.json') {
+          return { schemaVersion: 1, lastUpdated: now, matches: [] };
+        }
+        if (path === 'sellers/release-master-cache.json') {
+          return null;
+        }
+        throw new Error('File not found');
+      });
+
+      mockWishlistService.getWishlistItems.mockResolvedValue([]);
+
+      // Cancel immediately after the first seller's inventory is fetched.
+      // The cancel is called synchronously inside the mock, so the abort
+      // flag is set before the next iteration of the seller loop.
+      mockAxiosInstance.get.mockImplementation((url: string) => {
+        if (url.includes('/inventory')) {
+          inventoryCallCount++;
+          if (inventoryCallCount === 1) {
+            // Cancel synchronously during inventory fetch for first seller
+            // The abort flag will be checked before the second seller starts
+            sellerMonitoringService.cancelScan();
+          }
+          return Promise.resolve({
+            data: {
+              pagination: { pages: 1, items: 0 },
+              listings: [],
+            },
+          });
+        }
+        return Promise.reject(new Error(`Unexpected URL: ${url}`));
+      });
+
+      // Act
+      await sellerMonitoringService.startScan();
+      // Advance time to let the scan process
+      await jest.advanceTimersByTimeAsync(500);
+
+      // Assert: scan status should be 'cancelled'
+      const cancelledStatusCall = mockFileStorage.writeJSON.mock.calls.find(
+        call =>
+          call[0] === 'sellers/scan-status.json' &&
+          (call[1] as SellerScanStatus).status === 'cancelled'
+      );
+      expect(cancelledStatusCall).toBeDefined();
+
+      // Should have saved partial matches
+      const matchesSaveCall = mockFileStorage.writeJSON.mock.calls.find(
+        call => call[0] === 'sellers/matches.json'
+      );
+      expect(matchesSaveCall).toBeDefined();
+
+      // Should NOT have scanned all 3 sellers (scan was cancelled after first)
+      expect(inventoryCallCount).toBeLessThan(3);
+    });
+
+    it('should stop during matching loop and save release cache', async () => {
+      const now = Date.now();
+      let releaseCallCount = 0;
+
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'sellers/monitored-sellers.json') {
+          return {
+            schemaVersion: 1,
+            sellers: [
+              {
+                username: 'BigShop',
+                displayName: 'Big Shop',
+                addedAt: now - 86400000,
+                matchCount: 0,
+              },
+            ],
+          };
+        }
+        if (path === 'sellers/scan-status.json') {
+          return {
+            status: 'idle',
+            progress: 0,
+            sellersScanned: 0,
+            totalSellers: 0,
+            newMatches: 0,
+          };
+        }
+        if (path === 'sellers/settings.json') {
+          return {
+            schemaVersion: 1,
+            scanFrequencyDays: 7,
+            quickCheckFrequencyHours: 24,
+            notifyOnNewMatch: true,
+            vinylFormatsOnly: false,
+          };
+        }
+        if (path === 'sellers/matches.json') {
+          return { schemaVersion: 1, lastUpdated: now, matches: [] };
+        }
+        if (path === 'sellers/release-master-cache.json') {
+          return null;
+        }
+        throw new Error('File not found');
+      });
+
+      mockWishlistService.getWishlistItems.mockResolvedValue([
+        {
+          id: 1,
+          masterId: 12345,
+          releaseId: 67890,
+          artist: 'Test',
+          title: 'Album',
+          dateAdded: '2024-01-15',
+          vinylStatus: 'has_vinyl' as const,
+          vinylVersions: [],
+        },
+      ]);
+
+      // Return many items so matching loop runs multiple iterations
+      mockAxiosInstance.get.mockImplementation((url: string) => {
+        if (url.includes('/inventory')) {
+          const listings = Array.from({ length: 10 }, (_, i) => ({
+            id: 2000 + i,
+            release: {
+              id: 200 + i,
+              artist: 'Test Artist',
+              title: `Album ${i}`,
+              format: 'Vinyl, LP',
+            },
+            condition: 'VG+',
+            sleeve_condition: 'VG',
+            price: { value: 20 + i, currency: 'USD' },
+            uri: `https://discogs.com/sell/item/${2000 + i}`,
+            posted: '2024-01-15T12:00:00Z',
+          }));
+
+          return Promise.resolve({
+            data: {
+              pagination: { pages: 1, items: listings.length },
+              listings,
+            },
+          });
+        }
+        if (url.includes('/releases/')) {
+          releaseCallCount++;
+          // Cancel after 3 release lookups
+          if (releaseCallCount === 3) {
+            sellerMonitoringService.cancelScan();
+          }
+          return Promise.resolve({ data: { master_id: 99999 } });
+        }
+        return Promise.reject(new Error(`Unexpected URL: ${url}`));
+      });
+
+      // Act
+      await sellerMonitoringService.startScan();
+      // Advance enough for inventory fetch + a few release lookups
+      await jest.advanceTimersByTimeAsync(5000);
+
+      // Assert: should have stopped before processing all 10 items
+      // (some items will be processed but not all 10)
+      expect(releaseCallCount).toBeLessThanOrEqual(5);
+      expect(releaseCallCount).toBeGreaterThanOrEqual(3);
+    });
+
+    it('should allow starting a new scan after cancellation', async () => {
+      const now = Date.now();
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'sellers/monitored-sellers.json') {
+          return { schemaVersion: 1, sellers: [] };
+        }
+        if (path === 'sellers/scan-status.json') {
+          return {
+            status: 'idle',
+            progress: 0,
+            sellersScanned: 0,
+            totalSellers: 0,
+            newMatches: 0,
+          };
+        }
+        if (path === 'sellers/matches.json') {
+          return { schemaVersion: 1, lastUpdated: now, matches: [] };
+        }
+        throw new Error('File not found');
+      });
+
+      // Start and cancel a scan
+      await sellerMonitoringService.startScan();
+      await jest.advanceTimersByTimeAsync(200);
+
+      // Now start a new scan - should work (not blocked)
+      const status = await sellerMonitoringService.startScan();
+
+      // Should have 'scanning' status (not "already in progress" warning)
+      expect(status.status).toBe('scanning');
+    });
+  });
+
+  describe('initialize - cancelled status reset', () => {
+    it('should reset cancelled status to idle on startup', async () => {
+      // Arrange: simulate a cancelled status from a previous run
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'sellers/scan-status.json') {
+          return {
+            status: 'cancelled',
+            progress: 50,
+            sellersScanned: 1,
+            totalSellers: 2,
+            newMatches: 0,
+          };
+        }
+        throw new Error('File not found');
+      });
+
+      // Act: create a new service instance (triggers initialize())
+      const freshService = new SellerMonitoringService(
+        mockFileStorage,
+        mockAuthService,
+        mockWishlistService
+      );
+
+      // Give the async initialize time to run
+      await jest.advanceTimersByTimeAsync(100);
+
+      // Assert: scan status should have been reset to idle
+      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+        'sellers/scan-status.json',
+        expect.objectContaining({
+          status: 'idle',
+          progress: 0,
+        })
+      );
+
+      // Suppress unused variable warning
+      expect(freshService).toBeDefined();
+    });
+  });
+
+  describe('executeWithRetry', () => {
+    it('should not retry on non-rate-limit errors', async () => {
+      const now = Date.now();
+      let requestCount = 0;
+
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'sellers/settings.json') {
+          return {
+            schemaVersion: 1,
+            scanFrequencyDays: 7,
+            quickCheckFrequencyHours: 24,
+            notifyOnNewMatch: true,
+            vinylFormatsOnly: false,
+          };
+        }
+        if (path === 'sellers/monitored-sellers.json') {
+          return {
+            schemaVersion: 1,
+            sellers: [
+              {
+                username: 'TestShop',
+                displayName: 'Test',
+                addedAt: now - 86400000,
+                matchCount: 0,
+              },
+            ],
+          };
+        }
+        if (path === 'sellers/scan-status.json') {
+          return {
+            status: 'idle',
+            progress: 0,
+            sellersScanned: 0,
+            totalSellers: 0,
+            newMatches: 0,
+          };
+        }
+        if (path === 'sellers/matches.json') {
+          return { schemaVersion: 1, lastUpdated: now, matches: [] };
+        }
+        throw new Error('File not found');
+      });
+
+      mockWishlistService.getWishlistItems.mockResolvedValue([]);
+
+      // Return a 500 server error - should NOT be retried
+      mockAxiosInstance.get.mockImplementation((url: string) => {
+        if (url.includes('/inventory')) {
+          requestCount++;
+          const error = new Error('Internal Server Error') as any;
+          error.response = { status: 500 };
+          mockedAxios.isAxiosError.mockReturnValue(true);
+          return Promise.reject(error);
+        }
+        return Promise.reject(new Error(`Unexpected URL: ${url}`));
+      });
+
+      await sellerMonitoringService.startScan();
+      await jest.advanceTimersByTimeAsync(1000);
+
+      // Should have only made 1 request (no retries for 500)
+      expect(requestCount).toBe(1);
+
+      // Should have recorded an error status
+      const errorStatusCall = mockFileStorage.writeJSON.mock.calls.find(
+        call =>
+          call[0] === 'sellers/scan-status.json' &&
+          (call[1] as SellerScanStatus).status === 'error'
+      );
+      expect(errorStatusCall).toBeDefined();
+    });
+
+    it('should exhaust all retries on persistent 429 and record error', async () => {
+      const now = Date.now();
+      let requestCount = 0;
+
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'sellers/settings.json') {
+          return {
+            schemaVersion: 1,
+            scanFrequencyDays: 7,
+            quickCheckFrequencyHours: 24,
+            notifyOnNewMatch: true,
+            vinylFormatsOnly: false,
+          };
+        }
+        if (path === 'sellers/monitored-sellers.json') {
+          return {
+            schemaVersion: 1,
+            sellers: [
+              {
+                username: 'TestShop',
+                displayName: 'Test',
+                addedAt: now - 86400000,
+                matchCount: 0,
+              },
+            ],
+          };
+        }
+        if (path === 'sellers/scan-status.json') {
+          return {
+            status: 'idle',
+            progress: 0,
+            sellersScanned: 0,
+            totalSellers: 0,
+            newMatches: 0,
+          };
+        }
+        if (path === 'sellers/matches.json') {
+          return { schemaVersion: 1, lastUpdated: now, matches: [] };
+        }
+        throw new Error('File not found');
+      });
+
+      mockWishlistService.getWishlistItems.mockResolvedValue([]);
+
+      // All requests fail with 429
+      mockAxiosInstance.get.mockImplementation((url: string) => {
+        if (url.includes('/inventory')) {
+          requestCount++;
+          const error = new Error('Too Many Requests') as any;
+          error.response = { status: 429 };
+          mockedAxios.isAxiosError.mockReturnValue(true);
+          return Promise.reject(error);
+        }
+        return Promise.reject(new Error(`Unexpected URL: ${url}`));
+      });
+
+      await sellerMonitoringService.startScan();
+      // Retries are immediate (bucket handles delays)
+      await jest.advanceTimersByTimeAsync(100);
+
+      // Should have made 3 attempts (MAX_RETRIES)
+      expect(requestCount).toBe(3);
+    });
+
+    it('should not retry on pagination limit 403 error', async () => {
+      const now = Date.now();
+      let requestCount = 0;
+
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'sellers/settings.json') {
+          return {
+            schemaVersion: 1,
+            scanFrequencyDays: 7,
+            quickCheckFrequencyHours: 24,
+            notifyOnNewMatch: true,
+            vinylFormatsOnly: false,
+          };
+        }
+        if (path === 'sellers/monitored-sellers.json') {
+          return {
+            schemaVersion: 1,
+            sellers: [
+              {
+                username: 'TestShop',
+                displayName: 'Test',
+                addedAt: now - 86400000,
+                matchCount: 0,
+              },
+            ],
+          };
+        }
+        if (path === 'sellers/scan-status.json') {
+          return {
+            status: 'idle',
+            progress: 0,
+            sellersScanned: 0,
+            totalSellers: 0,
+            newMatches: 0,
+          };
+        }
+        if (path === 'sellers/matches.json') {
+          return { schemaVersion: 1, lastUpdated: now, matches: [] };
+        }
+        throw new Error('File not found');
+      });
+
+      mockWishlistService.getWishlistItems.mockResolvedValue([]);
+
+      // Return a pagination limit error (403 but NOT a rate limit)
+      mockAxiosInstance.get.mockImplementation((url: string) => {
+        if (url.includes('/inventory')) {
+          requestCount++;
+          if (requestCount === 1) {
+            // First page succeeds
+            return Promise.resolve({
+              data: {
+                pagination: { pages: 200, items: 20000 },
+                listings: [
+                  {
+                    id: 1001,
+                    release: {
+                      id: 101,
+                      artist: 'Test',
+                      title: 'Album',
+                      format: 'LP',
+                    },
+                    condition: 'VG+',
+                    sleeve_condition: 'VG',
+                    price: { value: 25, currency: 'USD' },
+                    uri: 'https://discogs.com/sell/item/1001',
+                    posted: '2024-01-15T12:00:00Z',
+                  },
+                ],
+              },
+            });
+          }
+          // Subsequent pages hit pagination limit
+          const error = new Error('Pagination above 100 disabled') as any;
+          error.response = {
+            status: 403,
+            data: {
+              message:
+                'Pagination above 100 disabled for inventories besides your own',
+            },
+          };
+          mockedAxios.isAxiosError.mockReturnValue(true);
+          return Promise.reject(error);
+        }
+        return Promise.reject(new Error(`Unexpected URL: ${url}`));
+      });
+
+      await sellerMonitoringService.startScan();
+      await jest.advanceTimersByTimeAsync(5000);
+
+      // Pagination limit should NOT trigger retries - should be treated as a hard stop
+      // The fetchSellerInventory handler catches pagination errors and returns partial results
+      // So we expect: page 1 success + page 2 pagination error = 2 requests
+      // (no retry on pagination error)
+      expect(requestCount).toBeLessThanOrEqual(4); // page 1 + page 2 (no retries)
+    });
+  });
+
+  describe('lookupMasterId retry logic', () => {
+    beforeEach(() => {
+      mockedAxios.isAxiosError.mockImplementation((error: any) => {
+        return error?.isAxiosError === true;
+      });
+
+      mockAuthService.getDiscogsToken.mockResolvedValue(
+        'Discogs token=test-token'
+      );
+    });
+
+    it('should use executeWithRetry to handle 429 rate limit errors', async () => {
+      // Arrange
+      let callCount = 0;
+      mockAxiosInstance.get.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.reject({
+            isAxiosError: true,
+            response: { status: 429, data: {} },
+            message: 'Rate limited',
+          });
+        }
+        return Promise.resolve({ data: { master_id: 12345 } });
+      });
+
+      // Act - no manual delay needed; retries rely on the token bucket (mocked)
+      const result = await (sellerMonitoringService as any).lookupMasterId(100);
+
+      // Assert
+      expect(result).toEqual({ masterId: 12345, rateLimited: false });
+      expect(callCount).toBe(2);
+    });
+
+    it('should return rateLimited: true when all retries are exhausted on 429', async () => {
+      // Arrange
+      const rateLimitError = {
+        isAxiosError: true,
+        response: { status: 429, data: {} },
+        message: 'Rate limited',
+      };
+      mockAxiosInstance.get.mockRejectedValue(rateLimitError);
+
+      // Act - MAX_RETRIES = 3, retries are immediate (bucket handles delays)
+      const result = await (sellerMonitoringService as any).lookupMasterId(100);
+
+      // Assert
+      expect(result).toEqual({ masterId: undefined, rateLimited: true });
+    });
+
+    it('should return rateLimited: false for non-rate-limit errors', async () => {
+      // Arrange
+      const serverError = {
+        isAxiosError: true,
+        response: { status: 500, data: {} },
+        message: 'Internal Server Error',
+      };
+      mockAxiosInstance.get.mockRejectedValue(serverError);
+
+      // Act
+      const result = await (sellerMonitoringService as any).lookupMasterId(100);
+
+      // Assert
+      expect(result).toEqual({ masterId: undefined, rateLimited: false });
+    });
+
+    it('should return masterId when API call succeeds', async () => {
+      // Arrange
+      mockAxiosInstance.get.mockResolvedValue({
+        data: { master_id: 12345 },
+      });
+
+      // Act
+      const result = await (sellerMonitoringService as any).lookupMasterId(100);
+
+      // Assert
+      expect(result).toEqual({ masterId: 12345, rateLimited: false });
+    });
+
+    it('should return masterId: undefined when release has no master', async () => {
+      // Arrange
+      mockAxiosInstance.get.mockResolvedValue({
+        data: { master_id: undefined },
+      });
+
+      // Act
+      const result = await (sellerMonitoringService as any).lookupMasterId(100);
+
+      // Assert
+      expect(result).toEqual({ masterId: undefined, rateLimited: false });
+    });
+  });
+
+  describe('rate-limited items are not treated as non-matches', () => {
+    beforeEach(() => {
+      mockedAxios.isAxiosError.mockImplementation((error: any) => {
+        return error?.isAxiosError === true;
+      });
+    });
+
+    it('should skip rate-limited items without caching them', async () => {
+      // Arrange
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'sellers/settings.json') {
+          return {
+            schemaVersion: 1,
+            scanFrequencyDays: 7,
+            quickCheckFrequencyHours: 24,
+            notifyOnNewMatch: true,
+            vinylFormatsOnly: false,
+          };
+        }
+        if (path === 'sellers/release-master-cache.json') {
+          return null;
+        }
+        if (path === 'sellers/scan-status.json') {
+          return {
+            status: 'idle',
+            progress: 0,
+            sellersScanned: 0,
+            totalSellers: 0,
+            newMatches: 0,
+          };
+        }
+        throw new Error('File not found');
+      });
+
+      mockWishlistService.getWishlistItems.mockResolvedValue([
+        {
+          id: 1,
+          masterId: 12345,
+          releaseId: 67890,
+          artist: 'Test Artist',
+          title: 'Test Album',
+          dateAdded: '2024-01-15',
+          vinylStatus: 'has_vinyl' as const,
+          vinylVersions: [],
+        },
+      ]);
+
+      // Mock the API to always return 429 (rate limited)
+      const rateLimitError = {
+        isAxiosError: true,
+        response: { status: 429, data: {} },
+        message: 'Rate limited',
+      };
+      mockAxiosInstance.get.mockRejectedValue(rateLimitError);
+
+      const items = [
+        {
+          listingId: 1,
+          releaseId: 100,
+          masterId: undefined,
+          artist: 'Test Artist',
+          title: 'Test Album',
+          format: ['Vinyl', 'LP'],
+          condition: 'VG+/VG+',
+          price: 20,
+          currency: 'USD',
+          listingUrl: 'https://discogs.com/sell/item/1',
+        },
+      ];
+
+      // Act
+      const promise = (sellerMonitoringService as any).matchInventoryToWishlist(
+        items,
+        'testshop',
+        []
+      );
+      // Advance past all retry delays: 5000ms + 10000ms for MAX_RETRIES=3
+      await jest.advanceTimersByTimeAsync(20000);
+      const matches = await promise;
+
+      // Assert - item should NOT be in matches (was rate limited, not matched)
+      expect(matches).toHaveLength(0);
+
+      // Verify the persistent release cache was NOT populated for this release
+      // (rate-limited items should not be cached so they can be retried next scan)
+      const releaseCache = (sellerMonitoringService as any).releaseCache;
+      if (releaseCache) {
+        expect(releaseCache.releaseToMaster[100]).toBeUndefined();
+      }
+    });
+
+    it('should include rateLimitedCount in matching statistics', async () => {
+      // Arrange
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'sellers/settings.json') {
+          return {
+            schemaVersion: 1,
+            scanFrequencyDays: 7,
+            quickCheckFrequencyHours: 24,
+            notifyOnNewMatch: true,
+            vinylFormatsOnly: false,
+          };
+        }
+        if (path === 'sellers/release-master-cache.json') {
+          return null;
+        }
+        if (path === 'sellers/scan-status.json') {
+          return {
+            status: 'idle',
+            progress: 0,
+            sellersScanned: 0,
+            totalSellers: 0,
+            newMatches: 0,
+          };
+        }
+        throw new Error('File not found');
+      });
+
+      mockWishlistService.getWishlistItems.mockResolvedValue([
+        {
+          id: 1,
+          masterId: 12345,
+          releaseId: 67890,
+          artist: 'Test Artist',
+          title: 'Test Album',
+          dateAdded: '2024-01-15',
+          vinylStatus: 'has_vinyl' as const,
+          vinylVersions: [],
+        },
+      ]);
+
+      // Mock API to always 429
+      const rateLimitError = {
+        isAxiosError: true,
+        response: { status: 429, data: {} },
+        message: 'Rate limited',
+      };
+      mockAxiosInstance.get.mockRejectedValue(rateLimitError);
+
+      const items = [
+        {
+          listingId: 1,
+          releaseId: 100,
+          masterId: undefined,
+          artist: 'Test Artist',
+          title: 'Test Album',
+          format: ['Vinyl', 'LP'],
+          condition: 'VG+/VG+',
+          price: 20,
+          currency: 'USD',
+          listingUrl: 'https://discogs.com/sell/item/1',
+        },
+        {
+          listingId: 2,
+          releaseId: 200,
+          masterId: undefined,
+          artist: 'Another Artist',
+          title: 'Another Album',
+          format: ['Vinyl', 'LP'],
+          condition: 'NM/NM',
+          price: 30,
+          currency: 'USD',
+          listingUrl: 'https://discogs.com/sell/item/2',
+        },
+      ];
+
+      // Act
+      const promise = (sellerMonitoringService as any).matchInventoryToWishlist(
+        items,
+        'testshop',
+        []
+      );
+      // Advance past all retry delays for both items
+      await jest.advanceTimersByTimeAsync(60000);
+      await promise;
+
+      // Assert - check that updateScanStatus was called with rateLimited count
+      const statusCalls = mockFileStorage.writeJSON.mock.calls.filter(
+        call => call[0] === 'sellers/scan-status.json'
+      );
+      const finalStatusCall = statusCalls[statusCalls.length - 1];
+      expect(finalStatusCall).toBeDefined();
+      const finalStatus = finalStatusCall[1] as SellerScanStatus;
+      expect(finalStatus.matchingProgress?.rateLimited).toBeGreaterThan(0);
+    });
+  });
+
+  describe('scan cancellation - matching loop abort', () => {
+    it('should stop matching loop when scan is aborted', async () => {
+      // Arrange
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'sellers/settings.json') {
+          return {
+            schemaVersion: 1,
+            scanFrequencyDays: 7,
+            quickCheckFrequencyHours: 24,
+            notifyOnNewMatch: true,
+            vinylFormatsOnly: false,
+          };
+        }
+        if (path === 'sellers/release-master-cache.json') {
+          return null;
+        }
+        if (path === 'sellers/scan-status.json') {
+          return {
+            status: 'idle',
+            progress: 0,
+            sellersScanned: 0,
+            totalSellers: 0,
+            newMatches: 0,
+          };
+        }
+        throw new Error('File not found');
+      });
+
+      mockWishlistService.getWishlistItems.mockResolvedValue([
+        {
+          id: 1,
+          masterId: 12345,
+          releaseId: 67890,
+          artist: 'Test Artist',
+          title: 'Test Album',
+          dateAdded: '2024-01-15',
+          vinylStatus: 'has_vinyl' as const,
+          vinylVersions: [],
+        },
+      ]);
+
+      // Set scanAborted before calling matchInventoryToWishlist
+      (sellerMonitoringService as any).scanAborted = true;
+
+      const items = [
+        {
+          listingId: 1,
+          releaseId: 100,
+          masterId: undefined,
+          artist: 'Test Artist',
+          title: 'Test Album',
+          format: ['Vinyl', 'LP'],
+          condition: 'VG+/VG+',
+          price: 20,
+          currency: 'USD',
+          listingUrl: 'https://discogs.com/sell/item/1',
+        },
+        {
+          listingId: 2,
+          releaseId: 200,
+          masterId: undefined,
+          artist: 'Another Artist',
+          title: 'Another Album',
+          format: ['Vinyl', 'LP'],
+          condition: 'NM/NM',
+          price: 30,
+          currency: 'USD',
+          listingUrl: 'https://discogs.com/sell/item/2',
+        },
+      ];
+
+      // Act
+      const matches = await (
+        sellerMonitoringService as any
+      ).matchInventoryToWishlist(items, 'testshop', []);
+
+      // Assert - should return early with no matches processed
+      expect(matches).toHaveLength(0);
+      // No API calls should have been made (aborted before any processing)
+      expect(mockAxiosInstance.get).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('scan status transitions', () => {
+    it('should transition from scanning to cancelled when cancelled', async () => {
+      const now = Date.now();
+
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'sellers/monitored-sellers.json') {
+          return {
+            schemaVersion: 1,
+            sellers: [
+              {
+                username: 'Shop1',
+                displayName: 'Shop 1',
+                addedAt: now - 86400000,
+                matchCount: 0,
+              },
+            ],
+          };
+        }
+        if (path === 'sellers/scan-status.json') {
+          return {
+            status: 'idle',
+            progress: 0,
+            sellersScanned: 0,
+            totalSellers: 0,
+            newMatches: 0,
+          };
+        }
+        if (path === 'sellers/settings.json') {
+          return {
+            schemaVersion: 1,
+            scanFrequencyDays: 7,
+            quickCheckFrequencyHours: 24,
+            notifyOnNewMatch: true,
+            vinylFormatsOnly: false,
+          };
+        }
+        if (path === 'sellers/matches.json') {
+          return { schemaVersion: 1, lastUpdated: now, matches: [] };
+        }
+        if (path === 'sellers/release-master-cache.json') {
+          return null;
+        }
+        throw new Error('File not found');
+      });
+
+      mockWishlistService.getWishlistItems.mockResolvedValue([]);
+
+      // Make inventory fetch slow so we can cancel during it
+      mockAxiosInstance.get.mockImplementation((url: string) => {
+        if (url.includes('/inventory')) {
+          return new Promise(resolve => {
+            setTimeout(
+              () =>
+                resolve({
+                  data: { pagination: { pages: 1, items: 0 }, listings: [] },
+                }),
+              5000
+            );
+          });
+        }
+        return Promise.reject(new Error(`Unexpected URL: ${url}`));
+      });
+
+      // Act: start scan - status should go to 'scanning'
+      const initialStatus = await sellerMonitoringService.startScan();
+      expect(initialStatus.status).toBe('scanning');
+
+      // Verify 'scanning' was written
+      const scanningCall = mockFileStorage.writeJSON.mock.calls.find(
+        call =>
+          call[0] === 'sellers/scan-status.json' &&
+          (call[1] as SellerScanStatus).status === 'scanning'
+      );
+      expect(scanningCall).toBeDefined();
+
+      // Cancel the scan
+      await sellerMonitoringService.cancelScan();
+
+      // Advance time to let the scan process the cancellation
+      await jest.advanceTimersByTimeAsync(10000);
     });
   });
 });

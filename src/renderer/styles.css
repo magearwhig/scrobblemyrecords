@@ -6420,6 +6420,26 @@ body {
   color: var(--accent-danger, #ef4444);
 }
 
+.sellers-scan-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sellers-scan-cancelled {
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sellers-scan-rate-limited {
+  color: var(--color-warning, #e6a817);
+}
+
 .sellers-list {
   display: flex;
   flex-direction: column;

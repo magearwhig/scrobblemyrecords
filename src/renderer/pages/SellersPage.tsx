@@ -38,6 +38,7 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
   const [addingInProgress, setAddingInProgress] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [removingUsername, setRemovingUsername] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   // Wishlist check
   const [wishlistEmpty, setWishlistEmpty] = useState(false);
@@ -107,7 +108,11 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
           setScanStatus(status);
 
           // If scan completed, reload sellers to get updated counts
-          if (status.status === 'completed' || status.status === 'error') {
+          if (
+            status.status === 'completed' ||
+            status.status === 'error' ||
+            status.status === 'cancelled'
+          ) {
             loadSellers();
 
             // Check for new matches to notify
@@ -247,6 +252,24 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
         'error',
         err instanceof Error ? err.message : 'Failed to start scan'
       );
+    }
+  };
+
+  // Handle cancel scan
+  const handleCancelScan = async () => {
+    try {
+      setCancelling(true);
+      await api.cancelSellerScan();
+      // Poll one more time to get the updated status
+      const status = await api.getSellerScanStatus();
+      setScanStatus(status);
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to cancel scan'
+      );
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -450,6 +473,14 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
               </span>
             )}
           </div>
+          {refreshingCache && (
+            <div className='sellers-scan-progress'>
+              <div className='sellers-scan-progress-text'>
+                Building release cache... This may take several minutes.
+              </div>
+              <ProgressBar value={0} indeterminate size='small' animated />
+            </div>
+          )}
           {cacheStats.totalMasters === 0 && (
             <div className='sellers-cache-empty-warning'>
               ⚠️ Cache is empty. Build the cache first for fast matching (no API
@@ -514,6 +545,12 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
                   lookups
                 </span>
               )}
+              {scanStatus.matchingProgress.rateLimited > 0 && (
+                <span className='sellers-scan-rate-limited'>
+                  , {scanStatus.matchingProgress.rateLimited.toLocaleString()}{' '}
+                  rate limited
+                </span>
+              )}
             </div>
           )}
           {scanStatus.newMatches > 0 && (
@@ -522,6 +559,16 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
               {scanStatus.newMatches !== 1 ? 'es' : ''} found!
             </div>
           )}
+          <div className='sellers-scan-actions'>
+            <Button
+              variant='outline'
+              size='small'
+              onClick={handleCancelScan}
+              disabled={cancelling}
+            >
+              {cancelling ? 'Cancelling...' : 'Cancel Scan'}
+            </Button>
+          </div>
         </div>
       )}
 
@@ -537,6 +584,20 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
       {/* Error status */}
       {scanStatus?.status === 'error' && scanStatus.error && (
         <div className='sellers-scan-error'>Scan error: {scanStatus.error}</div>
+      )}
+
+      {/* Cancelled status */}
+      {scanStatus?.status === 'cancelled' && (
+        <div className='sellers-scan-cancelled'>
+          Scan was cancelled.{' '}
+          <Button
+            variant='outline'
+            size='small'
+            onClick={() => handleTriggerScan(false)}
+          >
+            Restart Scan
+          </Button>
+        </div>
       )}
 
       {/* Sellers list */}

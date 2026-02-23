@@ -29,8 +29,6 @@ const STALE_MATCH_PRUNE_DAYS = 30;
 
 // Retry constants for rate limiting
 const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY_MS = 5000; // 5 seconds
-const MAX_RETRY_DELAY_MS = 60000; // 60 seconds
 
 // Rate limit delay between API calls (in addition to existing 1s interceptor)
 const API_CALL_DELAY_MS = 200;
@@ -85,6 +83,7 @@ export class SellerMonitoringService {
 
   // Track scan state
   private scanInProgress = false;
+  private scanAborted = false;
   private initialized = false;
 
   constructor(
@@ -133,7 +132,9 @@ export class SellerMonitoringService {
       // reset to idle (this happens when server restarts during a scan)
       if (
         status &&
-        (status.status === 'scanning' || status.status === 'matching')
+        (status.status === 'scanning' ||
+          status.status === 'matching' ||
+          status.status === 'cancelled')
       ) {
         this.logger.info(
           `Resetting stale scan status from '${status.status}' to 'idle' (server restart detected)`
@@ -206,7 +207,6 @@ export class SellerMonitoringService {
     context: string
   ): Promise<T> {
     let lastError: Error | undefined;
-    let delay = INITIAL_RETRY_DELAY_MS;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
@@ -237,13 +237,13 @@ export class SellerMonitoringService {
           throw error;
         }
 
+        // No manual delay here — the token bucket in discogsAxios already
+        // pauses all requests for 30s on 429. Adding our own backoff on top
+        // would stack delays (30s pause + 5s/10s/20s = 35-50s per attempt).
+        // The next acquire() call will naturally block until the bucket unpauses.
         this.logger.warn(
-          `Rate limit hit for ${context} (attempt ${attempt}/${MAX_RETRIES}), retrying in ${delay / 1000}s...`
+          `Rate limit hit for ${context} (attempt ${attempt}/${MAX_RETRIES}), retrying after bucket pause...`
         );
-
-        // Wait before retrying with exponential backoff
-        await new Promise(resolve => setTimeout(resolve, delay));
-        delay = Math.min(delay * 2, MAX_RETRY_DELAY_MS);
       }
     }
 
@@ -1292,30 +1292,30 @@ export class SellerMonitoringService {
   }
 
   /**
-   * Check if a release_id belongs to any of the wishlist master IDs
-   * Uses local cache first, falls back to API lookup if needed
+   * Check if a release_id belongs to any of the wishlist master IDs.
+   * Uses local cache first, falls back to API lookup if needed.
+   * Returns { masterId, rateLimited } to allow callers to distinguish
+   * "no master_id" from "API unavailable due to rate limiting".
    */
   private async getMasterIdForRelease(
     releaseId: number,
     _wishlistMasterIds: Set<number>
-  ): Promise<number | undefined> {
+  ): Promise<{ masterId: number | undefined; rateLimited: boolean }> {
     // First check the cache
     const cachedMasterId = this.getCachedMasterId(releaseId);
     if (cachedMasterId !== undefined) {
-      return cachedMasterId;
+      return { masterId: cachedMasterId, rateLimited: false };
     }
 
     // Not in cache - need to call API
-    // Add small delay before API call to avoid rate limits
-    await new Promise(resolve => setTimeout(resolve, API_CALL_DELAY_MS));
-
-    const masterId = await this.lookupMasterId(releaseId);
-    if (masterId !== undefined) {
+    // Token bucket in discogsAxios handles rate limiting, no manual delay needed
+    const result = await this.lookupMasterId(releaseId);
+    if (result.masterId !== undefined) {
       // Add to cache for future lookups
-      this.addToReleaseCache(releaseId, masterId);
+      this.addToReleaseCache(releaseId, result.masterId);
     }
 
-    return masterId;
+    return result;
   }
 
   /**
@@ -1597,22 +1597,39 @@ export class SellerMonitoringService {
   }
 
   /**
-   * Look up master_id for a release from Discogs API
-   * Returns undefined if not found or on error
+   * Look up master_id for a release from Discogs API.
+   * Uses executeWithRetry to handle rate limiting (429/403) with exponential backoff.
+   * Returns { masterId, rateLimited } to distinguish between "no master_id" and "API unavailable".
    */
-  private async lookupMasterId(releaseId: number): Promise<number | undefined> {
+  private async lookupMasterId(
+    releaseId: number
+  ): Promise<{ masterId: number | undefined; rateLimited: boolean }> {
     try {
       const headers = await this.getAuthHeaders();
-      const response = await this.axios.get(`/releases/${releaseId}`, {
-        headers,
-      });
-      return response.data?.master_id;
+      const response = await this.executeWithRetry(
+        () => this.axios.get(`/releases/${releaseId}`, { headers }),
+        `lookup master_id for release ${releaseId}`
+      );
+      return { masterId: response.data?.master_id, rateLimited: false };
     } catch (error) {
+      // If executeWithRetry exhausted all retries on a rate limit error,
+      // signal that this was rate-limited so the caller can retry later
+      const isRateLimitError =
+        axios.isAxiosError(error) &&
+        (error.response?.status === 429 || error.response?.status === 403);
+
+      if (isRateLimitError) {
+        this.logger.warn(
+          `Rate limited looking up master_id for release ${releaseId} after ${MAX_RETRIES} retries`
+        );
+        return { masterId: undefined, rateLimited: true };
+      }
+
       this.logger.debug(
         `Failed to lookup master_id for release ${releaseId}`,
         error
       );
-      return undefined;
+      return { masterId: undefined, rateLimited: false };
     }
   }
 
@@ -1648,6 +1665,7 @@ export class SellerMonitoringService {
     let skippedFormats = 0;
     let skippedExisting = 0;
     let skippedNotInCache = 0;
+    let rateLimitedCount = 0;
     let itemsProcessed = 0;
     const totalItems = items.length;
 
@@ -1668,6 +1686,7 @@ export class SellerMonitoringService {
         totalItems,
         cacheHits: 0,
         apiCalls: 0,
+        rateLimited: 0,
       },
     });
 
@@ -1675,7 +1694,32 @@ export class SellerMonitoringService {
     const sessionCache = new Map<number, number | undefined>();
 
     for (const item of items) {
+      // Check for scan cancellation - stop immediately, preserving progress
+      if (this.scanAborted) {
+        this.logger.info(
+          `Scan cancelled during matching at item ${itemsProcessed}/${totalItems}`
+        );
+        // Save the release cache with whatever we've accumulated
+        if (apiCalls > 0) {
+          await this.saveReleaseCache();
+        }
+        break; // Exit the loop, return whatever matches we found so far
+      }
+
       itemsProcessed++;
+
+      // Update matching progress every 50 items (before any continue/skip paths)
+      if (itemsProcessed % 50 === 0 || itemsProcessed === totalItems) {
+        await this.updateScanStatus({
+          matchingProgress: {
+            itemsProcessed,
+            totalItems,
+            cacheHits,
+            apiCalls,
+            rateLimited: rateLimitedCount,
+          },
+        });
+      }
 
       // Check vinyl format filter first (before expensive lookups)
       if (settings.vinylFormatsOnly && !this.isVinylFormat(item.format)) {
@@ -1715,10 +1759,15 @@ export class SellerMonitoringService {
         masterId = sessionCache.get(item.releaseId);
         // Already counted, no stats change needed
       } else {
-        // Need to call API - add delay to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, API_CALL_DELAY_MS));
-        masterId = await this.lookupMasterId(item.releaseId);
-        sessionCache.set(item.releaseId, masterId);
+        // Need to call API - token bucket in discogsAxios handles rate limiting
+        const lookupResult = await this.lookupMasterId(item.releaseId);
+        if (lookupResult.rateLimited) {
+          rateLimitedCount++;
+          // Don't cache this result - we want to retry next scan
+          continue; // Skip this item, don't treat as "no match"
+        }
+        masterId = lookupResult.masterId;
+        sessionCache.set(item.releaseId, lookupResult.masterId);
         apiCalls++;
 
         // Add to persistent cache for future scans
@@ -1729,21 +1778,9 @@ export class SellerMonitoringService {
         // Log progress every 100 API calls
         if (apiCalls % 100 === 0) {
           this.logger.info(
-            `Master ID lookup progress: ${apiCalls} API calls, ${cacheHits} cache hits`
+            `Master ID lookup progress: ${apiCalls} API calls, ${cacheHits} cache hits, ${rateLimitedCount} rate limited`
           );
         }
-      }
-
-      // Update matching progress every 50 items
-      if (itemsProcessed % 50 === 0) {
-        await this.updateScanStatus({
-          matchingProgress: {
-            itemsProcessed,
-            totalItems,
-            cacheHits,
-            apiCalls,
-          },
-        });
       }
 
       // Check if this release's master_id is in our wishlist
@@ -1786,6 +1823,7 @@ export class SellerMonitoringService {
         totalItems,
         cacheHits,
         apiCalls,
+        rateLimited: rateLimitedCount,
       },
     });
 
@@ -1794,7 +1832,7 @@ export class SellerMonitoringService {
       `Matching complete for ${sellerId}: ${items.length} items processed, ` +
         `${skippedFormats} non-vinyl skipped, ${skippedExisting} existing matches, ` +
         `${cacheHits} cache hits, ${skippedNotInCache} skipped (not in cache), ` +
-        `${apiCalls} API calls, ${matches.length} matches found`
+        `${apiCalls} API calls, ${rateLimitedCount} rate limited, ${matches.length} matches found`
     );
 
     return matches;
@@ -2116,6 +2154,22 @@ export class SellerMonitoringService {
   }
 
   /**
+   * Cancel a running scan. The scan will stop within one iteration of the
+   * matching loop, save partial progress, and transition to 'cancelled' status.
+   * Returns true if a scan was running and cancellation was requested.
+   */
+  async cancelScan(): Promise<boolean> {
+    if (!this.scanInProgress) {
+      this.logger.info('No scan in progress to cancel');
+      return false;
+    }
+
+    this.logger.info('Scan cancellation requested');
+    this.scanAborted = true;
+    return true;
+  }
+
+  /**
    * Start a scan of all sellers (background)
    * @param forceFresh If true, always re-fetch inventory from API. If false, use cached inventory if fresh.
    */
@@ -2126,6 +2180,7 @@ export class SellerMonitoringService {
     }
 
     this.scanInProgress = true;
+    this.scanAborted = false;
 
     // Update status to 'scanning' BEFORE returning so UI can start polling immediately
     const sellers = await this.getSellers();
@@ -2146,6 +2201,7 @@ export class SellerMonitoringService {
         error: error instanceof Error ? error.message : 'Unknown error',
       });
       this.scanInProgress = false;
+      this.scanAborted = false;
     });
 
     // Return the 'scanning' status immediately
@@ -2180,6 +2236,20 @@ export class SellerMonitoringService {
 
     try {
       for (let i = 0; i < sellers.length; i++) {
+        // Check for cancellation before processing each seller
+        if (this.scanAborted) {
+          this.logger.info('Scan cancelled between sellers');
+          await this.updateScanStatus({
+            status: 'cancelled',
+            progress: Math.round((i / sellers.length) * 100),
+            sellersScanned: i,
+          });
+          // Save any partial matches accumulated so far
+          matchesStore.lastUpdated = Date.now();
+          await this.fileStorage.writeJSON(this.MATCHES_FILE, matchesStore);
+          return; // The finally block will set scanInProgress = false
+        }
+
         const seller = sellers[i];
 
         // Determine if full scan is needed based on timing
@@ -2249,6 +2319,7 @@ export class SellerMonitoringService {
       );
     } finally {
       this.scanInProgress = false;
+      this.scanAborted = false;
     }
   }
 }

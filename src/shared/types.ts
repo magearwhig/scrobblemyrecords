@@ -1146,7 +1146,13 @@ export interface SellerInventoryItem {
  * Scan status tracking
  */
 export interface SellerScanStatus {
-  status: 'idle' | 'scanning' | 'matching' | 'completed' | 'error';
+  status:
+    | 'idle'
+    | 'scanning'
+    | 'matching'
+    | 'completed'
+    | 'error'
+    | 'cancelled';
   currentSeller?: string;
   sellersScanned: number;
   totalSellers: number;
@@ -1162,6 +1168,13 @@ export interface SellerScanStatus {
     totalItems: number;
     cacheHits: number;
     apiCalls: number;
+    rateLimited: number;
+  };
+  // Rate limit state (from Discogs API headers)
+  rateLimitInfo?: {
+    remaining: number;
+    limit: number;
+    isThrottled: boolean;
   };
 }
 

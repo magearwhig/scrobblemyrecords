@@ -16,6 +16,7 @@ import DiscardStatsBar from '../components/discard/DiscardStatsBar';
 import DiscardTradedInModal from '../components/discard/DiscardTradedInModal';
 import { Modal, ModalFooter } from '../components/ui';
 import { Button } from '../components/ui/Button';
+import { ProgressBar } from '../components/ui/ProgressBar';
 import { ListItemSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -544,6 +545,14 @@ const DiscardPilePage: React.FC = () => {
           {selectionMode ? 'Cancel Selection' : 'Select Items'}
         </Button>
       </div>
+      {refreshing && (
+        <div className='discard-pile-refresh-progress'>
+          <span className='discard-pile-refresh-text'>
+            Refreshing marketplace values...
+          </span>
+          <ProgressBar value={0} indeterminate size='small' animated />
+        </div>
+      )}
 
       <DiscardFilterBar
         items={items}

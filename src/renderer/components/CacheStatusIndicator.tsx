@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { Button } from './ui/Button';
+import { ProgressBar } from './ui/ProgressBar';
 
 interface CacheProgress {
   status: 'loading' | 'completed' | 'failed';
@@ -65,6 +66,16 @@ const CacheStatusIndicator: React.FC<CacheStatusIndicatorProps> = ({
                 100
             )}
             %)
+            <ProgressBar
+              value={Math.round(
+                ((cacheProgress.currentPage || 0) /
+                  (cacheProgress.totalPages || 1)) *
+                  100
+              )}
+              size='small'
+              animated
+              showLabel
+            />
           </div>
         )}
 

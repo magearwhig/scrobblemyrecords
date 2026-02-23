@@ -3,6 +3,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { WrappedData } from '../../shared/types';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
+import { ProgressBar } from '../components/ui/ProgressBar';
 import { Skeleton } from '../components/ui/Skeleton';
 import WrappedSlideshow from '../components/wrapped/WrappedSlideshow';
 import { getApiService } from '../services/api';
@@ -209,6 +210,7 @@ const WrappedPage: React.FC = () => {
         {loading && (
           <div className='wrapped-loading'>
             <Skeleton variant='rectangular' width='100%' height={200} />
+            <ProgressBar value={0} indeterminate size='small' animated />
             <p className='wrapped-loading-text'>
               Crunching your listening data...
             </p>

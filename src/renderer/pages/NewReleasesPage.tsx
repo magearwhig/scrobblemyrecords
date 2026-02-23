@@ -508,6 +508,26 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
         </div>
       </header>
 
+      {/* Sync Starting Progress Bar */}
+      {syncStarting && (
+        <div className='sync-progress-container'>
+          <div className='sync-progress-info'>
+            <span className='sync-label'>Starting sync...</span>
+          </div>
+          <ProgressBar value={0} indeterminate size='small' animated />
+        </div>
+      )}
+
+      {/* Fetching Covers Progress Bar */}
+      {fetchingCovers && (
+        <div className='sync-progress-container'>
+          <div className='sync-progress-info'>
+            <span className='sync-label'>Fetching cover art...</span>
+          </div>
+          <ProgressBar value={0} indeterminate size='small' animated />
+        </div>
+      )}
+
       {/* Sync Progress Bar */}
       {syncStatus && syncStatus.status === 'syncing' && (
         <div className='sync-progress-container'>

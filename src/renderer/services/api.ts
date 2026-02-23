@@ -1321,6 +1321,22 @@ class ApiService {
     return response.data.data;
   }
 
+  async cancelSellerScan(): Promise<{ cancelled: boolean }> {
+    const response = await this.api.post('/sellers/scan/cancel');
+    return response.data.data;
+  }
+
+  async getRateLimitState(): Promise<{
+    limit: number;
+    used: number;
+    remaining: number;
+    isThrottled: boolean;
+    lastUpdated: number;
+  }> {
+    const response = await this.api.get('/sellers/scan/ratelimit');
+    return response.data.data;
+  }
+
   async markMatchAsSeen(matchId: string): Promise<void> {
     await this.api.post(`/sellers/matches/${matchId}/seen`);
   }

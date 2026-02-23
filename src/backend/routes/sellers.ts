@@ -2,6 +2,7 @@ import express from 'express';
 
 import { AuthService } from '../services/authService';
 import { SellerMonitoringService } from '../services/sellerMonitoringService';
+import { getRateLimitState } from '../utils/discogsAxios';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 import { validateUsername } from '../utils/validation';
@@ -125,6 +126,40 @@ export default function createSellersRouter(
       res.json({ success: true, data: status });
     } catch (error) {
       logger.error('Error getting scan status', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // POST /api/v1/sellers/scan/cancel - Cancel running scan
+  router.post('/scan/cancel', async (_req, res) => {
+    try {
+      const cancelled = await sellerMonitoringService.cancelScan();
+      res.json({
+        success: true,
+        data: { cancelled },
+        message: cancelled
+          ? 'Scan cancellation requested'
+          : 'No scan in progress',
+      });
+    } catch (error) {
+      logger.error('Error cancelling scan', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // GET /api/v1/sellers/scan/ratelimit - Get current rate limit state
+  router.get('/scan/ratelimit', async (_req, res) => {
+    try {
+      const rateLimitState = getRateLimitState();
+      res.json({ success: true, data: rateLimitState });
+    } catch (error) {
+      logger.error('Error getting rate limit state', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

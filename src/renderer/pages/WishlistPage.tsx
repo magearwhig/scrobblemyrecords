@@ -758,6 +758,14 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
               if any are now available on vinyl.
             </span>
           </div>
+          {checkingLocalVinyl && (
+            <div className='monitoring-check-progress'>
+              <span className='monitoring-check-text'>
+                Checking vinyl availability...
+              </span>
+              <ProgressBar value={0} indeterminate size='small' animated />
+            </div>
+          )}
           {loading ? (
             <AlbumCardSkeleton count={4} />
           ) : localWantItems.length === 0 ? (
