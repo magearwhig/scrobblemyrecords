@@ -106,6 +106,30 @@ export default function createReleasesRouter(
   });
 
   /**
+   * POST /api/v1/releases/sync/cancel
+   * Cancel a running release sync
+   */
+  router.post('/sync/cancel', async (_req: Request, res: Response) => {
+    try {
+      const cancelled = await releaseTrackingService.cancelSync();
+
+      res.json({
+        success: true,
+        data: { cancelled },
+        message: cancelled
+          ? 'Sync cancellation requested'
+          : 'No sync in progress',
+      });
+    } catch (error) {
+      logger.error('Error cancelling release sync', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
    * POST /api/v1/releases/sync
    * Trigger release sync
    */

@@ -1440,6 +1440,11 @@ class ApiService {
     return { message: response.data.message, status: response.data.data };
   }
 
+  async cancelReleaseTrackingSync(): Promise<{ cancelled: boolean }> {
+    const response = await this.api.post('/releases/sync/cancel');
+    return response.data.data;
+  }
+
   async getReleaseTrackingSettings(): Promise<{
     autoCheckOnStartup: boolean;
     checkFrequencyDays: number;

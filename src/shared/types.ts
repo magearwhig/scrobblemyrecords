@@ -1341,7 +1341,7 @@ export interface ArtistDisambiguationStatus {
  * Release tracking sync status
  */
 export interface ReleaseTrackingSyncStatus {
-  status: 'idle' | 'syncing' | 'completed' | 'error';
+  status: 'idle' | 'syncing' | 'completed' | 'error' | 'cancelled';
   lastSync: number | null;
   artistsProcessed: number;
   totalArtists: number;

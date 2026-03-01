@@ -408,7 +408,7 @@ describe('NewReleasesPage', () => {
     renderNewReleasesPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Syncing...')).toBeInTheDocument();
+      expect(screen.getByText('Cancel Sync')).toBeInTheDocument();
     });
 
     expect(screen.getByText(/Syncing releases:/)).toBeInTheDocument();

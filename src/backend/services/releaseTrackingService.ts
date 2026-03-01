@@ -48,6 +48,7 @@ export class ReleaseTrackingService {
 
   // Sync state
   private syncInProgress = false;
+  private syncAborted = false;
 
   constructor(
     fileStorage: FileStorage,
@@ -61,6 +62,44 @@ export class ReleaseTrackingService {
     this.musicBrainzService = musicBrainzService;
     this.wishlistService = wishlistService;
     this.hiddenReleasesService = hiddenReleasesService;
+
+    // Reset stale sync status on startup (handles server restart mid-sync)
+    this.initialize();
+  }
+
+  /**
+   * Initialize the service - reset sync status if it was left in a bad state.
+   * Handles the case where the server was stopped during a sync.
+   */
+  private async initialize(): Promise<void> {
+    try {
+      const store =
+        await this.fileStorage.readJSON<ReleaseSyncStatusStore>(
+          SYNC_STATUS_FILE
+        );
+
+      if (
+        store &&
+        store.schemaVersion === 1 &&
+        (store.status.status === 'syncing' ||
+          store.status.status === 'cancelled')
+      ) {
+        this.logger.info(
+          `Resetting stale sync status from '${store.status.status}' to 'idle' (server restart detected)`
+        );
+        await this.updateSyncStatus({
+          status: 'idle',
+          progress: 0,
+          artistsProcessed: 0,
+          totalArtists: 0,
+          currentArtist: undefined,
+          estimatedTimeRemaining: undefined,
+          error: undefined,
+        });
+      }
+    } catch {
+      // No status file exists, nothing to reset
+    }
   }
 
   // ============================================
@@ -707,6 +746,7 @@ export class ReleaseTrackingService {
     }
 
     this.syncInProgress = true;
+    this.syncAborted = false;
     this.logger.info(`Starting release sync for ${username}`);
 
     // Timing for ETA calculation
@@ -793,6 +833,14 @@ export class ReleaseTrackingService {
 
       // Process each artist
       for (const artist of artists) {
+        // Check for cancellation before processing each artist
+        if (this.syncAborted) {
+          this.logger.info(
+            `Sync cancelled at artist ${artistsProcessed}/${totalArtists}`
+          );
+          break;
+        }
+
         try {
           // Update current artist being processed
           await this.updateSyncStatus({
@@ -917,9 +965,27 @@ export class ReleaseTrackingService {
         }
       }
 
-      // Merge and save releases
+      // Merge and save releases (even on cancel, save what we found)
       const allReleases = [...existingReleases, ...newReleases];
       await this.saveTrackedReleases(allReleases);
+
+      // Handle cancellation
+      if (this.syncAborted) {
+        await this.updateSyncStatus({
+          status: 'cancelled',
+          artistsProcessed,
+          releasesFound: newReleases.length,
+          pendingDisambiguations,
+          currentArtist: undefined,
+          estimatedTimeRemaining: undefined,
+        });
+
+        this.logger.info(
+          `Release sync cancelled: ${artistsProcessed}/${totalArtists} artists, ${newReleases.length} new releases found before cancel`
+        );
+
+        return this.getSyncStatus();
+      }
 
       // Cleanup old disambiguations
       await this.cleanupOldDisambiguations();
@@ -965,7 +1031,24 @@ export class ReleaseTrackingService {
       throw error;
     } finally {
       this.syncInProgress = false;
+      this.syncAborted = false;
     }
+  }
+
+  /**
+   * Cancel a running sync. The sync will stop before processing the next artist,
+   * save any releases found so far, and transition to 'cancelled' status.
+   * Returns true if a sync was running and cancellation was requested.
+   */
+  async cancelSync(): Promise<boolean> {
+    if (!this.syncInProgress) {
+      this.logger.info('No sync in progress to cancel');
+      return false;
+    }
+
+    this.logger.info('Release sync cancellation requested');
+    this.syncAborted = true;
+    return true;
   }
 
   /**

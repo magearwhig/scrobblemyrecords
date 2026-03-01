@@ -63,6 +63,7 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
   // Sync state
   const [isPolling, setIsPolling] = useState(false);
   const [syncStarting, setSyncStarting] = useState(false);
+  const [syncCancelling, setSyncCancelling] = useState(false);
   const [fetchingCovers, setFetchingCovers] = useState(false);
 
   // Disambiguation modal state
@@ -121,10 +122,14 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
         const status = await api.getReleaseTrackingSyncStatus();
         setSyncStatus(status as ReleaseTrackingSyncStatus);
 
-        if (status.status === 'completed' || status.status === 'error') {
+        if (
+          status.status === 'completed' ||
+          status.status === 'error' ||
+          status.status === 'cancelled'
+        ) {
           setIsPolling(false);
-          // Reload data after sync completes
-          if (status.status === 'completed') {
+          // Reload data after sync completes or is cancelled
+          if (status.status === 'completed' || status.status === 'cancelled') {
             const [releasesData, disambiguationsData] = await Promise.all([
               api.getTrackedReleases({ types: selectedTypes.join(',') }),
               api.getPendingDisambiguations(),
@@ -133,7 +138,9 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
             setDisambiguations(disambiguationsData.disambiguations);
             addNotification(
               createSuccessNotification(
-                'Sync Complete',
+                status.status === 'completed'
+                  ? 'Sync Complete'
+                  : 'Sync Cancelled',
                 `Found ${status.releasesFound} releases`,
                 status.releasesFound > 0
                   ? { route: '/releases', label: 'View Releases' }
@@ -168,6 +175,22 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
       setError(e instanceof Error ? e.message : 'Failed to start sync');
     } finally {
       setSyncStarting(false);
+    }
+  };
+
+  const handleCancelSync = async () => {
+    try {
+      setSyncCancelling(true);
+      await api.cancelReleaseTrackingSync();
+    } catch (e) {
+      addNotification(
+        createAlertNotification(
+          'Error',
+          e instanceof Error ? e.message : 'Failed to cancel sync'
+        )
+      );
+    } finally {
+      setSyncCancelling(false);
     }
   };
 
@@ -492,19 +515,26 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
             onClick={handleFetchCovers}
             disabled={
               fetchingCovers ||
-              syncStatus?.status === 'syncing' ||
+              (syncStatus?.status === 'syncing' && isPolling) ||
               releases.length === 0
             }
             title='Fetch missing cover art from Cover Art Archive'
           >
             {fetchingCovers ? 'Fetching...' : 'Fetch Covers'}
           </Button>
-          <Button
-            onClick={handleSync}
-            disabled={syncStarting || syncStatus?.status === 'syncing'}
-          >
-            {syncStatus?.status === 'syncing' ? 'Syncing...' : 'Sync Releases'}
-          </Button>
+          {syncStatus?.status === 'syncing' && isPolling ? (
+            <Button
+              variant='warning'
+              onClick={handleCancelSync}
+              disabled={syncCancelling}
+            >
+              {syncCancelling ? 'Cancelling...' : 'Cancel Sync'}
+            </Button>
+          ) : (
+            <Button onClick={handleSync} disabled={syncStarting}>
+              {syncStarting ? 'Starting...' : 'Sync Releases'}
+            </Button>
+          )}
         </div>
       </header>
 
