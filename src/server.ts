@@ -17,8 +17,10 @@ import createBackupRouter from './backend/routes/backup';
 import createCollectionRouter from './backend/routes/collection';
 import createCollectionAnalyticsRouter from './backend/routes/collectionAnalytics';
 import createDiscardPileRouter from './backend/routes/discardPile';
+import { createEmbeddingsRouter } from './backend/routes/embeddings';
 import createImagesRouter from './backend/routes/images';
 import jobsRouter from './backend/routes/jobs';
+import { createRecommendationsRouter } from './backend/routes/recommendations';
 import createReleasesRouter from './backend/routes/releases';
 import createScrobbleRouter from './backend/routes/scrobble';
 import createSellersRouter from './backend/routes/sellers';
@@ -29,28 +31,41 @@ import createWrappedRouter from './backend/routes/wrapped';
 import { AnalyticsService } from './backend/services/analyticsService';
 import { artistMappingService } from './backend/services/artistMappingService';
 import { ArtistNameResolver } from './backend/services/artistNameResolver';
+import { ArtistSimilarityEnricherService } from './backend/services/artistSimilarityEnricherService';
+import { ArtistSimilarityStorageService } from './backend/services/artistSimilarityStorageService';
 import { AuthService } from './backend/services/authService';
 import { BackupService } from './backend/services/backupService';
 import { CleanupService } from './backend/services/cleanupService';
 import { CollectionAnalyticsService } from './backend/services/collectionAnalyticsService';
+import { CollectionIndexerService } from './backend/services/collectionIndexerService';
 import { DiscardPileService } from './backend/services/discardPileService';
 import { DiscogsService } from './backend/services/discogsService';
+import { EmbeddingStorageService } from './backend/services/embeddingStorageService';
 import { GenreAnalysisService } from './backend/services/genreAnalysisService';
 import { HiddenItemService } from './backend/services/hiddenItemService';
 import { HiddenReleasesService } from './backend/services/hiddenReleasesService';
 import { HistoryIndexMergeService } from './backend/services/historyIndexMergeService';
 import { ImageService } from './backend/services/imageService';
 import { LastFmService } from './backend/services/lastfmService';
+import { ListeningSessionStorageService } from './backend/services/listeningSessionStorageService';
 import { MappingService } from './backend/services/mappingService';
 import { MigrationService } from './backend/services/migrationService';
 import { MusicBrainzService } from './backend/services/musicbrainzService';
+import { OllamaEmbedderService } from './backend/services/ollamaEmbedderService';
+import { OllamaService } from './backend/services/ollamaService';
+import { ProfileBuilderService } from './backend/services/profileBuilderService';
 import { RankingsService } from './backend/services/rankingsService';
+import { RecommendationLogService } from './backend/services/recommendationLogService';
+import { RecommendationService } from './backend/services/recommendationService';
 import { ReleaseTrackingService } from './backend/services/releaseTrackingService';
+import { ScoringEngineService } from './backend/services/scoringEngineService';
 import { ScrobbleHistoryStorage } from './backend/services/scrobbleHistoryStorage';
 import { ScrobbleHistorySyncService } from './backend/services/scrobbleHistorySyncService';
 import { SellerMonitoringService } from './backend/services/sellerMonitoringService';
+import { SessionEmbedderService } from './backend/services/sessionEmbedderService';
 import { StatsService } from './backend/services/statsService';
 import { SuggestionService } from './backend/services/suggestionService';
+import { TagEnricherService } from './backend/services/tagEnricherService';
 import { TrackMappingService } from './backend/services/trackMappingService';
 import { WishlistService } from './backend/services/wishlistService';
 import { WrappedService } from './backend/services/wrappedService';
@@ -418,6 +433,8 @@ app.get('/api/v1', (req, res) => {
       wrapped: '/api/v1/wrapped',
       collectionAnalytics: '/api/v1/collection-analytics',
       jobs: '/api/v1/jobs',
+      recommendations: '/api/v1/recommendations',
+      embeddings: '/api/v1/embeddings',
     },
   });
 });
@@ -566,6 +583,76 @@ async function startServer() {
         historyIndexMergeService,
         imageService,
         genreAnalysisService
+      )
+    );
+
+    // Instantiate embedding & recommendation services
+    const embeddingStorageService = new EmbeddingStorageService(fileStorage);
+    const tagEnricherService = new TagEnricherService(
+      lastfmService,
+      embeddingStorageService
+    );
+    const artistSimilarityStorageService = new ArtistSimilarityStorageService(
+      fileStorage
+    );
+    const artistSimilarityEnricherService = new ArtistSimilarityEnricherService(
+      lastfmService,
+      artistSimilarityStorageService
+    );
+    const profileBuilderService = new ProfileBuilderService(
+      tagEnricherService,
+      artistSimilarityEnricherService,
+      mappingService
+    );
+    const ollamaService = new OllamaService();
+    const ollamaEmbedderService = new OllamaEmbedderService(ollamaService);
+    const listeningSessionStorageService = new ListeningSessionStorageService(
+      fileStorage
+    );
+    const sessionEmbedderService = new SessionEmbedderService(
+      ollamaEmbedderService,
+      listeningSessionStorageService
+    );
+    const collectionIndexerService = new CollectionIndexerService(
+      ollamaEmbedderService,
+      embeddingStorageService
+    );
+    const recommendationLogService = new RecommendationLogService(fileStorage);
+    const scoringEngineService = new ScoringEngineService(
+      artistSimilarityStorageService,
+      recommendationLogService
+    );
+    const recommendationService = new RecommendationService(
+      embeddingStorageService,
+      scoringEngineService,
+      sessionEmbedderService,
+      profileBuilderService,
+      collectionIndexerService,
+      recommendationLogService,
+      fileStorage,
+      artistSimilarityStorageService,
+      historyStorage
+    );
+
+    // Mount embedding & recommendation routes
+    app.use(
+      '/api/v1/embeddings',
+      createEmbeddingsRouter(
+        collectionIndexerService,
+        embeddingStorageService,
+        profileBuilderService,
+        discogsService,
+        authService,
+        fileStorage
+      )
+    );
+    app.use(
+      '/api/v1/recommendations',
+      createRecommendationsRouter(
+        recommendationService,
+        lastfmService,
+        authService,
+        fileStorage
       )
     );
 

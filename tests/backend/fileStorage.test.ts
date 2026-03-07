@@ -225,7 +225,10 @@ describe('FileStorage', () => {
       const filePath = path.join(testDataDir, 'invalid.json');
       await fs.writeFile(filePath, 'invalid json content', 'utf-8');
 
-      await expect(fileStorage.readJSON('invalid.json')).rejects.toThrow();
+      // Corrupted JSON returns null instead of throwing (per dev_prompt:
+      // "corrupted data files should not crash the server")
+      const result = await fileStorage.readJSON('invalid.json');
+      expect(result).toBeNull();
     });
 
     it('should handle write permission errors', async () => {

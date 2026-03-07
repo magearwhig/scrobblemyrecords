@@ -18,6 +18,7 @@ export const ROUTES = {
   WRAPPED: 'wrapped',
   ARTIST_DETAIL: 'artist',
   TRACK_DETAIL: 'track',
+  RECOMMENDATIONS: 'recommendations',
 } as const;
 
 /**

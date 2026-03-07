@@ -496,15 +496,25 @@ sudo systemctl enable ollama  # Start on boot
 
 </details>
 
-#### Download a Model
+#### Download Models
 
-After installing Ollama, download a model:
+After installing Ollama, download the required models:
 
 ```bash
+# Required for embedding-based recommendations
+ollama pull nomic-embed-text
+
+# Required for AI chat suggestions (pick one)
 ollama pull mistral
 ```
 
-**Recommended Models:**
+**Embedding Model (Required for Recommendations):**
+
+| Model | Command | Size | Best For |
+|-------|---------|------|----------|
+| **nomic-embed-text** | `ollama pull nomic-embed-text` | 274 MB | Embedding-based recommendations (768-dim vectors) |
+
+**Chat Models (For AI Suggestions):**
 
 | Model | Command | Size | RAM Required | Best For |
 |-------|---------|------|--------------|----------|
@@ -520,13 +530,22 @@ ollama pull mistral
 - **Limited RAM (<4 GB)**: Gemma 2B works but with reduced quality
 - First model load takes 10-30 seconds; subsequent calls are faster
 
-#### Enable in App
+#### Enable AI Chat Suggestions
 
 1. Go to **Settings → AI Recommendations**
 2. Toggle "Enable AI suggestions"
 3. Select your downloaded model from the dropdown
 4. Click "Test Connection" to verify
 5. AI suggestions will appear on the Suggestions page
+
+#### Enable Embedding-Based Recommendations
+
+1. Ensure `nomic-embed-text` is pulled: `ollama pull nomic-embed-text`
+2. Go to **Recommendations** (✨ in sidebar)
+3. Click "Rebuild All Embeddings" to index your collection
+4. First-time indexing fetches Last.fm tags (rate-limited at 1 req/sec) — large collections (500+ records) take 15-30+ minutes
+5. Subsequent rebuilds are incremental and much faster
+6. Recommendations are based on your recent Last.fm listening history
 
 #### Troubleshooting Ollama
 

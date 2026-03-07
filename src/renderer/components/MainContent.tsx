@@ -8,6 +8,7 @@ import DiscoveryPage from '../pages/DiscoveryPage';
 import HistoryPage from '../pages/HistoryPage';
 import HomePage from '../pages/HomePage';
 import MarketplacePage from '../pages/MarketplacePage';
+import RecommendationsPage from '../pages/RecommendationsPage';
 import ReleaseDetailsPage from '../pages/ReleaseDetailsPage';
 import ScrobblePage from '../pages/ScrobblePage';
 import SettingsPage from '../pages/SettingsPage';
@@ -72,6 +73,8 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
         return <ArtistDetailPage key={artistKey} />;
       case ROUTES.TRACK_DETAIL:
         return <TrackDetailPage key={trackKey} />;
+      case ROUTES.RECOMMENDATIONS:
+        return <RecommendationsPage />;
       default:
         return <HomePage />;
     }

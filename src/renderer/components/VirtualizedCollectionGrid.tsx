@@ -44,7 +44,7 @@ const VirtualizedCollectionGrid: React.FC<VirtualizedCollectionGridProps> = ({
       1,
       Math.floor((width + CARD_GAP) / (CARD_MIN_WIDTH + CARD_GAP))
     );
-    setColumns(cols);
+    setColumns(prev => (prev === cols ? prev : cols));
   }, []);
 
   useEffect(() => {

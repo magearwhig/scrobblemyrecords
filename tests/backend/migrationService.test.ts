@@ -401,10 +401,10 @@ describe('MigrationService', () => {
       // Act
       const report = await migrationService.migrateAllOnStartup();
 
-      // Assert
-      expect(report.errors.length).toBe(1);
-      expect(report.errors[0].file).toBe('user-settings');
-      // Should still process other files
+      // Assert - corrupted JSON is now handled gracefully by FileStorage.readJSON
+      // (returns null instead of throwing), so migration sees the file as empty/missing
+      // and skips it without reporting an error. The valid file should still be processed.
+      expect(report.errors.length).toBe(0);
       expect(report.checked).toBeGreaterThanOrEqual(1);
     });
   });

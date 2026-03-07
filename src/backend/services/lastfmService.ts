@@ -871,4 +871,164 @@ export class LastFmService {
       return [];
     }
   }
+
+  /**
+   * Get top tags for an album from Last.fm.
+   *
+   * API endpoint: album.getTopTags
+   * Returns empty array on any error for graceful degradation.
+   */
+  async getAlbumTopTags(
+    artist: string,
+    album: string
+  ): Promise<Array<{ name: string; count: number }>> {
+    try {
+      const credentials = await this.authService.getLastFmCredentials();
+      if (!credentials.apiKey) {
+        return [];
+      }
+
+      const response = await this.axios.get('', {
+        params: {
+          method: 'album.getTopTags',
+          api_key: credentials.apiKey,
+          artist,
+          album,
+          format: 'json',
+        },
+      });
+
+      if (response.data.error) {
+        this.logger.debug('Last.fm album.getTopTags error', {
+          error: response.data.error,
+          message: response.data.message,
+          artist,
+          album,
+        });
+        return [];
+      }
+
+      const toptags = response.data.toptags?.tag;
+      if (!Array.isArray(toptags)) {
+        return [];
+      }
+
+      return toptags.map((tag: { name: string; count: string | number }) => ({
+        name: tag.name,
+        count:
+          typeof tag.count === 'string' ? parseInt(tag.count, 10) : tag.count,
+      }));
+    } catch {
+      this.logger.debug('Error getting album top tags', { artist, album });
+      return [];
+    }
+  }
+
+  /**
+   * Get top tags for a track from Last.fm.
+   *
+   * API endpoint: track.getTopTags
+   * Returns empty array on any error for graceful degradation.
+   */
+  async getTrackTopTags(
+    artist: string,
+    track: string
+  ): Promise<Array<{ name: string; count: number }>> {
+    try {
+      const credentials = await this.authService.getLastFmCredentials();
+      if (!credentials.apiKey) {
+        return [];
+      }
+
+      const response = await this.axios.get('', {
+        params: {
+          method: 'track.getTopTags',
+          api_key: credentials.apiKey,
+          artist,
+          track,
+          format: 'json',
+        },
+      });
+
+      if (response.data.error) {
+        this.logger.debug('Last.fm track.getTopTags error', {
+          error: response.data.error,
+          message: response.data.message,
+          artist,
+          track,
+        });
+        return [];
+      }
+
+      const toptags = response.data.toptags?.tag;
+      if (!Array.isArray(toptags)) {
+        return [];
+      }
+
+      return toptags.map((tag: { name: string; count: string | number }) => ({
+        name: tag.name,
+        count:
+          typeof tag.count === 'string' ? parseInt(tag.count, 10) : tag.count,
+      }));
+    } catch {
+      this.logger.debug('Error getting track top tags', { artist, track });
+      return [];
+    }
+  }
+
+  /**
+   * Get similar artists for a given artist from Last.fm.
+   *
+   * API endpoint: artist.getSimilar
+   * match is returned as a string (0-1 float) by Last.fm and converted to number.
+   * Returns empty array on any error for graceful degradation.
+   *
+   * @param artist - Artist name
+   * @param limit - Maximum number of similar artists to return (default 50)
+   */
+  async getSimilarArtists(
+    artist: string,
+    limit: number = 50
+  ): Promise<Array<{ name: string; match: number }>> {
+    try {
+      const credentials = await this.authService.getLastFmCredentials();
+      if (!credentials.apiKey) {
+        return [];
+      }
+
+      const response = await this.axios.get('', {
+        params: {
+          method: 'artist.getSimilar',
+          api_key: credentials.apiKey,
+          artist,
+          limit: limit.toString(),
+          format: 'json',
+        },
+      });
+
+      if (response.data.error) {
+        this.logger.debug('Last.fm artist.getSimilar error', {
+          error: response.data.error,
+          message: response.data.message,
+          artist,
+        });
+        return [];
+      }
+
+      const similarArtists = response.data.similarartists?.artist;
+      if (!Array.isArray(similarArtists)) {
+        return [];
+      }
+
+      return similarArtists.map(
+        (a: { name: string; match: string | number }) => ({
+          name: a.name,
+          match: typeof a.match === 'string' ? parseFloat(a.match) : a.match,
+        })
+      );
+    } catch {
+      this.logger.debug('Error getting similar artists', { artist });
+      return [];
+    }
+  }
 }

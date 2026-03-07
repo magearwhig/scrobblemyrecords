@@ -131,8 +131,16 @@ const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
-      label: 'Explore',
+      label: 'Discover',
       items: [
+        {
+          id: ROUTES.RECOMMENDATIONS,
+          label: 'Recommendations',
+          icon: '✨',
+          enabled:
+            authStatus.discogs.authenticated && authStatus.lastfm.authenticated,
+          disabledReason: bothReason,
+        },
         {
           id: ROUTES.MARKETPLACE,
           label: 'Marketplace',

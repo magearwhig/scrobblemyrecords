@@ -25,6 +25,7 @@ import {
   DiscardPileItem,
   DiscardPileStats,
   DiscogsRelease,
+  EmbeddingStatus,
   EnrichedWishlistItem,
   EntireCollectionResponse,
   ExcludedArtistResponse,
@@ -44,6 +45,8 @@ import {
   MonitoredSeller,
   MusicBrainzArtistMatch,
   NewReleaseSyncStatus,
+  RecommendationResult,
+  RecommendationSettings,
   ReleaseTrackingSyncStatus,
   ReleaseVersion,
   ScrobbleArtistMapping,
@@ -1845,6 +1848,87 @@ class ApiService {
   > {
     const response = await this.api.get('/jobs');
     return response.data.data;
+  }
+
+  // ============================================
+  // Recommendations methods
+  // ============================================
+
+  async getRecommendations(params?: {
+    count?: number;
+    window?: number;
+    excludeRecent?: boolean;
+    minScore?: number;
+  }): Promise<ApiResponse<RecommendationResult[]>> {
+    const response = await this.api.get('/recommendations', { params });
+    return response.data;
+  }
+
+  async getRecommendationDebug(releaseId: number): Promise<
+    ApiResponse<{
+      release: DiscogsRelease;
+      breakdown: {
+        cosine: number;
+        artistSimilarity: number;
+        recency: number;
+        diversity: number;
+      };
+      explanation: string;
+    }>
+  > {
+    const response = await this.api.get(`/recommendations/debug/${releaseId}`);
+    return response.data;
+  }
+
+  async submitRecommendationFeedback(
+    releaseId: number,
+    action: 'played' | 'skipped' | 'not_interested'
+  ): Promise<ApiResponse<{ success: boolean }>> {
+    const response = await this.api.post('/recommendations/feedback', {
+      releaseId,
+      action,
+    });
+    return response.data;
+  }
+
+  async getRecommendationSettings(): Promise<
+    ApiResponse<RecommendationSettings>
+  > {
+    const response = await this.api.get('/recommendations/settings');
+    return response.data;
+  }
+
+  async updateRecommendationSettings(
+    settings: Partial<RecommendationSettings>
+  ): Promise<ApiResponse<RecommendationSettings>> {
+    const response = await this.api.put('/recommendations/settings', settings);
+    return response.data;
+  }
+
+  // ============================================
+  // Embeddings methods
+  // ============================================
+
+  async getEmbeddingStatus(): Promise<ApiResponse<EmbeddingStatus>> {
+    const response = await this.api.get('/embeddings/status');
+    return response.data;
+  }
+
+  async rebuildEmbeddings(): Promise<ApiResponse<{ status: string }>> {
+    const response = await this.api.post('/embeddings/rebuild');
+    return response.data;
+  }
+
+  async refreshEmbedding(
+    releaseId: number
+  ): Promise<ApiResponse<{ success: boolean }>> {
+    const response = await this.api.post(`/embeddings/refresh/${releaseId}`);
+    return response.data;
+  }
+
+  async cancelEmbeddingRebuild(): Promise<ApiResponse<{ success: boolean }>> {
+    const response = await this.api.post('/embeddings/cancel');
+    return response.data;
   }
 
   // Update base URL (for when server URL changes)

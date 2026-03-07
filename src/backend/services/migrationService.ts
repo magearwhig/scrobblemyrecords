@@ -154,16 +154,6 @@ export class MigrationService {
     });
 
     // ============================================
-    // Genre Analysis Cache
-    // ============================================
-    this.register('artist-tags-cache', {
-      path: 'cache/artist-tags.json',
-      currentVersion: 1,
-      migrations: [],
-      optional: true,
-    });
-
-    // ============================================
     // Wishlist Files (already have schemaVersion)
     // ============================================
     this.register('wishlist-settings', {
@@ -320,6 +310,44 @@ export class MigrationService {
     // ============================================
     this.register('discard-pile', {
       path: 'collections/discard-pile.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    // ============================================
+    // Embedding & Recommendation Files
+    // ============================================
+    this.register('embedding-record-embeddings', {
+      path: 'embeddings/record-embeddings.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('embedding-artist-similarity', {
+      path: 'embeddings/artist-similarity.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('embedding-recommendation-log', {
+      path: 'embeddings/recommendation-log.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('embedding-listening-sessions', {
+      path: 'embeddings/listening-sessions.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('embedding-recommendation-settings', {
+      path: 'settings/recommendation-settings.json',
       currentVersion: 1,
       migrations: [],
       optional: true,

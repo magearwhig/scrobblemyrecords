@@ -55,7 +55,7 @@ describe('Sidebar', () => {
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
       expect(screen.getByText('Library')).toBeInTheDocument();
       expect(screen.getByText('Listening')).toBeInTheDocument();
-      expect(screen.getByText('Explore')).toBeInTheDocument();
+      expect(screen.getByText('Discover')).toBeInTheDocument();
       expect(screen.getByText('System')).toBeInTheDocument();
     });
   });
@@ -82,7 +82,8 @@ describe('Sidebar', () => {
       expect(screen.getByText('Stats Dashboard')).toBeInTheDocument();
       expect(screen.getByText('Wrapped')).toBeInTheDocument();
 
-      // Explore group
+      // Discover group
+      expect(screen.getByText('Recommendations')).toBeInTheDocument();
       expect(screen.getByText('Marketplace')).toBeInTheDocument();
       expect(screen.getByText('Discovery')).toBeInTheDocument();
 
@@ -274,7 +275,7 @@ describe('Sidebar', () => {
       expect(statsButton).not.toHaveClass('disabled');
     });
 
-    it('disables Marketplace when Discogs is not authenticated (Explore group)', () => {
+    it('disables Marketplace when Discogs is not authenticated (Discover group)', () => {
       const authStatus: AuthStatus = {
         discogs: { authenticated: false, username: undefined },
         lastfm: { authenticated: true, username: 'lastfm_user' },

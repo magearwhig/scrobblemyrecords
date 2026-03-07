@@ -91,7 +91,15 @@ export class FileStorage {
     try {
       const fullPath = this.validateAndResolvePath(filePath);
       const data = await fs.readFile(fullPath, 'utf-8');
-      return JSON.parse(data) as T;
+      try {
+        return JSON.parse(data) as T;
+      } catch (parseError) {
+        log.error('JSON parse error — file may be corrupted, returning null', {
+          filePath,
+          error: parseError,
+        });
+        return null;
+      }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return null;

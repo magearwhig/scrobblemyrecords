@@ -2285,6 +2285,157 @@ export interface YearBucket {
   count: number;
 }
 
+// ============================================
+// Embedding & Recommendation Types
+// ============================================
+
+/**
+ * Single record's embedding data stored in file.
+ * embedding is a base64-encoded Float32Array.
+ */
+export interface RecordEmbeddingEntry {
+  discogsReleaseId: number;
+  textProfile: string;
+  embedding: string; // base64-encoded Float32Array
+  embeddingModel: string; // e.g. 'nomic-embed-text'
+  lastEnrichedAt: number; // millisecond timestamp
+  tagsJson?: Record<string, string[]>; // cached tag data
+  artistSimilarJson?: Array<{ name: string; match: number }>; // cached similar artists
+}
+
+/**
+ * Store for all record embeddings.
+ * Keyed by discogsReleaseId as string.
+ */
+export interface RecordEmbeddingStore extends VersionedStore {
+  schemaVersion: 1;
+  embeddings: Record<string, RecordEmbeddingEntry>;
+}
+
+/**
+ * Single artist similarity entry from Last.fm.
+ */
+export interface ArtistSimilarityEntry {
+  artistName: string;
+  similarArtistName: string;
+  matchScore: number;
+  lastFetchedAt: number; // millisecond timestamp
+}
+
+/**
+ * Store for artist similarity data.
+ * Keyed by artistName.
+ */
+export interface ArtistSimilarityStore extends VersionedStore {
+  schemaVersion: 1;
+  similarities: Record<string, ArtistSimilarityEntry[]>;
+}
+
+/**
+ * Single recommendation log entry.
+ */
+export interface RecommendationLogEntry {
+  discogsReleaseId: number;
+  recommendedAt: number; // millisecond timestamp
+  score: number;
+  wasSelected: boolean;
+}
+
+/**
+ * Store for recommendation log history.
+ */
+export interface RecommendationLogStore extends VersionedStore {
+  schemaVersion: 1;
+  entries: RecommendationLogEntry[];
+}
+
+/**
+ * A snapshot of the user's listening session for embedding.
+ * sessionEmbedding is a base64-encoded Float32Array.
+ */
+export interface ListeningSessionEntry {
+  sessionTextProfile: string;
+  sessionEmbedding: string; // base64-encoded Float32Array
+  createdAt: number; // millisecond timestamp
+  scrobbleWindowHours: number;
+}
+
+/**
+ * Store for listening session snapshots.
+ */
+export interface ListeningSessionStore extends VersionedStore {
+  schemaVersion: 1;
+  sessions: ListeningSessionEntry[];
+}
+
+/**
+ * Configuration for the Ollama embedding model.
+ */
+export interface EmbeddingSettings {
+  model: string; // default 'nomic-embed-text'
+  ollamaUrl: string; // default 'http://localhost:11434'
+  batchSize: number; // default 5
+  concurrency: number; // default 2
+  cacheMaxAgeDays: number; // default 30
+}
+
+/**
+ * Weight configuration for recommendation scoring factors.
+ */
+export interface RecommendationWeights {
+  cosineSimilarity: number;
+  artistSimilarity: number;
+  recencyDecay: number;
+  diversityBonus: number;
+}
+
+/**
+ * Full recommendation settings configuration.
+ */
+export interface RecommendationSettings extends VersionedStore {
+  schemaVersion: 1;
+  defaultCount: number; // default 10
+  defaultWindowHours: number; // default 168
+  weights: RecommendationWeights;
+  recencyDecayHalfLifeDays: number; // default 90
+  excludeRecentlyPlayed: boolean;
+  excludeRecentlyRecommended: boolean;
+  recentlyRecommendedWindowDays: number; // default 7
+  embedding: EmbeddingSettings;
+}
+
+/**
+ * A single recommendation result with scoring details.
+ */
+export interface RecommendationResult {
+  release: DiscogsRelease;
+  score: number;
+  explanation: string;
+  breakdown: {
+    cosine: number;
+    artistSimilarity: number;
+    recency: number;
+    diversity: number;
+  };
+}
+
+/**
+ * Embedding index status information.
+ */
+export interface EmbeddingStatus {
+  totalRecords: number;
+  embeddedRecords: number;
+  lastRebuildAt: number | null;
+  averageEmbeddingAge: number | null; // days
+  staleRecords: number;
+  isRebuilding: boolean;
+  rebuildProgress?: {
+    current: number;
+    total: number;
+    phase: string;
+  };
+}
+
 /**
  * Collection growth over time
  */

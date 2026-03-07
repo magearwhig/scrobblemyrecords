@@ -6,6 +6,7 @@ import {
   CollectionItem,
   CollectionSortBy,
   DiscardReason,
+  DiscogsRelease,
   AddDiscardPileItemRequest,
   MarketplaceStats,
 } from '../../shared/types';
@@ -732,6 +733,19 @@ const CollectionPage: React.FC = () => {
     []
   );
 
+  const handleViewDetails = useCallback(
+    (release: DiscogsRelease, item: CollectionItem) => {
+      localStorage.setItem('selectedRelease', JSON.stringify(release));
+      localStorage.setItem('selectedCollectionItemId', item.id.toString());
+      // Use pushState + manual hashchange to avoid browser hash-anchor
+      // scroll behavior which can scroll the page to top when no element
+      // with id="release-details" exists in the DOM.
+      window.history.pushState(null, '', '#release-details');
+      window.dispatchEvent(new Event('hashchange'));
+    },
+    []
+  );
+
   // Fetch play counts when scrobbles sort is selected
   const fetchPlayCounts = useCallback(
     async (albums: AlbumIdentifier[]) => {
@@ -1263,17 +1277,7 @@ const CollectionPage: React.FC = () => {
                   item={item}
                   selected={selectedAlbums.has(item.release.id)}
                   onSelect={() => handleAlbumSelect(item.release.id)}
-                  onViewDetails={release => {
-                    localStorage.setItem(
-                      'selectedRelease',
-                      JSON.stringify(release)
-                    );
-                    localStorage.setItem(
-                      'selectedCollectionItemId',
-                      item.id.toString()
-                    );
-                    window.location.hash = '#release-details';
-                  }}
+                  onViewDetails={release => handleViewDetails(release, item)}
                   isInDiscardPile={discardPileIds.has(item.id)}
                   onAddToDiscardPile={handleOpenDiscardModal}
                   playCount={pcData?.playCount}
@@ -1288,14 +1292,7 @@ const CollectionPage: React.FC = () => {
             selectedAlbums={selectedAlbums}
             discardPileIds={discardPileIds}
             onAlbumSelect={handleAlbumSelect}
-            onViewDetails={(release, item) => {
-              localStorage.setItem('selectedRelease', JSON.stringify(release));
-              localStorage.setItem(
-                'selectedCollectionItemId',
-                item.id.toString()
-              );
-              window.location.hash = '#release-details';
-            }}
+            onViewDetails={handleViewDetails}
             onAddToDiscardPile={handleOpenDiscardModal}
             playCounts={playCounts}
             getPlayCountKey={getPlayCountKey}
@@ -1351,17 +1348,9 @@ const CollectionPage: React.FC = () => {
                   item={currentItem}
                   selected={selectedAlbums.has(currentItem.release.id)}
                   onSelect={() => handleAlbumSelect(currentItem.release.id)}
-                  onViewDetails={release => {
-                    localStorage.setItem(
-                      'selectedRelease',
-                      JSON.stringify(release)
-                    );
-                    localStorage.setItem(
-                      'selectedCollectionItemId',
-                      currentItem.id.toString()
-                    );
-                    window.location.hash = '#release-details';
-                  }}
+                  onViewDetails={release =>
+                    handleViewDetails(release, currentItem)
+                  }
                   isInDiscardPile={discardPileIds.has(currentItem.id)}
                   onAddToDiscardPile={handleOpenDiscardModal}
                   playCount={pcData?.playCount}

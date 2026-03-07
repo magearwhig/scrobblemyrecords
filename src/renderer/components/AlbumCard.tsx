@@ -47,6 +47,13 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
       <div
         className='album-cover'
         onClick={() => onViewDetails(release)}
+        onMouseDown={e => {
+          // Prevent browser's default focus behavior on mousedown.
+          // In virtualized lists, focusing an absolutely-positioned element
+          // triggers scroll-into-view using its CSS top:0 position (not its
+          // visual transform position), which scrolls the container to top.
+          e.preventDefault();
+        }}
         onKeyDown={e => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
