@@ -17,7 +17,7 @@ interface GenreTreemapProps {
 // Multi-color palette for treemap cells, defined as CSS custom properties
 // so they can be themed. Fallback hex values match the light mode defaults.
 const GENRE_COLORS = [
-  'var(--chart-color-1, #1db954)',
+  'var(--chart-color-1, #d4a24e)',
   'var(--chart-color-2, #1e90ff)',
   'var(--chart-color-3, #ff6b6b)',
   'var(--chart-color-4, #ffd43b)',

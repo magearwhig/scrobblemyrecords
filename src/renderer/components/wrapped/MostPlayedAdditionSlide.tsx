@@ -1,3 +1,4 @@
+import { Disc3 } from 'lucide-react';
 import React from 'react';
 
 import { WrappedCollectionStats } from '../../../shared/types';
@@ -42,7 +43,7 @@ const MostPlayedAdditionSlide: React.FC<MostPlayedAdditionSlideProps> = ({
           />
         ) : (
           <div className='wrapped-featured-cover wrapped-cover-placeholder'>
-            💿
+            <Disc3 size={48} aria-hidden='true' />
           </div>
         )}
         <h2 className='wrapped-featured-title'>{artist}</h2>

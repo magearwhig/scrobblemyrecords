@@ -657,9 +657,14 @@ describe('ReleaseDetailsPage Scrobble Progress and Results', () => {
     await waitFor(() => {
       expect(screen.getByText('Scrobbling Progress:')).toBeInTheDocument();
       expect(screen.getByText('2 / 5')).toBeInTheDocument();
-      expect(screen.getByText(/✅ 1 successful/)).toBeInTheDocument();
-      expect(screen.getByText(/⚠️ 1 ignored/)).toBeInTheDocument();
-      expect(screen.getByText(/❌ 0 failed/)).toBeInTheDocument();
+      // Progress stats are now rendered with Lucide SVG icons instead of emoji
+      const progressStats = document.querySelector(
+        '.release-details-progress-stats'
+      );
+      expect(progressStats).toBeInTheDocument();
+      expect(progressStats?.textContent).toMatch(/1 successful/);
+      expect(progressStats?.textContent).toMatch(/1 ignored/);
+      expect(progressStats?.textContent).toMatch(/0 failed/);
     });
   });
 

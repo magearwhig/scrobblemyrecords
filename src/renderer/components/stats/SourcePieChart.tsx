@@ -9,7 +9,7 @@ interface SourcePieChartProps {
 }
 
 // Colors for the pie chart
-const COLORS = ['#1db954', '#6b7280']; // Green for RecordScrobbles, gray for Other
+const COLORS = ['#d4a24e', '#6b7280']; // Amber for RecordScrobbles, gray for Other
 
 /**
  * Pie chart showing scrobble source breakdown

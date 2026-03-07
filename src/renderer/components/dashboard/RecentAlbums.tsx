@@ -1,3 +1,4 @@
+import { Disc3 } from 'lucide-react';
 import React, { useCallback } from 'react';
 
 import { DashboardRecentAlbum } from '../../../shared/types';
@@ -77,7 +78,9 @@ export const RecentAlbums: React.FC<RecentAlbumsProps> = ({
               {album.coverUrl ? (
                 <img src={album.coverUrl} alt={`${album.album} cover`} />
               ) : (
-                <div className='dashboard-album-cover-placeholder'>💿</div>
+                <div className='dashboard-album-cover-placeholder'>
+                  <Disc3 size={24} aria-hidden='true' />
+                </div>
               )}
             </div>
             <div className='dashboard-album-info'>

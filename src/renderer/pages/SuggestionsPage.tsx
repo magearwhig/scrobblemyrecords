@@ -1,3 +1,4 @@
+import { Dices } from 'lucide-react';
 import React, { useEffect, useState, useCallback } from 'react';
 
 import {
@@ -285,7 +286,7 @@ const SuggestionsPage: React.FC<SuggestionsPageProps> = ({
             </div>
           ) : suggestions.length === 0 ? (
             <EmptyState
-              icon='🎲'
+              icon={<Dices size={48} aria-hidden='true' />}
               title='No Suggestions Available'
               description='We need more data to generate personalized suggestions for you.'
               suggestion='Make sure your collection is loaded and your scrobble history is synced.'

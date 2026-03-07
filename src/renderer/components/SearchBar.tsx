@@ -1,3 +1,4 @@
+import { Search } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 
 interface SearchBarProps {
@@ -172,7 +173,9 @@ const SearchBar: React.FC<SearchBarProps> = ({
         />
 
         {/* Search icon */}
-        <div className='search-icon'>🔍</div>
+        <div className='search-icon'>
+          <Search size={16} aria-hidden='true' />
+        </div>
 
         {/* Clear button */}
         {query && (

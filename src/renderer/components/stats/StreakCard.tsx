@@ -1,3 +1,4 @@
+import { Flame } from 'lucide-react';
 import React from 'react';
 
 import { StreakInfo } from '../../../shared/types';
@@ -18,7 +19,9 @@ export const StreakCard: React.FC<StreakCardProps> = ({ streaks }) => {
   return (
     <div className='streak-card'>
       <div className='streak-card-content'>
-        <div className='streak-card-icon'>🔥</div>
+        <div className='streak-card-icon'>
+          <Flame size={20} aria-hidden='true' />
+        </div>
         <div className='streak-card-stats'>
           <div className='streak-card-current'>
             <span className='streak-card-value'>{streaks.currentStreak}</span>

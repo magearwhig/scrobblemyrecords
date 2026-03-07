@@ -1,3 +1,4 @@
+import { Bot, FolderOpen, Music } from 'lucide-react';
 import React, { useState, useCallback } from 'react';
 
 import EmbeddingManager from '../components/recommendations/EmbeddingManager';
@@ -182,7 +183,7 @@ const RecommendationsPage: React.FC = () => {
 
       {!isLoading && isOllamaError && (
         <EmptyState
-          icon='🤖'
+          icon={<Bot size={48} aria-hidden='true' />}
           title='Ollama is not running'
           description='Recommendations require Ollama to be running locally to generate embeddings.'
           suggestion='Start Ollama with: ollama serve — then make sure nomic-embed-text is available: ollama pull nomic-embed-text'
@@ -192,7 +193,7 @@ const RecommendationsPage: React.FC = () => {
 
       {!isLoading && !error && hasNoEmbeddings && (
         <EmptyState
-          icon='🗂️'
+          icon={<FolderOpen size={48} aria-hidden='true' />}
           title='No embeddings yet'
           description='Your collection has not been indexed yet. Build embeddings to get recommendations based on your listening history.'
           suggestion='Click "Rebuild All Embeddings" above to start indexing your collection.'
@@ -210,7 +211,7 @@ const RecommendationsPage: React.FC = () => {
         !hasNoEmbeddings &&
         recommendations.length === 0 && (
           <EmptyState
-            icon='🎵'
+            icon={<Music size={48} aria-hidden='true' />}
             title='No recommendations found'
             description='Could not find matching recommendations for your recent listening.'
             suggestion='Try broadening your listening window or scrobble some records to get personalized recommendations.'

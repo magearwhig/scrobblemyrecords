@@ -1,3 +1,4 @@
+import { Play } from 'lucide-react';
 import React, { useState } from 'react';
 
 import {
@@ -327,7 +328,7 @@ export const TopList: React.FC<TopListProps> = ({
                     )}
                   </div>
                   <IconButton
-                    icon={<>▶️</>}
+                    icon={<Play size={14} aria-hidden='true' />}
                     aria-label='Play on Spotify'
                     variant='ghost'
                     size='small'

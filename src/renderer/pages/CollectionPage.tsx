@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 import {
@@ -1100,7 +1101,8 @@ const CollectionPage: React.FC = () => {
           !cacheProgress && (
             <div className='card collection-warning-card'>
               <h4 className='collection-warning-title'>
-                ⚠️ Incomplete Collection Cache
+                <AlertTriangle size={16} aria-hidden='true' /> Incomplete
+                Collection Cache
               </h4>
               <p className='collection-warning-text'>
                 Only {entireCollection.length} items are currently cached. Your

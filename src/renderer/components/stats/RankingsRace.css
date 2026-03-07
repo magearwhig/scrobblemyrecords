@@ -27,7 +27,7 @@
 }
 
 .rankings-race-play-button {
-  background: var(--primary-color, #1db954);
+  background: var(--accent-primary);
   color: #ffffff;
   border: none;
   border-radius: 50%;
@@ -43,7 +43,7 @@
 }
 
 .rankings-race-play-button:hover {
-  background: var(--primary-hover, #1ed760);
+  background: var(--accent-primary-hover);
 }
 
 .rankings-race-play-button:active {
@@ -66,7 +66,7 @@
   width: 1.25rem;
   height: 1.25rem;
   border-radius: 50%;
-  background: var(--primary-color, #1db954);
+  background: var(--accent-primary);
   cursor: pointer;
   transition: transform 0.2s ease;
 }
@@ -79,7 +79,7 @@
   width: 1.25rem;
   height: 1.25rem;
   border-radius: 50%;
-  background: var(--primary-color, #1db954);
+  background: var(--accent-primary);
   cursor: pointer;
   border: none;
   transition: transform 0.2s ease;
@@ -112,11 +112,11 @@
 }
 
 .rankings-race-speed:hover {
-  border-color: var(--primary-color, #1db954);
+  border-color: var(--accent-primary);
 }
 
 .rankings-race-speed:focus {
-  border-color: var(--primary-color, #1db954);
+  border-color: var(--accent-primary);
 }
 
 /* Chart container */
@@ -179,8 +179,8 @@
   height: 2.5rem;
   background: linear-gradient(
     90deg,
-    var(--primary-color, #1db954) 0%,
-    var(--primary-color, #1db954) 100%
+    var(--accent-primary) 0%,
+    var(--accent-primary) 100%
   );
   border-radius: 0.25rem;
   /* Smooth width animation */

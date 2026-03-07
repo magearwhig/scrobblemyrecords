@@ -1,3 +1,4 @@
+import { BarChart3, Disc3, Music, PlusCircle } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
@@ -557,13 +558,13 @@ export const StatsPage: React.FC = () => {
         {counts && (
           <>
             <StatCard
-              icon='📊'
+              icon={<BarChart3 size={20} aria-hidden='true' />}
               value={counts.thisMonth}
               label='This Month'
               subValue={`${counts.thisWeek} this week`}
             />
             <StatCard
-              icon='🎵'
+              icon={<Music size={20} aria-hidden='true' />}
               value={counts.allTime.toLocaleString()}
               label='All Time'
               subValue={`${counts.thisYear.toLocaleString()} this year`}
@@ -571,7 +572,7 @@ export const StatsPage: React.FC = () => {
           </>
         )}
         <StatCard
-          icon='🆕'
+          icon={<PlusCircle size={20} aria-hidden='true' />}
           value={newArtistsCount}
           label='New Artists'
           subValue='discovered this month'
@@ -579,7 +580,7 @@ export const StatsPage: React.FC = () => {
         {listeningHours && <ListeningHoursCard hours={listeningHours} />}
         {coverage && (
           <PeriodStatCard
-            icon='📀'
+            icon={<Disc3 size={20} aria-hidden='true' />}
             values={{
               month: {
                 value: `${coverage.thisMonth}%`,

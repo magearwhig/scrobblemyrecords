@@ -1,3 +1,4 @@
+import { Music } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { SuggestionResult, SuggestionFactors } from '../../shared/types';
@@ -104,7 +105,7 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
         }}
         title='View album details'
       >
-        {!release.cover_image && '🎵'}
+        {!release.cover_image && <Music size={32} aria-hidden='true' />}
       </div>
 
       <div className='suggestion-card-content'>

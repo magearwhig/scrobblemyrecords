@@ -1,3 +1,4 @@
+import { DollarSign, Store } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 
 import {
@@ -139,7 +140,9 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
       {/* Wishlist Settings */}
       <div className='settings-section-card'>
         <div className='settings-section-header'>
-          <span className='settings-section-icon'>💰</span>
+          <span className='settings-section-icon'>
+            <DollarSign size={18} aria-hidden='true' />
+          </span>
           <div>
             <h3>Wishlist Settings</h3>
             <p className='settings-section-description'>
@@ -296,7 +299,9 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
       {/* Local Sellers Settings */}
       <div className='settings-section-card'>
         <div className='settings-section-header'>
-          <span className='settings-section-icon'>🏪</span>
+          <span className='settings-section-icon'>
+            <Store size={18} aria-hidden='true' />
+          </span>
           <div>
             <h3>Local Sellers</h3>
             <p className='settings-section-description'>

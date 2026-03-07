@@ -1,4 +1,5 @@
 /* global navigator */
+import { Play } from 'lucide-react';
 import React, { useState, useEffect, useMemo } from 'react';
 
 import {
@@ -445,7 +446,7 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
                       }
                       title='Play on Spotify'
                     >
-                      ▶️
+                      <Play size={14} aria-hidden='true' />
                     </Button>
                     <Button
                       variant='outline'

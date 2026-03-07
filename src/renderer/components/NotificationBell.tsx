@@ -1,3 +1,4 @@
+import { AlertCircle, AlertTriangle, Bell, Check, Info } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { AppNotification } from '../../shared/types';
@@ -90,17 +91,17 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     return new Date(timestamp).toLocaleDateString();
   };
 
-  const getTypeIcon = (type: AppNotification['type']): string => {
+  const getTypeIcon = (type: AppNotification['type']): React.ReactNode => {
     switch (type) {
       case 'success':
-        return '✓';
+        return <Check size={14} aria-hidden='true' />;
       case 'warning':
-        return '⚠';
+        return <AlertTriangle size={14} aria-hidden='true' />;
       case 'alert':
-        return '!';
+        return <AlertCircle size={14} aria-hidden='true' />;
       case 'info':
       default:
-        return 'ℹ';
+        return <Info size={14} aria-hidden='true' />;
     }
   };
 
@@ -154,7 +155,9 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
           <div className='notification-panel-content'>
             {notifications.length === 0 ? (
               <div className='notification-empty'>
-                <span className='notification-empty-icon'>🔔</span>
+                <span className='notification-empty-icon'>
+                  <Bell size={24} aria-hidden='true' />
+                </span>
                 <p>No notifications</p>
               </div>
             ) : (
@@ -199,7 +202,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                       }}
                       aria-label='Dismiss notification'
                     >
-                      ×
+                      &times;
                     </button>
                   </li>
                 ))}

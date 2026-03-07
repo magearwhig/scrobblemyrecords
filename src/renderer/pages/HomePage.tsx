@@ -1,3 +1,14 @@
+import {
+  AlertTriangle,
+  BarChart3,
+  Clock,
+  Disc3,
+  Flame,
+  Mic2,
+  Music,
+  Radio,
+  Target,
+} from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { DashboardData, MilestoneInfo } from '../../shared/types';
@@ -175,7 +186,9 @@ const HomePage: React.FC = () => {
         />
 
         <div className='dashboard-empty'>
-          <div className='dashboard-empty-icon'>🎵</div>
+          <div className='dashboard-empty-icon'>
+            <Music size={48} aria-hidden='true' />
+          </div>
           <h2>Welcome to RecordScrobbles</h2>
           <p>
             Connect your Discogs and Last.fm accounts to start tracking your
@@ -230,7 +243,9 @@ const HomePage: React.FC = () => {
     return (
       <div className='dashboard'>
         <div className='dashboard-error'>
-          <div className='dashboard-error-icon'>⚠️</div>
+          <div className='dashboard-error-icon'>
+            <AlertTriangle size={48} aria-hidden='true' />
+          </div>
           <h2>Unable to load dashboard</h2>
           <p>{dashboardError}</p>
           <Button type='button' onClick={loadDashboardData}>
@@ -256,7 +271,7 @@ const HomePage: React.FC = () => {
       {quickStats && (
         <div className='dashboard-stats-row'>
           <DashboardStatCard
-            icon='🔥'
+            icon={<Flame size={20} aria-hidden='true' />}
             value={quickStats.currentStreak}
             label='Day Streak'
             subValue={
@@ -267,32 +282,32 @@ const HomePage: React.FC = () => {
             onClick={() => navigate('/stats')}
           />
           <DashboardStatCard
-            icon='📊'
+            icon={<BarChart3 size={20} aria-hidden='true' />}
             value={formatNumber(quickStats.scrobblesThisMonth)}
             label='This Month'
             subValue={`Avg: ${formatNumber(quickStats.averageMonthlyScrobbles)}`}
           />
           <DashboardStatCard
-            icon='🎤'
+            icon={<Mic2 size={20} aria-hidden='true' />}
             value={quickStats.newArtistsThisMonth}
             label='New Artists'
             subValue='This month'
             onClick={() => openStatDetails('new-artists')}
           />
           <DashboardStatCard
-            icon='📀'
+            icon={<Disc3 size={20} aria-hidden='true' />}
             value={`${quickStats.collectionCoverageThisMonth}%`}
             label='Collection Played'
             subValue='This month'
           />
           <DashboardStatCard
-            icon='⏱️'
+            icon={<Clock size={20} aria-hidden='true' />}
             value={`${quickStats.listeningHoursThisMonth}h`}
             label='Listening Time'
             subValue='This month'
           />
           <DashboardStatCard
-            icon='🎯'
+            icon={<Target size={20} aria-hidden='true' />}
             value={formatNumber(quickStats.totalScrobbles)}
             label='All Time'
             subValue={
@@ -355,7 +370,9 @@ const HomePage: React.FC = () => {
         !dashboardData?.monthlyTopArtists?.length &&
         !heatmapData.length && (
           <div className='dashboard-empty'>
-            <div className='dashboard-empty-icon'>📻</div>
+            <div className='dashboard-empty-icon'>
+              <Radio size={48} aria-hidden='true' />
+            </div>
             <h2>No listening data yet</h2>
             <p>
               Start scrobbling your vinyl collection to see your listening

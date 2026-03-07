@@ -1,3 +1,4 @@
+import { Music } from 'lucide-react';
 import React, { useState, useCallback, useMemo } from 'react';
 
 import { WrappedData } from '../../shared/types';
@@ -219,7 +220,7 @@ const WrappedPage: React.FC = () => {
 
         {error && !loading && (
           <EmptyState
-            icon='🎵'
+            icon={<Music size={48} aria-hidden='true' />}
             title='No Data Found'
             description={error}
             suggestion='Try selecting a different date range or sync your listening history first.'

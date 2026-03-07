@@ -33,7 +33,8 @@ describe('SearchBar', () => {
     expect(input).not.toBeDisabled();
     expect(input).toHaveValue('');
 
-    expect(screen.getByText('🔍')).toBeInTheDocument();
+    // Search icon is now a Lucide SVG
+    expect(document.querySelector('.search-icon svg')).toBeInTheDocument();
   });
 
   it('renders with custom placeholder', () => {

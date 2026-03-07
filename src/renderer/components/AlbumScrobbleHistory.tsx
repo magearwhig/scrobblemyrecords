@@ -1,3 +1,4 @@
+import { Check, Disc3, Link } from 'lucide-react';
 import React, { useEffect, useState, useCallback } from 'react';
 
 import { useApp } from '../context/AppContext';
@@ -238,14 +239,16 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
             <h3>Scrobble History</h3>
           </div>
           <div className='album-history-empty'>
-            <span className='album-history-empty-icon'>📀</span>
+            <span className='album-history-empty-icon'>
+              <Disc3 size={32} aria-hidden='true' />
+            </span>
             <p>No scrobbles found for this album</p>
             <p className='album-history-empty-hint'>
               If you've scrobbled this album under a different name on Last.fm,
               you can create a mapping to link them together.
             </p>
             <button onClick={openMappingModal} className='album-mapping-button'>
-              🔗 Map to Last.fm Album
+              <Link size={14} aria-hidden='true' /> Map to Last.fm Album
             </button>
           </div>
         </div>
@@ -360,7 +363,7 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
         <div className='album-history-header'>
           <h3>Scrobble History</h3>
           <button onClick={openMappingModal} className='add-mapping-button'>
-            🔗 Add Mapping
+            <Link size={14} aria-hidden='true' /> Add Mapping
           </button>
         </div>
 
@@ -496,7 +499,9 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
                       <div className='mapping-result-title'>
                         {item.album}
                         {isAlreadyMapped && (
-                          <span className='mapping-badge-mapped'>✓ Mapped</span>
+                          <span className='mapping-badge-mapped'>
+                            <Check size={12} aria-hidden='true' /> Mapped
+                          </span>
                         )}
                       </div>
                       <div className='mapping-result-artist'>{item.artist}</div>

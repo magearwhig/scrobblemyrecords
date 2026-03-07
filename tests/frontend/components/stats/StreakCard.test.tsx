@@ -18,9 +18,11 @@ describe('StreakCard', () => {
   });
 
   it('should show fire icon for active streak', () => {
-    render(<StreakCard streaks={mockStreaks} />);
+    const { container } = render(<StreakCard streaks={mockStreaks} />);
 
-    expect(screen.getByText('🔥')).toBeInTheDocument();
+    // Icon is now a Lucide SVG, verify the icon container exists
+    expect(container.querySelector('.streak-card-icon')).toBeInTheDocument();
+    expect(container.querySelector('svg')).toBeInTheDocument();
   });
 
   it('should show streak label', () => {

@@ -1,3 +1,4 @@
+import { Disc3 } from 'lucide-react';
 import React from 'react';
 
 import { WrappedCollectionStats } from '../../../shared/types';
@@ -38,7 +39,7 @@ const RecordsAddedSlide: React.FC<RecordsAddedSlideProps> = ({
                 />
               ) : (
                 <div className='wrapped-cover-image wrapped-cover-placeholder'>
-                  💿
+                  <Disc3 size={24} aria-hidden='true' />
                 </div>
               )}
             </div>

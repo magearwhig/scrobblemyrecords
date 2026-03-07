@@ -55,13 +55,14 @@ export default function createScrobbleRouter(
       await lastfmService.scrobbleTrack(track);
 
       // Trigger incremental sync after successful scrobble
+      // Delay to give Last.fm time to index the scrobble before we fetch it back
       if (scrobbleHistorySyncService) {
         const jobId = jobStatusService.startJob(
           'sync',
           'Syncing scrobble history...'
         );
-        scrobbleHistorySyncService
-          .startIncrementalSync()
+        new Promise(resolve => setTimeout(resolve, 5000))
+          .then(() => scrobbleHistorySyncService.startIncrementalSync())
           .then(() =>
             jobStatusService.completeJob(jobId, 'Scrobble history synced')
           )
@@ -129,13 +130,14 @@ export default function createScrobbleRouter(
       const results = await lastfmService.scrobbleBatch(tracksWithTimestamps);
 
       // Trigger incremental sync after successful scrobble
+      // Delay to give Last.fm time to index the scrobbles before we fetch them back
       if (results.success > 0 && scrobbleHistorySyncService) {
         const jobId = jobStatusService.startJob(
           'sync',
           'Syncing scrobble history...'
         );
-        scrobbleHistorySyncService
-          .startIncrementalSync()
+        new Promise(resolve => setTimeout(resolve, 5000))
+          .then(() => scrobbleHistorySyncService.startIncrementalSync())
           .then(() =>
             jobStatusService.completeJob(jobId, 'Scrobble history synced')
           )

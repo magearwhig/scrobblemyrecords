@@ -1,3 +1,4 @@
+import { Disc3 } from 'lucide-react';
 import React from 'react';
 
 import { DashboardTopAlbum, DashboardTopArtist } from '../../../shared/types';
@@ -78,7 +79,7 @@ export const MonthlyHighlights: React.FC<MonthlyHighlightsProps> = ({
                       <img src={album.coverUrl} alt={`${album.album} cover`} />
                     ) : (
                       <span className='dashboard-highlight-cover-placeholder'>
-                        💿
+                        <Disc3 size={20} aria-hidden='true' />
                       </span>
                     )}
                   </div>

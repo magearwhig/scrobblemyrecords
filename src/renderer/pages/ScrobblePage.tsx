@@ -1,3 +1,4 @@
+import { Check, XCircle } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import {
@@ -488,9 +489,15 @@ const ScrobblePage: React.FC = () => {
           <div className='card scrobble-results-card'>
             <h4>Scrobbling Results</h4>
             <div>
-              <div>✅ Successfully scrobbled: {results.success} tracks</div>
+              <div className='scrobble-result-success'>
+                <Check size={14} aria-hidden='true' /> Successfully scrobbled:{' '}
+                {results.success} tracks
+              </div>
               {results.failed > 0 && (
-                <div>❌ Failed to scrobble: {results.failed} tracks</div>
+                <div className='scrobble-result-failed'>
+                  <XCircle size={14} aria-hidden='true' /> Failed to scrobble:{' '}
+                  {results.failed} tracks
+                </div>
               )}
               {results.errors && results.errors.length > 0 && (
                 <details className='scrobble-error-details'>

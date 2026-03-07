@@ -1,3 +1,4 @@
+import { ArrowLeftRight, Link2, Music } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import { ArtistMapping } from '../../../backend/services/artistMappingService';
@@ -497,7 +498,9 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
       {/* Artist Name Mappings */}
       <div className='settings-section-card'>
         <div className='settings-section-header'>
-          <span className='settings-section-icon'>🔄</span>
+          <span className='settings-section-icon'>
+            <ArrowLeftRight size={18} aria-hidden='true' />
+          </span>
           <div>
             <h3>Artist Name Mappings</h3>
             <p className='settings-section-description'>
@@ -850,7 +853,9 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
       {/* Discovery Mappings */}
       <div className='settings-section-card'>
         <div className='settings-section-header'>
-          <span className='settings-section-icon'>🔗</span>
+          <span className='settings-section-icon'>
+            <Link2 size={18} aria-hidden='true' />
+          </span>
           <div>
             <h3>Discovery Mappings</h3>
             <p className='settings-section-description'>
@@ -970,7 +975,9 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
       {/* Track Mappings (for Forgotten Favorites) */}
       <div className='settings-section-card'>
         <div className='settings-section-header'>
-          <span className='settings-section-icon'>🎵</span>
+          <span className='settings-section-icon'>
+            <Music size={18} aria-hidden='true' />
+          </span>
           <div>
             <h3>Track Mappings</h3>
             <p className='settings-section-description'>
@@ -1052,7 +1059,9 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
       {/* MusicBrainz Mappings (for New Release Tracking) */}
       <div className='settings-section-card'>
         <div className='settings-section-header'>
-          <span className='settings-section-icon'>🎵</span>
+          <span className='settings-section-icon'>
+            <Music size={18} aria-hidden='true' />
+          </span>
           <div>
             <h3>MusicBrainz Artist Mappings</h3>
             <p className='settings-section-description'>

@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 
 import {
@@ -596,7 +597,9 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
       {disambiguations.length > 0 && (
         <div className='disambiguation-alert'>
           <div className='alert-content'>
-            <span className='alert-icon'>⚠️</span>
+            <span className='alert-icon'>
+              <AlertTriangle size={16} aria-hidden='true' />
+            </span>
             <span>
               {disambiguations.length} artist
               {disambiguations.length > 1 ? 's' : ''} need disambiguation

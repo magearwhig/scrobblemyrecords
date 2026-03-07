@@ -1,3 +1,4 @@
+import { Info } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 
 import {
@@ -315,7 +316,9 @@ const SellerMatchesPage: React.FC<SellerMatchesPageProps> = ({
       {/* Cache info banner */}
       {cacheInfo && (
         <div className='seller-matches-cache-info'>
-          <span className='cache-info-icon'>ℹ️</span>
+          <span className='cache-info-icon'>
+            <Info size={14} aria-hidden='true' />
+          </span>
           <span>
             Data from {formatCacheAge(cacheInfo.oldestScanAge)}
             {cacheInfo.nextScanDue === 0 && ' (refresh recommended)'}

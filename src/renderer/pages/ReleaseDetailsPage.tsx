@@ -1,3 +1,4 @@
+import { AlertTriangle, Check, Package, Play, XCircle } from 'lucide-react';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 import {
@@ -875,7 +876,7 @@ const ReleaseDetailsPage: React.FC = () => {
                 }
                 title='Play on Spotify'
               >
-                ▶️ Play on Spotify
+                <Play size={14} aria-hidden='true' /> Play on Spotify
               </Button>
             </div>
 
@@ -884,7 +885,7 @@ const ReleaseDetailsPage: React.FC = () => {
               <div className='release-details-button-container'>
                 {isInDiscardPile ? (
                   <span className='release-details-discard-indicator'>
-                    📦 In Discard Pile
+                    <Package size={14} aria-hidden='true' /> In Discard Pile
                   </span>
                 ) : (
                   <Button
@@ -893,7 +894,7 @@ const ReleaseDetailsPage: React.FC = () => {
                     className='release-details-discard-button'
                     onClick={handleOpenDiscardModal}
                   >
-                    📦 Add to Discard Pile
+                    <Package size={14} aria-hidden='true' /> Add to Discard Pile
                   </Button>
                 )}
               </div>
@@ -926,8 +927,10 @@ const ReleaseDetailsPage: React.FC = () => {
               animated
             />
             <div className='release-details-progress-stats'>
-              ✅ {scrobbleProgress.success} successful • ⚠️{' '}
-              {scrobbleProgress.ignored} ignored • ❌ {scrobbleProgress.failed}{' '}
+              <Check size={14} aria-hidden='true' /> {scrobbleProgress.success}{' '}
+              successful • <AlertTriangle size={14} aria-hidden='true' />{' '}
+              {scrobbleProgress.ignored} ignored •{' '}
+              <XCircle size={14} aria-hidden='true' /> {scrobbleProgress.failed}{' '}
               failed
             </div>
           </div>
@@ -1341,7 +1344,7 @@ const ReleaseDetailsPage: React.FC = () => {
                   }}
                   title='Play on Spotify'
                 >
-                  ▶️
+                  <Play size={14} aria-hidden='true' />
                 </Button>
 
                 {/* Track scrobble stats */}

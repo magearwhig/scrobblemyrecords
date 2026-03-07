@@ -111,18 +111,25 @@ describe('Sidebar', () => {
         lastfm: { authenticated: true, username: 'lastfm_user' },
       };
 
-      renderSidebarWithAuth(authStatus);
+      const { container } = renderSidebarWithAuth(authStatus);
 
-      expect(screen.getByText('🏠')).toBeInTheDocument(); // Home
-      expect(screen.getByText('💿')).toBeInTheDocument(); // Collection
-      expect(screen.getByText('📦')).toBeInTheDocument(); // Discard Pile
-      expect(screen.getByText('🎲')).toBeInTheDocument(); // What to Play
-      expect(screen.getByText('📝')).toBeInTheDocument(); // History
-      expect(screen.getByText('📊')).toBeInTheDocument(); // Stats
-      expect(screen.getByText('🎁')).toBeInTheDocument(); // Wrapped
-      expect(screen.getByText('🏪')).toBeInTheDocument(); // Marketplace
-      expect(screen.getByText('🔍')).toBeInTheDocument(); // Discovery
-      expect(screen.getByText('⚙️')).toBeInTheDocument(); // Settings
+      // Icons are now SVG Lucide icons; verify each nav-link-icon contains an svg
+      const navIcons = container.querySelectorAll('.nav-link-icon svg');
+      expect(navIcons.length).toBeGreaterThan(0);
+
+      // Verify specific lucide icon classes are present
+      expect(container.querySelector('.lucide-house')).toBeInTheDocument(); // Home
+      expect(container.querySelector('.lucide-disc-3')).toBeInTheDocument(); // Collection
+      expect(container.querySelector('.lucide-package')).toBeInTheDocument(); // Discard Pile
+      expect(container.querySelector('.lucide-dices')).toBeInTheDocument(); // What to Play
+      expect(container.querySelector('.lucide-file-text')).toBeInTheDocument(); // History
+      expect(
+        container.querySelector('.lucide-chart-column')
+      ).toBeInTheDocument(); // Stats
+      expect(container.querySelector('.lucide-gift')).toBeInTheDocument(); // Wrapped
+      expect(container.querySelector('.lucide-store')).toBeInTheDocument(); // Marketplace
+      expect(container.querySelector('.lucide-search')).toBeInTheDocument(); // Discovery
+      expect(container.querySelector('.lucide-settings')).toBeInTheDocument(); // Settings
     });
 
     it('marks the current page as active', () => {

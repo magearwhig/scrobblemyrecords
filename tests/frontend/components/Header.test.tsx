@@ -4,8 +4,6 @@ import '@testing-library/jest-dom';
 import React from 'react';
 
 import Header from '../../../src/renderer/components/Header';
-import { AuthProvider } from '../../../src/renderer/context/AuthContext';
-import { AuthStatus } from '../../../src/shared/types';
 
 // Mock ThemeContext
 const mockToggleDarkMode = jest.fn();
@@ -18,29 +16,38 @@ jest.mock('../../../src/renderer/context/ThemeContext', () => ({
   useTheme: () => mockUseTheme,
 }));
 
-const createMockAuthContext = (authStatus: AuthStatus) => ({
-  authStatus,
-  setAuthStatus: jest.fn(),
-});
+// Mock useNotifications hook
+jest.mock('../../../src/renderer/hooks/useNotifications', () => ({
+  useNotifications: () => ({
+    notifications: [],
+    unreadCount: 0,
+    markAsRead: jest.fn(),
+    markAllAsRead: jest.fn(),
+    removeNotification: jest.fn(),
+    clearAll: jest.fn(),
+  }),
+}));
 
-const renderHeaderWithProviders = (
-  authStatus: AuthStatus,
-  isDarkMode: boolean = false
-) => {
+// Mock NotificationBell component
+jest.mock('../../../src/renderer/components/NotificationBell', () => ({
+  NotificationBell: () => <div data-testid='notification-bell' />,
+}));
+
+// Mock lucide-react icons
+jest.mock('lucide-react', () => ({
+  Sun: ({ size }: { size: number }) => (
+    <svg data-testid='sun-icon' data-size={size} />
+  ),
+  Moon: ({ size }: { size: number }) => (
+    <svg data-testid='moon-icon' data-size={size} />
+  ),
+}));
+
+const renderHeader = (isDarkMode: boolean = false) => {
   mockUseTheme.isDarkMode = isDarkMode;
   mockUseTheme.toggleDarkMode = mockToggleDarkMode;
 
-  const authContextValue = createMockAuthContext(authStatus);
-
-  return {
-    ...render(
-      <AuthProvider value={authContextValue}>
-        <Header />
-      </AuthProvider>
-    ),
-    authContextValue,
-    themeContextValue: mockUseTheme,
-  };
+  return render(<Header />);
 };
 
 describe('Header', () => {
@@ -48,157 +55,66 @@ describe('Header', () => {
     jest.clearAllMocks();
   });
 
-  it('renders the application title and version', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: false, username: undefined },
-      lastfm: { authenticated: false, username: undefined },
-    };
+  it('renders the brand name Listenography', () => {
+    renderHeader();
+    expect(screen.getByText('Listenography')).toBeInTheDocument();
+  });
 
-    renderHeaderWithProviders(authStatus);
-
+  it('does not render version or connection status', () => {
+    renderHeader();
+    expect(screen.queryByText(/v\d+\.\d+\.\d+/)).not.toBeInTheDocument();
     expect(
-      screen.getByText('Discogs to Last.fm Scrobbler')
-    ).toBeInTheDocument();
-    expect(screen.getByText('v1.0.0')).toBeInTheDocument();
+      screen.queryByText('All services connected')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Not connected')).not.toBeInTheDocument();
   });
 
-  it('shows "All services connected" when both services are authenticated', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: true, username: 'discogs_user' },
-      lastfm: { authenticated: true, username: 'lastfm_user' },
-    };
-
-    renderHeaderWithProviders(authStatus);
-
-    expect(screen.getByText('All services connected')).toBeInTheDocument();
-    expect(screen.getByText('Discogs:')).toBeInTheDocument();
-    expect(screen.getByText('discogs_user')).toBeInTheDocument();
-    expect(screen.getByText('Last.fm:')).toBeInTheDocument();
-    expect(screen.getByText('lastfm_user')).toBeInTheDocument();
+  it('renders the NotificationBell', () => {
+    renderHeader();
+    expect(screen.getByTestId('notification-bell')).toBeInTheDocument();
   });
 
-  it('shows "Partially connected" when only one service is authenticated', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: true, username: 'discogs_user' },
-      lastfm: { authenticated: false, username: undefined },
-    };
-
-    renderHeaderWithProviders(authStatus);
-
-    expect(screen.getByText('Partially connected')).toBeInTheDocument();
-    expect(screen.getByText('Discogs:')).toBeInTheDocument();
-    expect(screen.getByText('discogs_user')).toBeInTheDocument();
-    expect(screen.queryByText('Last.fm:')).not.toBeInTheDocument();
+  it('renders Moon icon in light mode', () => {
+    renderHeader(false);
+    expect(screen.getByTestId('moon-icon')).toBeInTheDocument();
+    expect(screen.queryByTestId('sun-icon')).not.toBeInTheDocument();
   });
 
-  it('shows "Not connected" when no services are authenticated', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: false, username: undefined },
-      lastfm: { authenticated: false, username: undefined },
-    };
-
-    renderHeaderWithProviders(authStatus);
-
-    expect(screen.getByText('Not connected')).toBeInTheDocument();
-    expect(screen.queryByText('Discogs:')).not.toBeInTheDocument();
-    expect(screen.queryByText('Last.fm:')).not.toBeInTheDocument();
+  it('renders Sun icon in dark mode', () => {
+    renderHeader(true);
+    expect(screen.getByTestId('sun-icon')).toBeInTheDocument();
+    expect(screen.queryByTestId('moon-icon')).not.toBeInTheDocument();
   });
 
   it('toggles dark mode when the theme button is clicked', async () => {
     const user = userEvent.setup();
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: false, username: undefined },
-      lastfm: { authenticated: false, username: undefined },
-    };
-
-    const { themeContextValue } = renderHeaderWithProviders(authStatus, false);
+    renderHeader(false);
 
     const themeButton = screen.getByTitle('Switch to dark mode');
-    expect(themeButton).toHaveTextContent('🌙');
-
     await user.click(themeButton);
 
-    expect(themeContextValue.toggleDarkMode).toHaveBeenCalledTimes(1);
+    expect(mockToggleDarkMode).toHaveBeenCalledTimes(1);
   });
 
-  it('shows sun emoji when in dark mode', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: false, username: undefined },
-      lastfm: { authenticated: false, username: undefined },
-    };
-
-    renderHeaderWithProviders(authStatus, true);
-
-    const themeButton = screen.getByTitle('Switch to light mode');
-    expect(themeButton).toHaveTextContent('☀️');
+  it('shows correct title in light mode', () => {
+    renderHeader(false);
+    expect(screen.getByTitle('Switch to dark mode')).toBeInTheDocument();
   });
 
-  it('applies correct CSS classes for connection status', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: true, username: 'test_user' },
-      lastfm: { authenticated: true, username: 'test_user' },
-    };
-
-    renderHeaderWithProviders(authStatus);
-
-    const statusElement = screen
-      .getByText('All services connected')
-      .closest('.status');
-    expect(statusElement).toHaveClass('connected');
+  it('shows correct title in dark mode', () => {
+    renderHeader(true);
+    expect(screen.getByTitle('Switch to light mode')).toBeInTheDocument();
   });
 
-  it('applies disconnected CSS class when services are not connected', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: false, username: undefined },
-      lastfm: { authenticated: false, username: undefined },
-    };
-
-    renderHeaderWithProviders(authStatus);
-
-    const statusElement = screen.getByText('Not connected').closest('.status');
-    expect(statusElement).toHaveClass('disconnected');
-  });
-
-  it('handles partial connection with Last.fm only', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: false, username: undefined },
-      lastfm: { authenticated: true, username: 'lastfm_user' },
-    };
-
-    renderHeaderWithProviders(authStatus);
-
-    expect(screen.getByText('Partially connected')).toBeInTheDocument();
-    expect(screen.queryByText('Discogs:')).not.toBeInTheDocument();
-    expect(screen.getByText('Last.fm:')).toBeInTheDocument();
-    expect(screen.getByText('lastfm_user')).toBeInTheDocument();
-  });
-
-  it('renders status dot element', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: false, username: undefined },
-      lastfm: { authenticated: false, username: undefined },
-    };
-
-    renderHeaderWithProviders(authStatus);
-
-    const statusDot = document.querySelector('.status-dot');
-    expect(statusDot).toBeInTheDocument();
-  });
-
-  it('applies correct CSS classes to theme button', () => {
-    const authStatus: AuthStatus = {
-      discogs: { authenticated: false, username: undefined },
-      lastfm: { authenticated: false, username: undefined },
-    };
-
-    // Test light mode
-    renderHeaderWithProviders(authStatus, false);
-    let themeButton = screen.getByTitle('Switch to dark mode');
+  it('applies correct CSS class to theme button', () => {
+    renderHeader(false);
+    const themeButton = screen.getByTitle('Switch to dark mode');
     expect(themeButton).toHaveClass('header-theme-toggle');
+  });
 
-    // Test dark mode
-    renderHeaderWithProviders(authStatus, true);
-    themeButton = screen.getByTitle('Switch to light mode');
-    expect(themeButton).toHaveClass('header-theme-toggle');
+  it('icons are rendered at 18px size', () => {
+    renderHeader(false);
+    const moonIcon = screen.getByTestId('moon-icon');
+    expect(moonIcon).toHaveAttribute('data-size', '18');
   });
 });

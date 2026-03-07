@@ -1,3 +1,11 @@
+import {
+  ArrowLeftRight,
+  Database,
+  Eye,
+  Link2,
+  Music,
+  Plug,
+} from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import {
@@ -27,7 +35,7 @@ type SettingsTab =
 interface TabConfig {
   id: SettingsTab;
   label: string;
-  icon: string;
+  icon: React.ReactNode;
   description: string;
 }
 
@@ -35,37 +43,37 @@ const TABS: TabConfig[] = [
   {
     id: 'connections',
     label: 'Connections',
-    icon: '🔗',
+    icon: <Link2 size={16} aria-hidden='true' />,
     description: 'Discogs & Last.fm accounts',
   },
   {
     id: 'integrations',
     label: 'Integrations',
-    icon: '🔌',
+    icon: <Plug size={16} aria-hidden='true' />,
     description: 'Sync & AI connections',
   },
   {
     id: 'mappings',
     label: 'Mappings',
-    icon: '🔄',
+    icon: <ArrowLeftRight size={16} aria-hidden='true' />,
     description: 'Artist, album & track mappings',
   },
   {
     id: 'filters',
     label: 'Filters',
-    icon: '👁️',
+    icon: <Eye size={16} aria-hidden='true' />,
     description: 'Hidden items',
   },
   {
     id: 'wishlist',
     label: 'Wishlist',
-    icon: '💿',
+    icon: <Music size={16} aria-hidden='true' />,
     description: 'Wishlist & sellers',
   },
   {
     id: 'backup',
     label: 'Backup',
-    icon: '💾',
+    icon: <Database size={16} aria-hidden='true' />,
     description: 'Export & restore',
   },
 ];

@@ -228,10 +228,7 @@ describe('HistoryPage', () => {
       renderHistoryPageWithProviders(authStatus);
 
       await waitFor(() => {
-        expect(screen.getByText('✅')).toBeInTheDocument(); // completed icon
-        expect(screen.getByText('❌')).toBeInTheDocument(); // failed icon
-        expect(screen.getByText('⏳')).toBeInTheDocument(); // pending icon
-
+        // Status icons are now Lucide SVGs, verify sessions are rendered by their status text
         expect(screen.getByText('completed')).toBeInTheDocument();
         expect(screen.getByText('failed')).toBeInTheDocument();
         expect(screen.getByText('pending')).toBeInTheDocument();

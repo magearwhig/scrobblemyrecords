@@ -14,7 +14,7 @@ interface ScrobbleSessionCardProps {
   session: ScrobbleSession;
   isExpanded: boolean;
   onToggleDetails: () => void;
-  getStatusIcon: (status: string) => string;
+  getStatusIcon: (status: string) => React.ReactNode;
   formatDate: (timestamp: number) => string;
   formatTrackTimestamp: (timestampMs: number) => string;
   onDelete: (sessionId: string) => void;

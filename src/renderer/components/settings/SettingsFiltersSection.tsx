@@ -1,3 +1,4 @@
+import { Eye, Music } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import {
@@ -133,7 +134,9 @@ const SettingsFiltersSection: React.FC<SettingsFiltersSectionProps> = ({
       {/* Hidden Discovery Items */}
       <div className='settings-section-card'>
         <div className='settings-section-header'>
-          <span className='settings-section-icon'>👁️‍🗨️</span>
+          <span className='settings-section-icon'>
+            <Eye size={18} aria-hidden='true' />
+          </span>
           <div>
             <h3>Hidden Discovery Items</h3>
             <p className='settings-section-description'>
@@ -262,7 +265,9 @@ const SettingsFiltersSection: React.FC<SettingsFiltersSectionProps> = ({
       {/* Release Tracking Filters */}
       <div className='settings-section-card'>
         <div className='settings-section-header'>
-          <span className='settings-section-icon'>🎵</span>
+          <span className='settings-section-icon'>
+            <Music size={18} aria-hidden='true' />
+          </span>
           <div>
             <h3>Release Tracking Filters</h3>
             <p className='settings-section-description'>

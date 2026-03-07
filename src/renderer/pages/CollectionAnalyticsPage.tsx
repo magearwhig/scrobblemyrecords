@@ -1,3 +1,4 @@
+import { AlertTriangle, Disc3, TrendingUp } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 
 import { CollectionAnalyticsOverview } from '../../shared/types';
@@ -98,7 +99,7 @@ const CollectionAnalyticsPage: React.FC = () => {
       <div className='collection-analytics-page'>
         <h1>Collection Analytics</h1>
         <EmptyState
-          icon='📈'
+          icon={<TrendingUp size={48} aria-hidden='true' />}
           title='Connect Discogs'
           description='Connect your Discogs account to see collection analytics.'
         />
@@ -131,7 +132,7 @@ const CollectionAnalyticsPage: React.FC = () => {
       <div className='collection-analytics-page'>
         <h1>Collection Analytics</h1>
         <EmptyState
-          icon='⚠️'
+          icon={<AlertTriangle size={48} aria-hidden='true' />}
           title='Error Loading Analytics'
           description={error}
         />
@@ -144,7 +145,7 @@ const CollectionAnalyticsPage: React.FC = () => {
       <div className='collection-analytics-page'>
         <h1>Collection Analytics</h1>
         <EmptyState
-          icon='💿'
+          icon={<Disc3 size={48} aria-hidden='true' />}
           title='No Collection Data'
           description='Add records to your Discogs collection to see analytics.'
         />

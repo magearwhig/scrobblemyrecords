@@ -217,12 +217,12 @@
 }
 
 .button--filter.button--primary {
-  box-shadow: 0 2px 4px rgba(29, 185, 84, 0.3);
+  box-shadow: 0 2px 4px rgba(var(--accent-primary-rgb), 0.3);
 }
 
 .button--filter.button--primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(29, 185, 84, 0.4);
+  box-shadow: 0 4px 8px rgba(var(--accent-primary-rgb), 0.4);
 }
 
 /* Dark mode adjustments */

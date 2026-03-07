@@ -1,3 +1,4 @@
+import { Disc3, Package, Sparkles, Target } from 'lucide-react';
 import React, { useCallback } from 'react';
 
 import { DashboardQuickActions } from '../../../shared/types';
@@ -8,7 +9,7 @@ interface QuickActionsGridProps {
 
 interface ActionCard {
   key: keyof DashboardQuickActions;
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   route: string;
   urgency: 'high' | 'medium' | 'low';
@@ -18,7 +19,7 @@ interface ActionCard {
 const ACTION_CARDS: ActionCard[] = [
   {
     key: 'newSellerMatches',
-    icon: '🎯',
+    icon: <Target size={20} aria-hidden='true' />,
     label: 'seller matches',
     route: '/sellers',
     urgency: 'high',
@@ -26,7 +27,7 @@ const ACTION_CARDS: ActionCard[] = [
   },
   {
     key: 'missingAlbumsCount',
-    icon: '📦',
+    icon: <Package size={20} aria-hidden='true' />,
     label: "albums you've played but don't own",
     route: '/discovery',
     urgency: 'medium',
@@ -34,7 +35,7 @@ const ACTION_CARDS: ActionCard[] = [
   },
   {
     key: 'wantListCount',
-    icon: '💿',
+    icon: <Disc3 size={20} aria-hidden='true' />,
     label: 'items in your want list',
     route: '/wishlist',
     urgency: 'medium',
@@ -42,7 +43,7 @@ const ACTION_CARDS: ActionCard[] = [
   },
   {
     key: 'dustyCornersCount',
-    icon: '🕸️',
+    icon: <Sparkles size={20} aria-hidden='true' />,
     label: 'albums need some attention',
     route: '/stats',
     urgency: 'low',

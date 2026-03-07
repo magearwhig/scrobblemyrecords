@@ -1,3 +1,4 @@
+import { Play } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 
 import { CollectionItem } from '../../shared/types';
@@ -671,7 +672,7 @@ const LastFmHistoryTab: React.FC = () => {
                       </button>
                     ) : (
                       <IconButton
-                        icon='▶️'
+                        icon={<Play size={14} aria-hidden='true' />}
                         aria-label='Play on Spotify'
                         variant='outline'
                         size='small'

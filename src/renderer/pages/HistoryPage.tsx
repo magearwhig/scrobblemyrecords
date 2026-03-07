@@ -1,3 +1,4 @@
+import { Check, Circle, Clock, FileText, XCircle } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import { ScrobbleSession, ScrobbleTrack } from '../../shared/types';
@@ -169,13 +170,13 @@ const HistoryPage: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
-        return '✅';
+        return <Check size={14} aria-hidden='true' />;
       case 'failed':
-        return '❌';
+        return <XCircle size={14} aria-hidden='true' />;
       case 'pending':
-        return '⏳';
+        return <Clock size={14} aria-hidden='true' />;
       default:
-        return '⚪';
+        return <Circle size={14} aria-hidden='true' />;
     }
   };
 
@@ -314,7 +315,7 @@ const HistoryPage: React.FC = () => {
           {!loading && sessions.length === 0 && !error && (
             <div className='card'>
               <EmptyState
-                icon='📝'
+                icon={<FileText size={48} aria-hidden='true' />}
                 title='No Scrobble Sessions Yet'
                 description='Start scrobbling tracks from your collection to see your listening history here.'
                 suggestion='Select an album from your collection and click "Scrobble" to begin.'

@@ -1,3 +1,4 @@
+import { Trophy } from 'lucide-react';
 import React from 'react';
 
 import { MilestoneInfo } from '../../../shared/types';
@@ -61,7 +62,8 @@ export const MilestoneProgress: React.FC<MilestoneProgressProps> = ({
             {milestones.history.map(({ milestone, reachedAt }) => (
               <li key={milestone} className='milestone-history-item'>
                 <span className='milestone-history-badge'>
-                  🏆 {formatNumber(milestone)}
+                  <Trophy size={14} aria-hidden='true' />{' '}
+                  {formatNumber(milestone)}
                 </span>
                 <span className='milestone-history-date'>
                   {formatDate(reachedAt)}

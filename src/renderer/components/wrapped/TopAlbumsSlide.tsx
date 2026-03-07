@@ -1,3 +1,4 @@
+import { Disc3 } from 'lucide-react';
 import React from 'react';
 
 import { WrappedTopItem } from '../../../shared/types';
@@ -28,7 +29,7 @@ const TopAlbumsSlide: React.FC<TopAlbumsSlideProps> = ({ albums }) => {
               />
             ) : (
               <div className='wrapped-rank-image wrapped-rank-placeholder'>
-                💿
+                <Disc3 size={32} aria-hidden='true' />
               </div>
             )}
             <div className='wrapped-rank-info'>

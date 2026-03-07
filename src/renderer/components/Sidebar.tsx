@@ -1,3 +1,19 @@
+import {
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
+  Dices,
+  Disc3,
+  FileText,
+  Gift,
+  Home,
+  Package,
+  Search,
+  Settings,
+  Sparkles,
+  Store,
+  TrendingUp,
+} from 'lucide-react';
 import React, { useEffect } from 'react';
 
 import { useAuth } from '../context/AuthContext';
@@ -13,7 +29,7 @@ interface SidebarProps {
 interface NavItem {
   id: string;
   label: string;
-  icon: string;
+  icon: React.ReactNode;
   enabled: boolean;
   disabledReason?: string;
 }
@@ -58,14 +74,14 @@ const Sidebar: React.FC<SidebarProps> = ({
       ? 'Connect Discogs and Last.fm first'
       : discogsReason || lastfmReason;
 
-  const navCategories: NavCategory[] = [
+  const topNavCategories: NavCategory[] = [
     {
       label: 'Dashboard',
       items: [
         {
           id: ROUTES.HOME,
           label: 'Home',
-          icon: '🏠',
+          icon: <Home size={18} aria-hidden='true' />,
           enabled: true,
         },
       ],
@@ -76,21 +92,21 @@ const Sidebar: React.FC<SidebarProps> = ({
         {
           id: ROUTES.COLLECTION,
           label: 'Browse Collection',
-          icon: '💿',
+          icon: <Disc3 size={18} aria-hidden='true' />,
           enabled: authStatus.discogs.authenticated,
           disabledReason: discogsReason,
         },
         {
           id: ROUTES.DISCARD_PILE,
           label: 'Discard Pile',
-          icon: '📦',
+          icon: <Package size={18} aria-hidden='true' />,
           enabled: authStatus.discogs.authenticated,
           disabledReason: discogsReason,
         },
         {
           id: ROUTES.COLLECTION_ANALYTICS,
           label: 'Collection Analytics',
-          icon: '📈',
+          icon: <TrendingUp size={18} aria-hidden='true' />,
           enabled: authStatus.discogs.authenticated,
           disabledReason: discogsReason,
         },
@@ -102,7 +118,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {
           id: ROUTES.WHAT_TO_PLAY,
           label: 'What to Play',
-          icon: '🎲',
+          icon: <Dices size={18} aria-hidden='true' />,
           enabled:
             authStatus.discogs.authenticated && authStatus.lastfm.authenticated,
           disabledReason: bothReason,
@@ -110,21 +126,21 @@ const Sidebar: React.FC<SidebarProps> = ({
         {
           id: ROUTES.HISTORY,
           label: 'Scrobble History',
-          icon: '📝',
+          icon: <FileText size={18} aria-hidden='true' />,
           enabled: authStatus.lastfm.authenticated,
           disabledReason: lastfmReason,
         },
         {
           id: ROUTES.STATS,
           label: 'Stats Dashboard',
-          icon: '📊',
+          icon: <BarChart3 size={18} aria-hidden='true' />,
           enabled: authStatus.lastfm.authenticated,
           disabledReason: lastfmReason,
         },
         {
           id: ROUTES.WRAPPED,
           label: 'Wrapped',
-          icon: '🎁',
+          icon: <Gift size={18} aria-hidden='true' />,
           enabled: authStatus.lastfm.authenticated,
           disabledReason: lastfmReason,
         },
@@ -136,7 +152,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {
           id: ROUTES.RECOMMENDATIONS,
           label: 'Recommendations',
-          icon: '✨',
+          icon: <Sparkles size={18} aria-hidden='true' />,
           enabled:
             authStatus.discogs.authenticated && authStatus.lastfm.authenticated,
           disabledReason: bothReason,
@@ -144,117 +160,134 @@ const Sidebar: React.FC<SidebarProps> = ({
         {
           id: ROUTES.MARKETPLACE,
           label: 'Marketplace',
-          icon: '🏪',
+          icon: <Store size={18} aria-hidden='true' />,
           enabled: authStatus.discogs.authenticated,
           disabledReason: discogsReason,
         },
         {
           id: ROUTES.DISCOVERY,
           label: 'Discovery',
-          icon: '🔍',
+          icon: <Search size={18} aria-hidden='true' />,
           enabled: authStatus.lastfm.authenticated,
           disabledReason: lastfmReason,
         },
       ],
     },
+  ];
+
+  const bottomNavCategories: NavCategory[] = [
     {
       label: 'System',
       items: [
         {
           id: ROUTES.SETTINGS,
           label: 'Settings',
-          icon: '⚙️',
+          icon: <Settings size={18} aria-hidden='true' />,
           enabled: true,
         },
       ],
     },
   ];
 
+  const renderNavCategory = (category: NavCategory) => (
+    <React.Fragment key={category.label}>
+      {!collapsed && <li className='nav-category-header'>{category.label}</li>}
+      {category.items.map(item => (
+        <li key={item.id} className='nav-item'>
+          <button
+            className={`nav-link ${currentPage === item.id ? 'active' : ''} ${!item.enabled ? 'disabled' : ''}`}
+            onClick={() => {
+              if (item.enabled) {
+                onPageChange(item.id);
+                window.location.hash = item.id;
+              }
+            }}
+            disabled={!item.enabled}
+            title={
+              !item.enabled && item.disabledReason
+                ? item.disabledReason
+                : collapsed
+                  ? item.label
+                  : undefined
+            }
+          >
+            <span className='nav-link-icon'>{item.icon}</span>
+            {!collapsed && <span className='nav-link-label'>{item.label}</span>}
+          </button>
+        </li>
+      ))}
+    </React.Fragment>
+  );
+
   return (
     <nav className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
-      <button
-        className='sidebar-toggle'
-        onClick={handleToggleCollapse}
-        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-      >
-        <span className='sidebar-toggle-icon'>{collapsed ? '→' : '←'}</span>
-      </button>
+      <div className='sidebar-nav-top'>
+        <ul className='nav-menu'>{topNavCategories.map(renderNavCategory)}</ul>
+      </div>
 
-      <ul className='nav-menu'>
-        {navCategories.map(category => (
-          <React.Fragment key={category.label}>
-            {!collapsed && (
-              <li className='nav-category-header'>{category.label}</li>
+      <div className='sidebar-nav-bottom'>
+        <ul className='nav-menu'>
+          {bottomNavCategories.map(renderNavCategory)}
+        </ul>
+
+        <div className='sidebar-status'>
+          {!collapsed && <div className='sidebar-status-label'>Status:</div>}
+          <div
+            className={`sidebar-status-item ${authStatus.discogs.authenticated ? 'sidebar-status-connected' : 'sidebar-status-disconnected'}`}
+            title={
+              collapsed
+                ? `Discogs: ${authStatus.discogs.authenticated ? 'Connected' : 'Not connected'}`
+                : undefined
+            }
+          >
+            {collapsed ? (
+              <span className='sidebar-status-dot' />
+            ) : (
+              <>
+                <span className='sidebar-status-dot' />
+                Discogs:{' '}
+                {authStatus.discogs.authenticated
+                  ? 'Connected'
+                  : 'Not connected'}
+              </>
             )}
-            {category.items.map(item => (
-              <li key={item.id} className='nav-item'>
-                <button
-                  className={`nav-link ${currentPage === item.id ? 'active' : ''} ${!item.enabled ? 'disabled' : ''}`}
-                  onClick={() => {
-                    if (item.enabled) {
-                      onPageChange(item.id);
-                      window.location.hash = item.id;
-                    }
-                  }}
-                  disabled={!item.enabled}
-                  title={
-                    !item.enabled && item.disabledReason
-                      ? item.disabledReason
-                      : collapsed
-                        ? item.label
-                        : undefined
-                  }
-                >
-                  <span className='nav-link-icon'>{item.icon}</span>
-                  {!collapsed && (
-                    <span className='nav-link-label'>{item.label}</span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </React.Fragment>
-        ))}
-      </ul>
+          </div>
+          <div
+            className={`sidebar-status-item ${authStatus.lastfm.authenticated ? 'sidebar-status-connected' : 'sidebar-status-disconnected'}`}
+            title={
+              collapsed
+                ? `Last.fm: ${authStatus.lastfm.authenticated ? 'Connected' : 'Not connected'}`
+                : undefined
+            }
+          >
+            {collapsed ? (
+              <span className='sidebar-status-dot' />
+            ) : (
+              <>
+                <span className='sidebar-status-dot' />
+                Last.fm:{' '}
+                {authStatus.lastfm.authenticated
+                  ? 'Connected'
+                  : 'Not connected'}
+              </>
+            )}
+          </div>
+        </div>
 
-      <div className='sidebar-status'>
-        {!collapsed && <div className='sidebar-status-label'>Status:</div>}
-        <div
-          className={`sidebar-status-item ${authStatus.discogs.authenticated ? 'sidebar-status-connected' : 'sidebar-status-disconnected'}`}
-          title={
-            collapsed
-              ? `Discogs: ${authStatus.discogs.authenticated ? 'Connected' : 'Not connected'}`
-              : undefined
-          }
+        <button
+          className='sidebar-toggle'
+          onClick={handleToggleCollapse}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {collapsed ? (
-            <span className='sidebar-status-dot' />
-          ) : (
-            <>
-              <span className='sidebar-status-dot' />
-              Discogs:{' '}
-              {authStatus.discogs.authenticated ? 'Connected' : 'Not connected'}
-            </>
-          )}
-        </div>
-        <div
-          className={`sidebar-status-item ${authStatus.lastfm.authenticated ? 'sidebar-status-connected' : 'sidebar-status-disconnected'}`}
-          title={
-            collapsed
-              ? `Last.fm: ${authStatus.lastfm.authenticated ? 'Connected' : 'Not connected'}`
-              : undefined
-          }
-        >
-          {collapsed ? (
-            <span className='sidebar-status-dot' />
-          ) : (
-            <>
-              <span className='sidebar-status-dot' />
-              Last.fm:{' '}
-              {authStatus.lastfm.authenticated ? 'Connected' : 'Not connected'}
-            </>
-          )}
-        </div>
+          <span className='sidebar-toggle-icon'>
+            {collapsed ? (
+              <ChevronRight size={18} aria-hidden='true' />
+            ) : (
+              <ChevronLeft size={18} aria-hidden='true' />
+            )}
+          </span>
+        </button>
       </div>
     </nav>
   );

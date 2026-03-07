@@ -1,3 +1,4 @@
+import { Bot, Disc3, Music } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 
 import { SyncStatus, SyncSettings } from '../../../shared/types';
@@ -288,7 +289,9 @@ const SettingsIntegrationsSection: React.FC<
       {/* Last.fm Sync Section */}
       <div className='settings-section-card'>
         <div className='settings-section-header'>
-          <span className='settings-section-icon'>🎵</span>
+          <span className='settings-section-icon'>
+            <Music size={18} aria-hidden='true' />
+          </span>
           <div>
             <h3>Last.fm Sync</h3>
             <p className='settings-section-description'>
@@ -439,7 +442,9 @@ const SettingsIntegrationsSection: React.FC<
       {/* Discogs Collection Cache Section */}
       <div className='settings-section-card'>
         <div className='settings-section-header'>
-          <span className='settings-section-icon'>💿</span>
+          <span className='settings-section-icon'>
+            <Disc3 size={18} aria-hidden='true' />
+          </span>
           <div>
             <h3>Discogs Collection Cache</h3>
             <p className='settings-section-description'>
@@ -470,7 +475,9 @@ const SettingsIntegrationsSection: React.FC<
       {/* AI Recommendations Section */}
       <div className='settings-section-card'>
         <div className='settings-section-header'>
-          <span className='settings-section-icon'>🤖</span>
+          <span className='settings-section-icon'>
+            <Bot size={18} aria-hidden='true' />
+          </span>
           <div>
             <h3>AI Recommendations (Ollama)</h3>
             <p className='settings-section-description'>

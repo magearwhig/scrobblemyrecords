@@ -1,3 +1,4 @@
+import { Lightbulb } from 'lucide-react';
 import React from 'react';
 
 import { Button } from './Button';
@@ -11,9 +12,9 @@ export interface EmptyStateAction {
 
 export interface EmptyStateProps {
   /**
-   * Large icon or emoji to display.
+   * Large icon or React node to display.
    */
-  icon?: string;
+  icon?: React.ReactNode;
   /**
    * Main title for the empty state.
    */
@@ -55,7 +56,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       {description && <p className='empty-state-description'>{description}</p>}
       {suggestion && (
         <p className='empty-state-suggestion'>
-          <span className='empty-state-suggestion-icon'>💡</span>
+          <span className='empty-state-suggestion-icon'>
+            <Lightbulb size={14} aria-hidden='true' />
+          </span>
           {suggestion}
         </p>
       )}

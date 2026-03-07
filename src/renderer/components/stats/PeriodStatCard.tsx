@@ -9,7 +9,7 @@ type CoveragePeriod =
   | 'days365';
 
 interface PeriodStatCardProps {
-  icon: string;
+  icon: React.ReactNode;
   values: {
     month: { value: string | number; subValue: string };
     year: { value: string | number; subValue: string };

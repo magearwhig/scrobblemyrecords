@@ -1,3 +1,4 @@
+import { Bot, Music, RefreshCw } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { AISuggestion } from '../../shared/types';
@@ -75,7 +76,9 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
     return (
       <div className='ai-suggestion-card ai-suggestion-empty'>
         <div className='ai-suggestion-empty-content'>
-          <span className='ai-suggestion-empty-icon'>🤖</span>
+          <span className='ai-suggestion-empty-icon'>
+            <Bot size={32} aria-hidden='true' />
+          </span>
           <p>No AI suggestion available</p>
           {onRefresh && (
             <Button size='small' onClick={onRefresh}>
@@ -90,7 +93,9 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
   return (
     <div className='ai-suggestion-card'>
       <div className='ai-suggestion-badge'>
-        <span className='ai-badge-icon'>🤖</span>
+        <span className='ai-badge-icon'>
+          <Bot size={14} aria-hidden='true' />
+        </span>
         <span className='ai-badge-text'>AI Pick</span>
         {mood && <span className='ai-badge-mood'>{mood}</span>}
       </div>
@@ -105,7 +110,7 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
         }}
         title='View album details'
       >
-        {!release.cover_image && '🎵'}
+        {!release.cover_image && <Music size={32} aria-hidden='true' />}
       </div>
 
       <div className='ai-suggestion-content'>
@@ -159,7 +164,7 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
               title='Get another AI suggestion'
               aria-label='Get another AI suggestion'
             >
-              🔄
+              <RefreshCw size={14} aria-hidden='true' />
             </Button>
           )}
         </div>

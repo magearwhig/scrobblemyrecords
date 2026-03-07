@@ -1,13 +1,12 @@
+import { Sun, Moon } from 'lucide-react';
 import React from 'react';
 
-import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../hooks/useNotifications';
 
 import { NotificationBell } from './NotificationBell';
 
 const Header: React.FC = () => {
-  const { authStatus } = useAuth();
   const { isDarkMode, toggleDarkMode } = useTheme();
   const {
     notifications,
@@ -17,31 +16,14 @@ const Header: React.FC = () => {
     removeNotification,
     clearAll,
   } = useNotifications();
-  const appVersion = '1.0.0'; // Static version for web app
-
-  const getConnectionStatus = () => {
-    const discogsConnected = authStatus.discogs.authenticated;
-    const lastfmConnected = authStatus.lastfm.authenticated;
-
-    if (discogsConnected && lastfmConnected) {
-      return { status: 'connected', text: 'All services connected' };
-    } else if (discogsConnected || lastfmConnected) {
-      return { status: 'partial', text: 'Partially connected' };
-    } else {
-      return { status: 'disconnected', text: 'Not connected' };
-    }
-  };
-
-  const connectionStatus = getConnectionStatus();
 
   return (
     <header className='header'>
-      <div>
-        <h1>Discogs to Last.fm Scrobbler</h1>
-        {appVersion && <small className='header-version'>v{appVersion}</small>}
+      <div className='header-brand'>
+        <h1 className='header-title'>Listenography</h1>
       </div>
 
-      <div className='header-actions'>
+      <div className='header-controls'>
         <NotificationBell
           notifications={notifications}
           unreadCount={unreadCount}
@@ -52,36 +34,15 @@ const Header: React.FC = () => {
         />
 
         <button
-          onClick={() => {
-            toggleDarkMode();
-          }}
+          onClick={toggleDarkMode}
           className='header-theme-toggle'
           title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           aria-label={
             isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'
           }
         >
-          {isDarkMode ? '☀️' : '🌙'}
+          {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
         </button>
-
-        <div
-          className={`status ${connectionStatus.status === 'connected' ? 'connected' : 'disconnected'}`}
-        >
-          <span className='status-dot'></span>
-          {connectionStatus.text}
-        </div>
-
-        {authStatus.discogs.username && (
-          <div className='header-username'>
-            <strong>Discogs:</strong> {authStatus.discogs.username}
-          </div>
-        )}
-
-        {authStatus.lastfm.username && (
-          <div className='header-username'>
-            <strong>Last.fm:</strong> {authStatus.lastfm.username}
-          </div>
-        )}
       </div>
     </header>
   );

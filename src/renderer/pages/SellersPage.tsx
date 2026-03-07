@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 
 import { MonitoredSeller, SellerScanStatus } from '../../shared/types';
@@ -483,8 +484,9 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
           )}
           {cacheStats.totalMasters === 0 && (
             <div className='sellers-cache-empty-warning'>
-              ⚠️ Cache is empty. Build the cache first for fast matching (no API
-              calls during scan).
+              <AlertTriangle size={14} aria-hidden='true' /> Cache is empty.
+              Build the cache first for fast matching (no API calls during
+              scan).
             </div>
           )}
         </div>

@@ -1,3 +1,4 @@
+import { Clock } from 'lucide-react';
 import React from 'react';
 
 import { ListeningHours } from '../../../shared/types';
@@ -21,7 +22,9 @@ export const ListeningHoursCard: React.FC<ListeningHoursCardProps> = ({
 
   return (
     <div className='stat-card'>
-      <div className='stat-card-icon'>⏱️</div>
+      <div className='stat-card-icon'>
+        <Clock size={20} aria-hidden='true' />
+      </div>
       <div className='stat-card-content'>
         <div className='stat-card-value'>{formatHours(hours.thisMonth)}</div>
         <div className='stat-card-label'>Listening This Month</div>

@@ -1,3 +1,4 @@
+import { Check, Music, Package } from 'lucide-react';
 import React from 'react';
 
 import { CollectionItem, DiscogsRelease } from '../../shared/types';
@@ -70,10 +71,12 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
         title='Click to view details'
         aria-label={`View details for ${release.title}`}
       >
-        {!getImageUrl(release.cover_image) && '🎵'}
+        {!getImageUrl(release.cover_image) && (
+          <Music size={32} aria-hidden='true' />
+        )}
         {isInDiscardPile && (
           <span className='discard-pile-badge' title='In Discard Pile'>
-            📦
+            <Package size={14} aria-hidden='true' />
           </span>
         )}
         {playCount != null && playCount > 0 && (
@@ -119,7 +122,13 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
             onSelect();
           }}
         >
-          {selected ? '✓ Selected' : 'Select'}
+          {selected ? (
+            <>
+              <Check size={14} aria-hidden='true' /> Selected
+            </>
+          ) : (
+            'Select'
+          )}
         </Button>
 
         <Button
@@ -144,7 +153,7 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
             }}
             title='Add to discard pile'
           >
-            📦 Discard
+            <Package size={14} aria-hidden='true' /> Discard
           </Button>
         )}
 

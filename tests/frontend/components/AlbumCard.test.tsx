@@ -93,15 +93,18 @@ describe('AlbumCard', () => {
       release: { ...mockRelease, cover_image: undefined },
     };
 
-    render(<AlbumCard {...defaultProps} item={itemWithoutCover} />);
-
-    expect(screen.getByText('🎵')).toBeInTheDocument();
+    // Music icon is now a Lucide SVG
+    const { container } = render(
+      <AlbumCard {...defaultProps} item={itemWithoutCover} />
+    );
+    expect(container.querySelector('.album-cover svg')).toBeInTheDocument();
   });
 
   it('shows selected state correctly', () => {
     render(<AlbumCard {...defaultProps} selected={true} />);
 
-    expect(screen.getByText('✓ Selected')).toBeInTheDocument();
+    // Button text is now "Selected" with a Lucide Check icon
+    expect(screen.getByText('Selected')).toBeInTheDocument();
 
     const card = screen.getByText('Test Album').closest('.album-card');
     expect(card).toHaveClass('selected');

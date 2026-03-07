@@ -13,9 +13,11 @@ describe('ListeningHoursCard', () => {
   };
 
   it('should render listening hours icon', () => {
-    render(<ListeningHoursCard hours={mockHours} />);
+    const { container } = render(<ListeningHoursCard hours={mockHours} />);
 
-    expect(screen.getByText('⏱️')).toBeInTheDocument();
+    // Icon is now a Lucide SVG, verify the icon container exists
+    expect(container.querySelector('.stat-card-icon')).toBeInTheDocument();
+    expect(container.querySelector('svg')).toBeInTheDocument();
   });
 
   it('should display this month hours as main value', () => {
