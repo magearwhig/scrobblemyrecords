@@ -18,4 +18,5 @@ Active plans and feature specs. Completed plans are in `done/`.
 | done/wishlist-new-release-tracking-plan.md | Complete -- Feature 5.5 |
 | done/artist-track-deep-dives-plan.md | Complete -- Feature 15, all 4 phases implemented |
 | done/traded-in-archive-plan.md | Complete -- Feature 7 extension, all 3 phases implemented |
+| missing-albums-page-plan.md | Backlog -- not started |
 | backlog_ideas.md | Reference -- consolidation proposals implemented |
