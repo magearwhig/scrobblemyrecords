@@ -228,15 +228,12 @@ const Sidebar: React.FC<SidebarProps> = ({
           }
         >
           {collapsed ? (
-            <span className='sidebar-status-icon'>
-              {authStatus.discogs.authenticated ? '✓' : '✗'}
-            </span>
+            <span className='sidebar-status-dot' />
           ) : (
             <>
+              <span className='sidebar-status-dot' />
               Discogs:{' '}
-              {authStatus.discogs.authenticated
-                ? '✓ Connected'
-                : '✗ Not connected'}
+              {authStatus.discogs.authenticated ? 'Connected' : 'Not connected'}
             </>
           )}
         </div>
@@ -249,15 +246,12 @@ const Sidebar: React.FC<SidebarProps> = ({
           }
         >
           {collapsed ? (
-            <span className='sidebar-status-icon'>
-              {authStatus.lastfm.authenticated ? '✓' : '✗'}
-            </span>
+            <span className='sidebar-status-dot' />
           ) : (
             <>
+              <span className='sidebar-status-dot' />
               Last.fm:{' '}
-              {authStatus.lastfm.authenticated
-                ? '✓ Connected'
-                : '✗ Not connected'}
+              {authStatus.lastfm.authenticated ? 'Connected' : 'Not connected'}
             </>
           )}
         </div>

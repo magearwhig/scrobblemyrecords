@@ -348,8 +348,8 @@ describe('Sidebar', () => {
 
       renderSidebarWithAuth(authStatus);
 
-      expect(screen.getByText('Discogs: ✓ Connected')).toBeInTheDocument();
-      expect(screen.getByText('Last.fm: ✓ Connected')).toBeInTheDocument();
+      expect(screen.getByText(/Discogs:.*Connected/)).toBeInTheDocument();
+      expect(screen.getByText(/Last\.fm:.*Connected/)).toBeInTheDocument();
     });
 
     it('shows not connected status for unauthenticated services', () => {
@@ -360,8 +360,8 @@ describe('Sidebar', () => {
 
       renderSidebarWithAuth(authStatus);
 
-      expect(screen.getByText('Discogs: ✗ Not connected')).toBeInTheDocument();
-      expect(screen.getByText('Last.fm: ✗ Not connected')).toBeInTheDocument();
+      expect(screen.getByText(/Discogs:.*Not connected/)).toBeInTheDocument();
+      expect(screen.getByText(/Last\.fm:.*Not connected/)).toBeInTheDocument();
     });
 
     it('applies correct CSS classes to status items', () => {
@@ -372,8 +372,8 @@ describe('Sidebar', () => {
 
       renderSidebarWithAuth(authStatus);
 
-      const discogsStatus = screen.getByText('Discogs: ✓ Connected');
-      const lastfmStatus = screen.getByText('Last.fm: ✗ Not connected');
+      const discogsStatus = screen.getByText(/Discogs:.*Connected/);
+      const lastfmStatus = screen.getByText(/Last\.fm:.*Not connected/);
 
       expect(discogsStatus).toHaveClass('sidebar-status-connected');
       expect(lastfmStatus).toHaveClass('sidebar-status-disconnected');

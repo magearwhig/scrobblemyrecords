@@ -2,6 +2,7 @@
 .skeleton {
   background-color: var(--bg-secondary);
   display: block;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
 }
 
 /* Variants */

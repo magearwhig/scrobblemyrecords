@@ -561,4 +561,34 @@ All specialist agents agreed on the following:
 
 ---
 
+## Implementation Phases
+
+### Phase 1: Design Token System + CSS Quick Wins (COMPLETED)
+
+Foundation work that all subsequent phases depend on:
+- Semantic CSS variable system (`--surface-*`, `--accent-*`, `--text-*`, `--status-*`, `--border-*`, `--shadow-*`, `--space-*`, `--text-xs`–`--text-3xl`, `--radius-*`)
+- Accent color migrated from Spotify green (#1db954) to warm amber (#D4A24E light / #E0B366 dark)
+- Legacy aliases for zero-breakage backward compatibility (~900+ existing var references)
+- 13 CSS quick wins: nav padding, active state refinement, category headers, card hover, album card min-height, global focus ring, modal backdrop blur, skeleton animation, button transitions, page title standardization, content area background, status dots replacing emoji
+- Primary button text changed to dark (#1a1a1a) for WCAG AA contrast on amber
+- Sidebar width updated (250→240px, 64→56px collapsed)
+
+### Phase 2: Visual Polish (parallel team of 3-4 agents)
+
+Depends on Phase 1 tokens being in place.
+
+- **Icon migration**: Install `lucide-react`, create icon mapping, replace all emoji across ~20 components (Sidebar nav, AlbumCard, Header, NotificationBell, page-specific emojis). Independent — touches components, minimal CSS.
+- **Header redesign**: Compact from 56px→44px, dark surface bg instead of accent-colored, short brand name, move connection status to sidebar. Independent component restructure.
+- **Sidebar redesign**: Component restructure for the new layout (collapse toggle to bottom, Settings pushed down with spacer). Independent component restructure.
+- **Hardcoded color cleanup**: Migrate 8 hardcoded `rgba(29,185,84,...)` in styles.css, hardcoded `#1db954` in chart TSX files (PlayTrendChart, SourcePieChart, ListeningTimeline, etc.), Wrapped page green gradients. Can be done by one agent touching only color values.
+
+### Phase 3: Sequential Cleanup
+
+- **Card/typography consistency audit**: Migrate all 26 font-size values to `--text-*` tokens, standardize card padding/radii to token values
+- **Page transitions**: Add CSS fade-in (120ms) on route change, standardize skeleton loading across all pages
+- **Form/input polish**: Consistent focus rings (already global from Phase 1), input padding, disabled states, custom select styling
+- **CSS modularization**: Begin splitting styles.css into co-located CSS modules, starting with isolated pages
+
+---
+
 *Report compiled by the Synthesis Lead from audits by: Visual Design Critic, UX Flow Analyst, Brand & Identity Strategist, Motion & Interaction Designer, and Accessibility & Polish Reviewer.*
