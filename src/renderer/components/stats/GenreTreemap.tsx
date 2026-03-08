@@ -4,6 +4,7 @@ import { Treemap, ResponsiveContainer, Tooltip } from 'recharts';
 import { GenreData } from '../../../shared/types';
 import { EmptyState } from '../ui/EmptyState';
 import { Skeleton } from '../ui/Skeleton';
+import './GenreTreemap.css';
 
 interface GenreTreemapProps {
   /** Genre entries with normalized weights (0-1) and artist counts, sorted by weight descending */

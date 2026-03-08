@@ -3,6 +3,7 @@ import React from 'react';
 
 import { MilestoneInfo } from '../../../shared/types';
 import { ProgressBar } from '../ui/ProgressBar';
+import './MilestoneProgress.css';
 
 interface MilestoneProgressProps {
   milestones: MilestoneInfo;

@@ -49,12 +49,23 @@ Before adding any new page or navigation item:
 
 ## Styling
 
-- **NEVER use inline `style={}` attributes** -- extract to CSS classes
-- Only exception: truly dynamic values computed at runtime (e.g., `width: ${percent}%`)
-- Use existing global CSS classes (`.form-input`, `.card`, etc.) before creating new ones
-- **Shared/global styles** live in `src/renderer/styles.css`
-- **Page-specific styles** live in co-located CSS module files (e.g., `HomePage.module.css` next to `HomePage.tsx`)
-- Import module CSS in the page component: `import './PageName.module.css'` (no CSS Modules object needed -- classes are global within the file)
+This project uses a 3-tier CSS architecture:
+
+1. **Global** (`src/renderer/styles.css`) -- design tokens (`:root` / `.dark-mode`), utilities (`.sr-only`, `.card`), and styles for widely-shared components
+2. **Page** (`PageName.page.css`) -- styles ONLY for that page's own markup. Never put shared component styles here. Import as `import './PageName.page.css'`
+3. **Component** (`ComponentName.css`) -- styles for a reusable component, co-located and imported by the component itself: `import './ComponentName.css'`
+
+### Decision Flowchart
+
+- Is it a design token or utility? --> `styles.css`
+- Is it only used by one page's own JSX (not an imported component)? --> `PageName.page.css`
+- Is it for a shared/reusable component? --> `ComponentName.css` next to the `.tsx`
+
+### Rules
+
+- **NEVER use `.module.css`** -- `css-loader@7.x` auto-hashes class names; use `.page.css` for pages and plain `.css` for components
+- **NEVER use inline `style={}` attributes** -- extract to CSS classes (exception: truly dynamic values like `width: ${percent}%`)
+- **USE design tokens** -- never hardcode `font-size`, `border-radius`, or color values
 - Check `src/renderer/styles.css` for existing patterns before writing new CSS
 
 ## Icons

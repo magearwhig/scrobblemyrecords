@@ -1,5 +1,7 @@
 import React from 'react';
 
+import './PeriodStatCard.css';
+
 type CoveragePeriod =
   | 'month'
   | 'year'

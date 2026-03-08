@@ -41,12 +41,12 @@
 /* Primary variant */
 .button--primary {
   background: var(--accent-color);
-  color: #1a1a1a;
+  color: var(--text-inverse);
   border-color: var(--accent-color);
 }
 
 .button--primary.text-muted-sm {
-  color: #1a1a1a;
+  color: var(--text-inverse);
 }
 
 .button--primary:hover:not(:disabled) {
@@ -57,7 +57,7 @@
 /* Secondary variant */
 .button--secondary {
   background: var(--text-secondary);
-  color: white;
+  color: var(--text-inverse);
   border-color: var(--text-secondary);
 }
 
@@ -69,25 +69,23 @@
 /* Danger variant */
 .button--danger {
   background: var(--error-color);
-  color: white;
+  color: var(--text-inverse);
   border-color: var(--error-color);
 }
 
 .button--danger:hover:not(:disabled) {
-  background: #c82333;
-  border-color: #c82333;
+  filter: brightness(0.85);
 }
 
 /* Success variant */
 .button--success {
   background: var(--success-color);
-  color: white;
+  color: var(--text-inverse);
   border-color: var(--success-color);
 }
 
 .button--success:hover:not(:disabled) {
-  background: #218838;
-  border-color: #218838;
+  filter: brightness(0.85);
 }
 
 /* Outline variant */
@@ -111,7 +109,7 @@
 
 .button--warning:hover:not(:disabled) {
   background: var(--accent-warning, #f59e0b);
-  color: white;
+  color: var(--text-inverse);
 }
 
 /* Ghost variant (no border) */
@@ -159,14 +157,14 @@
 }
 
 .button--primary .button-spinner {
-  border-color: #1a1a1a;
+  border-color: var(--text-inverse);
   border-right-color: transparent;
 }
 
 .button--secondary .button-spinner,
 .button--danger .button-spinner,
 .button--success .button-spinner {
-  border-color: white;
+  border-color: var(--text-inverse);
   border-right-color: transparent;
 }
 

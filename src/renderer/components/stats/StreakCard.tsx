@@ -2,6 +2,7 @@ import { Flame } from 'lucide-react';
 import React from 'react';
 
 import { StreakInfo } from '../../../shared/types';
+import './StreakCard.css';
 
 interface StreakCardProps {
   streaks: StreakInfo;

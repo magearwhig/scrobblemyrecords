@@ -4,6 +4,7 @@ import { DustyCornerAlbum } from '../../../shared/types';
 import { Button, IconButton } from '../../components/ui/Button';
 import { navigate } from '../../routes';
 import { playAlbumOnSpotify } from '../../utils/spotifyUtils';
+import './DustyCornersSection.css';
 
 interface DustyCornersSectionProps {
   albums: DustyCornerAlbum[];

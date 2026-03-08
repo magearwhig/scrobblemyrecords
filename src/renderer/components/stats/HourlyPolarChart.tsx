@@ -12,6 +12,7 @@ import {
 import { HourlyDistributionData } from '../../../shared/types';
 import { EmptyState } from '../ui/EmptyState';
 import { Skeleton } from '../ui/Skeleton';
+import './ListeningPatterns.css';
 
 interface HourlyPolarChartProps {
   /** Array of 24 data points (one per hour, 0-23) with scrobble counts */

@@ -1,0 +1,129 @@
+/* Heatmap Day Detail panel */
+@keyframes heatmap-detail-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.heatmap-day-detail {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  margin-top: 1rem;
+  animation: heatmap-detail-slide-down 0.2s ease-out;
+}
+
+.heatmap-day-detail:focus {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.heatmap-day-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.heatmap-day-detail-date {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.heatmap-day-detail-count {
+  margin: 0.25rem 0 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.heatmap-day-detail-close {
+  background: none;
+  border: none;
+  font-size: var(--text-2xl);
+  line-height: 1;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0 0.25rem;
+  border-radius: var(--radius-sm);
+}
+
+.heatmap-day-detail-close:hover {
+  color: var(--text-primary);
+}
+
+.heatmap-day-detail-close:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.heatmap-day-detail-empty {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.heatmap-day-detail-albums {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.heatmap-day-detail-album {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.heatmap-day-detail-cover {
+  width: 50px;
+  height: 50px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.heatmap-day-detail-cover-placeholder {
+  background: var(--bg-secondary);
+}
+
+.heatmap-day-detail-album-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.heatmap-day-detail-album-title {
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.heatmap-day-detail-album-artist {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.heatmap-day-detail-album-plays {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}

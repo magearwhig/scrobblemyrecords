@@ -8,7 +8,7 @@
 
 ### Guidelines
 - **AVOID inline styles** - They make components harder to maintain, test, and reuse
-- **USE co-located CSS module files** for page-specific styles (e.g., `HomePage.module.css` next to `HomePage.tsx`)
+- **USE co-located page CSS files** for page-specific styles (e.g., `HomePage.page.css` next to `HomePage.tsx`)
 - **USE global CSS classes** in `styles.css` for shared styles (buttons, cards, layout)
 - **ENSURE text readability** - Always specify both color and background-color
 - **TEST in different themes** - Avoid assumptions about default colors

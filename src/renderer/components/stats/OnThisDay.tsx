@@ -3,6 +3,7 @@ import React from 'react';
 import { OnThisDayResult } from '../../../shared/types';
 import { EmptyState } from '../ui/EmptyState';
 import { Skeleton } from '../ui/Skeleton';
+import './OnThisDay.css';
 
 interface OnThisDayProps {
   /** On This Day data with year-by-year listening history */

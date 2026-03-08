@@ -1,0 +1,28 @@
+/* Genre Treemap */
+.genre-treemap-container {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+}
+
+.genre-treemap-header {
+  margin-bottom: 1rem;
+}
+
+.genre-treemap-header h3 {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.genre-treemap-description {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0.25rem 0 0 0;
+}
+
+.genre-treemap-chart {
+  margin-top: 0.5rem;
+}

@@ -1,0 +1,70 @@
+/* Listening Patterns Section */
+.listening-patterns-section {
+  margin-bottom: 1.5rem;
+}
+
+.listening-patterns-section h2 {
+  margin: 0 0 1rem 0;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.listening-patterns-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .listening-patterns-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.polar-chart-container,
+.day-of-week-chart-container {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+}
+
+.polar-chart-container h3,
+.day-of-week-chart-container h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.polar-chart-wrapper,
+.day-of-week-chart-wrapper {
+  margin-bottom: 0.5rem;
+}
+
+.listening-insight-text {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0.5rem 0 0 0;
+  line-height: 1.4;
+}
+
+.listening-insight-text strong {
+  color: var(--text-primary);
+}
+
+.listening-insight-skeleton {
+  margin-top: 0.75rem;
+}
+
+/* Day of week bar colors */
+.day-of-week-bar {
+  fill: var(--accent-color);
+}
+
+.day-of-week-bar-peak {
+  fill: var(--accent-color);
+  stroke: var(--text-primary);
+  stroke-width: 1;
+}

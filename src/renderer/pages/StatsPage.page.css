@@ -118,3 +118,15 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Music DNA section layout */
+.music-dna-section {
+  margin-top: 1.5rem;
+}
+
+.music-dna-section h2 {
+  margin: 0 0 1rem 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-primary);
+}

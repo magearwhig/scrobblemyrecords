@@ -12,6 +12,7 @@ import {
 import { DayOfWeekDistributionData } from '../../../shared/types';
 import { EmptyState } from '../ui/EmptyState';
 import { Skeleton } from '../ui/Skeleton';
+import './ListeningPatterns.css';
 
 interface DayOfWeekChartProps {
   /** Array of 7 data points (0=Sunday through 6=Saturday) with scrobble counts and day names */

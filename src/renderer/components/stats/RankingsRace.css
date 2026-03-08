@@ -1,5 +1,5 @@
 .rankings-race {
-  background: var(--card-bg, #ffffff);
+  background: var(--card-bg);
   border-radius: var(--radius-md);
   padding: 1.5rem;
   box-shadow: 0 2px 0.5rem rgba(0, 0, 0, 0.1);
@@ -11,7 +11,7 @@
   align-items: center;
   justify-content: center;
   min-height: 25rem;
-  color: var(--text-secondary, #666666);
+  color: var(--text-secondary);
   text-align: center;
   font-size: var(--text-md);
 }
@@ -23,12 +23,12 @@
   gap: 1rem;
   margin-bottom: 2rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .rankings-race-play-button {
   background: var(--accent-primary);
-  color: #ffffff;
+  color: var(--text-inverse);
   border: none;
   border-radius: 50%;
   width: 3rem;
@@ -54,7 +54,7 @@
   flex: 1;
   height: 0.5rem;
   border-radius: var(--radius-sm);
-  background: var(--slider-bg, #e0e0e0);
+  background: var(--border-default);
   outline: none;
   -webkit-appearance: none;
   appearance: none;
@@ -92,7 +92,7 @@
 .rankings-race-period {
   font-size: var(--text-lg);
   font-weight: 600;
-  color: var(--text-primary, #000000);
+  color: var(--text-primary);
   min-width: 9.375rem;
   text-align: center;
   flex-shrink: 0;
@@ -101,7 +101,7 @@
 .rankings-race-speed {
   padding: 0.5rem 0.75rem;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-color, #e0e0e0);
+  border: 1px solid var(--border-color);
   background: var(--bg-secondary);
   color: var(--text-primary);
   font-size: var(--text-base);
@@ -151,7 +151,7 @@
 .rankings-race-rank {
   font-size: var(--text-2xl);
   font-weight: 700;
-  color: var(--text-secondary, #666666);
+  color: var(--text-secondary);
   width: 2.5rem;
   text-align: right;
   flex-shrink: 0;
@@ -160,7 +160,7 @@
 .rankings-race-label {
   font-size: var(--text-base);
   font-weight: 500;
-  color: var(--text-primary, #000000);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -193,7 +193,7 @@
 .rankings-race-count {
   font-size: var(--text-base);
   font-weight: 600;
-  color: var(--text-primary, #000000);
+  color: var(--text-primary);
   margin-left: 0.5rem;
   min-width: 3.75rem;
   flex-shrink: 0;
@@ -203,7 +203,7 @@
 .rankings-race-progress {
   text-align: center;
   font-size: var(--text-base);
-  color: var(--text-secondary, #666666);
+  color: var(--text-secondary);
   margin-top: 1rem;
 }
 

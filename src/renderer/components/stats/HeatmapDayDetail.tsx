@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 
 import { DateAlbumsResult } from '../../../shared/types';
+import './HeatmapDayDetail.css';
 
 interface HeatmapDayDetailProps {
   /** Selected date in YYYY-MM-DD format, displayed as a formatted heading */

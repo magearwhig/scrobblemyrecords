@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 
 import { CalendarHeatmapData } from '../../../shared/types';
+import './CalendarHeatmap.css';
 
 interface CalendarHeatmapProps {
   /** Array of { date, count } entries for days with scrobble activity */

@@ -12,6 +12,7 @@ import {
 import { TimelineDataPoint, DateRange } from '../../../shared/types';
 
 import DateRangePicker from './DateRangePicker';
+import './ListeningTimeline.css';
 
 type Period =
   | 'week'

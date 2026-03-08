@@ -55,37 +55,37 @@
 /* Primary variant */
 .badge--primary {
   background: var(--accent-color);
-  color: white;
+  color: var(--text-inverse);
 }
 
 /* Secondary variant */
 .badge--secondary {
   background: var(--text-secondary);
-  color: white;
+  color: var(--text-inverse);
 }
 
 /* Success variant */
 .badge--success {
   background: var(--success-color);
-  color: white;
+  color: var(--text-inverse);
 }
 
 /* Warning variant */
 .badge--warning {
   background: var(--warning-color);
-  color: #1a1a1a;
+  color: #1a1a1a; /* Keep dark text on yellow for contrast */
 }
 
 /* Danger variant */
 .badge--danger {
   background: var(--error-color);
-  color: white;
+  color: var(--text-inverse);
 }
 
 /* Info variant */
 .badge--info {
-  background: #3b82f6;
-  color: white;
+  background: var(--status-algo);
+  color: var(--text-inverse);
 }
 
 /* Outline variants */
@@ -120,7 +120,7 @@
 }
 
 .badge--outline.badge--info {
-  color: #3b82f6;
+  color: var(--status-algo);
 }
 
 /* Badge icon */
@@ -159,5 +159,5 @@
 }
 
 .dark-mode .badge--warning {
-  color: #1a1a1a;
+  color: #1a1a1a; /* Keep dark text on yellow for contrast */
 }

@@ -19,6 +19,7 @@ import TrackLink from '../TrackLink';
 import { IconButton } from '../ui/Button';
 
 import DateRangePicker from './DateRangePicker';
+import './TopList.css';
 
 type Period =
   | 'week'

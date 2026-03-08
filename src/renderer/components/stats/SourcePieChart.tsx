@@ -2,6 +2,7 @@ import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 import { SourceBreakdownItem } from '../../../shared/types';
+import './SourcePieChart.css';
 
 interface SourcePieChartProps {
   data: SourceBreakdownItem[];
