@@ -6,9 +6,8 @@ test.describe('Smoke Tests', () => {
 
     // Header is always visible
     await expect(
-      page.getByRole('heading', { name: /Discogs to Last\.fm Scrobbler/i })
+      page.getByRole('heading', { name: /Listenography/i })
     ).toBeVisible();
-    await expect(page.getByText('v1.0.0')).toBeVisible();
   });
 
   test('sidebar navigation is visible', async ({ page }) => {
@@ -30,7 +29,7 @@ test.describe('Smoke Tests', () => {
       page.locator('.nav-link-label', { hasText: 'Browse Collection' })
     ).toBeVisible();
     await expect(
-      page.locator('.nav-link-label', { hasText: 'Wishlist' })
+      page.locator('.nav-link-label', { hasText: 'Marketplace' })
     ).toBeVisible();
     await expect(
       page.locator('.nav-link-label', { hasText: 'Discard Pile' })

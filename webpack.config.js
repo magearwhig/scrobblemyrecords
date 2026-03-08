@@ -80,6 +80,10 @@ const webConfig = {
       'process.env.REACT_APP_BACKEND_PORT': JSON.stringify(BACKEND_PORT),
     }),
   ],
+  performance: {
+    // Local-first app — default 244 KiB thresholds are for public websites
+    hints: false,
+  },
   devServer: {
     port: FRONTEND_PORT,
     hot: true,
