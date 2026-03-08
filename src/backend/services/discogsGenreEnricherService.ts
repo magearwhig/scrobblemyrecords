@@ -51,29 +51,16 @@ export class DiscogsGenreEnricherService {
           release.genres = details.genres ?? [];
           release.styles = details.styles ?? [];
           enriched++;
-          if (i < 5 || i % 50 === 0) {
-            log.info(
-              `[${i + 1}/${needsEnrichment.length}] ${release.artist} - ${release.title}: genres=${JSON.stringify(release.genres)}, styles=${JSON.stringify(release.styles)}`
-            );
-          }
         } else {
           release.genres = [];
           release.styles = [];
           skipped++;
-          log.warn(
-            `[${i + 1}/${needsEnrichment.length}] getReleaseDetails returned null for ${release.id} (${release.artist} - ${release.title})`
-          );
         }
       } catch (err) {
-        log.warn(
-          `[${i + 1}/${needsEnrichment.length}] Failed to fetch genre details for release`,
-          {
-            releaseId: release.id,
-            artist: release.artist,
-            title: release.title,
-            err,
-          }
-        );
+        log.warn('Failed to fetch genre details for release', {
+          releaseId: release.id,
+          err,
+        });
         release.genres = [];
         release.styles = [];
         failed++;
