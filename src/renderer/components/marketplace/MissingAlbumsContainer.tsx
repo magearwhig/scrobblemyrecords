@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 
+// Discovery styles are needed for MissingAlbumsTab (originally part of DiscoveryPage)
+import '../../pages/DiscoveryPage.page.css';
+
 import {
   MissingAlbum,
   CollectionItem,
