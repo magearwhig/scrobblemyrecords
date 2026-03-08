@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
+import './TrackDetailPage.page.css';
+
 import { TrackDetailResponse } from '../../shared/types';
 import ArtistLink from '../components/ArtistLink';
 import PlayTrendChart from '../components/PlayTrendChart';
 import { Badge } from '../components/ui/Badge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton } from '../components/ui/Skeleton';
-import { ROUTES } from '../routes';
+import { ROUTES, navigate } from '../routes';
 import { statsApi } from '../services/statsApi';
 import { formatLocalDateOnly, formatRelativeTime } from '../utils/dateUtils';
 import { createLogger } from '../utils/logger';
@@ -108,8 +110,11 @@ const TrackDetailPage: React.FC = () => {
     return () => controller.abort();
   }, [fetchTrackDetail]);
 
+  /** The page to navigate back to — derived from `?from=` URL param. */
   const previousPage = useMemo(() => {
-    return localStorage.getItem('previousPage') || ROUTES.STATS;
+    const hash = window.location.hash.replace('#', '');
+    const query = hash.includes('?') ? hash.split('?')[1] : '';
+    return new URLSearchParams(query).get('from') || ROUTES.STATS;
   }, []);
 
   const backLabel = useMemo(() => {
@@ -118,7 +123,7 @@ const TrackDetailPage: React.FC = () => {
   }, [previousPage]);
 
   const handleBack = useCallback(() => {
-    window.location.hash = `#${previousPage}`;
+    navigate(previousPage);
   }, [previousPage]);
 
   const handleSpotifyPlay = useCallback(() => {

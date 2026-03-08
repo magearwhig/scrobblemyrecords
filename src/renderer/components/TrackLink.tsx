@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 
-import { ROUTES } from '../routes';
+import { ROUTES, navigate } from '../routes';
 
 interface TrackLinkProps {
   artist: string;
@@ -11,8 +11,9 @@ interface TrackLinkProps {
 
 /**
  * Clickable track name that navigates to TrackDetailPage.
- * Stores a JSON object { artist, track, album } under 'selectedTrack'
- * and the current route under 'previousPage' in localStorage before navigating.
+ * Stores a JSON object { artist, track, album } under 'selectedTrack' in
+ * localStorage and passes the current page as a `?from=` query param so the
+ * detail page can render a correct back link.
  */
 const TrackLink: React.FC<TrackLinkProps> = ({
   artist,
@@ -25,12 +26,11 @@ const TrackLink: React.FC<TrackLinkProps> = ({
       e.stopPropagation();
       e.preventDefault();
       const currentPage = window.location.hash.replace('#', '').split('?')[0];
-      localStorage.setItem('previousPage', currentPage);
       localStorage.setItem(
         'selectedTrack',
         JSON.stringify({ artist, track, album })
       );
-      window.location.hash = `#${ROUTES.TRACK_DETAIL}`;
+      navigate(ROUTES.TRACK_DETAIL, { from: currentPage });
     },
     [artist, track, album]
   );
@@ -41,12 +41,11 @@ const TrackLink: React.FC<TrackLinkProps> = ({
         e.preventDefault();
         e.stopPropagation();
         const currentPage = window.location.hash.replace('#', '').split('?')[0];
-        localStorage.setItem('previousPage', currentPage);
         localStorage.setItem(
           'selectedTrack',
           JSON.stringify({ artist, track, album })
         );
-        window.location.hash = `#${ROUTES.TRACK_DETAIL}`;
+        navigate(ROUTES.TRACK_DETAIL, { from: currentPage });
       }
     },
     [artist, track, album]

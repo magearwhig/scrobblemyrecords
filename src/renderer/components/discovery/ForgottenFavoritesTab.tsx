@@ -9,6 +9,7 @@ import {
 } from '../../../shared/types';
 import { normalizeForMatching } from '../../../shared/utils/trackNormalization';
 import { lookupInCollection } from '../../hooks/useCollectionLookup';
+import { navigate } from '../../routes';
 import ApiService from '../../services/api';
 import { createLogger } from '../../utils/logger';
 import { playTrackOnSpotify } from '../../utils/spotifyUtils';
@@ -89,7 +90,7 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
   const navigateToAlbum = (item: CollectionItem) => {
     localStorage.setItem('selectedRelease', JSON.stringify(item.release));
     localStorage.setItem('selectedCollectionItemId', item.id.toString());
-    window.location.hash = '#release-details';
+    navigate('release-details');
   };
 
   // Load existing track mappings on mount

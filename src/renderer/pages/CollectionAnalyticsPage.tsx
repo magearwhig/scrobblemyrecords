@@ -13,6 +13,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton } from '../components/ui/Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { useTabKeyNavigation } from '../hooks/useTabKeyNavigation';
+import { navigate } from '../routes';
 import { collectionAnalyticsApi } from '../services/statsApi';
 import { createLogger } from '../utils/logger';
 import { getTabFromUrl } from '../utils/tabUtils';
@@ -88,11 +89,10 @@ const CollectionAnalyticsPage: React.FC = () => {
 
   const handleTabChange = useCallback((tab: TabId) => {
     setActiveTab(tab);
-    const baseHash = window.location.hash.split('?')[0];
     if (tab === 'overview') {
-      window.location.hash = baseHash;
+      navigate('collection-analytics');
     } else {
-      window.location.hash = `${baseHash}?tab=${tab}`;
+      navigate('collection-analytics', { tab });
     }
   }, []);
 

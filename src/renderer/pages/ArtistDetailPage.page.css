@@ -1,0 +1,351 @@
+/* ArtistDetailPage and TrackDetailPage shared styles */
+/* Co-located CSS extracted from styles.css */
+
+/* ==========================================================================
+   Artist & Track Detail Pages
+   ========================================================================== */
+
+/* Detail Page Layout */
+.detail-page {
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.detail-page-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--accent-color);
+  cursor: pointer;
+  font-size: var(--text-base);
+  margin-bottom: 1rem;
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: none;
+}
+
+.detail-page-back-link:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+/* Header: image + info side-by-side */
+.detail-page-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.detail-page-image {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+}
+
+.detail-page-image-placeholder {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+  background-color: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: var(--text-3xl);
+  border: 1px solid var(--border-color);
+}
+
+.detail-page-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-page-title {
+  margin: 0 0 0.25rem 0;
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-page-meta {
+  margin: 0 0 0.5rem 0;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.detail-page-external-links {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.detail-page-external-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.75rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border-radius: var(--radius-xl);
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.detail-page-external-links a:hover {
+  background: var(--bg-hover);
+  border-color: var(--text-secondary);
+}
+
+/* Content: two-column grid */
+.detail-page-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+/* Card-like section */
+.detail-page-section {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  box-shadow: var(--card-shadow);
+}
+
+.detail-page-section h3 {
+  margin: 0 0 1rem 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Top Tracks List */
+.detail-page-top-tracks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.detail-page-track-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.detail-page-track-item:last-child {
+  border-bottom: none;
+}
+
+.detail-page-track-rank {
+  width: 1.5rem;
+  text-align: right;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.detail-page-track-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-size: var(--text-base);
+}
+
+.detail-page-track-count {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+/* Albums List */
+.detail-page-albums {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.detail-page-album-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.detail-page-album-item:last-child {
+  border-bottom: none;
+}
+
+.detail-page-album-cover {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+}
+
+.detail-page-album-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-page-album-name {
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-page-album-meta {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-top: 0.15rem;
+}
+
+/* Stats Row */
+.detail-page-stats-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.detail-page-stat-card {
+  flex: 1;
+  min-width: 100px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  text-align: center;
+}
+
+.detail-page-stat-card .stat-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.25rem;
+}
+
+.detail-page-stat-card .stat-value {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Appears On (Track Detail) */
+.detail-page-appears-on {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Album cover placeholder (when no cover image available) */
+.detail-page-album-cover-placeholder {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  background-color: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: var(--text-xl);
+  border: 1px solid var(--border-color);
+}
+
+/* External link styled as button (for Spotify play which uses onClick) */
+.detail-page-external-links button.detail-page-external-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.75rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border-radius: var(--radius-xl);
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  font-family: inherit;
+}
+
+.detail-page-external-links button.detail-page-external-link-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   Detail Pages - Responsive
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .detail-page-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .detail-page-image,
+  .detail-page-image-placeholder {
+    width: 64px;
+    height: 64px;
+  }
+
+  .detail-page-title {
+    font-size: var(--text-xl);
+  }
+
+  .detail-page-external-links {
+    justify-content: center;
+  }
+
+  .detail-page-content {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-page-stats-row {
+    flex-direction: column;
+  }
+
+  .detail-page-stat-card {
+    min-width: unset;
+  }
+}
+
+/* ==========================================================================
+   Focus-visible styles for detail page elements
+   ========================================================================== */
+
+.detail-page-back-link:focus-visible,
+.detail-page-external-links a:focus-visible,
+.detail-page-external-link-btn:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}

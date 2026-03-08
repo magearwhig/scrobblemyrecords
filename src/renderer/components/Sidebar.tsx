@@ -17,7 +17,7 @@ import {
 import React, { useEffect } from 'react';
 
 import { useAuth } from '../context/AuthContext';
-import { ROUTES } from '../routes';
+import { ROUTES, navigate } from '../routes';
 
 interface SidebarProps {
   currentPage: string;
@@ -199,7 +199,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => {
               if (item.enabled) {
                 onPageChange(item.id);
-                window.location.hash = item.id;
+                navigate(item.id);
               }
             }}
             disabled={!item.enabled}

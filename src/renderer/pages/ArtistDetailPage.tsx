@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
+import './ArtistDetailPage.page.css';
+
 import { ArtistDetailResponse } from '../../shared/types';
 import PlayTrendChart from '../components/PlayTrendChart';
 import TrackLink from '../components/TrackLink';
@@ -7,7 +9,7 @@ import { Badge } from '../components/ui/Badge';
 import { IconButton } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton } from '../components/ui/Skeleton';
-import { ROUTES } from '../routes';
+import { ROUTES, navigate } from '../routes';
 import { statsApi, imagesApi } from '../services/statsApi';
 import { formatLocalDateOnly, formatRelativeTime } from '../utils/dateUtils';
 import { createLogger } from '../utils/logger';
@@ -47,7 +49,12 @@ const ArtistDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [trendPeriod, setTrendPeriod] = useState<'month' | 'week'>('month');
-  const [previousPage, setPreviousPage] = useState<string>('');
+  /** The page to navigate back to — derived from `?from=` URL param. */
+  const previousPage = useMemo<string>(() => {
+    const hash = window.location.hash.replace('#', '');
+    const query = hash.includes('?') ? hash.split('?')[1] : '';
+    return new URLSearchParams(query).get('from') || ROUTES.STATS;
+  }, []);
 
   const fetchArtistData = useCallback(
     async (name: string, period: 'month' | 'week', signal: AbortSignal) => {
@@ -104,8 +111,6 @@ const ArtistDetailPage: React.FC = () => {
   // Load artist name from localStorage on mount
   useEffect(() => {
     const storedArtist = localStorage.getItem('selectedArtist');
-    const storedPreviousPage = localStorage.getItem('previousPage') || '';
-    setPreviousPage(storedPreviousPage);
 
     if (!storedArtist) {
       setError('No artist selected. Please go back and select an artist.');
@@ -135,11 +140,7 @@ const ArtistDetailPage: React.FC = () => {
   );
 
   const handleBackClick = useCallback(() => {
-    if (previousPage) {
-      window.location.hash = `#${previousPage}`;
-    } else {
-      window.location.hash = `#${ROUTES.STATS}`;
-    }
+    navigate(previousPage);
   }, [previousPage]);
 
   const backLabel = useMemo(() => {

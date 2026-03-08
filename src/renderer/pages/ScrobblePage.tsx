@@ -13,6 +13,7 @@ import { ProgressBar } from '../components/ui/ProgressBar';
 import { ListItemSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { navigate } from '../routes';
 import { getApiService } from '../services/api';
 import { formatLocalTimeClean } from '../utils/dateUtils';
 import { createLogger } from '../utils/logger';
@@ -199,7 +200,7 @@ const ScrobblePage: React.FC = () => {
   // Navigate to settings with artist pre-filled for mapping
   const navigateToMappingWithArtist = (artist: string) => {
     setShowDisambiguationWarning(false);
-    window.location.hash = `#settings?prefillArtist=${encodeURIComponent(artist)}`;
+    navigate(`settings?prefillArtist=${encodeURIComponent(artist)}`);
   };
 
   // The actual scrobble logic (called after disambiguation check passes)
@@ -279,7 +280,7 @@ const ScrobblePage: React.FC = () => {
         <div className='scrobble-margin-top'>
           <Button
             onClick={() => {
-              window.location.hash = 'settings?tab=connections';
+              navigate('settings?tab=connections');
             }}
           >
             Connect Accounts
@@ -300,7 +301,7 @@ const ScrobblePage: React.FC = () => {
         <div className='scrobble-margin-top'>
           <Button
             onClick={() => {
-              window.location.hash = 'collection';
+              navigate('collection');
             }}
           >
             Browse Collection

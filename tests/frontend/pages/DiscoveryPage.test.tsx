@@ -44,13 +44,6 @@ jest.mock('../../../src/renderer/services/api', () => ({
   }),
 }));
 
-// Mock SyncStatusBar
-jest.mock('../../../src/renderer/components/SyncStatusBar', () => {
-  return function MockSyncStatusBar() {
-    return <div data-testid='sync-status-bar'>Sync Status Bar</div>;
-  };
-});
-
 const mockMissingAlbums: MissingAlbum[] = [
   {
     artist: 'Radiohead',
@@ -515,14 +508,6 @@ describe('DiscoveryPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Radiohead')).toBeInTheDocument();
-    });
-  });
-
-  it('renders SyncStatusBar component', async () => {
-    renderDiscoveryPage();
-
-    await waitFor(() => {
-      expect(screen.getByTestId('sync-status-bar')).toBeInTheDocument();
     });
   });
 

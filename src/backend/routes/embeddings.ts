@@ -12,7 +12,6 @@
 
 import express, { Request, Response } from 'express';
 
-import { CollectionItem } from '../../shared/types';
 import { AuthService } from '../services/authService';
 import {
   CollectionIndexerService,
@@ -24,6 +23,7 @@ import { EmbeddingStorageService } from '../services/embeddingStorageService';
 import { MusicBrainzGenreEnricherService } from '../services/musicbrainzGenreEnricherService';
 import { ProfileBuilderService } from '../services/profileBuilderService';
 import { sendError, sendSuccess } from '../utils/apiResponse';
+import { getAllCachedCollectionItems } from '../utils/collectionCache';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -326,21 +326,6 @@ export function createEmbeddingsRouter(
 async function loadCollectionFromCache(
   username: string,
   fileStorage: FileStorage
-): Promise<CollectionItem[]> {
-  const allItems: CollectionItem[] = [];
-  let pageNumber = 1;
-
-  while (true) {
-    const cacheKey = `collections/${username}-page-${pageNumber}.json`;
-    const cached = await fileStorage.readJSON<{
-      data: CollectionItem[];
-      timestamp: number;
-    }>(cacheKey);
-
-    if (!cached || !cached.data || cached.data.length === 0) break;
-    allItems.push(...cached.data);
-    pageNumber++;
-  }
-
-  return allItems;
+) {
+  return getAllCachedCollectionItems(username, fileStorage);
 }

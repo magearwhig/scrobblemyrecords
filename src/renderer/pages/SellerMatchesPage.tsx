@@ -14,6 +14,7 @@ import { Button } from '../components/ui/Button';
 import { AlbumCardSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
+import { navigate } from '../routes';
 import { getApiService } from '../services/api';
 import { createLogger } from '../utils/logger';
 
@@ -335,7 +336,7 @@ const SellerMatchesPage: React.FC<SellerMatchesPageProps> = ({
             variant='outline'
             size='small'
             onClick={() => {
-              window.location.hash = 'marketplace?tab=sellers';
+              navigate('marketplace?tab=sellers');
             }}
           >
             &larr; Back to Sellers

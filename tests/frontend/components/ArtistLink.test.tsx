@@ -9,10 +9,12 @@ describe('ArtistLink', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (localStorage.getItem as jest.Mock).mockReturnValue('');
+    window.location.hash = '';
   });
 
   afterEach(() => {
     localStorage.clear();
+    window.location.hash = '';
   });
 
   it('should render the artist name', () => {
@@ -50,7 +52,7 @@ describe('ArtistLink', () => {
     );
   });
 
-  it('should store previousPage in localStorage on click', async () => {
+  it('should embed current page as ?from= param in the URL on click', async () => {
     // Arrange
     const user = userEvent.setup();
     window.location.hash = '#stats';
@@ -59,8 +61,13 @@ describe('ArtistLink', () => {
     // Act
     await user.click(screen.getByText('Radiohead'));
 
-    // Assert
-    expect(localStorage.setItem).toHaveBeenCalledWith('previousPage', 'stats');
+    // Assert: ?from=stats is present in the hash
+    expect(window.location.hash).toContain('from=stats');
+    // Old localStorage.previousPage should NOT be written
+    expect(localStorage.setItem).not.toHaveBeenCalledWith(
+      'previousPage',
+      expect.anything()
+    );
   });
 
   it('should navigate to artist detail page on click', async () => {
@@ -71,8 +78,8 @@ describe('ArtistLink', () => {
     // Act
     await user.click(screen.getByText('Radiohead'));
 
-    // Assert
-    expect(window.location.hash).toBe('#artist');
+    // Assert: hash starts with #artist
+    expect(window.location.hash).toMatch(/^#artist/);
   });
 
   it('should navigate on Enter key press', async () => {
@@ -90,7 +97,7 @@ describe('ArtistLink', () => {
       'selectedArtist',
       'Radiohead'
     );
-    expect(window.location.hash).toBe('#artist');
+    expect(window.location.hash).toMatch(/^#artist/);
   });
 
   it('should navigate on Space key press', async () => {
@@ -108,7 +115,7 @@ describe('ArtistLink', () => {
       'selectedArtist',
       'Radiohead'
     );
-    expect(window.location.hash).toBe('#artist');
+    expect(window.location.hash).toMatch(/^#artist/);
   });
 
   it('should apply custom className', () => {

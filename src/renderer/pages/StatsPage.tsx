@@ -42,6 +42,7 @@ import { TopList } from '../components/stats/TopList';
 import { Button } from '../components/ui/Button';
 import { StatsPageSkeleton } from '../components/ui/Skeleton';
 import { useCollectionLookup } from '../hooks/useCollectionLookup';
+import { navigate } from '../routes';
 import { imagesApi, statsApi } from '../services/statsApi';
 import { createLogger } from '../utils/logger';
 
@@ -743,7 +744,7 @@ export const StatsPage: React.FC = () => {
             variant='outline'
             size='small'
             onClick={() => {
-              window.location.hash = 'what-to-play?tab=dusty';
+              navigate('what-to-play?tab=dusty');
             }}
           >
             View all in What to Play

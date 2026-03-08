@@ -1,5 +1,4 @@
 import {
-  AlertTriangle,
   BarChart3,
   Clock,
   Disc3,
@@ -9,11 +8,15 @@ import {
   Radio,
   Target,
 } from 'lucide-react';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import './HomePage.page.css';
 
-import { DashboardData, MilestoneInfo } from '../../shared/types';
+import {
+  DashboardData,
+  MilestoneInfo,
+  OnThisDayResult,
+} from '../../shared/types';
 import {
   ConnectionStatus,
   DashboardStatCard,
@@ -23,23 +26,23 @@ import {
   StatDetailsModal,
 } from '../components/dashboard';
 import { StatType } from '../components/dashboard/StatDetailsModal';
+import { SetupProgress } from '../components/SetupProgress';
 import { CalendarHeatmap } from '../components/stats/CalendarHeatmap';
 import { MilestoneProgress } from '../components/stats/MilestoneProgress';
+import { OnThisDay } from '../components/stats/OnThisDay';
 import { Button } from '../components/ui/Button';
+import { ErrorState } from '../components/ui/EmptyState';
 import { StatCardSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { navigate } from '../routes';
 import { getApiService } from '../services/api';
+import { statsApi } from '../services/statsApi';
 import { getTimezoneOffset } from '../utils/dateUtils';
 
 const HomePage: React.FC = () => {
   const { authStatus, setAuthStatus } = useAuth();
   const { state } = useApp();
-
-  // Navigation helper using hash-based routing
-  const navigate = useCallback((path: string) => {
-    window.location.hash = path.startsWith('/') ? path.slice(1) : path;
-  }, []);
 
   const [serverStatus, setServerStatus] = useState<
     'checking' | 'connected' | 'error'
@@ -55,6 +58,10 @@ const HomePage: React.FC = () => {
   const [milestoneData, setMilestoneData] = useState<MilestoneInfo | null>(
     null
   );
+  const [onThisDayData, setOnThisDayData] = useState<OnThisDayResult | null>(
+    null
+  );
+  const [hasSyncedHistory, setHasSyncedHistory] = useState(false);
   const [secondaryDataLoaded, setSecondaryDataLoaded] = useState(false);
 
   // Stat details modal state
@@ -105,6 +112,17 @@ const HomePage: React.FC = () => {
       // Get auth status
       const status = await api.getAuthStatus();
       setAuthStatus(status);
+
+      // Check sync status for setup progress
+      try {
+        const syncData = await api.getHistorySyncStatus();
+        setHasSyncedHistory(
+          syncData.storage.totalScrobbles > 0 ||
+            syncData.sync.status === 'completed'
+        );
+      } catch {
+        // Non-critical — leave hasSyncedHistory as false
+      }
     } catch {
       setServerStatus('error');
     }
@@ -134,13 +152,15 @@ const HomePage: React.FC = () => {
     const api = getApiService(state.serverUrl);
 
     // Load heatmap and milestones in parallel, but don't block on failures
-    const [heatmap, milestones] = await Promise.all([
+    const [heatmap, milestones, onThisDay] = await Promise.all([
       loadHeatmapData(api),
       loadMilestoneData(api),
+      loadOnThisDayData(api),
     ]);
 
     setHeatmapData(heatmap);
     setMilestoneData(milestones);
+    setOnThisDayData(onThisDay);
     setSecondaryDataLoaded(true);
   };
 
@@ -162,6 +182,17 @@ const HomePage: React.FC = () => {
     try {
       const response = await api['api'].get('/stats/milestones');
       return response.data.data || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const loadOnThisDayData = async (
+    _api: ReturnType<typeof getApiService>
+  ): Promise<OnThisDayResult | null> => {
+    try {
+      const response = await statsApi.getOnThisDay();
+      return response.success && response.data ? response.data : null;
     } catch {
       return null;
     }
@@ -244,16 +275,10 @@ const HomePage: React.FC = () => {
   if (dashboardError) {
     return (
       <div className='dashboard'>
-        <div className='dashboard-error'>
-          <div className='dashboard-error-icon'>
-            <AlertTriangle size={48} aria-hidden='true' />
-          </div>
-          <h2>Unable to load dashboard</h2>
-          <p>{dashboardError}</p>
-          <Button type='button' onClick={loadDashboardData}>
-            Try Again
-          </Button>
-        </div>
+        <ErrorState
+          description={dashboardError}
+          actions={[{ label: 'Try Again', onClick: loadDashboardData }]}
+        />
       </div>
     );
   }
@@ -267,6 +292,12 @@ const HomePage: React.FC = () => {
         authStatus={authStatus}
         serverConnected={serverStatus === 'connected'}
         isLoading={serverStatus === 'checking'}
+      />
+
+      {/* Setup Progress Banner (auto-hides when complete) */}
+      <SetupProgress
+        authStatus={authStatus}
+        hasSyncedHistory={hasSyncedHistory}
       />
 
       {/* Quick Stats Row */}
@@ -347,6 +378,13 @@ const HomePage: React.FC = () => {
             artists={dashboardData.monthlyTopArtists || []}
             albums={dashboardData.monthlyTopAlbums || []}
           />
+        )}
+
+        {/* On This Day */}
+        {onThisDayData && (
+          <div className='dashboard-section dashboard-grid-full'>
+            <OnThisDay data={onThisDayData} />
+          </div>
         )}
 
         {/* Calendar Heatmap */}

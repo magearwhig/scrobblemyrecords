@@ -315,9 +315,7 @@ describe('HomePage Dashboard', () => {
       renderHomePageWithProviders(authStatus);
 
       await waitFor(() => {
-        expect(
-          screen.getByText('Unable to load dashboard')
-        ).toBeInTheDocument();
+        expect(screen.getByText('Something went wrong')).toBeInTheDocument();
       });
 
       expect(screen.getByText('Try Again')).toBeInTheDocument();

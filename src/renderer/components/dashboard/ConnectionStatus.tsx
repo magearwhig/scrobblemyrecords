@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { AuthStatus } from '../../../shared/types';
+import { navigate } from '../../routes';
 
 interface ConnectionStatusProps {
   authStatus: AuthStatus | null;
@@ -28,11 +29,6 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
   serverConnected,
   isLoading,
 }) => {
-  // Navigation helper using hash-based routing
-  const navigate = useCallback((path: string) => {
-    window.location.hash = path.startsWith('/') ? path.slice(1) : path;
-  }, []);
-
   const statusItems: StatusItem[] = [
     {
       key: 'server',

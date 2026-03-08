@@ -24,6 +24,7 @@ import { ScrobbleHistoryStorage } from '../services/scrobbleHistoryStorage';
 import { SellerMonitoringService } from '../services/sellerMonitoringService';
 import { StatsService } from '../services/statsService';
 import { WishlistService } from '../services/wishlistService';
+import { getAllCachedCollectionItems } from '../utils/collectionCache';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -50,23 +51,8 @@ export default function createStatsRouter(
   /**
    * Helper to load user's collection from cache
    */
-  async function loadCollection(username: string): Promise<CollectionItem[]> {
-    const allItems: CollectionItem[] = [];
-    let pageNumber = 1;
-
-    while (true) {
-      const cacheKey = `collections/${username}-page-${pageNumber}.json`;
-      const cached = await fileStorage.readJSON<{
-        data: CollectionItem[];
-        timestamp: number;
-      }>(cacheKey);
-
-      if (!cached || !cached.data) break;
-      allItems.push(...cached.data);
-      pageNumber++;
-    }
-
-    return allItems;
+  async function loadCollection(username: string) {
+    return getAllCachedCollectionItems(username, fileStorage);
   }
 
   // ============================================

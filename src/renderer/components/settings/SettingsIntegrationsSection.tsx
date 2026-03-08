@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { SyncStatus, SyncSettings } from '../../../shared/types';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirmModal } from '../../hooks/useConfirmModal';
+import { navigate } from '../../routes';
 import ApiService from '../../services/api';
 import { createLogger } from '../../utils/logger';
 import SyncStatusBar from '../SyncStatusBar';
@@ -430,7 +431,7 @@ const SettingsIntegrationsSection: React.FC<
             </p>
             <Button
               onClick={() => {
-                window.location.hash = 'settings?tab=connections';
+                navigate('settings?tab=connections');
               }}
             >
               Connect Last.fm
@@ -463,7 +464,7 @@ const SettingsIntegrationsSection: React.FC<
             <Button
               variant='secondary'
               onClick={() => {
-                window.location.hash = '#collection';
+                navigate('collection');
               }}
             >
               Go to Collection

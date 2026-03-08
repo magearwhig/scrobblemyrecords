@@ -6,6 +6,7 @@ import {
   SellerMonitoringSettings,
 } from '../../../shared/types';
 import { useAuth } from '../../context/AuthContext';
+import { navigate } from '../../routes';
 import ApiService from '../../services/api';
 import { createLogger } from '../../utils/logger';
 import { Button } from '../ui/Button';
@@ -282,7 +283,7 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
                   </p>
                   <Button
                     onClick={() => {
-                      window.location.hash = 'settings?tab=connections';
+                      navigate('settings?tab=connections');
                     }}
                   >
                     Connect Discogs
@@ -435,7 +436,7 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
                 <Button
                   variant='outline'
                   onClick={() => {
-                    window.location.hash = 'marketplace?tab=sellers';
+                    navigate('marketplace?tab=sellers');
                   }}
                 >
                   Manage Sellers &rarr;
@@ -452,7 +453,7 @@ const SettingsWishlistSection: React.FC<SettingsWishlistSectionProps> = ({
                   </p>
                   <Button
                     onClick={() => {
-                      window.location.hash = 'settings?tab=connections';
+                      navigate('settings?tab=connections');
                     }}
                   >
                     Connect Discogs

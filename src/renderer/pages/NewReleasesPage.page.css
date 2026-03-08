@@ -112,7 +112,7 @@
 /* Disambiguation Alert */
 .disambiguation-alert {
   background-color: var(--warning-color);
-  color: #333;
+  color: var(--text-primary);
   padding: 0.75rem 1rem;
   border-radius: var(--radius-md);
   margin-bottom: 1rem;
@@ -354,7 +354,7 @@
 
 .badge-warning {
   background-color: var(--warning-color);
-  color: #333;
+  color: var(--text-primary);
 }
 
 .badge-error {
@@ -609,9 +609,9 @@
   align-items: center;
   padding: 0.75rem 1rem;
   background: rgba(239, 68, 68, 0.1);
-  border: 1px solid var(--accent-danger, #ef4444);
+  border: 1px solid var(--status-error);
   border-radius: var(--radius-md);
-  color: var(--accent-danger, #ef4444);
+  color: var(--status-error);
 }
 
 .new-releases-filters {
@@ -741,7 +741,7 @@
 }
 
 .new-release-badge.new {
-  background: var(--accent-success, #22c55e);
+  background: var(--status-success);
   color: white;
 }
 
@@ -795,7 +795,7 @@
 
 .new-release-source-badge[data-source='vinyl_watch'] {
   background: rgba(34, 197, 94, 0.15);
-  color: var(--accent-success, #22c55e);
+  color: var(--status-success);
 }
 
 .new-release-detected {

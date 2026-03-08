@@ -1,7 +1,8 @@
 import { Disc3 } from 'lucide-react';
-import React, { useCallback } from 'react';
+import React from 'react';
 
 import { DashboardRecentAlbum } from '../../../shared/types';
+import { navigate } from '../../routes';
 import { formatLocalTimeClean } from '../../utils/dateUtils';
 
 interface RecentAlbumsProps {
@@ -18,11 +19,6 @@ export const RecentAlbums: React.FC<RecentAlbumsProps> = ({
   albums,
   timezone,
 }) => {
-  // Navigation helper using hash-based routing
-  const navigate = useCallback((path: string) => {
-    window.location.hash = path.startsWith('/') ? path.slice(1) : path;
-  }, []);
-
   if (albums.length === 0) {
     return null;
   }

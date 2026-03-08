@@ -9,6 +9,7 @@ import {
   WrappedNewArtist,
   WrappedTopItem,
 } from '../../shared/types';
+import { getAllCachedCollectionItems } from '../utils/collectionCache';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -613,21 +614,10 @@ export class WrappedService {
       const username = settings?.discogs?.username;
       if (!username) return null;
 
-      const allItems: CollectionItem[] = [];
-      let pageNumber = 1;
-
-      while (true) {
-        const cacheKey = `collections/${username}-page-${pageNumber}.json`;
-        const cached = await this.fileStorage.readJSON<{
-          data: CollectionItem[];
-          timestamp: number;
-        }>(cacheKey);
-
-        if (!cached || !cached.data) break;
-        allItems.push(...cached.data);
-        pageNumber++;
-      }
-
+      const allItems = await getAllCachedCollectionItems(
+        username,
+        this.fileStorage
+      );
       return allItems.length > 0 ? allItems : null;
     } catch {
       this.logger.warn('Failed to load collection for wrapped');

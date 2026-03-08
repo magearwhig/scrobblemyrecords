@@ -64,6 +64,18 @@ export interface ScrobbleSession {
   };
 }
 
+export interface CollectionFilterPreset {
+  id: string;
+  name: string;
+  filters: {
+    format: string;
+    yearFrom: string;
+    yearTo: string;
+    dateAdded: string;
+  };
+  createdAt: number; // milliseconds since epoch
+}
+
 export interface UserSettings {
   discogs: {
     token?: string;
@@ -78,6 +90,8 @@ export interface UserSettings {
     defaultTimestamp: 'now' | 'custom';
     batchSize: number;
     autoScrobble: boolean;
+    historyDefaultTab?: 'sessions' | 'lastfm';
+    collectionPresets?: CollectionFilterPreset[];
   };
   temp?: {
     oauthTokenSecret?: string;

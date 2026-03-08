@@ -1,0 +1,6 @@
+/* TrackDetailPage styles */
+/* Co-located CSS — detail-page class styles are shared with ArtistDetailPage */
+/* Both pages import their own .page.css; webpack deduplicates identical rules */
+
+/* All shared detail-page styles are defined in ArtistDetailPage.page.css.
+   Import that file to get the shared styles. */

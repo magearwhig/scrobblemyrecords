@@ -2,6 +2,7 @@ import { Music } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { SuggestionResult, SuggestionFactors } from '../../shared/types';
+import { navigate } from '../routes';
 import { createLogger } from '../utils/logger';
 
 import { Button } from './ui/Button';
@@ -73,7 +74,7 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
 
   const handleViewInCollection = () => {
     // Navigate to collection with this album highlighted using hash routing
-    window.location.hash = `collection?highlight=${album.id}`;
+    navigate(`collection?highlight=${album.id}`);
   };
 
   const handleViewDetails = () => {
@@ -90,7 +91,7 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
     logger.info('localStorage set, verifying', {
       title: stored ? JSON.parse(stored).title : 'null',
     });
-    window.location.hash = 'release-details';
+    navigate('release-details');
   };
 
   return (

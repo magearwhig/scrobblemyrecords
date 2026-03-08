@@ -18,6 +18,7 @@ import {
   BackupPreview,
   BackupSettings,
   CollectionArtist,
+  CollectionFilterPreset,
   CollectionItem,
   DashboardData,
   DiscogsCollectionProgress,
@@ -197,6 +198,24 @@ class ApiService {
 
   async clearAuth(): Promise<void> {
     await this.api.post('/auth/clear');
+  }
+
+  async getUserPreferences(): Promise<{
+    defaultTimestamp: 'now' | 'custom';
+    batchSize: number;
+    autoScrobble: boolean;
+    historyDefaultTab?: 'sessions' | 'lastfm';
+    collectionPresets?: CollectionFilterPreset[];
+  }> {
+    const response = await this.api.get('/auth/preferences');
+    return response.data.data;
+  }
+
+  async updateUserPreferences(updates: {
+    historyDefaultTab?: 'sessions' | 'lastfm';
+    collectionPresets?: CollectionFilterPreset[];
+  }): Promise<void> {
+    await this.api.patch('/auth/preferences', updates);
   }
 
   // OAuth methods

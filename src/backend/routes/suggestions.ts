@@ -27,6 +27,7 @@ import {
   SuggestionService,
 } from '../services/suggestionService';
 import { TrackMappingService } from '../services/trackMappingService';
+import { getAllCachedCollectionItems } from '../utils/collectionCache';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -80,18 +81,7 @@ export default function createSuggestionsRouter(
       );
 
       // Get collection
-      const allItems: CollectionItem[] = [];
-      let pageNumber = 1;
-      while (true) {
-        const cacheKey = `collections/${username}-page-${pageNumber}.json`;
-        const cached = await fileStorage.readJSON<{
-          data: CollectionItem[];
-          timestamp: number;
-        }>(cacheKey);
-        if (!cached || !cached.data) break;
-        allItems.push(...cached.data);
-        pageNumber++;
-      }
+      const allItems = await getAllCachedCollectionItems(username, fileStorage);
 
       if (allItems.length === 0) {
         return res.json({
@@ -939,18 +929,10 @@ export default function createSuggestionsRouter(
         const limit = parseInt(req.query.limit as string) || 20;
 
         // Get collection
-        const allItems: CollectionItem[] = [];
-        let pageNumber = 1;
-        while (true) {
-          const cacheKey = `collections/${username}-page-${pageNumber}.json`;
-          const cached = await fileStorage.readJSON<{
-            data: CollectionItem[];
-            timestamp: number;
-          }>(cacheKey);
-          if (!cached || !cached.data) break;
-          allItems.push(...cached.data);
-          pageNumber++;
-        }
+        const allItems = await getAllCachedCollectionItems(
+          username,
+          fileStorage
+        );
 
         // Get more than requested to account for filtering
         const missingAlbums = await analyticsService.getMissingAlbums(
@@ -1006,18 +988,10 @@ export default function createSuggestionsRouter(
         const limit = parseInt(req.query.limit as string) || 20;
 
         // Get collection
-        const allItems: CollectionItem[] = [];
-        let pageNumber = 1;
-        while (true) {
-          const cacheKey = `collections/${username}-page-${pageNumber}.json`;
-          const cached = await fileStorage.readJSON<{
-            data: CollectionItem[];
-            timestamp: number;
-          }>(cacheKey);
-          if (!cached || !cached.data) break;
-          allItems.push(...cached.data);
-          pageNumber++;
-        }
+        const allItems = await getAllCachedCollectionItems(
+          username,
+          fileStorage
+        );
 
         // Get more than requested to account for filtering
         const missingArtists = await analyticsService.getMissingArtists(
@@ -1287,18 +1261,7 @@ export default function createSuggestionsRouter(
       }
 
       // Get collection
-      const allItems: CollectionItem[] = [];
-      let pageNumber = 1;
-      while (true) {
-        const cacheKey = `collections/${username}-page-${pageNumber}.json`;
-        const cached = await fileStorage.readJSON<{
-          data: CollectionItem[];
-          timestamp: number;
-        }>(cacheKey);
-        if (!cached || !cached.data) break;
-        allItems.push(...cached.data);
-        pageNumber++;
-      }
+      const allItems = await getAllCachedCollectionItems(username, fileStorage);
 
       if (allItems.length === 0) {
         return res.status(400).json({

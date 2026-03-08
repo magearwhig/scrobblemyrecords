@@ -49,6 +49,14 @@ const createMockAuthContext = (authStatus: AuthStatus) => ({
 const createMockApiInstance = () => ({
   getAuthStatus: jest.fn(),
   getScrobbleHistory: jest.fn(),
+  getUserPreferences: jest.fn().mockResolvedValue({
+    defaultTimestamp: 'now',
+    batchSize: 50,
+    autoScrobble: false,
+    historyDefaultTab: 'sessions', // Keep 'sessions' so existing tests don't break
+    collectionPresets: [],
+  }),
+  updateUserPreferences: jest.fn().mockResolvedValue(undefined),
 });
 
 const createMockScrobbleSession = (

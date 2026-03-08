@@ -1,4 +1,4 @@
-import { Lightbulb } from 'lucide-react';
+import { AlertTriangle, Lightbulb } from 'lucide-react';
 import React from 'react';
 
 import { Button } from './Button';
@@ -78,5 +78,25 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     </div>
   );
 };
+
+export interface ErrorStateProps {
+  description?: string;
+  actions?: EmptyStateAction[];
+  size?: 'small' | 'medium' | 'large';
+}
+
+export const ErrorState: React.FC<ErrorStateProps> = ({
+  description,
+  actions,
+  size = 'medium',
+}) => (
+  <EmptyState
+    icon={<AlertTriangle size={40} aria-hidden='true' />}
+    title='Something went wrong'
+    description={description}
+    actions={actions}
+    size={size}
+  />
+);
 
 export default EmptyState;

@@ -1,6 +1,8 @@
 import { AlertTriangle } from 'lucide-react';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 
+import './NewReleasesPage.page.css';
+
 import {
   TrackedRelease,
   ArtistDisambiguationStatus,
@@ -21,7 +23,6 @@ import {
   createAlertNotification,
 } from '../hooks/useNotifications';
 import { getApiService } from '../services/api';
-import '../styles/NewReleasesPage.css';
 
 type TabType = 'all' | 'upcoming' | 'recent' | 'vinyl';
 type SortOption = 'releaseDate' | 'artistName' | 'title' | 'firstSeen';

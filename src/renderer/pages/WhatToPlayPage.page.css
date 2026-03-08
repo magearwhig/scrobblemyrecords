@@ -1,0 +1,12 @@
+/* WhatToPlayPage styles */
+/* Co-located CSS extracted from styles.css */
+
+.what-to-play-page {
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.what-to-play-tab-content {
+  margin-top: 1rem;
+}

@@ -15,7 +15,7 @@ import {
   useNotifications,
 } from '../hooks/useNotifications';
 import useRecommendations from '../hooks/useRecommendations';
-import { ROUTES } from '../routes';
+import { ROUTES, navigate } from '../routes';
 
 interface WindowOption {
   label: string;
@@ -52,7 +52,7 @@ const RecommendationsPage: React.FC = () => {
   } = useEmbeddingStatus();
 
   const handleNavigate = useCallback((releaseId: number) => {
-    window.location.hash = `${ROUTES.RELEASE_DETAILS}?id=${releaseId}`;
+    navigate(ROUTES.RELEASE_DETAILS, { id: releaseId.toString() });
   }, []);
 
   const handleWindowChange = useCallback(

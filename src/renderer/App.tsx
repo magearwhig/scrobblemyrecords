@@ -1,18 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 
 import { AuthStatus } from '../shared/types';
 
 import ErrorBoundary from './components/ErrorBoundary';
 import Header from './components/Header';
+import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp';
 import MainContent from './components/MainContent';
 import Sidebar from './components/Sidebar';
+import SyncStatusBar from './components/SyncStatusBar';
 import ToastContainer from './components/ToastContainer';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { useJobPoller } from './hooks/useJobPoller';
-import { DEFAULT_ROUTE, ROUTE_REDIRECTS } from './routes';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { DEFAULT_ROUTE, ROUTE_REDIRECTS, ROUTES, navigate } from './routes';
 
 const JobPollerSetup: React.FC = () => {
   useJobPoller();
@@ -30,6 +33,38 @@ const App: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
     return saved === 'true';
+  });
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  const handleFocusSearch = useCallback(() => {
+    const searchInput = document.querySelector<HTMLInputElement>(
+      'input[type="search"], input[placeholder*="earch"], input.search-input'
+    );
+    searchInput?.focus();
+  }, []);
+
+  const handleSync = useCallback(() => {
+    navigate(ROUTES.SCROBBLE);
+  }, []);
+
+  const handleNewScrobble = useCallback(() => {
+    navigate(ROUTES.SCROBBLE);
+  }, []);
+
+  const handleToggleHelp = useCallback(() => {
+    setHelpOpen(prev => !prev);
+  }, []);
+
+  const handleCloseHelp = useCallback(() => {
+    setHelpOpen(false);
+  }, []);
+
+  useKeyboardShortcuts({
+    onFocusSearch: handleFocusSearch,
+    onSync: handleSync,
+    onNewScrobble: handleNewScrobble,
+    onToggleHelp: handleToggleHelp,
+    onCloseHelp: handleCloseHelp,
   });
 
   const handleSidebarCollapsedChange = (collapsed: boolean) => {
@@ -63,7 +98,7 @@ const App: React.FC = () => {
         const newHash = merged.toString()
           ? `${redirectBase}?${merged.toString()}`
           : redirectBase;
-        window.location.hash = newHash;
+        navigate(newHash);
         return;
       }
 
@@ -88,6 +123,7 @@ const App: React.FC = () => {
           <ToastProvider>
             <JobPollerSetup />
             <div className='app'>
+              <SyncStatusBar globalBar />
               <Header />
               <div
                 className={`main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
@@ -107,6 +143,10 @@ const App: React.FC = () => {
                 </div>
               </div>
               <ToastContainer />
+              <KeyboardShortcutsHelp
+                isOpen={helpOpen}
+                onClose={handleCloseHelp}
+              />
             </div>
           </ToastProvider>
         </AuthProvider>

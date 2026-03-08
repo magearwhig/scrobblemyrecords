@@ -8,11 +8,11 @@ import {
   useCollectionLookup,
   lookupInCollection,
 } from '../hooks/useCollectionLookup';
+import { navigate } from '../routes';
 import { getApiService } from '../services/api';
 import { playTrackOnSpotify } from '../utils/spotifyUtils';
 
 import ArtistLink from './ArtistLink';
-import SyncStatusBar from './SyncStatusBar';
 import TrackLink from './TrackLink';
 import { Badge } from './ui/Badge';
 import { Button, IconButton } from './ui/Button';
@@ -73,7 +73,7 @@ const LastFmHistoryTab: React.FC = () => {
   const navigateToAlbum = (item: CollectionItem) => {
     localStorage.setItem('selectedRelease', JSON.stringify(item.release));
     localStorage.setItem('selectedCollectionItemId', item.id.toString());
-    window.location.hash = '#release-details';
+    navigate('release-details');
   };
 
   // View mode toggle (supports deep-linking via ?view= param)
@@ -204,17 +204,6 @@ const LastFmHistoryTab: React.FC = () => {
     }
   }, [viewMode, loadAlbums, loadTracks, loadArtists]);
 
-  const handleSyncComplete = () => {
-    // Reload data when sync completes
-    if (viewMode === 'albums') {
-      loadAlbums();
-    } else if (viewMode === 'tracks') {
-      loadTracks();
-    } else {
-      loadArtists();
-    }
-  };
-
   const handleAlbumSortChange = (newSortBy: AlbumSortBy) => {
     if (newSortBy === albumSortBy) {
       setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
@@ -288,12 +277,6 @@ const LastFmHistoryTab: React.FC = () => {
 
   return (
     <div className='lastfm-history-tab'>
-      {/* Sync Status */}
-      <div className='card'>
-        <h3 className='lastfm-history-section-title'>Last.fm Sync Status</h3>
-        <SyncStatusBar onSyncComplete={handleSyncComplete} />
-      </div>
-
       {/* Search and Controls */}
       <div className='card'>
         <div className='lastfm-history-controls'>

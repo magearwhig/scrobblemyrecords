@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirmModal } from '../hooks/useConfirmModal';
 import { useTabKeyNavigation } from '../hooks/useTabKeyNavigation';
+import { navigate } from '../routes';
 import { getApiService } from '../services/api';
 import { formatLocalTimeClean, getTimezoneOffset } from '../utils/dateUtils';
 import { createLogger } from '../utils/logger';
@@ -22,16 +23,16 @@ const logger = createLogger('HistoryPage');
 
 type HistoryTab = 'sessions' | 'lastfm';
 
-// Auto-select lastfm tab when deep-linked with ?view= param
-const getInitialTab = (): HistoryTab => {
+// Returns the tab from URL params, or null if no URL override
+const getTabFromUrl = (): HistoryTab | null => {
   const hash = window.location.hash;
   const queryIndex = hash.indexOf('?');
-  if (queryIndex === -1) return 'sessions';
+  if (queryIndex === -1) return null;
 
   const queryString = hash.slice(queryIndex + 1);
   const params = new URLSearchParams(queryString);
   if (params.get('view')) return 'lastfm';
-  return 'sessions';
+  return null;
 };
 
 const HistoryPage: React.FC = () => {
@@ -40,7 +41,10 @@ const HistoryPage: React.FC = () => {
   const { showToast } = useToast();
   const [confirmAction, ConfirmModal] = useConfirmModal();
   const handleTabKeyDown = useTabKeyNavigation();
-  const [activeTab, setActiveTab] = useState<HistoryTab>(getInitialTab);
+  // Default to 'lastfm' per spec; URL param overrides; persisted preference loaded async
+  const [activeTab, setActiveTab] = useState<HistoryTab>(
+    () => getTabFromUrl() ?? 'lastfm'
+  );
   const [sessions, setSessions] = useState<ScrobbleSession[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
@@ -56,6 +60,21 @@ const HistoryPage: React.FC = () => {
     if (!authStatus.lastfm.authenticated) {
       checkAuthStatus();
     }
+  }, []);
+
+  // Load persisted history tab preference (URL param takes priority)
+  useEffect(() => {
+    const urlTab = getTabFromUrl();
+    if (urlTab) return; // URL takes priority, no need to load preference
+    api
+      .getUserPreferences()
+      .then((prefs: { historyDefaultTab?: 'sessions' | 'lastfm' }) => {
+        setActiveTab(prefs.historyDefaultTab ?? 'lastfm');
+      })
+      .catch((err: unknown) => {
+        logger.warn('Failed to load history tab preference', err);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -325,7 +344,7 @@ const HistoryPage: React.FC = () => {
                   {
                     label: 'Browse Collection',
                     onClick: () => {
-                      window.location.hash = 'collection';
+                      navigate('collection');
                     },
                   },
                 ]}

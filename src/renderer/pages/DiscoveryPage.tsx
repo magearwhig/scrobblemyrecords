@@ -11,7 +11,6 @@ import {
 } from '../../shared/types';
 import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import { MissingAlbumsTab, MissingArtistsTab } from '../components/discovery';
-import SyncStatusBar from '../components/SyncStatusBar';
 import { Modal, ModalFooter } from '../components/ui';
 import { Button } from '../components/ui/Button';
 import { AlbumCardSkeleton, ListItemSkeleton } from '../components/ui/Skeleton';
@@ -177,10 +176,6 @@ const DiscoveryPage: React.FC = () => {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const handleSyncComplete = () => {
-    loadData();
-  };
-
   // Open mapping modal for an album
   const openAlbumMapping = (album: MissingAlbum) => {
     setMappingModal({
@@ -342,8 +337,6 @@ const DiscoveryPage: React.FC = () => {
         Find albums and artists you listen to frequently but don't have in your
         vinyl collection.
       </p>
-
-      <SyncStatusBar onSyncComplete={handleSyncComplete} />
 
       <div className='discovery-tabs'>
         <button

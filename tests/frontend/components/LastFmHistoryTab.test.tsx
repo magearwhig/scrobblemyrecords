@@ -10,21 +10,6 @@ import * as apiService from '../../../src/renderer/services/api';
 jest.mock('../../../src/renderer/services/api');
 const mockApiService = apiService as jest.Mocked<typeof apiService>;
 
-// Mock SyncStatusBar to simplify tests
-jest.mock('../../../src/renderer/components/SyncStatusBar', () => {
-  return function MockSyncStatusBar({
-    onSyncComplete,
-  }: {
-    onSyncComplete?: () => void;
-  }) {
-    return (
-      <div data-testid='sync-status-bar'>
-        <button onClick={onSyncComplete}>Trigger Sync Complete</button>
-      </div>
-    );
-  };
-});
-
 // Mock AppContext
 const mockUseApp = {
   state: { serverUrl: 'http://localhost:3001' },
@@ -208,16 +193,6 @@ describe('LastFmHistoryTab', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/Showing 3 of 3 albums/)).toBeInTheDocument();
-      });
-    });
-
-    it('renders SyncStatusBar', async () => {
-      render(<LastFmHistoryTab />);
-
-      jest.advanceTimersByTime(300);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('sync-status-bar')).toBeInTheDocument();
       });
     });
   });
@@ -478,29 +453,6 @@ describe('LastFmHistoryTab', () => {
         const prevButton = screen.getByRole('button', { name: /Previous/ });
         expect(prevButton).toBeDisabled();
         expect(screen.getByRole('button', { name: /First/ })).toBeDisabled();
-      });
-    });
-  });
-
-  describe('Sync Integration', () => {
-    it('reloads albums when sync completes', async () => {
-      mockApi.getAlbumHistoryPaginated.mockResolvedValue(
-        createMockAlbumHistory(5)
-      );
-
-      render(<LastFmHistoryTab />);
-
-      jest.advanceTimersByTime(300);
-
-      await waitFor(() => {
-        expect(mockApi.getAlbumHistoryPaginated).toHaveBeenCalledTimes(1);
-      });
-
-      // Trigger sync complete via mock SyncStatusBar
-      await user.click(screen.getByText('Trigger Sync Complete'));
-
-      await waitFor(() => {
-        expect(mockApi.getAlbumHistoryPaginated).toHaveBeenCalledTimes(2);
       });
     });
   });
@@ -822,30 +774,6 @@ describe('LastFmHistoryTab', () => {
           'asc',
           undefined
         );
-      });
-    });
-
-    it('reloads artists when sync completes in artists view', async () => {
-      render(<LastFmHistoryTab />);
-
-      jest.advanceTimersByTime(300);
-
-      await waitFor(() => {
-        expect(screen.getByText('Artist 1')).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByRole('button', { name: 'Artists' }));
-
-      jest.advanceTimersByTime(300);
-
-      await waitFor(() => {
-        expect(mockApi.getArtistHistoryPaginated).toHaveBeenCalledTimes(1);
-      });
-
-      await user.click(screen.getByText('Trigger Sync Complete'));
-
-      await waitFor(() => {
-        expect(mockApi.getArtistHistoryPaginated).toHaveBeenCalledTimes(2);
       });
     });
 

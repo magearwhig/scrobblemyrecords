@@ -6,6 +6,7 @@ import MissingAlbumsContainer from '../components/marketplace/MissingAlbumsConta
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useTabKeyNavigation } from '../hooks/useTabKeyNavigation';
+import { ROUTES, navigate } from '../routes';
 import { getApiService } from '../services/api';
 import { getTabFromUrl } from '../utils/tabUtils';
 
@@ -85,7 +86,7 @@ const MarketplacePage: React.FC = () => {
     if (tab !== 'matches') {
       existingParams.delete('seller');
     }
-    window.location.hash = `marketplace?${existingParams.toString()}`;
+    navigate(ROUTES.MARKETPLACE, Object.fromEntries(existingParams));
   };
 
   if (!authStatus.discogs.authenticated) {

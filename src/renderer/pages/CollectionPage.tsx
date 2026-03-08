@@ -1,10 +1,11 @@
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Bookmark, X } from 'lucide-react';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import './CollectionPage.page.css';
 
 import {
   AlbumIdentifier,
   AlbumPlayCountResult,
+  CollectionFilterPreset,
   CollectionItem,
   CollectionSortBy,
   DiscardReason,
@@ -24,6 +25,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
+import { navigate } from '../routes';
 import { getApiService } from '../services/api';
 import { createLogger } from '../utils/logger';
 
@@ -105,6 +107,14 @@ const CollectionPage: React.FC = () => {
     Map<string, AlbumPlayCountResult>
   >(new Map());
   const [loadingPlayCounts, setLoadingPlayCounts] = useState(false);
+
+  // Filter presets state
+  const [filterPresets, setFilterPresets] = useState<CollectionFilterPreset[]>(
+    []
+  );
+  const [savePresetModalOpen, setSavePresetModalOpen] = useState(false);
+  const [newPresetName, setNewPresetName] = useState('');
+  const [savingPreset, setSavingPreset] = useState(false);
 
   const api = getApiService(state.serverUrl);
   const itemsPerPage = 50;
@@ -262,6 +272,60 @@ const CollectionPage: React.FC = () => {
     setFilterYearFrom('');
     setFilterYearTo('');
     setFilterDateAdded('');
+  };
+
+  // Load filter presets from user preferences on mount
+  useEffect(() => {
+    api
+      .getUserPreferences()
+      .then(prefs => {
+        setFilterPresets(prefs.collectionPresets ?? []);
+      })
+      .catch(err => {
+        logger.warn('Failed to load filter presets', err);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const persistPresets = async (presets: CollectionFilterPreset[]) => {
+    setFilterPresets(presets);
+    await api.updateUserPreferences({ collectionPresets: presets });
+  };
+
+  const handleSavePreset = async () => {
+    if (!newPresetName.trim()) return;
+    setSavingPreset(true);
+    const newPreset: CollectionFilterPreset = {
+      id: `preset-${Date.now()}`,
+      name: newPresetName.trim(),
+      filters: {
+        format: filterFormat,
+        yearFrom: filterYearFrom,
+        yearTo: filterYearTo,
+        dateAdded: filterDateAdded,
+      },
+      createdAt: Date.now(),
+    };
+    const updated = [...filterPresets, newPreset];
+    await persistPresets(updated);
+    setSavePresetModalOpen(false);
+    setNewPresetName('');
+    setSavingPreset(false);
+    showToast('success', `Preset "${newPreset.name}" saved`);
+  };
+
+  const handleDeletePreset = async (presetId: string) => {
+    const updated = filterPresets.filter(p => p.id !== presetId);
+    await persistPresets(updated);
+    showToast('success', 'Preset deleted');
+  };
+
+  const handleApplyPreset = (preset: CollectionFilterPreset) => {
+    setFilterFormat(preset.filters.format);
+    setFilterYearFrom(preset.filters.yearFrom);
+    setFilterYearTo(preset.filters.yearTo);
+    setFilterDateAdded(preset.filters.dateAdded);
+    showToast('success', `Applied preset "${preset.name}"`);
   };
 
   useEffect(() => {
@@ -1145,6 +1209,50 @@ const CollectionPage: React.FC = () => {
           filterOptions={filterOptions}
         />
 
+        {/* Filter Presets */}
+        {filterPresets.length > 0 && (
+          <div className='collection-filter-presets'>
+            <span className='collection-filter-presets-label'>
+              <Bookmark size={14} aria-hidden='true' />
+              Presets:
+            </span>
+            <div className='collection-filter-presets-list'>
+              {filterPresets.map(preset => (
+                <div key={preset.id} className='collection-filter-preset-chip'>
+                  <button
+                    className='collection-filter-preset-chip-name'
+                    onClick={() => handleApplyPreset(preset)}
+                    title={`Apply preset: ${preset.name}`}
+                  >
+                    {preset.name}
+                  </button>
+                  <button
+                    className='collection-filter-preset-chip-delete'
+                    onClick={() => handleDeletePreset(preset.id)}
+                    aria-label={`Delete preset ${preset.name}`}
+                  >
+                    <X size={12} aria-hidden='true' />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Save as Preset button */}
+        {hasActiveFilters && (
+          <div className='collection-save-preset-row'>
+            <Button
+              variant='ghost'
+              size='small'
+              onClick={() => setSavePresetModalOpen(true)}
+            >
+              <Bookmark size={14} aria-hidden='true' />
+              Save as Preset
+            </Button>
+          </div>
+        )}
+
         <div className='collection-controls'>
           <div className='collection-controls-group'>
             <div className='collection-view-toggle'>
@@ -1404,7 +1512,7 @@ const CollectionPage: React.FC = () => {
                     'selectedAlbums',
                     JSON.stringify(selectedItems)
                   );
-                  window.location.hash = '#scrobble';
+                  navigate('scrobble');
                 }}
               >
                 Scrobble
@@ -1718,6 +1826,60 @@ const CollectionPage: React.FC = () => {
             placeholder='Condition, pressing details, etc.'
             rows={3}
           />
+        </div>
+      </Modal>
+
+      {/* Save Filter Preset Modal */}
+      <Modal
+        isOpen={savePresetModalOpen}
+        onClose={() => {
+          setSavePresetModalOpen(false);
+          setNewPresetName('');
+        }}
+        title='Save Filter Preset'
+      >
+        <div className='form-group'>
+          <label className='form-label' htmlFor='preset-name'>
+            Preset Name
+          </label>
+          <input
+            id='preset-name'
+            type='text'
+            className='form-input'
+            value={newPresetName}
+            onChange={e => setNewPresetName(e.target.value)}
+            placeholder='e.g. "Vinyl LPs from the 80s"'
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleSavePreset();
+            }}
+          />
+          <div className='collection-preset-save-summary'>
+            {filterFormat && <span>Format: {filterFormat}</span>}
+            {(filterYearFrom || filterYearTo) && (
+              <span>
+                Year: {filterYearFrom || '?'} – {filterYearTo || '?'}
+              </span>
+            )}
+            {filterDateAdded && <span>Added: {filterDateAdded}</span>}
+          </div>
+        </div>
+        <div className='modal-footer'>
+          <Button
+            variant='ghost'
+            onClick={() => {
+              setSavePresetModalOpen(false);
+              setNewPresetName('');
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant='primary'
+            onClick={handleSavePreset}
+            disabled={!newPresetName.trim() || savingPreset}
+          >
+            {savingPreset ? 'Saving...' : 'Save Preset'}
+          </Button>
         </div>
       </Modal>
     </div>

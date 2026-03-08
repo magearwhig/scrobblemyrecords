@@ -9,11 +9,14 @@ import { ProgressBar } from './ui/ProgressBar';
 interface SyncStatusBarProps {
   onSyncComplete?: () => void;
   compact?: boolean;
+  /** When true, only renders during active syncing/paused states (for app-level global bar) */
+  globalBar?: boolean;
 }
 
 const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
   onSyncComplete,
   compact = false,
+  globalBar = false,
 }) => {
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [storageStats, setStorageStats] = useState<{
@@ -168,6 +171,33 @@ const SyncStatusBar: React.FC<SyncStatusBarProps> = ({
   }
 
   if (!syncStatus) return null;
+
+  // Global bar mode: only show during active syncing or paused states
+  if (globalBar) {
+    const isActive =
+      syncStatus.status === 'syncing' || syncStatus.status === 'paused';
+    if (!isActive) return null;
+
+    return (
+      <div className='sync-status-global-bar'>
+        <div className='sync-progress-info'>
+          <span className='sync-label'>
+            {syncStatus.status === 'paused'
+              ? 'Sync paused:'
+              : 'Syncing history:'}
+          </span>
+          <span className='sync-percentage'>{syncStatus.progress}%</span>
+          {syncStatus.estimatedTimeRemaining && (
+            <span className='sync-eta'>
+              ~{formatTimeRemaining(syncStatus.estimatedTimeRemaining)}{' '}
+              remaining
+            </span>
+          )}
+        </div>
+        <ProgressBar value={syncStatus.progress} size='small' animated />
+      </div>
+    );
+  }
 
   // Compact mode for embedding in other components
   if (compact) {

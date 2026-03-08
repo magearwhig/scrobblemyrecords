@@ -1142,3 +1142,8 @@
     margin-top: 0.5rem;
   }
 }
+
+/* Preferences section */
+.preferences-section-actions {
+  margin-top: var(--space-4);
+}

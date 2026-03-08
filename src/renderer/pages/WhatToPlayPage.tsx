@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
+import './WhatToPlayPage.page.css';
+
 import DustyCornersContainer from '../components/whattoplay/DustyCornersContainer';
 import ForgottenFavoritesContainer from '../components/whattoplay/ForgottenFavoritesContainer';
 import { useTabKeyNavigation } from '../hooks/useTabKeyNavigation';
+import { navigate } from '../routes';
 import { getTabFromUrl } from '../utils/tabUtils';
 
 import SuggestionsPage from './SuggestionsPage';
@@ -38,7 +41,7 @@ const WhatToPlayPage: React.FC = () => {
 
   const handleTabChange = (tab: WhatToPlayTab) => {
     setActiveTab(tab);
-    window.location.hash = `what-to-play?tab=${tab}`;
+    navigate('what-to-play', { tab });
   };
 
   return (

@@ -1,7 +1,8 @@
 import { Disc3, Package, Sparkles, Target } from 'lucide-react';
-import React, { useCallback } from 'react';
+import React from 'react';
 
 import { DashboardQuickActions } from '../../../shared/types';
+import { navigate } from '../../routes';
 
 interface QuickActionsGridProps {
   actions: DashboardQuickActions;
@@ -58,11 +59,6 @@ const ACTION_CARDS: ActionCard[] = [
 export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({
   actions,
 }) => {
-  // Navigation helper using hash-based routing
-  const navigate = useCallback((path: string) => {
-    window.location.hash = path.startsWith('/') ? path.slice(1) : path;
-  }, []);
-
   // Filter to only show actions with count > 0
   const activeActions = ACTION_CARDS.filter(card => actions[card.key] > 0);
 

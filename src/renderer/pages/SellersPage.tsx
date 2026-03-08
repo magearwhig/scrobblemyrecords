@@ -17,6 +17,7 @@ import {
   createSuccessNotification,
   createInfoNotification,
 } from '../hooks/useNotifications';
+import { navigate } from '../routes';
 import { getApiService } from '../services/api';
 
 interface SellersPageProps {
@@ -361,7 +362,7 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
             </p>
             <Button
               onClick={() => {
-                window.location.hash = 'marketplace?tab=wishlist';
+                navigate('marketplace?tab=wishlist');
               }}
             >
               Go to Wishlist
@@ -692,7 +693,7 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
           <Button
             variant='outline'
             onClick={() => {
-              window.location.hash = 'marketplace?tab=matches';
+              navigate('marketplace?tab=matches');
             }}
           >
             View All Matches

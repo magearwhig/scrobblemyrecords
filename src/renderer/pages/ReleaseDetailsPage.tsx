@@ -17,6 +17,7 @@ import { ProgressBar } from '../components/ui/ProgressBar';
 import { ReleaseDetailsSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { navigate } from '../routes';
 import { getApiService } from '../services/api';
 import { formatLocalTimeClean, formatRelativeTime } from '../utils/dateUtils';
 import { createLogger } from '../utils/logger';
@@ -527,7 +528,7 @@ const ReleaseDetailsPage: React.FC = () => {
   // Navigate to settings with artist pre-filled for mapping
   const navigateToMappingWithArtist = (artist: string) => {
     setShowDisambiguationWarning(false);
-    window.location.hash = `#settings?prefillArtist=${encodeURIComponent(artist)}`;
+    navigate(`settings?prefillArtist=${encodeURIComponent(artist)}`);
   };
 
   // The actual scrobble logic (called after disambiguation check passes)
@@ -733,7 +734,7 @@ const ReleaseDetailsPage: React.FC = () => {
           <Button
             size='small'
             className='release-details-button-margin-left'
-            onClick={() => (window.location.hash = '#collection')}
+            onClick={() => navigate('collection')}
           >
             Back to Collection
           </Button>
@@ -750,7 +751,7 @@ const ReleaseDetailsPage: React.FC = () => {
           <Button
             size='small'
             className='release-details-button-margin-left'
-            onClick={() => (window.location.hash = '#collection')}
+            onClick={() => navigate('collection')}
           >
             Back to Collection
           </Button>
@@ -818,7 +819,7 @@ const ReleaseDetailsPage: React.FC = () => {
           <Button
             variant='secondary'
             size='small'
-            onClick={() => (window.location.hash = '#collection')}
+            onClick={() => navigate('collection')}
           >
             Back to Collection
           </Button>
@@ -1231,9 +1232,7 @@ const ReleaseDetailsPage: React.FC = () => {
               <Button
                 size='small'
                 className='release-details-button-margin-left'
-                onClick={() =>
-                  (window.location.hash = '#settings?tab=connections')
-                }
+                onClick={() => navigate('settings?tab=connections')}
               >
                 Connect Last.fm
               </Button>

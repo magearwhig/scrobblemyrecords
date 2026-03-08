@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { MonitoredSeller } from '../../shared/types';
+import { navigate } from '../routes';
 
 import { Button } from './ui/Button';
 
@@ -41,7 +42,9 @@ const SellerCard: React.FC<SellerCardProps> = ({
           <Button
             size='small'
             onClick={() => {
-              window.location.hash = `marketplace?tab=matches&seller=${encodeURIComponent(seller.username)}`;
+              navigate(
+                `marketplace?tab=matches&seller=${encodeURIComponent(seller.username)}`
+              );
             }}
           >
             View Matches

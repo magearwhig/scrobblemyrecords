@@ -12,11 +12,11 @@ import {
 import AISuggestionCard from '../components/AISuggestionCard';
 import SuggestionCard from '../components/SuggestionCard';
 import SuggestionWeightControls from '../components/SuggestionWeightControls';
-import SyncStatusBar from '../components/SyncStatusBar';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { AlbumCardSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
+import { navigate } from '../routes';
 import { getApiService } from '../services/api';
 import { createLogger } from '../utils/logger';
 
@@ -192,11 +192,6 @@ const SuggestionsPage: React.FC<SuggestionsPageProps> = ({
     }
   };
 
-  const handleSyncComplete = () => {
-    // Reload suggestions when sync completes
-    loadSuggestions();
-  };
-
   return (
     <div className='suggestions-page'>
       <div className='suggestions-header'>
@@ -213,8 +208,6 @@ const SuggestionsPage: React.FC<SuggestionsPageProps> = ({
           </Button>
         </div>
       </div>
-
-      <SyncStatusBar onSyncComplete={handleSyncComplete} />
 
       {showWeightControls && settings && (
         <div className='suggestions-weight-panel'>
@@ -300,7 +293,7 @@ const SuggestionsPage: React.FC<SuggestionsPageProps> = ({
                 {
                   label: 'Sync History',
                   onClick: () => {
-                    window.location.hash = 'stats';
+                    navigate('stats');
                   },
                   variant: 'secondary',
                 },

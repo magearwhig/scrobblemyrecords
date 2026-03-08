@@ -2,6 +2,7 @@ import { Bot, Music, RefreshCw } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { AISuggestion } from '../../shared/types';
+import { navigate } from '../routes';
 import { createLogger } from '../utils/logger';
 
 import { Button } from './ui/Button';
@@ -26,7 +27,7 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
 
   const handleViewInCollection = () => {
     if (album?.id) {
-      window.location.hash = `collection?highlight=${album.id}`;
+      navigate(`collection?highlight=${album.id}`);
     }
   };
 
@@ -44,7 +45,7 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
       logger.info('localStorage set, verifying', {
         title: stored ? JSON.parse(stored).title : 'null',
       });
-      window.location.hash = 'release-details';
+      navigate('release-details');
     }
   };
 

@@ -34,6 +34,8 @@ const mockApiServiceInstance = {
   preloadCollection: jest.fn(),
   getMarketplaceStats: jest.fn(),
   addToDiscardPile: jest.fn(),
+  getUserPreferences: jest.fn(),
+  updateUserPreferences: jest.fn(),
 };
 
 // Mock the getApiService function to return our mock instance
@@ -300,6 +302,14 @@ describe('CollectionPage', () => {
     mockApiServiceInstance.preloadCollection.mockResolvedValue(undefined);
     mockApiServiceInstance.getMarketplaceStats.mockResolvedValue(null);
     mockApiServiceInstance.addToDiscardPile.mockResolvedValue(undefined);
+    mockApiServiceInstance.getUserPreferences.mockResolvedValue({
+      defaultTimestamp: 'now',
+      batchSize: 50,
+      autoScrobble: false,
+      historyDefaultTab: 'lastfm',
+      collectionPresets: [],
+    });
+    mockApiServiceInstance.updateUserPreferences.mockResolvedValue(undefined);
   });
 
   describe('Authentication', () => {

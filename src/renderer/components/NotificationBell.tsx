@@ -2,6 +2,7 @@ import { AlertCircle, AlertTriangle, Bell, Check, Info } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { AppNotification } from '../../shared/types';
+import { navigate } from '../routes';
 
 interface NotificationBellProps {
   notifications: AppNotification[];
@@ -73,7 +74,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
         if (notification.action.externalUrl) {
           window.open(notification.action.externalUrl, '_blank');
         } else if (notification.action.route) {
-          window.location.hash = notification.action.route.replace('#', '');
+          navigate(notification.action.route);
           setIsOpen(false);
         }
       }

@@ -411,5 +411,66 @@ export function createAuthRouter(
     }
   });
 
+  // Get user preferences
+  router.get('/preferences', async (req: Request, res: Response) => {
+    try {
+      const settings = await authService.getUserSettings();
+      res.json({
+        success: true,
+        data: settings.preferences,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error:
+          error instanceof Error ? error.message : 'Failed to get preferences',
+      });
+    }
+  });
+
+  // Update user preferences (partial update)
+  router.patch('/preferences', async (req: Request, res: Response) => {
+    try {
+      const settings = await authService.getUserSettings();
+      const updates = req.body as Partial<typeof settings.preferences>;
+
+      if (updates.historyDefaultTab !== undefined) {
+        const validTabs = ['sessions', 'lastfm'];
+        if (!validTabs.includes(updates.historyDefaultTab)) {
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid historyDefaultTab value',
+          });
+        }
+        settings.preferences.historyDefaultTab = updates.historyDefaultTab;
+      }
+
+      if (updates.collectionPresets !== undefined) {
+        if (!Array.isArray(updates.collectionPresets)) {
+          return res.status(400).json({
+            success: false,
+            error: 'collectionPresets must be an array',
+          });
+        }
+        settings.preferences.collectionPresets = updates.collectionPresets;
+      }
+
+      await authService.saveUserSettings(settings);
+
+      res.json({
+        success: true,
+        data: settings.preferences,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to update preferences',
+      });
+    }
+  });
+
   return router;
 }

@@ -2,6 +2,7 @@ import React from 'react';
 
 import { DustyCornerAlbum } from '../../../shared/types';
 import { Button, IconButton } from '../../components/ui/Button';
+import { navigate } from '../../routes';
 import { playAlbumOnSpotify } from '../../utils/spotifyUtils';
 
 interface DustyCornersSectionProps {
@@ -124,7 +125,7 @@ export const DustyCornersSection: React.FC<DustyCornersSectionProps> = ({
                 'selectedRelease',
                 JSON.stringify(releaseInfo)
               );
-              window.location.hash = 'release-details';
+              navigate('release-details');
             }}
           >
             <div className='dusty-corners-cover'>
@@ -171,7 +172,7 @@ export const DustyCornersSection: React.FC<DustyCornersSectionProps> = ({
             variant='outline'
             size='small'
             onClick={() => {
-              window.location.hash = 'what-to-play?tab=dusty';
+              navigate('what-to-play?tab=dusty');
             }}
             aria-label='See all dusty corners in What to Play'
           >

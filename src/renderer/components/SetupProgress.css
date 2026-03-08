@@ -1,0 +1,103 @@
+/* SetupProgress — onboarding checklist banner */
+
+.setup-progress {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+}
+
+.setup-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+
+.setup-progress-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.setup-progress-count {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.setup-progress-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.setup-progress-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.setup-progress-step-done {
+  color: var(--text-muted);
+}
+
+.setup-progress-step-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.setup-progress-step-done .setup-progress-step-icon {
+  color: var(--status-success);
+}
+
+.setup-progress-step:not(.setup-progress-step-done) .setup-progress-step-icon {
+  color: var(--text-muted);
+}
+
+.setup-progress-step-number {
+  font-weight: 500;
+  color: inherit;
+  flex-shrink: 0;
+}
+
+.setup-progress-step-label {
+  flex: 1;
+  color: inherit;
+}
+
+.setup-progress-step-done .setup-progress-step-label {
+  text-decoration: line-through;
+}
+
+.setup-progress-step-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: none;
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  color: var(--accent-primary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  white-space: nowrap;
+}
+
+.setup-progress-step-action:hover {
+  background: var(--accent-primary-muted);
+}
+
+.setup-progress-step-action:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}

@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 
-import { ROUTES } from '../routes';
+import { ROUTES, navigate } from '../routes';
 
 interface ArtistLinkProps {
   artist: string;
@@ -9,8 +9,8 @@ interface ArtistLinkProps {
 
 /**
  * Clickable artist name that navigates to ArtistDetailPage.
- * Stores 'selectedArtist' and 'previousPage' in localStorage before navigating,
- * enabling the detail page to load the correct artist and show a back link.
+ * Stores 'selectedArtist' in localStorage and passes the current page as a
+ * `?from=` query param so the detail page can render a correct back link.
  */
 const ArtistLink: React.FC<ArtistLinkProps> = ({ artist, className = '' }) => {
   const handleClick = useCallback(
@@ -18,9 +18,8 @@ const ArtistLink: React.FC<ArtistLinkProps> = ({ artist, className = '' }) => {
       e.stopPropagation();
       e.preventDefault();
       const currentPage = window.location.hash.replace('#', '').split('?')[0];
-      localStorage.setItem('previousPage', currentPage);
       localStorage.setItem('selectedArtist', artist);
-      window.location.hash = `#${ROUTES.ARTIST_DETAIL}`;
+      navigate(ROUTES.ARTIST_DETAIL, { from: currentPage });
     },
     [artist]
   );
@@ -31,9 +30,8 @@ const ArtistLink: React.FC<ArtistLinkProps> = ({ artist, className = '' }) => {
         e.preventDefault();
         e.stopPropagation();
         const currentPage = window.location.hash.replace('#', '').split('?')[0];
-        localStorage.setItem('previousPage', currentPage);
         localStorage.setItem('selectedArtist', artist);
-        window.location.hash = `#${ROUTES.ARTIST_DETAIL}`;
+        navigate(ROUTES.ARTIST_DETAIL, { from: currentPage });
       }
     },
     [artist]

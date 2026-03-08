@@ -428,3 +428,79 @@
   width: 12px;
   height: 12px;
 }
+
+/* Filter Presets */
+.collection-filter-presets {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+
+.collection-filter-presets-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.collection-filter-presets-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.collection-filter-preset-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--bg-secondary);
+}
+
+.collection-filter-preset-chip-name {
+  background: none;
+  border: none;
+  padding: 2px var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.collection-filter-preset-chip-name:hover {
+  background: var(--bg-hover);
+  color: var(--accent-primary);
+}
+
+.collection-filter-preset-chip-delete {
+  background: none;
+  border: none;
+  border-left: 1px solid var(--border-default);
+  padding: 2px 6px;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+}
+
+.collection-filter-preset-chip-delete:hover {
+  background: var(--bg-hover);
+  color: var(--status-error);
+}
+
+.collection-save-preset-row {
+  margin-bottom: var(--space-2);
+}
+
+.collection-preset-save-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}

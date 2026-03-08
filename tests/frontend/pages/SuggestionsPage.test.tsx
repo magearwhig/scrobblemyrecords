@@ -35,13 +35,6 @@ jest.mock('../../../src/renderer/services/api', () => ({
   }),
 }));
 
-// Mock SyncStatusBar
-jest.mock('../../../src/renderer/components/SyncStatusBar', () => {
-  return function MockSyncStatusBar() {
-    return <div data-testid='sync-status-bar'>Sync Status Bar</div>;
-  };
-});
-
 // Mock SuggestionCard
 jest.mock('../../../src/renderer/components/SuggestionCard', () => {
   return function MockSuggestionCard({
@@ -266,12 +259,6 @@ describe('SuggestionsPage', () => {
     });
 
     expect(screen.getByTestId('suggestion-card-2')).toBeInTheDocument();
-  });
-
-  it('shows SyncStatusBar', async () => {
-    renderSuggestionsPage();
-
-    expect(screen.getByTestId('sync-status-bar')).toBeInTheDocument();
   });
 
   it('shows error state when API fails', async () => {
