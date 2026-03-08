@@ -16,6 +16,9 @@ dist/
 build/
 *.tsbuildinfo
 
+# Agent team scratch files
+agentteam*.md
+
 # Cache and data files
 data/
 *.cache

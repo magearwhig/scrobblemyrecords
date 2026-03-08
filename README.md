@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-3762%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-4131%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -124,6 +124,11 @@ npm run start:web
 - **Cache Management**: Force reload collection data when needed
 - **Cache Updates**: Check for new Discogs additions and update the cache incrementally
 - **Discovery + Mapping**: Find "missing" albums/artists and map them to items in your collection
+- **Keyboard Shortcuts**: Global shortcuts for quick navigation (press `?` to see all)
+- **Setup Progress**: Guided setup banner shows remaining configuration steps
+- **Sync Status Bar**: Real-time sync progress indicator in the header
+- **Saved Filter Presets**: Save and recall collection filter configurations
+- **Breadcrumbs**: Detail pages show navigation breadcrumbs for easy back-navigation
 - **Dark Mode**: Toggle between light and dark themes
 - **Local Timezone**: All times displayed in your local timezone
 - **Sorting Options**: Sort collection by artist, title, year, date added, or scrobble count
@@ -151,6 +156,7 @@ Your personalized dashboard showing key metrics and insights at a glance:
 **Recent Activity:**
 - Last 5 albums you played (album-focused view)
 - Monthly top 5 artists and albums
+- On This Day: what you were listening to on this date in previous years
 - Calendar heatmap of listening activity
 - Progress toward scrobble milestones
 
@@ -175,6 +181,9 @@ Comprehensive listening statistics and visualizations:
 - **Custom Date Range**: Pick specific months or custom date ranges for all stats
 - **Milestone Progress**: Track progress toward scrobble milestones (1K, 5K, 10K, etc.)
 - **Dusty Corners**: Albums in your collection you haven't played in 6+ months, with Spotify play buttons
+- **Collection ROI Score**: "Bang for your buck" leaderboard showing plays-per-dollar for albums in your collection with marketplace value data
+- **Album Listening Arc**: Monthly play count chart for any album, revealing honeymoon phases, plateaus, and rediscovery
+- **Taste Drift**: Genre trajectory chart showing how your listening taste evolves over time by quarter
 - **Source Breakdown**: See which sources your scrobbles come from
 - **Listening Timeline**: Visualize listening trends over time
 
@@ -707,7 +716,9 @@ src/
 │   │   ├── backup.ts              # Backup & restore
 │   │   ├── discardPile.ts         # Discard pile management
 │   │   ├── wrapped.ts             # Wrapped/period-in-review
-│   │   └── collectionAnalytics.ts # Collection analytics & value estimation
+│   │   ├── collectionAnalytics.ts # Collection analytics & value estimation
+│   │   ├── embeddings.ts          # Embedding management endpoints
+│   │   └── recommendations.ts     # Embedding-based recommendations
 │   ├── services/                  # Business logic
 │   │   ├── authService.ts         # Encrypted credential storage
 │   │   ├── discogsService.ts      # Discogs API client (rate-limited)
@@ -738,7 +749,13 @@ src/
 │   │   ├── migrationService.ts    # Data schema migrations
 │   │   ├── ollamaService.ts       # AI integration (Ollama)
 │   │   ├── aiPromptBuilder.ts     # AI prompt generation
-│   │   └── collectionAnalyticsService.ts # Collection analytics & value estimation
+│   │   ├── ollamaEmbedderService.ts    # Ollama embedding generation
+│   │   ├── embeddingStorageService.ts  # Vector storage for embeddings
+│   │   ├── profileBuilderService.ts    # Album profile construction for recommendations
+│   │   ├── scoringEngineService.ts     # Cosine similarity scoring engine
+│   │   ├── recommendationService.ts    # Embedding-based recommendation orchestration
+│   │   ├── collectionAnalyticsService.ts # Collection analytics & value estimation
+│   │   └── collectionIndexerService.ts   # Collection index for batch lookups
 │   └── utils/                     # Utilities
 │       ├── fileStorage.ts         # File-based JSON storage
 │       ├── logger.ts              # Secure logger with redaction
@@ -783,6 +800,7 @@ src/
 │   │   ├── TrackDetailPage.tsx    # Track deep dive
 │   │   ├── DiscardPilePage.tsx    # Discard pile
 │   │   ├── CollectionAnalyticsPage.tsx # Collection analytics
+│   │   ├── RecommendationsPage.tsx # Embedding-based recommendations
 │   │   └── SettingsPage.tsx       # Settings (tabs: Connections, Mappings, Filters, etc.)
 │   ├── context/                   # React Context providers
 │   │   ├── AppContext.tsx         # Global app state
