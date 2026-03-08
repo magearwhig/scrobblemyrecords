@@ -139,6 +139,29 @@ describe('WrappedService', () => {
       entry: null,
       match: 'none',
     });
+    mockHistoryStorage.normalizeKey = jest
+      .fn()
+      .mockImplementation(
+        (artist: string, album: string) =>
+          `${artist.toLowerCase().trim()}|${album.toLowerCase().trim()}`
+      );
+    // batchLookup delegates to getAlbumHistoryFuzzy so existing test setups still work
+    mockHistoryStorage.batchLookup = jest
+      .fn()
+      .mockImplementation(
+        async (keys: Array<{ artist: string; album: string }>) => {
+          const result = new Map();
+          for (const { artist, album } of keys) {
+            const mapKey = `${artist.toLowerCase().trim()}|${album.toLowerCase().trim()}`;
+            const fuzzyResult = await mockHistoryStorage.getAlbumHistoryFuzzy(
+              artist,
+              album
+            );
+            result.set(mapKey, fuzzyResult);
+          }
+          return result;
+        }
+      );
 
     mockStatsService.getTopArtists = jest.fn().mockResolvedValue([
       { artist: 'Radiohead', playCount: 4 },

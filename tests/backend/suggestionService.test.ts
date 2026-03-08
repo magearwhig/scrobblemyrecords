@@ -58,6 +58,33 @@ describe('SuggestionService', () => {
         .fn()
         .mockResolvedValue({ entry: null, matchType: 'none' }),
       getDaysSinceLastPlayed: jest.fn().mockResolvedValue(null),
+      normalizeKey: jest
+        .fn()
+        .mockImplementation(
+          (artist: string, album: string) =>
+            `${artist.toLowerCase().trim()}|${album.toLowerCase().trim()}`
+        ),
+      // batchLookup delegates to getAlbumHistoryFuzzy so existing test setups still work
+      batchLookup: jest
+        .fn()
+        .mockImplementation(
+          async (
+            keys: Array<{ artist: string; album: string }>,
+            options?: { countsOnly?: boolean }
+          ) => {
+            const result = new Map();
+            for (const { artist, album } of keys) {
+              const mapKey = `${artist.toLowerCase().trim()}|${album.toLowerCase().trim()}`;
+              const fuzzyResult = await mockHistoryStorage.getAlbumHistoryFuzzy(
+                artist,
+                album,
+                options
+              );
+              result.set(mapKey, fuzzyResult);
+            }
+            return result;
+          }
+        ),
     } as unknown as jest.Mocked<ScrobbleHistoryStorage>;
 
     suggestionService = new SuggestionService(

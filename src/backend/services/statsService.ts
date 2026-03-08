@@ -121,7 +121,9 @@ export class StatsService {
   }
 
   /**
-   * Get all stats for the overview dashboard
+   * Get all stats for the overview dashboard.
+   * Individual stat methods serve from cache when warm; collection-dependent
+   * stats (collectionCoverage) are always computed live.
    */
   async getStatsOverview(collection: CollectionItem[]): Promise<StatsOverview> {
     const [streaks, counts, listeningHours, collectionCoverage, milestones] =
@@ -146,10 +148,134 @@ export class StatsService {
   }
 
   /**
+   * Precompute all expensive stats (excluding collection-dependent ones) and
+   * persist to stats-cache.json. Called asynchronously after a sync completes.
+   * Does not throw — errors are logged and the cache simply stays cold.
+   */
+  async warmCache(): Promise<void> {
+    try {
+      this.logger.info('Warming stats cache...');
+
+      const lastSyncTimestamp =
+        await this.historyStorage.getLastSyncTimestamp();
+      if (lastSyncTimestamp === null) {
+        this.logger.debug('No sync timestamp — skipping cache warm');
+        return;
+      }
+
+      const WARM_PERIODS = ['month', 'year', 'all'] as const;
+      const TOP_LIMIT = 10;
+
+      const [
+        streaks,
+        counts,
+        listeningHours,
+        milestones,
+        newArtistsThisMonth,
+        hourlyDistribution,
+        dayOfWeekDistribution,
+      ] = await Promise.all([
+        this.calculateStreaks(),
+        this.getScrobbleCounts(),
+        this.getListeningHours(),
+        this.getMilestones(),
+        this.getNewArtistsThisMonth(),
+        this.getHourlyDistribution(),
+        this.getDayOfWeekDistribution(),
+      ]);
+
+      // Pre-fetch top artists/albums/tracks for each period in parallel
+      const [topArtistsResults, topAlbumsResults, topTracksResults] =
+        await Promise.all([
+          Promise.all(WARM_PERIODS.map(p => this.getTopArtists(p, TOP_LIMIT))),
+          Promise.all(WARM_PERIODS.map(p => this.getTopAlbums(p, TOP_LIMIT))),
+          Promise.all(WARM_PERIODS.map(p => this.getTopTracks(p, TOP_LIMIT))),
+        ]);
+
+      const topArtists: Record<string, ArtistPlayCount[]> = {};
+      const topAlbums: Record<string, AlbumPlayCount[]> = {};
+      const topTracks: Record<string, TrackPlayCount[]> = {};
+
+      WARM_PERIODS.forEach((period, i) => {
+        topArtists[period] = topArtistsResults[i];
+        topAlbums[period] = topAlbumsResults[i];
+        topTracks[period] = topTracksResults[i];
+      });
+
+      // Preserve existing milestone history when updating the cache
+      const existing = await this.loadStatsCache();
+      const now = Math.floor(Date.now() / 1000);
+
+      await this.saveStatsCache({
+        schemaVersion: 1,
+        lastUpdated: now,
+        streaks,
+        milestoneHistory: existing?.milestoneHistory ?? [],
+        warm: {
+          warmedAt: now,
+          syncTimestamp: lastSyncTimestamp,
+          streaks,
+          counts,
+          listeningHours,
+          newArtistsThisMonth,
+          milestones,
+          topArtists,
+          topAlbums,
+          topTracks,
+          hourlyDistribution,
+          dayOfWeekDistribution,
+        },
+      });
+
+      this.logger.info('Stats cache warmed successfully');
+    } catch (error) {
+      this.logger.error('Failed to warm stats cache', error);
+    }
+  }
+
+  /**
+   * Invalidate the persisted warm cache so the next request recomputes live.
+   * Should be called when a new sync starts.
+   */
+  async invalidateStatsCache(): Promise<void> {
+    try {
+      const existing = await this.loadStatsCache();
+      if (existing?.warm) {
+        await this.saveStatsCache({
+          ...existing,
+          warm: undefined,
+        });
+        this.logger.debug('Stats warm cache invalidated');
+      }
+    } catch (error) {
+      this.logger.error('Failed to invalidate stats cache', error);
+    }
+  }
+
+  /**
+   * Load the warm cache and validate freshness against current sync timestamp.
+   * Returns the warm cache block if valid, null otherwise.
+   */
+  private async getValidWarmCache(): Promise<StatsCache['warm'] | null> {
+    const cache = await this.loadStatsCache();
+    if (!cache?.warm) return null;
+    const lastSyncTimestamp = await this.historyStorage.getLastSyncTimestamp();
+    if (lastSyncTimestamp === null) return null;
+    if (cache.warm.syncTimestamp !== lastSyncTimestamp) return null;
+    return cache.warm;
+  }
+
+  /**
    * Calculate daily listening streak.
    * A streak is consecutive calendar days (in local time) with at least one scrobble.
    */
   async calculateStreaks(): Promise<StreakInfo> {
+    const warm = await this.getValidWarmCache();
+    if (warm) {
+      this.logger.debug('Serving calculateStreaks from warm cache');
+      return warm.streaks;
+    }
+
     const index = await this.historyStorage.getIndex();
     if (!index) {
       return {
@@ -280,6 +406,12 @@ export class StatsService {
    * Get scrobble counts for various time periods
    */
   async getScrobbleCounts(): Promise<ScrobbleCounts> {
+    const warm = await this.getValidWarmCache();
+    if (warm) {
+      this.logger.debug('Serving getScrobbleCounts from warm cache');
+      return warm.counts;
+    }
+
     const index = await this.historyStorage.getIndex();
     if (!index) {
       return {
@@ -333,6 +465,12 @@ export class StatsService {
    * Uses average track duration of 3.5 minutes.
    */
   async getListeningHours(): Promise<ListeningHours> {
+    const warm = await this.getValidWarmCache();
+    if (warm) {
+      this.logger.debug('Serving getListeningHours from warm cache');
+      return warm.listeningHours;
+    }
+
     const counts = await this.getScrobbleCounts();
 
     return {
@@ -394,6 +532,20 @@ export class StatsService {
     startDate?: number,
     endDate?: number
   ): Promise<ArtistPlayCount[]> {
+    // Serve from warm cache for standard periods at default limit
+    if (
+      (period === 'month' || period === 'year' || period === 'all') &&
+      limit === 10 &&
+      startDate === undefined &&
+      endDate === undefined
+    ) {
+      const warm = await this.getValidWarmCache();
+      if (warm?.topArtists[period]) {
+        this.logger.debug(`Serving getTopArtists(${period}) from warm cache`);
+        return warm.topArtists[period];
+      }
+    }
+
     const index = await this.historyStorage.getIndex();
     if (!index) {
       return [];
@@ -463,6 +615,21 @@ export class StatsService {
     endDate?: number,
     collection?: CollectionItem[]
   ): Promise<AlbumPlayCount[]> {
+    // Serve from warm cache for standard periods at default limit (without collection enrichment)
+    if (
+      (period === 'month' || period === 'year' || period === 'all') &&
+      limit === 10 &&
+      startDate === undefined &&
+      endDate === undefined &&
+      !collection
+    ) {
+      const warm = await this.getValidWarmCache();
+      if (warm?.topAlbums[period]) {
+        this.logger.debug(`Serving getTopAlbums(${period}) from warm cache`);
+        return warm.topAlbums[period];
+      }
+    }
+
     const index = await this.historyStorage.getIndex();
     if (!index) {
       return [];
@@ -559,6 +726,20 @@ export class StatsService {
     startDate?: number,
     endDate?: number
   ): Promise<TrackPlayCount[]> {
+    // Serve from warm cache for standard periods at default limit
+    if (
+      (period === 'month' || period === 'year' || period === 'all') &&
+      limit === 10 &&
+      startDate === undefined &&
+      endDate === undefined
+    ) {
+      const warm = await this.getValidWarmCache();
+      if (warm?.topTracks[period]) {
+        this.logger.debug(`Serving getTopTracks(${period}) from warm cache`);
+        return warm.topTracks[period];
+      }
+    }
+
     const index = await this.historyStorage.getIndex();
     if (!index) {
       return [];
@@ -673,8 +854,11 @@ export class StatsService {
     let albumsPlayedDays90 = 0;
     let albumsPlayedDays365 = 0;
 
+    // Step 1: resolve album mappings for all collection items
+    const batchKeys: Array<{ artist: string; album: string }> = [];
+    const resolvedItems: Array<{ artist: string; album: string }> = [];
+
     for (const item of collection) {
-      // Check if there's an album mapping for this collection item
       let searchArtist = item.release.artist;
       let searchAlbum = item.release.title;
 
@@ -694,12 +878,19 @@ export class StatsService {
         }
       }
 
-      const result = await this.historyStorage.getAlbumHistoryFuzzy(
-        searchArtist,
-        searchAlbum
-      );
+      resolvedItems.push({ artist: searchArtist, album: searchAlbum });
+      batchKeys.push({ artist: searchArtist, album: searchAlbum });
+    }
 
-      if (result.entry && result.entry.playCount > 0) {
+    // Step 2: batch lookup — single index read for all collection items
+    const batchResults = await this.historyStorage.batchLookup(batchKeys);
+
+    // Step 3: process results from the batch map
+    for (const { artist, album } of resolvedItems) {
+      const lookupKey = this.historyStorage.normalizeKey(artist, album);
+      const result = batchResults.get(lookupKey);
+
+      if (result?.entry && result.entry.playCount > 0) {
         // Album has been played at least once
         albumsPlayedAllTime++;
 
@@ -773,8 +964,15 @@ export class StatsService {
 
     const dustyAlbums: DustyCornerAlbum[] = [];
 
+    // Step 1: resolve album mappings for all collection items
+    const batchKeys: Array<{ artist: string; album: string }> = [];
+    const resolvedDustyItems: Array<{
+      item: CollectionItem;
+      searchArtist: string;
+      searchAlbum: string;
+    }> = [];
+
     for (const item of collection) {
-      // Check if there's an album mapping for this collection item
       let searchArtist = item.release.artist;
       let searchAlbum = item.release.title;
 
@@ -794,14 +992,26 @@ export class StatsService {
         }
       }
 
-      const result = await this.historyStorage.getAlbumHistoryFuzzy(
+      resolvedDustyItems.push({ item, searchArtist, searchAlbum });
+      batchKeys.push({ artist: searchArtist, album: searchAlbum });
+    }
+
+    // Step 2: batch lookup — countsOnly since we only need lastPlayed/playCount
+    const batchResults = await this.historyStorage.batchLookup(batchKeys, {
+      countsOnly: true,
+    });
+
+    // Step 3: filter and collect dusty albums from batch results
+    for (const { item, searchArtist, searchAlbum } of resolvedDustyItems) {
+      const lookupKey = this.historyStorage.normalizeKey(
         searchArtist,
         searchAlbum
       );
+      const result = batchResults.get(lookupKey);
 
       // Album never played or last played more than 6 months ago
-      if (!result.entry || result.entry.lastPlayed < sixMonthsAgoSeconds) {
-        const lastPlayed = result.entry?.lastPlayed || 0;
+      if (!result?.entry || result.entry.lastPlayed < sixMonthsAgoSeconds) {
+        const lastPlayed = result?.entry?.lastPlayed || 0;
         const daysSincePlay = lastPlayed
           ? Math.floor((now / 1000 - lastPlayed) / (24 * 60 * 60))
           : Infinity;
@@ -839,8 +1049,15 @@ export class StatsService {
   ): Promise<AlbumPlayCount[]> {
     const albumsWithPlays: AlbumPlayCount[] = [];
 
+    // Step 1: resolve album mappings for all collection items
+    const heavyBatchKeys: Array<{ artist: string; album: string }> = [];
+    const resolvedHeavyItems: Array<{
+      item: CollectionItem;
+      searchArtist: string;
+      searchAlbum: string;
+    }> = [];
+
     for (const item of collection) {
-      // Check if there's an album mapping for this collection item
       let searchArtist = item.release.artist;
       let searchAlbum = item.release.title;
 
@@ -860,12 +1077,25 @@ export class StatsService {
         }
       }
 
-      const result = await this.historyStorage.getAlbumHistoryFuzzy(
+      resolvedHeavyItems.push({ item, searchArtist, searchAlbum });
+      heavyBatchKeys.push({ artist: searchArtist, album: searchAlbum });
+    }
+
+    // Step 2: batch lookup — countsOnly since we only need playCount/lastPlayed
+    const heavyBatchResults = await this.historyStorage.batchLookup(
+      heavyBatchKeys,
+      { countsOnly: true }
+    );
+
+    // Step 3: collect albums with plays from batch results
+    for (const { item, searchArtist, searchAlbum } of resolvedHeavyItems) {
+      const lookupKey = this.historyStorage.normalizeKey(
         searchArtist,
         searchAlbum
       );
+      const result = heavyBatchResults.get(lookupKey);
 
-      if (result.entry && result.entry.playCount > 0) {
+      if (result?.entry && result.entry.playCount > 0) {
         albumsWithPlays.push({
           artist: item.release.artist,
           album: item.release.title,
@@ -919,6 +1149,12 @@ export class StatsService {
    * Calculates when each milestone was actually reached based on scrobble history
    */
   async getMilestones(): Promise<MilestoneInfo> {
+    const warm = await this.getValidWarmCache();
+    if (warm) {
+      this.logger.debug('Serving getMilestones from warm cache');
+      return warm.milestones;
+    }
+
     const total = await this.historyStorage.getTotalScrobbles();
 
     // Find next milestone
@@ -992,7 +1228,7 @@ export class StatsService {
         }
       }
 
-      // Update cache
+      // Update cache — preserve the warm block so we don't inadvertently clear it
       const now = Math.floor(Date.now() / 1000);
       await this.saveStatsCache({
         schemaVersion: 1,
@@ -1002,6 +1238,7 @@ export class StatsService {
           longestStreak: 0,
         },
         milestoneHistory: history,
+        warm: cache?.warm,
       });
     }
 
@@ -1018,6 +1255,12 @@ export class StatsService {
    * Count new artists discovered this month
    */
   async getNewArtistsThisMonth(): Promise<number> {
+    const warm = await this.getValidWarmCache();
+    if (warm) {
+      this.logger.debug('Serving getNewArtistsThisMonth from warm cache');
+      return warm.newArtistsThisMonth;
+    }
+
     const details = await this.getNewArtistsDetails();
     return details.length;
   }
@@ -1863,6 +2106,12 @@ export class StatsService {
    * @returns Distribution array (always 24 entries), peak hour, total count, and insight
    */
   async getHourlyDistribution(): Promise<HourlyDistributionResult> {
+    const warm = await this.getValidWarmCache();
+    if (warm) {
+      this.logger.debug('Serving getHourlyDistribution from warm cache');
+      return warm.hourlyDistribution;
+    }
+
     const hourlyMap = await this.historyStorage.getHourlyDistribution();
 
     // Build array for all 24 hours (Map may not have entries for every hour)
@@ -1926,6 +2175,12 @@ export class StatsService {
    * @returns Distribution array (always 7 entries), peak day, weekday/weekend averages, and insight
    */
   async getDayOfWeekDistribution(): Promise<DayOfWeekDistributionResult> {
+    const warm = await this.getValidWarmCache();
+    if (warm) {
+      this.logger.debug('Serving getDayOfWeekDistribution from warm cache');
+      return warm.dayOfWeekDistribution;
+    }
+
     const dayMap = await this.historyStorage.getDayOfWeekDistribution();
 
     const dayNames = [
@@ -2230,7 +2485,7 @@ export class StatsService {
 
   private async saveStatsCache(cache: StatsCache): Promise<void> {
     try {
-      await this.fileStorage.writeJSON(STATS_CACHE_FILE, cache);
+      await this.fileStorage.writeJSONWithBackup(STATS_CACHE_FILE, cache);
     } catch (error) {
       this.logger.error('Failed to save stats cache', error);
     }

@@ -790,6 +790,25 @@ export interface StatsCache {
   lastUpdated: number; // Unix timestamp UTC
   streaks: StreakInfo;
   milestoneHistory: { milestone: number; reachedAt: number }[];
+  /**
+   * Warm cache block — populated by warmCache() after each sync.
+   * Contains all stats that do NOT require collection data.
+   * Keyed by syncTimestamp so stale entries are automatically ignored.
+   */
+  warm?: {
+    warmedAt: number; // Unix timestamp seconds when cache was built
+    syncTimestamp: number; // historyStorage.lastSyncTimestamp at warm time (ms)
+    streaks: StreakInfo;
+    counts: ScrobbleCounts;
+    listeningHours: ListeningHours;
+    newArtistsThisMonth: number;
+    milestones: MilestoneInfo;
+    topArtists: Record<string, ArtistPlayCount[]>; // keyed by period
+    topAlbums: Record<string, AlbumPlayCount[]>; // keyed by period (no collection enrichment)
+    topTracks: Record<string, TrackPlayCount[]>; // keyed by period
+    hourlyDistribution: HourlyDistributionResult;
+    dayOfWeekDistribution: DayOfWeekDistributionResult;
+  };
 }
 
 // ============================================

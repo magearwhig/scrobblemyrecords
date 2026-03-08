@@ -14,6 +14,15 @@ import { createLogger } from '../utils/logger';
 import { AuthService } from './authService';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 
+/**
+ * Minimal interface for stats cache warming, used to avoid a circular import
+ * between ScrobbleHistorySyncService and StatsService.
+ */
+export interface StatsCacheWarmer {
+  warmCache(): Promise<void>;
+  invalidateStatsCache(): Promise<void>;
+}
+
 // Last.fm API track response type
 interface LastFmTrack {
   artist: { '#text': string } | string;
@@ -32,6 +41,7 @@ export class ScrobbleHistorySyncService extends EventEmitter {
   private fileStorage: FileStorage;
   private authService: AuthService;
   private historyStorage: ScrobbleHistoryStorage | null = null;
+  private statsWarmer: StatsCacheWarmer | null = null;
   private baseUrl = 'https://ws.audioscrobbler.com/2.0/';
   private logger = createLogger('ScrobbleHistorySyncService');
 
@@ -87,6 +97,29 @@ export class ScrobbleHistorySyncService extends EventEmitter {
    */
   setHistoryStorage(historyStorage: ScrobbleHistoryStorage): void {
     this.historyStorage = historyStorage;
+  }
+
+  /**
+   * Set the stats cache warmer (StatsService).
+   * Called from server.ts after both services are constructed to avoid circular imports.
+   * After each successful sync, warmCache() is triggered asynchronously.
+   */
+  setStatsWarmer(warmer: StatsCacheWarmer): void {
+    this.statsWarmer = warmer;
+  }
+
+  /**
+   * Trigger async cache warm after sync — fire-and-forget, errors are swallowed
+   * by warmCache() itself so they don't affect the sync result.
+   */
+  private triggerCacheWarm(): void {
+    if (!this.statsWarmer) {
+      return;
+    }
+    // Run async without blocking — warmCache() already logs its own errors
+    this.statsWarmer.warmCache().catch(err => {
+      this.logger.error('Failed to trigger stats cache warm after sync', err);
+    });
   }
 
   /**
@@ -270,6 +303,16 @@ export class ScrobbleHistorySyncService extends EventEmitter {
     this.isPaused = false;
     this.syncAbortController = new AbortController();
 
+    // Invalidate stale overview cache at sync start so reads fall back to live computation
+    if (this.statsWarmer) {
+      this.statsWarmer.invalidateStatsCache().catch(err => {
+        this.logger.error(
+          'Failed to invalidate stats cache before full sync',
+          err
+        );
+      });
+    }
+
     const index: ScrobbleHistoryIndex = {
       lastSyncTimestamp: Date.now(),
       totalScrobbles: 0,
@@ -373,6 +416,9 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       this.logger.info(
         `Full sync completed: ${processedCount} scrobbles indexed, ${Object.keys(index.albums).length} albums`
       );
+
+      // Warm stats cache asynchronously — does not block sync completion
+      this.triggerCacheWarm();
     } catch (error) {
       this.logger.error('Error during full sync', error);
       this.syncStatus.status = 'error';
@@ -404,6 +450,16 @@ export class ScrobbleHistorySyncService extends EventEmitter {
     this.logger.info('Starting incremental scrobble sync');
     this.isSyncing = true;
     this.isPaused = false;
+
+    // Invalidate stale overview cache at sync start
+    if (this.statsWarmer) {
+      this.statsWarmer.invalidateStatsCache().catch(err => {
+        this.logger.error(
+          'Failed to invalidate stats cache before incremental sync',
+          err
+        );
+      });
+    }
 
     try {
       let page = 1;
@@ -482,6 +538,9 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       this.logger.info(
         `Incremental sync completed: ${newScrobbles} new scrobbles`
       );
+
+      // Warm stats cache asynchronously — does not block sync completion
+      this.triggerCacheWarm();
     } catch (error) {
       this.logger.error('Error during incremental sync', error);
       this.syncStatus.status = 'error';

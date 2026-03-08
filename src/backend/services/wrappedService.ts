@@ -339,13 +339,22 @@ export class WrappedService {
       let maxPlays = 0;
       let bestItem: CollectionItem | null = null;
 
+      // Batch lookup — single index read for all new additions
+      const addedBatchKeys = addedInRange.map(item => ({
+        artist: item.release.artist,
+        album: item.release.title,
+      }));
+      const addedBatchResults =
+        await this.historyStorage.batchLookup(addedBatchKeys);
+
       for (const item of addedInRange) {
-        const result = await this.historyStorage.getAlbumHistoryFuzzy(
+        const lookupKey = this.historyStorage.normalizeKey(
           item.release.artist,
           item.release.title
         );
+        const result = addedBatchResults.get(lookupKey);
 
-        if (result.entry) {
+        if (result?.entry) {
           // Count plays that occurred after the item was added and within the range
           const addedSec = new Date(item.date_added).getTime() / 1000;
           const playsInRange = result.entry.plays.filter(
@@ -393,13 +402,22 @@ export class WrappedService {
     const totalCollectionSize = collection?.length || 0;
 
     if (collection && collection.length > 0 && index) {
+      // Batch lookup — single index read for entire collection
+      const crossBatchKeys = collection.map(item => ({
+        artist: item.release.artist,
+        album: item.release.title,
+      }));
+      const crossBatchResults =
+        await this.historyStorage.batchLookup(crossBatchKeys);
+
       for (const item of collection) {
-        const result = await this.historyStorage.getAlbumHistoryFuzzy(
+        const lookupKey = this.historyStorage.normalizeKey(
           item.release.artist,
           item.release.title
         );
+        const result = crossBatchResults.get(lookupKey);
 
-        if (result.entry) {
+        if (result?.entry) {
           const hasRangePlays = result.entry.plays.some(
             p => p.timestamp >= startSec && p.timestamp <= endSec
           );

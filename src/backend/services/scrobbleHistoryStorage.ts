@@ -359,6 +359,144 @@ export class ScrobbleHistoryStorage {
   }
 
   /**
+   * Batch lookup for multiple artist|album keys in a single index load.
+   * Performs the same fuzzy matching as getAlbumHistoryFuzzy() but for many
+   * keys at once, avoiding repeated index reads.
+   *
+   * The map key is `artist|album` (lowercase/trimmed), matching the format
+   * returned by normalizeKey().
+   */
+  async batchLookup(
+    keys: Array<{ artist: string; album: string }>,
+    options?: { countsOnly?: boolean }
+  ): Promise<
+    Map<
+      string,
+      {
+        entry: AlbumHistoryEntry | null;
+        matchType: 'exact' | 'fuzzy' | 'none';
+        matchedKeys?: string[];
+      }
+    >
+  > {
+    const result: Map<
+      string,
+      {
+        entry: AlbumHistoryEntry | null;
+        matchType: 'exact' | 'fuzzy' | 'none';
+        matchedKeys?: string[];
+      }
+    > = new Map();
+
+    if (keys.length === 0) {
+      return result;
+    }
+
+    // Load index once — leverages existing 1-min cache
+    const index = await this.getIndex();
+
+    for (const { artist, album } of keys) {
+      const mapKey = this.normalizeKey(artist, album);
+
+      if (!index) {
+        result.set(mapKey, { entry: null, matchType: 'none' });
+        continue;
+      }
+
+      // Try exact match first (mapKey is already normalizeKey(artist, album))
+      if (index.albums[mapKey]) {
+        const entry = index.albums[mapKey];
+        if (options?.countsOnly) {
+          result.set(mapKey, {
+            entry: {
+              playCount: entry.playCount,
+              lastPlayed: entry.lastPlayed,
+              plays: [],
+            },
+            matchType: 'exact',
+            matchedKeys: [mapKey],
+          });
+        } else {
+          result.set(mapKey, {
+            entry,
+            matchType: 'exact',
+            matchedKeys: [mapKey],
+          });
+        }
+        continue;
+      }
+
+      // Fall back to fuzzy match using already-built fuzzy index (O(1))
+      const fuzzyKey = this.fuzzyNormalizeKey(artist, album);
+      const matchedExactKeys = this.fuzzyIndex.get(fuzzyKey);
+
+      if (!matchedExactKeys || matchedExactKeys.length === 0) {
+        result.set(mapKey, { entry: null, matchType: 'none' });
+        continue;
+      }
+
+      // Aggregate all matching albums
+      let totalPlayCount = 0;
+      let latestPlayed = 0;
+
+      if (options?.countsOnly) {
+        for (const key of matchedExactKeys) {
+          const albumEntry = index.albums[key];
+          if (albumEntry) {
+            totalPlayCount += albumEntry.playCount;
+            if (albumEntry.lastPlayed > latestPlayed) {
+              latestPlayed = albumEntry.lastPlayed;
+            }
+          }
+        }
+
+        result.set(mapKey, {
+          entry: {
+            playCount: totalPlayCount,
+            lastPlayed: latestPlayed,
+            plays: [],
+          },
+          matchType: 'fuzzy',
+          matchedKeys: matchedExactKeys,
+        });
+        continue;
+      }
+
+      const allPlays: Array<{ timestamp: number; track?: string }> = [];
+
+      for (const key of matchedExactKeys) {
+        const albumEntry = index.albums[key];
+        if (albumEntry) {
+          totalPlayCount += albumEntry.playCount;
+          if (albumEntry.lastPlayed > latestPlayed) {
+            latestPlayed = albumEntry.lastPlayed;
+          }
+          allPlays.push(...albumEntry.plays);
+        }
+      }
+
+      // Sort plays by timestamp (most recent first)
+      allPlays.sort((a, b) => b.timestamp - a.timestamp);
+
+      result.set(mapKey, {
+        entry: {
+          playCount: totalPlayCount,
+          lastPlayed: latestPlayed,
+          plays: allPlays,
+        },
+        matchType: 'fuzzy',
+        matchedKeys: matchedExactKeys,
+      });
+    }
+
+    this.logger.debug(
+      `batchLookup: processed ${keys.length} keys, index loaded once`
+    );
+
+    return result;
+  }
+
+  /**
    * Get last played timestamp for an album (with fuzzy matching)
    */
   async getLastPlayed(artist: string, album: string): Promise<number | null> {

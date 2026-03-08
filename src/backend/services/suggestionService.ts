@@ -1,4 +1,5 @@
 import {
+  AlbumHistoryEntry,
   CollectionItem,
   SuggestionFactors,
   SuggestionWeights,
@@ -63,38 +64,53 @@ export class SuggestionService {
   }
 
   /**
-   * Calculate all suggestion factors for a single album
+   * Calculate all suggestion factors for a single album.
+   * When prefetchedHistory is provided, skips the historyStorage lookup and
+   * uses the pre-fetched result instead (enables batch optimisation in getSuggestions).
    */
   async calculateFactors(
     album: CollectionItem,
-    precomputed?: { timeOfDayScore: number }
+    precomputed?: { timeOfDayScore: number },
+    prefetchedHistory?: {
+      entry: AlbumHistoryEntry | null;
+      matchType: 'exact' | 'fuzzy' | 'none';
+    }
   ): Promise<SuggestionFactors> {
     const artist = album.release.artist;
     const title = album.release.title;
 
-    // Check if there's an album mapping for this collection item
-    let searchArtist = artist;
-    let searchAlbum = title;
+    let historyResult: {
+      entry: AlbumHistoryEntry | null;
+      matchType: 'exact' | 'fuzzy' | 'none';
+    };
 
-    if (this.mappingService) {
-      const albumMapping =
-        await this.mappingService.getAlbumMappingForCollection(artist, title);
+    if (prefetchedHistory !== undefined) {
+      historyResult = prefetchedHistory;
+    } else {
+      // Check if there's an album mapping for this collection item
+      let searchArtist = artist;
+      let searchAlbum = title;
 
-      if (albumMapping) {
-        searchArtist = albumMapping.historyArtist;
-        searchAlbum = albumMapping.historyAlbum;
-        this.logger.debug(
-          `Suggestion Factors: using album mapping "${artist}|${title}" -> "${searchArtist}|${searchAlbum}"`
-        );
+      if (this.mappingService) {
+        const albumMapping =
+          await this.mappingService.getAlbumMappingForCollection(artist, title);
+
+        if (albumMapping) {
+          searchArtist = albumMapping.historyArtist;
+          searchAlbum = albumMapping.historyAlbum;
+          this.logger.debug(
+            `Suggestion Factors: using album mapping "${artist}|${title}" -> "${searchArtist}|${searchAlbum}"`
+          );
+        }
       }
-    }
 
-    // Get album history from local index with fuzzy matching
-    // This allows "Shame Shame" to match "Shame Shame (Deluxe Edition)"
-    const historyResult = await this.historyStorage.getAlbumHistoryFuzzy(
-      searchArtist,
-      searchAlbum
-    );
+      // Get album history from local index with fuzzy matching
+      // This allows "Shame Shame" to match "Shame Shame (Deluxe Edition)"
+      historyResult = await this.historyStorage.getAlbumHistoryFuzzy(
+        searchArtist,
+        searchAlbum
+      );
+    }
 
     // Calculate recency gap (days since last played)
     let recencyGap = Infinity;
@@ -298,12 +314,57 @@ export class SuggestionService {
 
     const precomputed = { timeOfDayScore };
 
+    // Pre-fetch history for all collection items in a single batch lookup
+    const suggestionBatchKeys: Array<{ artist: string; album: string }> = [];
+    const suggestionResolvedKeys: Array<{ artist: string; album: string }> = [];
+
+    for (const album of collection) {
+      let searchArtist = album.release.artist;
+      let searchAlbum = album.release.title;
+
+      if (this.mappingService) {
+        const albumMapping =
+          await this.mappingService.getAlbumMappingForCollection(
+            album.release.artist,
+            album.release.title
+          );
+        if (albumMapping) {
+          searchArtist = albumMapping.historyArtist;
+          searchAlbum = albumMapping.historyAlbum;
+          this.logger.debug(
+            `Suggestions batch: using album mapping "${album.release.artist}|${album.release.title}" -> "${searchArtist}|${searchAlbum}"`
+          );
+        }
+      }
+
+      suggestionResolvedKeys.push({ artist: searchArtist, album: searchAlbum });
+      suggestionBatchKeys.push({ artist: searchArtist, album: searchAlbum });
+    }
+
+    const suggestionBatchResults =
+      await this.historyStorage.batchLookup(suggestionBatchKeys);
+
     // Score all albums
     const scoredAlbums: SuggestionResult[] = [];
 
-    for (const album of collection) {
+    for (let i = 0; i < collection.length; i++) {
+      const album = collection[i];
+      const resolved = suggestionResolvedKeys[i];
+      const lookupKey = this.historyStorage.normalizeKey(
+        resolved.artist,
+        resolved.album
+      );
+      const prefetchedHistory = suggestionBatchResults.get(lookupKey) ?? {
+        entry: null,
+        matchType: 'none' as const,
+      };
+
       try {
-        const factors = await this.calculateFactors(album, precomputed);
+        const factors = await this.calculateFactors(
+          album,
+          precomputed,
+          prefetchedHistory
+        );
 
         // Optional filtering
         if (excludeRecentlyPlayed && factors.recencyGap < 7) {

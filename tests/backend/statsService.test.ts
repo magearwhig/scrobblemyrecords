@@ -64,6 +64,7 @@ describe('StatsService', () => {
     mockFileStorage = {
       readJSON: jest.fn().mockResolvedValue(null),
       writeJSON: jest.fn().mockResolvedValue(undefined),
+      writeJSONWithBackup: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<FileStorage>;
 
     mockHistoryStorage = {
@@ -73,6 +74,7 @@ describe('StatsService', () => {
         matchType: 'none',
       }),
       getTotalScrobbles: jest.fn().mockResolvedValue(0),
+      getLastSyncTimestamp: jest.fn().mockResolvedValue(null),
       fuzzyNormalizeKey: jest
         .fn()
         .mockImplementation((artist: string, album: string) => {
@@ -83,6 +85,35 @@ describe('StatsService', () => {
               .replace(/[^a-z0-9]/g, '');
           return `${norm(artist)}|${norm(album)}`;
         }),
+      normalizeKey: jest
+        .fn()
+        .mockImplementation(
+          (artist: string, album: string) =>
+            `${artist.toLowerCase().trim()}|${album.toLowerCase().trim()}`
+        ),
+      // batchLookup delegates to getAlbumHistoryFuzzy so existing test setups still work
+      batchLookup: jest
+        .fn()
+        .mockImplementation(
+          async (
+            keys: Array<{ artist: string; album: string }>,
+            options?: { countsOnly?: boolean }
+          ) => {
+            const result = new Map();
+            for (const { artist, album } of keys) {
+              const mapKey = `${artist.toLowerCase().trim()}|${album.toLowerCase().trim()}`;
+              const fuzzyResult = await mockHistoryStorage.getAlbumHistoryFuzzy(
+                artist,
+                album,
+                options
+              );
+              result.set(mapKey, fuzzyResult);
+            }
+            return result;
+          }
+        ),
+      getHourlyDistribution: jest.fn().mockResolvedValue(new Map()),
+      getDayOfWeekDistribution: jest.fn().mockResolvedValue(new Map()),
     } as unknown as jest.Mocked<ScrobbleHistoryStorage>;
 
     statsService = new StatsService(mockFileStorage, mockHistoryStorage);
@@ -878,7 +909,7 @@ describe('StatsService', () => {
       const milestones = await statsService.getMilestones();
 
       // Assert
-      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
       // Should have added 2500 and 5000 milestones
       expect(milestones.history).toContainEqual(
         expect.objectContaining({ milestone: 1000 })
@@ -1083,6 +1114,458 @@ describe('StatsService', () => {
       expect(overview).toHaveProperty('collectionCoverage');
       expect(overview).toHaveProperty('milestones');
       expect(overview).toHaveProperty('newArtistsThisMonth');
+    });
+
+    it('should serve warm cached data via individual methods when syncTimestamp matches', async () => {
+      // Arrange — warm cache present with matching syncTimestamp
+      const syncTimestamp = 1700000000000;
+      mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(syncTimestamp);
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
+      mockHistoryStorage.getTotalScrobbles.mockResolvedValue(0);
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+        entry: null,
+        matchType: 'none',
+      });
+
+      const warmBlock = {
+        warmedAt: Math.floor(Date.now() / 1000),
+        syncTimestamp,
+        streaks: { currentStreak: 5, longestStreak: 10 },
+        counts: {
+          today: 3,
+          thisWeek: 20,
+          thisMonth: 80,
+          thisYear: 900,
+          allTime: 5000,
+        },
+        listeningHours: { today: 0.2, thisWeek: 1.5, thisMonth: 5 },
+        newArtistsThisMonth: 4,
+        milestones: {
+          total: 5000,
+          nextMilestone: 10000,
+          scrobblesToNext: 5000,
+          progressPercent: 50,
+          history: [],
+        },
+        topArtists: {},
+        topAlbums: {},
+        topTracks: {},
+        hourlyDistribution: {
+          distribution: [],
+          peakHour: 0,
+          totalScrobbles: 0,
+        },
+        dayOfWeekDistribution: { distribution: [], peakDay: 0 },
+      };
+
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        lastUpdated: Math.floor(Date.now() / 1000),
+        streaks: { currentStreak: 5, longestStreak: 10 },
+        milestoneHistory: [],
+        warm: warmBlock,
+      });
+
+      const collection = [createMockCollectionItem()];
+
+      // Act — individual cached methods are called via getStatsOverview
+      const overview = await statsService.getStatsOverview(collection);
+
+      // Assert — cached values returned by individual methods
+      expect(overview.streaks.currentStreak).toBe(5);
+      expect(overview.counts.today).toBe(3);
+      expect(overview.newArtistsThisMonth).toBe(4);
+    });
+
+    it('should fall back to live computation when no cache exists', async () => {
+      // Arrange
+      mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(null);
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
+      mockHistoryStorage.getTotalScrobbles.mockResolvedValue(0);
+      mockFileStorage.readJSON.mockResolvedValue(null); // no cache
+
+      const collection = [createMockCollectionItem()];
+
+      // Act
+      const overview = await statsService.getStatsOverview(collection);
+
+      // Assert — live computation ran
+      expect(overview).toHaveProperty('streaks');
+      expect(mockHistoryStorage.getIndex).toHaveBeenCalled();
+    });
+  });
+
+  describe('warmCache', () => {
+    it('should persist warm stats to cache file', async () => {
+      // Arrange
+      const syncTimestamp = 1700000000000;
+      mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(syncTimestamp);
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
+      mockHistoryStorage.getTotalScrobbles.mockResolvedValue(100);
+      mockFileStorage.readJSON.mockResolvedValue(null); // no existing cache
+
+      // Act
+      await statsService.warmCache();
+
+      // Assert — writeJSONWithBackup should have been called with a cache including warm block
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
+        expect.stringContaining('stats-cache'),
+        expect.objectContaining({
+          schemaVersion: 1,
+          warm: expect.objectContaining({
+            syncTimestamp,
+            streaks: expect.any(Object),
+            counts: expect.any(Object),
+            listeningHours: expect.any(Object),
+            newArtistsThisMonth: expect.any(Number),
+            milestones: expect.any(Object),
+            topArtists: expect.any(Object),
+            topAlbums: expect.any(Object),
+            topTracks: expect.any(Object),
+            hourlyDistribution: expect.any(Object),
+            dayOfWeekDistribution: expect.any(Object),
+          }),
+        })
+      );
+    });
+
+    it('should not throw and not write when no sync timestamp exists', async () => {
+      // Arrange — no sync timestamp means no history yet
+      mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(null);
+
+      // Act
+      await statsService.warmCache();
+
+      // Assert — writeJSONWithBackup not called
+      expect(mockFileStorage.writeJSONWithBackup).not.toHaveBeenCalled();
+    });
+
+    it('should preserve existing milestoneHistory when writing cache', async () => {
+      // Arrange
+      const syncTimestamp = 1700000000000;
+      const existingHistory = [{ milestone: 1000, reachedAt: 1234567 }];
+      mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(syncTimestamp);
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
+      mockHistoryStorage.getTotalScrobbles.mockResolvedValue(5000);
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        lastUpdated: 123,
+        streaks: { currentStreak: 0, longestStreak: 0 },
+        milestoneHistory: existingHistory,
+      });
+
+      // Act
+      await statsService.warmCache();
+
+      // Assert — milestoneHistory is preserved
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
+        expect.stringContaining('stats-cache'),
+        expect.objectContaining({
+          milestoneHistory: existingHistory,
+        })
+      );
+    });
+
+    it('should not throw when computation fails', async () => {
+      // Arrange — simulate getIndex throwing
+      mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(1700000000000);
+      mockHistoryStorage.getIndex.mockRejectedValue(new Error('disk error'));
+
+      // Act & Assert — must not throw
+      await expect(statsService.warmCache()).resolves.toBeUndefined();
+    });
+  });
+
+  describe('invalidateStatsCache', () => {
+    it('should remove overview from existing cache', async () => {
+      // Arrange — cache with a warm block
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        lastUpdated: 123,
+        streaks: { currentStreak: 5, longestStreak: 10 },
+        milestoneHistory: [],
+        warm: {
+          warmedAt: 100,
+          syncTimestamp: 999,
+          streaks: { currentStreak: 5, longestStreak: 10 },
+          counts: {
+            today: 1,
+            thisWeek: 7,
+            thisMonth: 30,
+            thisYear: 365,
+            allTime: 1000,
+          },
+          listeningHours: {
+            today: 0.1,
+            thisWeek: 0.5,
+            thisMonth: 2,
+            allTime: 100,
+          },
+          newArtistsThisMonth: 1,
+          milestones: {
+            totalScrobbles: 1000,
+            nextMilestone: 2500,
+            previousMilestone: 0,
+            progressPercent: 40,
+            milestoneHistory: [],
+          },
+          topArtists: {},
+          topAlbums: {},
+          topTracks: {},
+          hourlyDistribution: { hours: [] },
+          dayOfWeekDistribution: { days: [] },
+        },
+      });
+
+      // Act
+      await statsService.invalidateStatsCache();
+
+      // Assert — written cache has no warm block
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
+        expect.stringContaining('stats-cache'),
+        expect.objectContaining({ warm: undefined })
+      );
+    });
+
+    it('should do nothing when no cache exists', async () => {
+      // Arrange
+      mockFileStorage.readJSON.mockResolvedValue(null);
+
+      // Act
+      await statsService.invalidateStatsCache();
+
+      // Assert — writeJSONWithBackup not called
+      expect(mockFileStorage.writeJSONWithBackup).not.toHaveBeenCalled();
+    });
+
+    it('should do nothing when cache has no warm block', async () => {
+      // Arrange — cache without warm
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        lastUpdated: 123,
+        streaks: { currentStreak: 0, longestStreak: 0 },
+        milestoneHistory: [],
+      });
+
+      // Act
+      await statsService.invalidateStatsCache();
+
+      // Assert — writeJSONWithBackup not called (nothing to invalidate)
+      expect(mockFileStorage.writeJSONWithBackup).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('warm cache serving in individual methods', () => {
+    const syncTimestamp = 1700000000000;
+
+    const buildWarmCache = (overrides: object = {}) => ({
+      schemaVersion: 1 as const,
+      lastUpdated: Math.floor(Date.now() / 1000),
+      streaks: { currentStreak: 0, longestStreak: 0 },
+      milestoneHistory: [],
+      warm: {
+        warmedAt: Math.floor(Date.now() / 1000),
+        syncTimestamp,
+        streaks: { currentStreak: 7, longestStreak: 21 },
+        counts: {
+          today: 5,
+          thisWeek: 30,
+          thisMonth: 100,
+          thisYear: 1200,
+          allTime: 9999,
+        },
+        listeningHours: { today: 0.5, thisWeek: 2, thisMonth: 8 },
+        newArtistsThisMonth: 3,
+        milestones: {
+          total: 9999,
+          nextMilestone: 10000,
+          scrobblesToNext: 1,
+          progressPercent: 99,
+          history: [],
+        },
+        topArtists: {
+          month: [{ artist: 'Cached Artist', playCount: 50 }],
+          year: [{ artist: 'Cached Year Artist', playCount: 300 }],
+          all: [{ artist: 'Cached All Artist', playCount: 9000 }],
+        },
+        topAlbums: {
+          month: [
+            {
+              artist: 'A',
+              album: 'Cached Month Album',
+              playCount: 20,
+              lastPlayed: 0,
+            },
+          ],
+          year: [],
+          all: [],
+        },
+        topTracks: {
+          month: [
+            {
+              artist: 'A',
+              album: 'B',
+              track: 'Cached Track',
+              playCount: 15,
+              lastPlayed: 0,
+            },
+          ],
+          year: [],
+          all: [],
+        },
+        hourlyDistribution: {
+          distribution: [{ hour: 22, count: 99, percentage: 99 }],
+          peakHour: 22,
+          totalScrobbles: 99,
+        },
+        dayOfWeekDistribution: {
+          distribution: [
+            { day: 0, dayName: 'Sunday', count: 50, percentage: 50 },
+          ],
+          peakDay: 0,
+        },
+        ...overrides,
+      },
+    });
+
+    beforeEach(() => {
+      mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(syncTimestamp);
+    });
+
+    it('calculateStreaks serves from warm cache', async () => {
+      mockFileStorage.readJSON.mockResolvedValue(buildWarmCache());
+
+      const result = await statsService.calculateStreaks();
+
+      expect(result.currentStreak).toBe(7);
+      expect(result.longestStreak).toBe(21);
+      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
+    });
+
+    it('getScrobbleCounts serves from warm cache', async () => {
+      mockFileStorage.readJSON.mockResolvedValue(buildWarmCache());
+
+      const result = await statsService.getScrobbleCounts();
+
+      expect(result.today).toBe(5);
+      expect(result.allTime).toBe(9999);
+      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
+    });
+
+    it('getListeningHours serves from warm cache', async () => {
+      mockFileStorage.readJSON.mockResolvedValue(buildWarmCache());
+
+      const result = await statsService.getListeningHours();
+
+      expect(result.today).toBe(0.5);
+      expect(result.thisMonth).toBe(8);
+      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
+    });
+
+    it('getNewArtistsThisMonth serves from warm cache', async () => {
+      mockFileStorage.readJSON.mockResolvedValue(buildWarmCache());
+
+      const result = await statsService.getNewArtistsThisMonth();
+
+      expect(result).toBe(3);
+      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
+    });
+
+    it('getMilestones serves from warm cache', async () => {
+      mockHistoryStorage.getTotalScrobbles.mockResolvedValue(9999);
+      mockFileStorage.readJSON.mockResolvedValue(buildWarmCache());
+
+      const result = await statsService.getMilestones();
+
+      expect(result.progressPercent).toBe(99);
+      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
+    });
+
+    it('getTopArtists(month) serves from warm cache at default limit', async () => {
+      mockFileStorage.readJSON.mockResolvedValue(buildWarmCache());
+
+      const result = await statsService.getTopArtists('month', 10);
+
+      expect(result[0].artist).toBe('Cached Artist');
+      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
+    });
+
+    it('getTopArtists(week) skips cache — not a cached period', async () => {
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
+      mockFileStorage.readJSON.mockResolvedValue(buildWarmCache());
+
+      await statsService.getTopArtists('week', 10);
+
+      expect(mockHistoryStorage.getIndex).toHaveBeenCalled();
+    });
+
+    it('getTopAlbums(month) serves from warm cache at default limit without collection', async () => {
+      mockFileStorage.readJSON.mockResolvedValue(buildWarmCache());
+
+      const result = await statsService.getTopAlbums('month', 10);
+
+      expect(result[0].album).toBe('Cached Month Album');
+      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
+    });
+
+    it('getTopAlbums with collection bypasses cache for live enrichment', async () => {
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
+      mockFileStorage.readJSON.mockResolvedValue(buildWarmCache());
+
+      await statsService.getTopAlbums('month', 10, undefined, undefined, [
+        createMockCollectionItem(),
+      ]);
+
+      expect(mockHistoryStorage.getIndex).toHaveBeenCalled();
+    });
+
+    it('getTopTracks(all) serves from warm cache at default limit', async () => {
+      mockFileStorage.readJSON.mockResolvedValue(buildWarmCache());
+
+      const result = await statsService.getTopTracks('all', 10);
+
+      expect(result).toEqual([]);
+      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
+    });
+
+    it('getHourlyDistribution serves from warm cache', async () => {
+      mockFileStorage.readJSON.mockResolvedValue(buildWarmCache());
+
+      const result = await statsService.getHourlyDistribution();
+
+      expect(result.peakHour).toBe(22);
+      expect(result.totalScrobbles).toBe(99);
+      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
+    });
+
+    it('getDayOfWeekDistribution serves from warm cache', async () => {
+      mockFileStorage.readJSON.mockResolvedValue(buildWarmCache());
+
+      const result = await statsService.getDayOfWeekDistribution();
+
+      expect(result.peakDay).toBe(0);
+      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
+    });
+
+    it('falls back to live when syncTimestamp does not match', async () => {
+      mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(9999999999999);
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
+      mockFileStorage.readJSON.mockResolvedValue(buildWarmCache());
+
+      const result = await statsService.calculateStreaks();
+
+      expect(mockHistoryStorage.getIndex).toHaveBeenCalled();
+      expect(result.currentStreak).toBe(0);
+    });
+
+    it('falls back to live when no cache file exists', async () => {
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
+      mockFileStorage.readJSON.mockResolvedValue(null);
+
+      const result = await statsService.calculateStreaks();
+
+      expect(mockHistoryStorage.getIndex).toHaveBeenCalled();
+      expect(result.currentStreak).toBe(0);
     });
   });
 

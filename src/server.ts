@@ -316,6 +316,10 @@ suggestionService.setMappingService(mappingService);
 const statsService = new StatsService(fileStorage, historyStorage);
 statsService.setTrackMappingService(trackMappingService);
 statsService.setMappingService(mappingService);
+
+// Wire up stats cache warming: after each sync StatsService precomputes
+// expensive stats and persists them so dashboard reads are instant.
+syncService.setStatsWarmer(statsService);
 const rankingsService = new RankingsService(historyStorage);
 const imageService = new ImageService(fileStorage, lastfmService);
 imageService.setMappingService(mappingService);

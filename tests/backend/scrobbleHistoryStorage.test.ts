@@ -659,6 +659,282 @@ describe('ScrobbleHistoryStorage', () => {
     });
   });
 
+  describe('batchLookup', () => {
+    it('should return empty Map for empty input', async () => {
+      // Arrange
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': { lastPlayed: 100, playCount: 10, plays: [] },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.batchLookup([]);
+
+      // Assert
+      expect(result.size).toBe(0);
+    });
+
+    it('should return entry with matchType none when index does not exist', async () => {
+      // Act
+      const result = await storage.batchLookup([
+        { artist: 'Radiohead', album: 'Kid A' },
+      ]);
+
+      // Assert
+      expect(result.size).toBe(1);
+      const entry = result.get('radiohead|kid a');
+      expect(entry?.matchType).toBe('none');
+      expect(entry?.entry).toBeNull();
+    });
+
+    it('should return exact match for single item', async () => {
+      // Arrange
+      const albumEntry = {
+        lastPlayed: Math.floor(Date.now() / 1000),
+        playCount: 15,
+        plays: [{ timestamp: Math.floor(Date.now() / 1000) }],
+      };
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: { 'radiohead|kid a': albumEntry },
+        })
+      );
+
+      // Act
+      const result = await storage.batchLookup([
+        { artist: 'Radiohead', album: 'Kid A' },
+      ]);
+
+      // Assert
+      expect(result.size).toBe(1);
+      const entry = result.get('radiohead|kid a');
+      expect(entry?.matchType).toBe('exact');
+      expect(entry?.entry?.playCount).toBe(15);
+      expect(entry?.matchedKeys).toEqual(['radiohead|kid a']);
+    });
+
+    it('should return fuzzy match for single item with edition suffix', async () => {
+      // Arrange
+      const albumEntry = {
+        lastPlayed: Math.floor(Date.now() / 1000),
+        playCount: 81,
+        plays: [{ timestamp: Math.floor(Date.now() / 1000) }],
+      };
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'dr. dog|shame shame (deluxe edition)': albumEntry,
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.batchLookup([
+        { artist: 'Dr. Dog', album: 'Shame Shame' },
+      ]);
+
+      // Assert
+      expect(result.size).toBe(1);
+      const entry = result.get('dr. dog|shame shame');
+      expect(entry?.matchType).toBe('fuzzy');
+      expect(entry?.entry?.playCount).toBe(81);
+      expect(entry?.matchedKeys).toContain(
+        'dr. dog|shame shame (deluxe edition)'
+      );
+    });
+
+    it('should handle multiple items with mixed match types', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: now,
+              playCount: 10,
+              plays: [{ timestamp: now }],
+            },
+            'pink floyd|animals (deluxe edition)': {
+              lastPlayed: now - 1000,
+              playCount: 5,
+              plays: [{ timestamp: now - 1000 }],
+            },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.batchLookup([
+        { artist: 'Radiohead', album: 'Kid A' }, // exact
+        { artist: 'Pink Floyd', album: 'Animals' }, // fuzzy
+        { artist: 'Unknown', album: 'Album' }, // none
+      ]);
+
+      // Assert
+      expect(result.size).toBe(3);
+
+      const exactEntry = result.get('radiohead|kid a');
+      expect(exactEntry?.matchType).toBe('exact');
+      expect(exactEntry?.entry?.playCount).toBe(10);
+
+      const fuzzyEntry = result.get('pink floyd|animals');
+      expect(fuzzyEntry?.matchType).toBe('fuzzy');
+      expect(fuzzyEntry?.entry?.playCount).toBe(5);
+
+      const noneEntry = result.get('unknown|album');
+      expect(noneEntry?.matchType).toBe('none');
+      expect(noneEntry?.entry).toBeNull();
+    });
+
+    it('should aggregate multiple fuzzy matches', async () => {
+      // Arrange — two versions of the same album
+      const now = Math.floor(Date.now() / 1000);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'artist|album': {
+              lastPlayed: now - 86400,
+              playCount: 20,
+              plays: [{ timestamp: now - 86400 }],
+            },
+            'artist|album (deluxe edition)': {
+              lastPlayed: now,
+              playCount: 30,
+              plays: [{ timestamp: now }],
+            },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.batchLookup([
+        { artist: 'Artist', album: 'Album (Special Edition)' },
+      ]);
+
+      // Assert
+      expect(result.size).toBe(1);
+      const entry = result.get('artist|album (special edition)');
+      expect(entry?.matchType).toBe('fuzzy');
+      expect(entry?.entry?.playCount).toBe(50); // 20 + 30 aggregated
+      expect(entry?.matchedKeys).toHaveLength(2);
+    });
+
+    it('should return matchType none for all keys when no matches', async () => {
+      // Arrange
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': { lastPlayed: 100, playCount: 10, plays: [] },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.batchLookup([
+        { artist: 'Unknown Artist', album: 'Unknown Album' },
+        { artist: 'Another Artist', album: 'Another Album' },
+      ]);
+
+      // Assert
+      expect(result.size).toBe(2);
+      for (const value of result.values()) {
+        expect(value.matchType).toBe('none');
+        expect(value.entry).toBeNull();
+      }
+    });
+
+    it('should work correctly with countsOnly option', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const plays = [
+        { timestamp: now, track: 'Track 1' },
+        { timestamp: now - 1000, track: 'Track 2' },
+      ];
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: now,
+              playCount: 10,
+              plays,
+            },
+          },
+        })
+      );
+
+      // Act
+      const result = await storage.batchLookup(
+        [{ artist: 'Radiohead', album: 'Kid A' }],
+        { countsOnly: true }
+      );
+
+      // Assert
+      expect(result.size).toBe(1);
+      const entry = result.get('radiohead|kid a');
+      expect(entry?.matchType).toBe('exact');
+      expect(entry?.entry?.playCount).toBe(10);
+      expect(entry?.entry?.plays).toEqual([]); // Empty plays when countsOnly
+    });
+
+    it('should produce results identical to individual getAlbumHistoryFuzzy calls', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: now,
+              playCount: 10,
+              plays: [{ timestamp: now, track: 'Track A' }],
+            },
+            'pink floyd|animals (deluxe edition)': {
+              lastPlayed: now - 500,
+              playCount: 8,
+              plays: [{ timestamp: now - 500, track: 'Pigs' }],
+            },
+          },
+        })
+      );
+
+      const keys = [
+        { artist: 'Radiohead', album: 'Kid A' },
+        { artist: 'Pink Floyd', album: 'Animals' },
+        { artist: 'Missing', album: 'Album' },
+      ];
+
+      // Act — batch
+      const batchResult = await storage.batchLookup(keys);
+
+      // Act — individual (reset cache between calls is not needed since same index)
+      for (const key of keys) {
+        const individual = await storage.getAlbumHistoryFuzzy(
+          key.artist,
+          key.album
+        );
+        const lookupKey = storage.normalizeKey(key.artist, key.album);
+        const batched = batchResult.get(lookupKey);
+
+        // Assert — matchType must match
+        expect(batched?.matchType).toBe(individual.matchType);
+        // Assert — playCount must match
+        expect(batched?.entry?.playCount).toBe(individual.entry?.playCount);
+        // Assert — lastPlayed must match
+        expect(batched?.entry?.lastPlayed).toBe(individual.entry?.lastPlayed);
+      }
+    });
+  });
+
   describe('getLastPlayed', () => {
     it('should return null when album not found', async () => {
       // Arrange
