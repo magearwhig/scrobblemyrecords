@@ -96,13 +96,14 @@ export function createEmbeddingsRouter(
         try {
           // Phase 1: Enrich releases with Discogs genres/styles
           if (discogsGenreEnricherService) {
+            log.info('Phase 1: Starting Discogs genre enrichment');
             currentRebuildProgress = {
               current: 0,
               total: allItems.length,
               phase: 'Enriching Discogs genres',
             };
             const releases = allItems.map(item => item.release);
-            await discogsGenreEnricherService.enrichBatch(
+            const enrichResult = await discogsGenreEnricherService.enrichBatch(
               releases,
               (current, total) => {
                 currentRebuildProgress = {
@@ -112,10 +113,21 @@ export function createEmbeddingsRouter(
                 };
               }
             );
+            log.info(
+              'Phase 1 complete: Discogs genre enrichment',
+              enrichResult
+            );
+          } else {
+            log.warn(
+              'Phase 1 SKIPPED: discogsGenreEnricherService not provided'
+            );
           }
 
           // Phase 2: Pre-warm MusicBrainz genre cache for all artists
           if (musicBrainzGenreEnricherService) {
+            log.info(
+              `Phase 2: Starting MusicBrainz genre enrichment for ${collectionArtists.length} artists`
+            );
             currentRebuildProgress = {
               current: 0,
               total: collectionArtists.length,
@@ -130,6 +142,11 @@ export function createEmbeddingsRouter(
                   phase: `Fetching MusicBrainz genres ${current}/${total}`,
                 };
               }
+            );
+            log.info('Phase 2 complete: MusicBrainz genre enrichment');
+          } else {
+            log.warn(
+              'Phase 2 SKIPPED: musicBrainzGenreEnricherService not provided'
             );
           }
 
@@ -164,6 +181,14 @@ export function createEmbeddingsRouter(
                 err,
               });
             }
+          }
+
+          log.info(`Phase 3 complete: Built ${records.length} profiles`);
+          if (records.length > 0) {
+            const sample = records[0];
+            log.info(
+              `Sample profile (${sample.release.artist} - ${sample.release.title}):\n${sample.textProfile}`
+            );
           }
 
           // Embed all records

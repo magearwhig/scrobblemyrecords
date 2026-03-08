@@ -20,6 +20,7 @@ const log = createLogger('CollectionIndexerService');
 const EMBED_MODEL = 'nomic-embed-text';
 const DEFAULT_CONCURRENCY = 2;
 const PROGRESS_INTERVAL_MS = 5000;
+const BATCH_SAVE_SIZE = 100;
 
 export interface IndexProgress {
   current: number;
@@ -107,7 +108,25 @@ export class CollectionIndexerService {
       const concurrency = DEFAULT_CONCURRENCY;
 
       let processedIndex = 0;
-      const embeddedEntries: RecordEmbeddingEntry[] = [];
+      const pendingEntries: RecordEmbeddingEntry[] = [];
+      let totalSaved = 0;
+      let flushing = false;
+
+      // Flush pending entries to disk in batches to preserve progress
+      const flushBatch = async (): Promise<void> => {
+        if (pendingEntries.length === 0 || flushing) return;
+        flushing = true;
+        try {
+          const batch = pendingEntries.splice(0, pendingEntries.length);
+          await this.embeddingStorageService.bulkSetEmbeddings(batch);
+          totalSaved += batch.length;
+          log.info(
+            `Saved batch of ${batch.length} embeddings (${totalSaved}/${total} total saved)`
+          );
+        } finally {
+          flushing = false;
+        }
+      };
 
       const worker = async (): Promise<void> => {
         while (processedIndex < total) {
@@ -146,7 +165,7 @@ export class CollectionIndexerService {
               continue;
             }
 
-            embeddedEntries.push({
+            pendingEntries.push({
               discogsReleaseId: record.release.id,
               textProfile: record.textProfile,
               embedding: vectorToBase64(vec),
@@ -154,6 +173,11 @@ export class CollectionIndexerService {
               lastEnrichedAt: Date.now(),
             });
             result.embedded++;
+
+            // Save in batches to preserve progress if interrupted
+            if (pendingEntries.length >= BATCH_SAVE_SIZE) {
+              await flushBatch();
+            }
 
             log.debug(
               `Embedded release ${record.release.id} (${currentIndex + 1}/${total})`
@@ -177,10 +201,8 @@ export class CollectionIndexerService {
       }
       await Promise.all(workers);
 
-      // Single bulk write — avoids 2000 read+write cycles during rebuild
-      if (embeddedEntries.length > 0) {
-        await this.embeddingStorageService.bulkSetEmbeddings(embeddedEntries);
-      }
+      // Flush any remaining entries
+      await flushBatch();
 
       // Final progress ping
       if (onProgress) {

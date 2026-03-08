@@ -427,6 +427,9 @@ export class DiscogsService {
         return cached;
       }
 
+      // Add delay to respect rate limits (1 request per second)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       const headers = await this.getAuthHeaders();
       const response = await this.axios.get(`/releases/${releaseId}`, {
         headers,
