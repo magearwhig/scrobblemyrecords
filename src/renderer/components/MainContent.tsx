@@ -1,22 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 
-import ArtistDetailPage from '../pages/ArtistDetailPage';
-import CollectionAnalyticsPage from '../pages/CollectionAnalyticsPage';
-import CollectionPage from '../pages/CollectionPage';
-import DiscardPilePage from '../pages/DiscardPilePage';
-import DiscoveryPage from '../pages/DiscoveryPage';
-import HistoryPage from '../pages/HistoryPage';
 import HomePage from '../pages/HomePage';
-import MarketplacePage from '../pages/MarketplacePage';
-import RecommendationsPage from '../pages/RecommendationsPage';
-import ReleaseDetailsPage from '../pages/ReleaseDetailsPage';
-import ScrobblePage from '../pages/ScrobblePage';
-import SettingsPage from '../pages/SettingsPage';
-import StatsPage from '../pages/StatsPage';
-import TrackDetailPage from '../pages/TrackDetailPage';
-import WhatToPlayPage from '../pages/WhatToPlayPage';
-import WrappedPage from '../pages/WrappedPage';
 import { ROUTES } from '../routes';
+
+// Lazy-load all pages except HomePage (default route, should load instantly)
+const ArtistDetailPage = React.lazy(() => import('../pages/ArtistDetailPage'));
+const CollectionAnalyticsPage = React.lazy(
+  () => import('../pages/CollectionAnalyticsPage')
+);
+const CollectionPage = React.lazy(() => import('../pages/CollectionPage'));
+const DiscardPilePage = React.lazy(() => import('../pages/DiscardPilePage'));
+const DiscoveryPage = React.lazy(() => import('../pages/DiscoveryPage'));
+const HistoryPage = React.lazy(() => import('../pages/HistoryPage'));
+const MarketplacePage = React.lazy(() => import('../pages/MarketplacePage'));
+const RecommendationsPage = React.lazy(
+  () => import('../pages/RecommendationsPage')
+);
+const ReleaseDetailsPage = React.lazy(
+  () => import('../pages/ReleaseDetailsPage')
+);
+const ScrobblePage = React.lazy(() => import('../pages/ScrobblePage'));
+const SettingsPage = React.lazy(() => import('../pages/SettingsPage'));
+const StatsPage = React.lazy(() => import('../pages/StatsPage'));
+const TrackDetailPage = React.lazy(() => import('../pages/TrackDetailPage'));
+const WhatToPlayPage = React.lazy(() => import('../pages/WhatToPlayPage'));
+const WrappedPage = React.lazy(() => import('../pages/WrappedPage'));
+
+const PageLoadingFallback: React.FC = () => (
+  <div className='page-loading-fallback'>
+    <div className='spinner' />
+  </div>
+);
 
 interface MainContentProps {
   currentPage: string;
@@ -80,7 +94,7 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
     }
   };
 
-  return <>{renderPage()}</>;
+  return <Suspense fallback={<PageLoadingFallback />}>{renderPage()}</Suspense>;
 };
 
 export default MainContent;

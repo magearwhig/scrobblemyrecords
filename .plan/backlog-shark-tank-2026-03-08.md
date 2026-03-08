@@ -34,21 +34,11 @@ Generated via a 7-agent brainstorming session. 25 accepted items from 39 pitches
 
 ---
 
-### Effort B: Analytics Trio (all add analytics views, share statsService)
+### ~~Effort B: Analytics Trio~~ — DONE
 
-Three analytics features that surface new insights from existing data. Can be implemented independently but share service patterns.
-
-**#1. Collection ROI Score (plays-per-dollar)**
-- **Category:** Analytics | **Size:** Small
-- **Description:** Join Discogs market value data from `collectionAnalyticsService` with play counts from `statsService.getTopAlbums('all')`. Compute `playCount / currentValue` ratio. Surface top/bottom 10 as a "bang for your buck" leaderboard. Uses existing fuzzy collection map pattern.
-
-**#10. Album Listening Arc (sparkline)**
-- **Category:** Analytics | **Size:** Small
-- **Description:** Show monthly play counts over an album's lifetime as a sparkline or bar chart on detail pages. Reveals the honeymoon phase, plateau, rediscovery. Add `getAlbumListeningArc(artist, album)` to statsService using existing per-album `plays[]` timestamps and `RankingsService` monthly bucketing. Render on ArtistDetailPage / TrackDetailPage.
-
-**#16. Taste Drift Dashboard (genre trajectories)**
-- **Category:** Analytics | **Size:** Medium
-- **Description:** Compute rolling genre share per quarter using `genreAnalysisService` tag data and `rankingsService` monthly bucketing. Render as stacked area chart. Answers: "Am I broadening my taste or tunneling deeper into one genre?" No new data sources needed.
+~~#1. Collection ROI Score~~ — DONE
+~~#10. Album Listening Arc~~ — DONE
+~~#16. Taste Drift Dashboard~~ — DONE
 
 ---
 
@@ -79,11 +69,9 @@ Both touch `sellerMonitoringService` and enhance the marketplace workflow. Compl
 
 ---
 
-### Effort E: Build Infrastructure (standalone)
+### ~~Effort E: Build Infrastructure~~ — DONE
 
-**#6. Webpack Bundle Splitting**
-- **Category:** Performance | **Size:** Small
-- **Description:** Add `optimization.splitChunks` to webpack.config.js with `chunks: 'all'`. Use `React.lazy()` + `Suspense` on page-level components in `MainContent.tsx`. Heavy pages (Wrapped, CollectionAnalytics, Recommendations) get their own async chunks. Cuts initial parse cost.
+~~#6. Webpack Bundle Splitting~~ — DONE
 
 ---
 
@@ -119,4 +107,4 @@ Full-stack feature touching data model, UI, and analytics. Complex enough to war
 | Feature Scout | 2 | 3 |
 | Integration Explorer | 2 | 4 |
 
-**Total: 25 accepted / 14 declined from 39 pitches. 16 done, 9 remaining.**
+**Total: 25 accepted / 14 declined from 39 pitches. 20 done, 5 remaining.**

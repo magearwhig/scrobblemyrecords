@@ -17,7 +17,14 @@ const webConfig = {
     rules: [
       {
         test: /\.tsx?$/,
-        use: 'ts-loader',
+        use: {
+          loader: 'ts-loader',
+          options: {
+            compilerOptions: {
+              module: 'ESNext',
+            },
+          },
+        },
         exclude: /node_modules/,
       },
       {
@@ -34,12 +41,33 @@ const webConfig = {
     extensions: ['.tsx', '.ts', '.js', '.jsx'],
   },
   output: {
-    filename: 'app.js',
+    filename: '[name].[contenthash].js',
+    chunkFilename: '[name].[contenthash].chunk.js',
     path: path.resolve(__dirname, 'dist/web'),
     clean: true,
     publicPath: '/',
     environment: {
       globalThis: true,
+    },
+  },
+  optimization: {
+    runtimeChunk: 'single',
+    splitChunks: {
+      chunks: 'all',
+      cacheGroups: {
+        vendor: {
+          test: /[\\/]node_modules[\\/]/,
+          name: 'vendors',
+          chunks: 'all',
+          priority: 10,
+        },
+        recharts: {
+          test: /[\\/]node_modules[\\/](recharts|d3-.*|victory-.*)[\\/]/,
+          name: 'recharts',
+          chunks: 'all',
+          priority: 20,
+        },
+      },
     },
   },
   plugins: [
