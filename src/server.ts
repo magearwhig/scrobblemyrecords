@@ -39,6 +39,7 @@ import { CleanupService } from './backend/services/cleanupService';
 import { CollectionAnalyticsService } from './backend/services/collectionAnalyticsService';
 import { CollectionIndexerService } from './backend/services/collectionIndexerService';
 import { DiscardPileService } from './backend/services/discardPileService';
+import { DiscogsGenreEnricherService } from './backend/services/discogsGenreEnricherService';
 import { DiscogsService } from './backend/services/discogsService';
 import { EmbeddingStorageService } from './backend/services/embeddingStorageService';
 import { GenreAnalysisService } from './backend/services/genreAnalysisService';
@@ -50,6 +51,7 @@ import { LastFmService } from './backend/services/lastfmService';
 import { ListeningSessionStorageService } from './backend/services/listeningSessionStorageService';
 import { MappingService } from './backend/services/mappingService';
 import { MigrationService } from './backend/services/migrationService';
+import { MusicBrainzGenreEnricherService } from './backend/services/musicbrainzGenreEnricherService';
 import { MusicBrainzService } from './backend/services/musicbrainzService';
 import { OllamaEmbedderService } from './backend/services/ollamaEmbedderService';
 import { OllamaService } from './backend/services/ollamaService';
@@ -599,10 +601,19 @@ async function startServer() {
       lastfmService,
       artistSimilarityStorageService
     );
+    const discogsGenreEnricherService = new DiscogsGenreEnricherService(
+      discogsService
+    );
+    const musicBrainzGenreEnricherService = new MusicBrainzGenreEnricherService(
+      musicBrainzService,
+      releaseTrackingService,
+      fileStorage
+    );
     const profileBuilderService = new ProfileBuilderService(
       tagEnricherService,
       artistSimilarityEnricherService,
-      mappingService
+      mappingService,
+      musicBrainzGenreEnricherService
     );
     const ollamaService = new OllamaService();
     const ollamaEmbedderService = new OllamaEmbedderService(ollamaService);
@@ -643,7 +654,9 @@ async function startServer() {
         profileBuilderService,
         discogsService,
         authService,
-        fileStorage
+        fileStorage,
+        discogsGenreEnricherService,
+        musicBrainzGenreEnricherService
       )
     );
     app.use(

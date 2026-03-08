@@ -423,7 +423,7 @@ export class DiscogsService {
 
       // Try cache first
       const cached = await this.fileStorage.readJSON<DiscogsRelease>(cacheKey);
-      if (cached) {
+      if (cached && cached.genres !== undefined) {
         return cached;
       }
 
@@ -442,6 +442,8 @@ export class DiscogsService {
           'Unknown Artist',
         year: rawRelease.year,
         format: rawRelease.formats?.map((f: DiscogsRawFormat) => f.name) || [],
+        genres: rawRelease.genres ?? [],
+        styles: rawRelease.styles ?? [],
         label: rawRelease.labels?.map((l: DiscogsRawLabel) => l.name) || [],
         catalog_number: rawRelease.catalog_number,
         cover_image: rawRelease.images?.[0]?.uri,

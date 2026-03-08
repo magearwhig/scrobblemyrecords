@@ -5,6 +5,8 @@ export interface DiscogsRelease {
   artist: string;
   year?: number;
   format: string[];
+  genres?: string[];
+  styles?: string[];
   label: string[];
   catalog_number?: string;
   cover_image?: string;
@@ -2048,6 +2050,8 @@ export interface DiscogsRawReleaseResponse {
   year: number;
   artists?: DiscogsRawArtist[];
   formats?: DiscogsRawFormat[];
+  genres?: string[];
+  styles?: string[];
   labels?: DiscogsRawLabel[];
   catalog_number?: string;
   images?: DiscogsRawImage[];

@@ -18,8 +18,10 @@ import {
   CollectionIndexerService,
   IndexProgress,
 } from '../services/collectionIndexerService';
+import { DiscogsGenreEnricherService } from '../services/discogsGenreEnricherService';
 import { DiscogsService } from '../services/discogsService';
 import { EmbeddingStorageService } from '../services/embeddingStorageService';
+import { MusicBrainzGenreEnricherService } from '../services/musicbrainzGenreEnricherService';
 import { ProfileBuilderService } from '../services/profileBuilderService';
 import { sendError, sendSuccess } from '../utils/apiResponse';
 import { FileStorage } from '../utils/fileStorage';
@@ -42,7 +44,9 @@ export function createEmbeddingsRouter(
   profileBuilderService: ProfileBuilderService,
   discogsService: DiscogsService,
   authService: AuthService,
-  fileStorage: FileStorage
+  fileStorage: FileStorage,
+  discogsGenreEnricherService?: DiscogsGenreEnricherService,
+  musicBrainzGenreEnricherService?: MusicBrainzGenreEnricherService
 ): express.Router {
   const router = express.Router();
 
@@ -90,6 +94,45 @@ export function createEmbeddingsRouter(
       // Background rebuild
       (async () => {
         try {
+          // Phase 1: Enrich releases with Discogs genres/styles
+          if (discogsGenreEnricherService) {
+            currentRebuildProgress = {
+              current: 0,
+              total: allItems.length,
+              phase: 'Enriching Discogs genres',
+            };
+            const releases = allItems.map(item => item.release);
+            await discogsGenreEnricherService.enrichBatch(
+              releases,
+              (current, total) => {
+                currentRebuildProgress = {
+                  current,
+                  total,
+                  phase: `Enriching Discogs genres ${current}/${total}`,
+                };
+              }
+            );
+          }
+
+          // Phase 2: Pre-warm MusicBrainz genre cache for all artists
+          if (musicBrainzGenreEnricherService) {
+            currentRebuildProgress = {
+              current: 0,
+              total: collectionArtists.length,
+              phase: 'Fetching MusicBrainz genres',
+            };
+            await musicBrainzGenreEnricherService.enrichBatch(
+              collectionArtists,
+              (current, total) => {
+                currentRebuildProgress = {
+                  current,
+                  total,
+                  phase: `Fetching MusicBrainz genres ${current}/${total}`,
+                };
+              }
+            );
+          }
+
           currentRebuildProgress = {
             current: 0,
             total: allItems.length,

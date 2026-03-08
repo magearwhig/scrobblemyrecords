@@ -387,6 +387,36 @@ export class MusicBrainzService {
   }
 
   /**
+   * Get genres for an artist by MBID.
+   * Uses the inc=genres parameter to fetch genre tags from MusicBrainz.
+   * Returns sorted genre names.
+   */
+  async getArtistGenres(artistMbid: string): Promise<string[]> {
+    await this.enforceRateLimit();
+
+    return this.executeWithBackoff(async () => {
+      try {
+        const response = await this.axios.get(`/artist/${artistMbid}`, {
+          params: {
+            inc: 'genres',
+            fmt: 'json',
+          },
+        });
+
+        const genres: Array<{ name: string; count: number }> =
+          response.data.genres || [];
+
+        return genres.sort((a, b) => b.count - a.count).map(g => g.name);
+      } catch (error) {
+        if (axios.isAxiosError(error) && error.response?.status === 404) {
+          return [];
+        }
+        throw error;
+      }
+    }, `getArtistGenres(${artistMbid})`);
+  }
+
+  /**
    * Get artist details by MBID
    */
   async getArtistById(

@@ -191,6 +191,7 @@ describe('DiscogsService', () => {
         id: 123,
         title: 'Cached Album',
         artist: 'Cached Artist',
+        genres: ['Rock'],
       };
 
       mockFileStorage.readJSON.mockResolvedValue(mockCachedRelease);

@@ -29,6 +29,7 @@ import { createLogger } from '../utils/logger';
 import { artistMappingService } from './artistMappingService';
 import { ArtistSimilarityEnricherService } from './artistSimilarityEnricherService';
 import { MappingService } from './mappingService';
+import { MusicBrainzGenreEnricherService } from './musicbrainzGenreEnricherService';
 import { TagEnricherService } from './tagEnricherService';
 
 const log = createLogger('ProfileBuilderService');
@@ -44,15 +45,18 @@ export class ProfileBuilderService {
   private tagEnricherService: TagEnricherService;
   private artistSimilarityEnricherService: ArtistSimilarityEnricherService;
   private mappingService: MappingService;
+  private mbGenreEnricherService?: MusicBrainzGenreEnricherService;
 
   constructor(
     tagEnricherService: TagEnricherService,
     artistSimilarityEnricherService: ArtistSimilarityEnricherService,
-    mappingService: MappingService
+    mappingService: MappingService,
+    mbGenreEnricherService?: MusicBrainzGenreEnricherService
   ) {
     this.tagEnricherService = tagEnricherService;
     this.artistSimilarityEnricherService = artistSimilarityEnricherService;
     this.mappingService = mappingService;
+    this.mbGenreEnricherService = mbGenreEnricherService;
   }
 
   /**
@@ -158,14 +162,30 @@ export class ProfileBuilderService {
       });
     }
 
+    // Fetch MusicBrainz genres for the artist (if enricher is available)
+    let mbGenres: string[] = [];
+    if (this.mbGenreEnricherService) {
+      try {
+        mbGenres =
+          await this.mbGenreEnricherService.getArtistGenres(discogsArtist);
+      } catch (err) {
+        log.warn('MusicBrainz genre fetch failed for artist', {
+          artist: discogsArtist,
+          err,
+        });
+      }
+    }
+
     return this.formatRecordProfile({
       artist: lastfmArtist,
       album: lastfmAlbum,
       year: release.year,
-      genres: release.format ?? [],
+      genres: release.genres ?? [],
+      styles: release.styles ?? [],
       albumTags,
       artistTags,
       trackTags,
+      mbGenres,
       similarArtistsInCollection: similarInCollection,
       tracks: trackTitles,
     });
@@ -180,9 +200,11 @@ export class ProfileBuilderService {
     album: string;
     year?: number;
     genres: string[];
+    styles: string[];
     albumTags: string[];
     artistTags: string[];
     trackTags: string[];
+    mbGenres?: string[];
     similarArtistsInCollection: string[];
     tracks: string[];
   }): string {
@@ -197,6 +219,14 @@ export class ProfileBuilderService {
 
     if (data.genres.length > 0) {
       lines.push(`Genres: ${data.genres.join(', ')}`);
+    }
+
+    if (data.styles.length > 0) {
+      lines.push(`Styles: ${data.styles.join(', ')}`);
+    }
+
+    if (data.mbGenres && data.mbGenres.length > 0) {
+      lines.push(`MusicBrainz Genres: ${data.mbGenres.join(', ')}`);
     }
 
     // Deduplicate album and track tags, excluding duplicates already in album tags

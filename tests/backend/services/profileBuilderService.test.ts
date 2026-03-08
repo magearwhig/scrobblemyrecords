@@ -1,6 +1,7 @@
 import { artistMappingService } from '../../../src/backend/services/artistMappingService';
 import { ArtistSimilarityEnricherService } from '../../../src/backend/services/artistSimilarityEnricherService';
 import { MappingService } from '../../../src/backend/services/mappingService';
+import { MusicBrainzGenreEnricherService } from '../../../src/backend/services/musicbrainzGenreEnricherService';
 import {
   ProfileBuilderService,
   RecentScrobble,
@@ -12,6 +13,7 @@ import { createMockRelease } from '../../fixtures/embeddingFixtures';
 jest.mock('../../../src/backend/services/tagEnricherService');
 jest.mock('../../../src/backend/services/artistSimilarityEnricherService');
 jest.mock('../../../src/backend/services/mappingService');
+jest.mock('../../../src/backend/services/musicbrainzGenreEnricherService');
 
 // Mock the singleton artistMappingService
 jest.mock('../../../src/backend/services/artistMappingService', () => ({
@@ -30,12 +32,17 @@ const MockedArtistSimilarityEnricherService =
 const MockedMappingService = MappingService as jest.MockedClass<
   typeof MappingService
 >;
+const MockedMBGenreEnricherService =
+  MusicBrainzGenreEnricherService as jest.MockedClass<
+    typeof MusicBrainzGenreEnricherService
+  >;
 
 describe('ProfileBuilderService', () => {
   let service: ProfileBuilderService;
   let mockTagEnricher: jest.Mocked<TagEnricherService>;
   let mockArtistSimilarityEnricher: jest.Mocked<ArtistSimilarityEnricherService>;
   let mockMappingService: jest.Mocked<MappingService>;
+  let mockMBGenreEnricher: jest.Mocked<MusicBrainzGenreEnricherService>;
   let mockedArtistMapping: jest.Mocked<typeof artistMappingService>;
 
   beforeEach(() => {
@@ -50,6 +57,11 @@ describe('ProfileBuilderService', () => {
     mockMappingService = new MockedMappingService(
       {} as never
     ) as jest.Mocked<MappingService>;
+    mockMBGenreEnricher = new MockedMBGenreEnricherService(
+      {} as never,
+      {} as never,
+      {} as never
+    ) as jest.Mocked<MusicBrainzGenreEnricherService>;
     mockedArtistMapping = jest.mocked(artistMappingService);
 
     // Default mocks
@@ -70,11 +82,13 @@ describe('ProfileBuilderService', () => {
     mockedArtistMapping.getLastfmName.mockImplementation(
       (name: string) => name
     );
+    mockMBGenreEnricher.getArtistGenres = jest.fn().mockResolvedValue([]);
 
     service = new ProfileBuilderService(
       mockTagEnricher,
       mockArtistSimilarityEnricher,
-      mockMappingService
+      mockMappingService,
+      mockMBGenreEnricher
     );
   });
 
@@ -270,6 +284,83 @@ describe('ProfileBuilderService', () => {
         t => t === 'alternative rock'
       ).length;
       expect(altRockCount).toBe(1);
+    });
+
+    it('should include Discogs genres from release (not formats)', async () => {
+      // Arrange
+      const release = createMockRelease({
+        format: ['Vinyl', 'LP'],
+        genres: ['Electronic', 'Rock'],
+      });
+
+      // Act
+      const profile = await service.buildRecordProfile(release, []);
+
+      // Assert
+      expect(profile).toContain('Genres: Electronic, Rock');
+      expect(profile).not.toContain('Genres: Vinyl');
+    });
+
+    it('should include Discogs styles as a separate line', async () => {
+      // Arrange
+      const release = createMockRelease({
+        styles: ['Psychedelic Rock', 'Prog Rock'],
+      });
+
+      // Act
+      const profile = await service.buildRecordProfile(release, []);
+
+      // Assert
+      expect(profile).toContain('Styles: Psychedelic Rock, Prog Rock');
+    });
+
+    it('should include MusicBrainz genres when enricher provides them', async () => {
+      // Arrange
+      const release = createMockRelease();
+      mockMBGenreEnricher.getArtistGenres.mockResolvedValue([
+        'progressive rock',
+        'art rock',
+      ]);
+
+      // Act
+      const profile = await service.buildRecordProfile(release, []);
+
+      // Assert
+      expect(profile).toContain(
+        'MusicBrainz Genres: progressive rock, art rock'
+      );
+    });
+
+    it('should work without MB enricher (undefined)', async () => {
+      // Arrange
+      const serviceWithoutMB = new ProfileBuilderService(
+        mockTagEnricher,
+        mockArtistSimilarityEnricher,
+        mockMappingService
+      );
+      const release = createMockRelease();
+
+      // Act
+      const profile = await serviceWithoutMB.buildRecordProfile(release, []);
+
+      // Assert
+      expect(profile).toContain('Artist: Radiohead');
+      expect(profile).not.toContain('MusicBrainz Genres:');
+    });
+
+    it('should degrade gracefully when MB genre enricher throws', async () => {
+      // Arrange
+      const release = createMockRelease();
+      mockMBGenreEnricher.getArtistGenres.mockRejectedValue(
+        new Error('MB API error')
+      );
+
+      // Act — should not throw
+      const profile = await service.buildRecordProfile(release, []);
+
+      // Assert
+      expect(profile).toContain('Artist:');
+      expect(profile).not.toContain('MusicBrainz Genres:');
     });
   });
 
