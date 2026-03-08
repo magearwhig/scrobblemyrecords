@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 
+import './HomePage.page.css';
+
 import { DashboardData, MilestoneInfo } from '../../shared/types';
 import {
   ConnectionStatus,

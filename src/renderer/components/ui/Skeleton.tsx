@@ -1,6 +1,7 @@
 import React from 'react';
 
 import './Skeleton.css';
+import '../../pages/StatsPage.page.css';
 
 interface SkeletonProps {
   /**
@@ -57,7 +58,7 @@ export const AlbumCardSkeleton: React.FC<{ count?: number }> = ({
   return (
     <>
       {Array.from({ length: count }).map((_, index) => (
-        <div key={index} className='skeleton-album-card'>
+        <div key={index} className='skeleton-album-card' aria-hidden='true'>
           <Skeleton variant='rectangular' className='skeleton-album-cover' />
           <div className='skeleton-album-info'>
             <Skeleton variant='text' height={16} width='80%' />
@@ -79,7 +80,7 @@ export const StatCardSkeleton: React.FC<{ count?: number }> = ({
   return (
     <>
       {Array.from({ length: count }).map((_, index) => (
-        <div key={index} className='skeleton-stat-card'>
+        <div key={index} className='skeleton-stat-card' aria-hidden='true'>
           <Skeleton variant='text' height={14} width='60%' />
           <Skeleton variant='text' height={32} width='40%' />
         </div>
@@ -98,7 +99,7 @@ export const ListItemSkeleton: React.FC<{
   return (
     <>
       {Array.from({ length: count }).map((_, index) => (
-        <div key={index} className='skeleton-list-item'>
+        <div key={index} className='skeleton-list-item' aria-hidden='true'>
           {showAvatar && (
             <Skeleton
               variant='circular'
@@ -120,6 +121,9 @@ export const ListItemSkeleton: React.FC<{
 /**
  * Skeleton for table row loading states.
  */
+// Stable widths for skeleton columns to avoid visual jitter on re-renders
+const SKELETON_COL_WIDTHS = [75, 65, 80, 60, 70, 55, 85, 68];
+
 export const TableRowSkeleton: React.FC<{
   count?: number;
   columns?: number;
@@ -127,13 +131,13 @@ export const TableRowSkeleton: React.FC<{
   return (
     <>
       {Array.from({ length: count }).map((_, rowIndex) => (
-        <tr key={rowIndex} className='skeleton-table-row'>
+        <tr key={rowIndex} className='skeleton-table-row' aria-hidden='true'>
           {Array.from({ length: columns }).map((_, colIndex) => (
             <td key={colIndex}>
               <Skeleton
                 variant='text'
                 height={16}
-                width={`${60 + Math.random() * 30}%`}
+                width={`${SKELETON_COL_WIDTHS[(rowIndex * columns + colIndex) % SKELETON_COL_WIDTHS.length]}%`}
               />
             </td>
           ))}
@@ -152,7 +156,11 @@ export const SessionCardSkeleton: React.FC<{ count?: number }> = ({
   return (
     <>
       {Array.from({ length: count }).map((_, index) => (
-        <div key={index} className='card skeleton-session-card'>
+        <div
+          key={index}
+          className='card skeleton-session-card'
+          aria-hidden='true'
+        >
           <div className='skeleton-session-header'>
             <div className='skeleton-session-status'>
               <Skeleton variant='circular' width={24} height={24} />
@@ -179,7 +187,7 @@ export const SessionCardSkeleton: React.FC<{ count?: number }> = ({
  */
 export const StatsPageSkeleton: React.FC = () => {
   return (
-    <div className='stats-page'>
+    <div className='stats-page' aria-hidden='true'>
       <header className='stats-page-header'>
         <Skeleton variant='text' width={200} height={32} />
       </header>
@@ -210,6 +218,69 @@ export const StatsPageSkeleton: React.FC = () => {
           />
         </div>
       </section>
+    </div>
+  );
+};
+
+/**
+ * Skeleton for Collection page grid loading state.
+ */
+export const CollectionPageSkeleton: React.FC = () => {
+  return (
+    <div className='skeleton-collection-grid' aria-hidden='true'>
+      <AlbumCardSkeleton count={12} />
+    </div>
+  );
+};
+
+/**
+ * Skeleton for ReleaseDetailsPage loading state.
+ */
+export const ReleaseDetailsSkeleton: React.FC = () => {
+  return (
+    <div className='card' aria-hidden='true'>
+      <div className='skeleton-release-details-header'>
+        <Skeleton variant='text' width={180} height={28} />
+        <Skeleton variant='rectangular' width={120} height={32} />
+      </div>
+      <div className='skeleton-release-details-body'>
+        <Skeleton variant='rectangular' width={160} height={160} />
+        <div className='skeleton-release-details-info'>
+          <Skeleton variant='text' width='60%' height={24} />
+          <Skeleton variant='text' width='40%' height={18} />
+          <Skeleton variant='text' width='30%' height={16} />
+          <Skeleton variant='text' width='50%' height={16} />
+        </div>
+      </div>
+      <div className='skeleton-release-details-tracks'>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className='skeleton-release-track-row'>
+            <Skeleton variant='text' width={20} height={14} />
+            <Skeleton variant='text' width='60%' height={14} />
+            <Skeleton variant='text' width={50} height={14} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Skeleton for NewReleasesPage loading state.
+ */
+export const NewReleasesSkeleton: React.FC = () => {
+  return (
+    <div className='skeleton-new-releases-grid' aria-hidden='true'>
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className='skeleton-release-card'>
+          <Skeleton variant='rectangular' className='skeleton-release-cover' />
+          <div className='skeleton-release-card-info'>
+            <Skeleton variant='text' height={16} width='80%' />
+            <Skeleton variant='text' height={14} width='60%' />
+            <Skeleton variant='text' height={12} width='40%' />
+          </div>
+        </div>
+      ))}
     </div>
   );
 };

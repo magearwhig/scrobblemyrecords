@@ -1,0 +1,120 @@
+/* StatsPage-specific styles */
+/* Co-located CSS extracted from styles.css */
+
+/* Stats Page Layout */
+.stats-page {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.stats-page-header {
+  margin-bottom: 1.5rem;
+}
+
+.stats-page-header h1 {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Stats Loading State */
+.stats-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 1rem;
+}
+
+.stats-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--accent-primary);
+  border-radius: var(--radius-full);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.stats-loading p {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Stats Error State */
+.stats-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 1rem;
+  text-align: center;
+}
+
+.stats-error h2 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.stats-error p {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.stats-error button {
+  padding: 0.5rem 1rem;
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--text-base);
+}
+
+.stats-error button:hover {
+  background: var(--accent-primary-hover);
+}
+
+/* Stats Cards Row */
+.stats-cards-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Stats Section */
+.stats-section {
+  margin-bottom: 1.5rem;
+}
+
+/* Top Lists Row */
+.stats-top-lists-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Charts Row */
+.stats-charts-row {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(400px, 2fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .stats-charts-row {
+    grid-template-columns: 1fr;
+  }
+}

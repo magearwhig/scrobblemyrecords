@@ -1,5 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import './CollectionPage.page.css';
 
 import {
   AlbumIdentifier,
@@ -17,6 +18,7 @@ import CollectionFilterControls from '../components/CollectionFilterControls';
 import SearchBar from '../components/SearchBar';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
+import { CollectionPageSkeleton } from '../components/ui/Skeleton';
 import VirtualizedCollectionGrid from '../components/VirtualizedCollectionGrid';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -1243,14 +1245,7 @@ const CollectionPage: React.FC = () => {
         </div>
       </div>
 
-      {loading && (
-        <div className='card'>
-          <div className='loading'>
-            <div className='spinner'></div>
-            Loading collection...
-          </div>
-        </div>
-      )}
+      {loading && <CollectionPageSkeleton />}
 
       {!loading && filteredCollection.length === 0 && !error && (
         <div className='card'>

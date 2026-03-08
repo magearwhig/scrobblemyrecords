@@ -1,6 +1,6 @@
 .rankings-race {
   background: var(--card-bg, #ffffff);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 1.5rem;
   box-shadow: 0 2px 0.5rem rgba(0, 0, 0, 0.1);
   min-height: 31.25rem;
@@ -13,7 +13,7 @@
   min-height: 25rem;
   color: var(--text-secondary, #666666);
   text-align: center;
-  font-size: 1rem;
+  font-size: var(--text-md);
 }
 
 /* Controls */
@@ -33,7 +33,7 @@
   border-radius: 50%;
   width: 3rem;
   height: 3rem;
-  font-size: 1.25rem;
+  font-size: var(--text-xl);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -53,7 +53,7 @@
 .rankings-race-slider {
   flex: 1;
   height: 0.5rem;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   background: var(--slider-bg, #e0e0e0);
   outline: none;
   -webkit-appearance: none;
@@ -90,7 +90,7 @@
 }
 
 .rankings-race-period {
-  font-size: 1.125rem;
+  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--text-primary, #000000);
   min-width: 9.375rem;
@@ -100,11 +100,11 @@
 
 .rankings-race-speed {
   padding: 0.5rem 0.75rem;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-color, #e0e0e0);
   background: var(--bg-secondary);
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   cursor: pointer;
   outline: none;
   transition: border-color 0.2s ease;
@@ -149,7 +149,7 @@
 }
 
 .rankings-race-rank {
-  font-size: 1.5rem;
+  font-size: var(--text-2xl);
   font-weight: 700;
   color: var(--text-secondary, #666666);
   width: 2.5rem;
@@ -158,7 +158,7 @@
 }
 
 .rankings-race-label {
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   font-weight: 500;
   color: var(--text-primary, #000000);
   white-space: nowrap;
@@ -182,7 +182,7 @@
     var(--accent-primary) 0%,
     var(--accent-primary) 100%
   );
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   /* Smooth width animation */
   transition: width 0.8s ease-out;
   will-change: width;
@@ -191,7 +191,7 @@
 }
 
 .rankings-race-count {
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   font-weight: 600;
   color: var(--text-primary, #000000);
   margin-left: 0.5rem;
@@ -202,7 +202,7 @@
 /* Progress indicator */
 .rankings-race-progress {
   text-align: center;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   color: var(--text-secondary, #666666);
   margin-top: 1rem;
 }
@@ -227,16 +227,16 @@
   .rankings-race-label {
     min-width: 9.375rem;
     max-width: 12.5rem;
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
   }
 
   .rankings-race-count {
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     min-width: 3.125rem;
   }
 
   .rankings-race-rank {
-    font-size: 1.25rem;
+    font-size: var(--text-xl);
     width: 1.875rem;
   }
 }

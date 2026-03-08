@@ -18,7 +18,7 @@
 .new-releases-page .page-header h1 {
   margin: 0;
   color: var(--text-primary);
-  font-size: 1.75rem;
+  font-size: var(--text-2xl);
 }
 
 .new-releases-page .header-actions {
@@ -29,14 +29,14 @@
 
 .new-releases-page .sync-info {
   color: var(--text-secondary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
 }
 
 /* Sync Progress Bar */
 .sync-progress-container {
   background-color: var(--card-bg);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 1rem 1.25rem;
   margin-bottom: 1rem;
 }
@@ -61,18 +61,18 @@
 
 .sync-progress-info .sync-detail {
   color: var(--text-secondary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
 }
 
 .sync-progress-info .sync-eta {
   color: var(--text-muted);
-  font-size: 0.8125rem;
+  font-size: var(--text-sm);
   margin-left: auto;
 }
 
 .sync-current-artist {
   color: var(--text-secondary);
-  font-size: 0.8125rem;
+  font-size: var(--text-sm);
   margin-bottom: 0.5rem;
   white-space: nowrap;
   overflow: hidden;
@@ -82,7 +82,7 @@
 .sync-progress-track {
   height: 8px;
   background-color: var(--bg-tertiary);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   margin-bottom: 0.5rem;
 }
@@ -90,7 +90,7 @@
 .sync-progress-bar {
   height: 100%;
   background-color: var(--accent-color);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: width 0.3s ease;
 }
 
@@ -98,14 +98,14 @@
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 
 /* Checking Status */
 .checking-status {
   color: var(--text-muted);
-  font-size: 0.8125rem;
+  font-size: var(--text-sm);
   font-style: italic;
 }
 
@@ -114,7 +114,7 @@
   background-color: var(--warning-color);
   color: #333;
   padding: 0.75rem 1rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   margin-bottom: 1rem;
   display: flex;
   align-items: center;
@@ -139,9 +139,9 @@
   background-color: rgba(0, 0, 0, 0.1);
   border: none;
   padding: 0.25rem 0.75rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   transition: background-color 0.2s ease;
 }
 
@@ -150,7 +150,7 @@
 }
 
 .disambiguation-alert .more-count {
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   color: rgba(0, 0, 0, 0.6);
 }
 
@@ -162,7 +162,7 @@
   margin-bottom: 1.5rem;
   padding: 1rem;
   background-color: var(--bg-secondary);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .filter-group {
@@ -173,26 +173,26 @@
 
 .filter-group label {
   color: var(--text-secondary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
 }
 
 .filter-group select {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
 }
 
 .sort-order-btn {
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 0.5rem 0.75rem;
   cursor: pointer;
   color: var(--text-primary);
-  font-size: 1rem;
+  font-size: var(--text-md);
   line-height: 1;
 }
 
@@ -211,7 +211,7 @@
   gap: 0.375rem;
   cursor: pointer;
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
 }
 
 .checkbox-label input[type='checkbox'] {
@@ -245,7 +245,7 @@
 /* Release Card */
 .release-card {
   background-color: var(--card-bg);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   box-shadow: var(--card-shadow);
   transition:
@@ -281,7 +281,7 @@
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
 }
 
 .upcoming-badge {
@@ -291,8 +291,8 @@
   background-color: var(--accent-color);
   color: white;
   padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
   font-weight: 600;
 }
 
@@ -302,7 +302,7 @@
 
 .release-title {
   margin: 0 0 0.25rem;
-  font-size: 1rem;
+  font-size: var(--text-md);
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
@@ -312,7 +312,7 @@
 
 .release-artist {
   margin: 0 0 0.5rem;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -321,7 +321,7 @@
 
 .release-date {
   margin: 0 0 0.5rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 
@@ -336,8 +336,8 @@
 .badge {
   display: inline-block;
   padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
   font-weight: 500;
   background-color: var(--bg-tertiary);
   color: var(--text-secondary);
@@ -369,7 +369,7 @@
 
 .price-range {
   margin: 0.5rem 0;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   color: var(--success-color);
   font-weight: 500;
 }
@@ -383,7 +383,7 @@
 
 .in-wishlist {
   color: var(--success-color);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   font-weight: 500;
 }
 
@@ -398,10 +398,10 @@
   flex: 1;
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
 }
 
 .search-box button {
@@ -422,7 +422,7 @@
   padding: 0.75rem 1rem;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -445,13 +445,13 @@
 
 .disambiguation-text {
   color: var(--text-secondary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
 }
 
 .artist-details {
   display: flex;
   gap: 0.75rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 
@@ -495,4 +495,333 @@
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 1rem;
   }
+}
+
+/* ============================================ */
+/* Feature 5.5: New Releases Tab                */
+/* ============================================ */
+
+.new-releases-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.new-releases-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.new-releases-last-check {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.new-releases-sync-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.new-releases-sync-progress .sync-text {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.new-releases-sync-progress .sync-progress-bar-container {
+  width: 100px;
+  height: 6px;
+  background: var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.new-releases-sync-progress .sync-progress-bar {
+  height: 100%;
+  background: var(--accent-primary);
+  transition: width 0.3s;
+}
+
+.new-releases-sync-progress .sync-percent {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  min-width: 35px;
+}
+
+/* Enhanced sync progress display */
+.new-releases-sync-progress .sync-progress-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--text-sm);
+}
+
+.new-releases-sync-progress .sync-masters-count {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.new-releases-sync-progress .sync-auto-continue-badge {
+  padding: 0.125rem 0.4rem;
+  background: var(--accent-primary);
+  color: white;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.new-releases-sync-progress .sync-progress-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Progress summary in header */
+.new-releases-progress-summary {
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+
+/* Continue actions when batch is complete but more remain */
+.new-releases-continue-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.new-releases-continue-actions .continue-hint {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.new-releases-error {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--accent-danger, #ef4444);
+  border-radius: var(--radius-md);
+  color: var(--accent-danger, #ef4444);
+}
+
+.new-releases-filters {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.new-releases-filters .form-select {
+  min-width: 150px;
+}
+
+.new-releases-show-dismissed {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.new-releases-show-dismissed input {
+  cursor: pointer;
+}
+
+.new-releases-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* New Release Card */
+.new-release-card {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.new-release-card:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.new-release-card.dismissed {
+  opacity: 0.6;
+}
+
+.new-release-card-cover {
+  flex-shrink: 0;
+  width: 80px;
+  height: 80px;
+}
+
+.new-release-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+}
+
+.new-release-cover-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+}
+
+.new-release-cover-placeholder .vinyl-icon {
+  font-size: var(--text-3xl);
+}
+
+.new-release-card-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.new-release-title {
+  font-size: var(--text-md);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.new-release-artist {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.new-release-separator {
+  color: var(--text-tertiary);
+}
+
+.new-release-album {
+  color: var(--text-secondary);
+}
+
+.new-release-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.new-release-badge {
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.new-release-badge.new {
+  background: var(--accent-success, #22c55e);
+  color: white;
+}
+
+.new-release-format {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.new-release-meta {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.new-release-price {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--accent-primary);
+}
+
+.new-release-for-sale {
+  font-weight: 400;
+  color: var(--text-tertiary);
+  margin-left: 0.25rem;
+}
+
+.new-release-source {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  font-size: var(--text-xs);
+  margin-top: auto;
+}
+
+.new-release-source-badge {
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.new-release-source-badge[data-source='wishlist'] {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--accent-primary);
+}
+
+.new-release-source-badge[data-source='local_want'] {
+  background: rgba(168, 85, 247, 0.15);
+  color: var(--chart-color-5);
+}
+
+.new-release-source-badge[data-source='vinyl_watch'] {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--accent-success, #22c55e);
+}
+
+.new-release-detected {
+  color: var(--text-tertiary);
+}
+
+.new-release-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  justify-content: center;
+}
+
+/* Tab badge for new releases count */
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  margin-left: 0.35rem;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  border-radius: var(--radius-lg);
+  background: var(--accent-primary);
+  color: white;
 }

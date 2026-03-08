@@ -1,0 +1,544 @@
+/* MarketplacePage, SellersPage, SellerMatchesPage styles */
+/* Co-located CSS extracted from styles.css */
+
+/* ===== Marketplace Page ===== */
+.marketplace-page {
+  padding: 1.5rem;
+}
+
+.marketplace-page h1 {
+  margin-bottom: 0.25rem;
+}
+
+.marketplace-page .page-description {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.marketplace-tab-content {
+  margin-top: 0.5rem;
+}
+
+/* ===== What to Play Page ===== */
+.what-to-play-page {
+  padding: 1.5rem;
+}
+
+.what-to-play-page h1 {
+  margin-bottom: 0.25rem;
+}
+
+.what-to-play-page .page-description {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.what-to-play-tab-content {
+  margin-top: 0.5rem;
+}
+
+/* Embedded page action bars (when pages render inside tab containers) */
+.wishlist-actions,
+.new-releases-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.wishlist-embedded {
+  padding: 0;
+}
+
+/* ============================================ */
+/* Seller Monitoring Pages                      */
+/* ============================================ */
+
+/* Sellers Page */
+.sellers-page {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.sellers-page h1 {
+  margin: 0 0 0.5rem;
+  color: var(--text-primary);
+}
+
+.sellers-page .page-description {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+.sellers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+}
+
+.sellers-scan-buttons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.sellers-scan-progress {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-color);
+}
+
+.sellers-scan-progress-text {
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.sellers-scan-progress-bar {
+  height: 4px;
+  background: var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.sellers-scan-progress-fill {
+  height: 100%;
+  background: var(--accent-color);
+  transition: width 0.3s ease;
+}
+
+.sellers-scan-matches-found {
+  font-size: var(--text-sm);
+  color: var(--accent-success, #22c55e);
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
+.sellers-scan-cache-stats {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+/* Master/Release Cache Card */
+.sellers-cache-card {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-color);
+}
+
+.sellers-cache-header {
+  margin-bottom: 0.75rem;
+}
+
+.sellers-cache-header h3 {
+  margin: 0 0 0.25rem 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sellers-cache-hint {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.sellers-cache-stats {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.sellers-cache-stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.sellers-cache-stat-value {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sellers-cache-stat-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sellers-cache-stat-warning .sellers-cache-stat-value {
+  color: var(--accent-warning, #f59e0b);
+}
+
+.sellers-cache-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.sellers-cache-updated {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.sellers-cache-empty-warning {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--accent-warning, #f59e0b);
+}
+
+.sellers-scan-completed {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.sellers-scan-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: var(--text-sm);
+  color: var(--accent-danger, #ef4444);
+}
+
+.sellers-scan-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sellers-scan-cancelled {
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sellers-scan-rate-limited {
+  color: var(--color-warning, #e6a817);
+}
+
+.sellers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.seller-card {
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  border: 1px solid var(--border-color);
+  transition: box-shadow 0.2s;
+}
+
+.seller-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.seller-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.seller-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.seller-card-name {
+  font-weight: 600;
+  font-size: var(--text-lg);
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.seller-card-username {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.seller-card-stats {
+  display: flex;
+  gap: 1.5rem;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.seller-card-meta {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: 0.75rem;
+}
+
+.seller-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.sellers-view-all {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+/* Seller Matches Page */
+.seller-matches-page {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.seller-matches-page h1 {
+  margin: 0 0 0.5rem;
+  color: var(--text-primary);
+}
+
+.seller-matches-page .page-description {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.seller-matches-back {
+  margin-bottom: 1rem;
+}
+
+.seller-matches-controls {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.seller-matches-controls .form-group {
+  min-width: 180px;
+}
+
+.seller-match-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.seller-match-card {
+  display: flex;
+  gap: 1rem;
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  transition: box-shadow 0.2s;
+}
+
+.seller-match-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.seller-match-card-seen {
+  opacity: 0.7;
+}
+
+.seller-match-card-sold {
+  opacity: 0.6;
+  position: relative;
+}
+
+.seller-match-card-sold::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 8px,
+    rgba(128, 128, 128, 0.1) 8px,
+    rgba(128, 128, 128, 0.1) 16px
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.seller-match-cover {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.seller-match-cover-placeholder {
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.seller-match-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.seller-match-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.seller-match-details {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.seller-match-price {
+  font-weight: 600;
+  color: var(--accent-success, #22c55e);
+  font-size: var(--text-lg);
+  margin-bottom: 0.25rem;
+}
+
+.seller-match-seller {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.seller-match-date {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  margin-top: 0.25rem;
+}
+
+.seller-match-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.seller-match-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.seller-match-badge-seen {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+}
+
+.seller-match-badge-sold {
+  background: var(--accent-danger, #ef4444);
+  color: white;
+}
+
+.seller-match-badge-unverified {
+  background: var(--accent-warning, #f59e0b);
+  cursor: help;
+}
+
+/* Cache info banner */
+.seller-matches-cache-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.cache-info-icon {
+  font-size: var(--text-md);
+}
+
+/* Form Styles Enhancements */
+.form-error {
+  color: var(--accent-danger, #ef4444);
+  font-size: var(--text-sm);
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: var(--radius-sm);
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+}
+
+.empty-state h2 {
+  margin: 0 0 0.5rem;
+  color: var(--text-primary);
+}
+
+.empty-state p {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+/* Loading States */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  gap: 1rem;
+}
+
+.loading-container p {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.error-state {
+  text-align: center;
+  padding: 3rem 2rem;
+}
+
+.error-state p {
+  color: var(--accent-danger, #ef4444);
+  margin-bottom: 1.5rem;
+}

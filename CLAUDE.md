@@ -8,21 +8,22 @@
 
 ### Guidelines
 - **AVOID inline styles** - They make components harder to maintain, test, and reuse
-- **USE CSS modules or styled-components** for component-specific styles
-- **USE global CSS classes** for shared styles (buttons, cards, layout)
+- **USE co-located CSS module files** for page-specific styles (e.g., `HomePage.module.css` next to `HomePage.tsx`)
+- **USE global CSS classes** in `styles.css` for shared styles (buttons, cards, layout)
 - **ENSURE text readability** - Always specify both color and background-color
 - **TEST in different themes** - Avoid assumptions about default colors
+- **USE design tokens** - Never hardcode `font-size`, `border-radius`, or color values
+
+### Icon Conventions
+- **NEVER use emoji as icons** - Use `lucide-react` for all icons
+- Size: 16px for inline/badges, 18px for nav items, 20px for headers
+- Add `aria-hidden="true"` to decorative icons; `aria-label` to icon-only buttons
 
 ### Technical Reasoning
 - Inline styles have highest CSS specificity, making them hard to override
 - They don't support pseudo-classes, media queries, or advanced CSS features
 - Performance impact: inline styles prevent CSS caching and reuse
 - Maintenance burden: style changes require component updates
-
-### Example Issues Found
-- `src/renderer/pages/SettingsPage.tsx` - Extensive inline styling causing white-on-white text
-- Text readability problems due to missing color specifications
-- Difficulty maintaining consistent design across components
 
 ## Workflow Instructions
 

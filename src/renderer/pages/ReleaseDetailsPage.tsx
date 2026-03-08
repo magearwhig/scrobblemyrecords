@@ -1,5 +1,6 @@
 import { AlertTriangle, Check, Package, Play, XCircle } from 'lucide-react';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import './ReleaseDetailsPage.page.css';
 
 import {
   DiscogsRelease,
@@ -13,6 +14,7 @@ import ArtistLink from '../components/ArtistLink';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { ProgressBar } from '../components/ui/ProgressBar';
+import { ReleaseDetailsSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
@@ -720,14 +722,7 @@ const ReleaseDetailsPage: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <div className='card'>
-        <div className='loading'>
-          <div className='spinner'></div>
-          Loading release details...
-        </div>
-      </div>
-    );
+    return <ReleaseDetailsSkeleton />;
   }
 
   if (error) {

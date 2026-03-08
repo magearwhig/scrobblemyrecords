@@ -1,0 +1,485 @@
+/* ReleaseDetailsPage styles */
+/* Extracted from HistoryPage.module.css */
+
+/* ============================================================================
+   RELEASE DETAILS PAGE STYLES
+   ============================================================================ */
+
+/* Modal overlay */
+.release-details-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* Modal container */
+.release-details-modal-container {
+  background-color: var(--bg-primary);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+}
+
+/* Modal warning heading */
+.release-details-warning-heading {
+  margin: 0 0 1rem 0;
+  color: var(--warning-color);
+}
+
+/* Modal description text */
+.release-details-modal-description {
+  margin: 0 0 1rem 0;
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+}
+
+/* Modal list */
+.release-details-modal-list {
+  margin: 0 0 1.5rem 0;
+  padding-left: 1.5rem;
+}
+
+/* Modal list item */
+.release-details-modal-list-item {
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+/* Modal link */
+.release-details-modal-link {
+  margin-left: 0.75rem;
+  font-size: var(--text-sm);
+  color: var(--accent-color);
+}
+
+/* Modal muted text */
+.release-details-modal-muted-text {
+  margin: 0 0 1rem 0;
+  font-size: var(--text-base);
+  color: var(--text-muted);
+}
+
+/* Modal button container */
+.release-details-modal-button-container {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/* Header container */
+.release-details-header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+/* Main content container */
+.release-details-main-content {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+/* Image container */
+.release-details-image-container {
+  flex-shrink: 0;
+}
+
+/* Cover image */
+.release-details-cover-image {
+  width: 200px;
+  height: 200px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+/* Content container */
+.release-details-content {
+  flex: 1;
+}
+
+/* Title */
+.release-details-title {
+  margin: 0 0 0.5rem 0;
+  font-size: var(--text-2xl);
+  color: var(--text-primary);
+}
+
+/* Artist name */
+.release-details-artist {
+  margin: 0 0 0.5rem 0;
+  font-size: var(--text-lg);
+  color: var(--text-secondary);
+}
+
+/* Artist mapping badge */
+.release-details-artist-mapping-badge {
+  margin-left: 0.75rem;
+  font-size: var(--text-base);
+  padding: 0.2rem 0.5rem;
+  background-color: var(--accent-color);
+  color: white;
+  border-radius: var(--radius-lg);
+  font-weight: 500;
+}
+
+/* Metadata text */
+.release-details-metadata {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-muted);
+}
+
+/* Button container */
+.release-details-button-container {
+  margin-top: 1rem;
+}
+
+/* Discard pile indicator */
+.release-details-discard-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--text-base);
+  color: var(--accent-warning, #f59e0b);
+  padding: 0.4rem 0.75rem;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+}
+
+/* Discard pile button */
+.release-details-discard-button {
+  font-size: var(--text-sm);
+  padding: 0.4rem 0.75rem;
+}
+
+/* Message margin */
+.release-details-message-margin {
+  margin-bottom: 1rem;
+}
+
+/* Progress header */
+.release-details-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+/* Progress bar container */
+.release-details-progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background-color: var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+/* Progress bar fill - dynamic width handled inline */
+.release-details-progress-bar-fill {
+  height: 100%;
+  background-color: var(--accent-color);
+  transition: width 0.3s ease;
+}
+
+/* Progress stats */
+.release-details-progress-stats {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+/* Error details */
+.release-details-error-details {
+  margin-top: 0.5rem;
+  font-size: var(--text-base);
+}
+
+/* Error list */
+.release-details-error-list {
+  margin: 0.25rem 0;
+  padding-left: 1.5rem;
+}
+
+/* Ignored note */
+.release-details-ignored-note {
+  margin-top: 0.5rem;
+  font-size: var(--text-base);
+  color: var(--warning-color);
+}
+
+/* Profile link container */
+.release-details-profile-link {
+  margin-top: 0.5rem;
+}
+
+/* Tracks section */
+.release-details-tracks-section {
+  margin-bottom: 1rem;
+}
+
+/* Tracks header */
+.release-details-tracks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+/* Tracks heading */
+.release-details-tracks-heading {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+/* Tracks button group */
+.release-details-tracks-buttons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* Side selection container */
+.release-details-side-selection {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+/* Side selection heading */
+.release-details-side-heading {
+  margin: 0 0 0.75rem 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Disc selection group */
+.release-details-disc-group {
+  margin-bottom: 0.75rem;
+}
+
+/* Disc/Side label */
+.release-details-selection-label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+/* Disc/Side buttons container */
+.release-details-selection-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Button font size small */
+.release-details-button-small-text {
+  font-size: var(--text-sm);
+}
+
+/* Timing container */
+.release-details-timing-container {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+/* Timing heading */
+.release-details-timing-heading {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+}
+
+/* Timing description */
+.release-details-timing-description {
+  margin: 0 0 0.5rem 0;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+/* Timing inputs container */
+.release-details-timing-inputs {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+/* Form group no margin */
+.release-details-form-group {
+  margin: 0;
+  flex: 1;
+}
+
+/* Small label */
+.release-details-label-small {
+  font-size: var(--text-base);
+}
+
+/* Input container */
+.release-details-input-container {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Input small text */
+.release-details-input-small {
+  font-size: var(--text-base);
+  flex: 1;
+}
+
+/* Time adjust button */
+.release-details-time-adjust-button {
+  padding: 0.5rem 0.75rem;
+}
+
+/* Auto timing button container */
+.release-details-auto-timing-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+/* Timing display text */
+.release-details-timing-display {
+  margin-top: 0.5rem;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* Timing success display */
+.release-details-timing-success {
+  margin-top: 0.5rem;
+  font-size: var(--text-sm);
+  color: var(--success-color);
+}
+
+/* Button margin right */
+.release-details-button-margin-right {
+  margin-right: 0.5rem;
+}
+
+/* Button margin left */
+.release-details-button-margin-left {
+  margin-left: 1rem;
+}
+
+/* Session key message */
+.release-details-session-key {
+  margin-top: 0.5rem;
+  font-size: var(--text-sm);
+}
+
+/* Tracklist container */
+.release-details-tracklist {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+/* Section header */
+.release-details-section-header {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-primary);
+  border-left: 4px solid var(--accent-color);
+}
+
+/* Section header text */
+.release-details-section-header-text {
+  font-weight: 600;
+  color: var(--accent-color);
+  font-size: var(--text-base);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Track item - note: background color is dynamic based on selection state */
+.release-details-track-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem;
+  cursor: pointer;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.release-details-track-item:last-child {
+  border-bottom: none;
+}
+
+.release-details-track-item--selected {
+  background-color: var(--bg-tertiary);
+}
+
+/* Track checkbox */
+.release-details-track-checkbox {
+  margin-right: 1rem;
+}
+
+/* Track content */
+.release-details-track-content {
+  flex: 1;
+}
+
+/* Track title */
+.release-details-track-title {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* Track artist */
+.release-details-track-artist {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+/* Track duration */
+.release-details-track-duration {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* Spotify button margin */
+.release-details-spotify-button-margin {
+  margin-left: 0.5rem;
+}
+
+/* Track stats container */
+.release-details-track-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-left: 1rem;
+  min-width: 80px;
+}
+
+/* Play count */
+.release-details-play-count {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--accent-color);
+}
+
+/* Last played */
+.release-details-last-played {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}

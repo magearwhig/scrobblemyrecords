@@ -1,6 +1,8 @@
 import { Bot, FolderOpen, Music } from 'lucide-react';
 import React, { useState, useCallback } from 'react';
 
+import './RecommendationsPage.page.css';
+
 import EmbeddingManager from '../components/recommendations/EmbeddingManager';
 import RecommendationCard from '../components/recommendations/RecommendationCard';
 import { Button } from '../components/ui/Button';

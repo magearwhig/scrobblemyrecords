@@ -1,6 +1,8 @@
 import { Dices } from 'lucide-react';
 import React, { useEffect, useState, useCallback } from 'react';
 
+import './SuggestionsPage.page.css';
+
 import {
   SuggestionResult,
   SuggestionSettings,

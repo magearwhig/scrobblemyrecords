@@ -1826,6 +1826,35 @@ Dedicated detail pages for individual artists and tracks, reachable from anywher
 
 ---
 
+## UI/UX Polish: Listenography Visual Redesign
+
+### Status: COMPLETE (March 2026)
+
+Three-phase visual overhaul documented in `.plan/ui-audit-report.md`.
+
+**Phase 1 — Design Token System + CSS Quick Wins (COMPLETED):**
+- Semantic CSS token system (`--surface-*`, `--accent-*`, `--text-*`, `--radius-*`, `--space-*`, `--shadow-*`)
+- Accent color migrated from Spotify green (#1db954) to warm amber (#D4A24E/#E0B366)
+- 13 CSS quick wins: nav padding, focus rings, skeleton animation, sidebar width, modal backdrop blur, etc.
+
+**Phase 2 — Visual Polish (COMPLETED):**
+- App rebranded to "Listenography" in header
+- All emoji icons replaced with Lucide React SVG icons
+- Sidebar restructured (collapse toggle bottom, Settings pushed down, left-border active state)
+- Header redesigned (compact dark surface, connection status moved to sidebar footer)
+- All hardcoded `#1db954` references migrated to amber tokens
+
+**Phase 3 — Sequential Cleanup (COMPLETED):**
+- ~610 hardcoded `font-size` values migrated to `--text-*` tokens
+- ~290 hardcoded `border-radius` values migrated to `--radius-*` tokens
+- Page transition animation added (fadeIn, 120ms, `prefers-reduced-motion` support)
+- Shimmer skeleton loading system with reusable classes; skeleton states on all major pages
+- All form elements standardized (padding, font-size, borders, focus rings, disabled states, custom selects)
+- `styles.css` reduced from 12,424 → 3,048 lines (75.5% reduction)
+- 10 page-specific CSS module files created (co-located with page components)
+
+---
+
 ## Feature 16: Mapping System Consolidation
 
 ### Status: COMPLETE (February 2026)

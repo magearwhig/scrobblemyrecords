@@ -10,14 +10,14 @@
 .progress-bar-track {
   flex: 1;
   background: var(--bg-tertiary);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   overflow: hidden;
   display: flex;
 }
 
 .progress-bar-fill {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   transition: width 0.3s ease;
 }
 
@@ -57,13 +57,13 @@
 }
 
 .progress-bar--multi .progress-bar-fill:first-child {
-  border-top-left-radius: 999px;
-  border-bottom-left-radius: 999px;
+  border-top-left-radius: var(--radius-full);
+  border-bottom-left-radius: var(--radius-full);
 }
 
 .progress-bar--multi .progress-bar-fill:last-child {
-  border-top-right-radius: 999px;
-  border-bottom-right-radius: 999px;
+  border-top-right-radius: var(--radius-full);
+  border-bottom-right-radius: var(--radius-full);
 }
 
 .progress-bar-fill--primary {
@@ -84,7 +84,7 @@
 
 /* Label */
 .progress-bar-label {
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   font-weight: 500;
   color: var(--text-secondary);
   min-width: 3em;

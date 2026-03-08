@@ -1,0 +1,233 @@
+/* ScrobblePage styles */
+/* Extracted from HistoryPage.module.css */
+
+/* ScrobblePage Styles */
+.scrobble-margin-top {
+  margin-top: 1rem;
+}
+
+.scrobble-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.scrobble-modal-content {
+  background-color: var(--bg-primary);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+}
+
+.scrobble-modal-title {
+  margin: 0 0 1rem 0;
+  color: var(--warning-color);
+}
+
+.scrobble-modal-description {
+  margin: 0 0 1rem 0;
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+}
+
+.scrobble-modal-list {
+  margin: 0 0 1.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.scrobble-modal-list-item {
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.scrobble-modal-link {
+  margin-left: 0.75rem;
+  font-size: var(--text-sm);
+  color: var(--accent-color);
+}
+
+.scrobble-modal-note {
+  margin: 0 0 1rem 0;
+  font-size: var(--text-base);
+  color: var(--text-muted);
+}
+
+.scrobble-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.scrobble-section {
+  margin-bottom: 1.5rem;
+}
+
+.scrobble-album-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.scrobble-album-badge {
+  background: var(--bg-tertiary);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-xl);
+  font-size: var(--text-sm);
+}
+
+.scrobble-timestamp-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.scrobble-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.scrobble-datetime-input {
+  max-width: 300px;
+}
+
+.scrobble-timestamp-display {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.scrobble-tracks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.scrobble-tracks-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.scrobble-selected-count {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  line-height: 2rem;
+}
+
+.scrobble-track-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin-bottom: 1.5rem;
+}
+
+.scrobble-track-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--bg-tertiary);
+}
+
+.scrobble-track-item:last-child {
+  border-bottom: none;
+}
+
+.scrobble-track-item--selected {
+  background-color: var(--bg-hover);
+}
+
+.scrobble-track-checkbox {
+  margin-right: 1rem;
+}
+
+.scrobble-track-info {
+  flex: 1;
+}
+
+.scrobble-track-title {
+  font-weight: 500;
+  font-size: var(--text-base);
+}
+
+.scrobble-track-details {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.scrobble-progress-card {
+  background-color: var(--bg-tertiary);
+  margin: 1rem 0;
+}
+
+.scrobble-progress-section {
+  margin-bottom: 1rem;
+}
+
+.scrobble-progress-bar-bg {
+  background: var(--border-color);
+  border-radius: var(--radius-lg);
+  height: 20px;
+  overflow: hidden;
+}
+
+.scrobble-progress-bar-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.scrobble-progress-text {
+  margin-top: 0.5rem;
+  font-size: var(--text-base);
+}
+
+.scrobble-results-card {
+  background-color: var(--bg-tertiary);
+  margin-bottom: 1rem;
+}
+
+.scrobble-result-success {
+  color: var(--status-success);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.scrobble-result-failed {
+  color: var(--status-error);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.scrobble-error-details {
+  margin-top: 1rem;
+}
+
+.scrobble-error-list {
+  margin-top: 0.5rem;
+}
+
+.scrobble-error-item {
+  font-size: var(--text-sm);
+  color: var(--error-color);
+}
+
+.scrobble-actions {
+  display: flex;
+  gap: 1rem;
+}

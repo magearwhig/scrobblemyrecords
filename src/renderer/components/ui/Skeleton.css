@@ -1,81 +1,68 @@
 /* Base Skeleton Styles */
 .skeleton {
-  background-color: var(--bg-secondary);
+  background: linear-gradient(
+    90deg,
+    var(--surface-sunken) 25%,
+    var(--surface-raised) 50%,
+    var(--surface-sunken) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
   display: block;
-  animation: skeleton-pulse 1.5s ease-in-out infinite;
 }
 
 /* Variants */
 .skeleton--rectangular {
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .skeleton--text {
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transform: scale(1, 0.8);
 }
 
 .skeleton--circular {
-  border-radius: 50%;
+  border-radius: var(--radius-full);
 }
 
 /* Animations */
 .skeleton--pulse {
-  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  animation: skeleton-shimmer 1.5s infinite;
 }
 
 .skeleton--wave {
   position: relative;
   overflow: hidden;
-}
-
-.skeleton--wave::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.1),
-    transparent
-  );
-  animation: skeleton-wave 1.5s ease-in-out infinite;
+  animation: skeleton-shimmer 1.5s infinite;
 }
 
 .skeleton--none {
   animation: none;
+  background: var(--surface-sunken);
 }
 
-@keyframes skeleton-pulse {
+@keyframes skeleton-shimmer {
   0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
+    background-position: -200% 0;
   }
   100% {
-    opacity: 1;
+    background-position: 200% 0;
   }
 }
 
-@keyframes skeleton-wave {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: var(--surface-sunken);
   }
 }
 
 /* Album Card Skeleton */
 .skeleton-album-card {
-  background: var(--card-bg);
-  border-radius: 8px;
+  background: var(--surface-raised);
+  border-radius: var(--radius-md);
   overflow: hidden;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-default);
 }
 
 .skeleton-album-cover {
@@ -84,30 +71,30 @@
 }
 
 .skeleton-album-info {
-  padding: 0.75rem;
+  padding: var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 /* Stat Card Skeleton */
 .skeleton-stat-card {
-  background: var(--card-bg);
-  border-radius: 8px;
-  padding: 1.25rem;
-  border: 1px solid var(--border-color);
+  background: var(--surface-raised);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  border: 1px solid var(--border-default);
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 
 /* List Item Skeleton */
 .skeleton-list-item {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.75rem;
-  border-bottom: 1px solid var(--border-color);
+  gap: var(--space-4);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .skeleton-list-item:last-child {
@@ -122,70 +109,126 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 /* Table Row Skeleton */
 .skeleton-table-row td {
-  padding: 0.75rem;
+  padding: var(--space-3);
 }
 
 /* Session Card Skeleton */
 .skeleton-session-card {
-  padding: 1rem;
+  padding: var(--space-4);
 }
 
 .skeleton-session-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--space-3);
 }
 
 .skeleton-session-status {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .skeleton-session-info {
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--space-3);
 }
 
 .skeleton-session-covers {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .skeleton-session-covers .skeleton {
-  border-radius: 4px;
-}
-
-/* Dark mode adjustments */
-.dark-mode .skeleton {
-  background-color: var(--bg-secondary);
-}
-
-.dark-mode .skeleton--wave::after {
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.05),
-    transparent
-  );
+  border-radius: var(--radius-sm);
 }
 
 /* Chart Skeleton */
 .skeleton-chart-card {
-  background: var(--card-bg);
-  border-radius: 8px;
-  padding: 1.25rem;
-  border: 1px solid var(--border-color);
+  background: var(--surface-raised);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  border: 1px solid var(--border-default);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
 .skeleton-chart {
-  border-radius: 8px;
+  border-radius: var(--radius-md);
+}
+
+/* Collection skeleton grid */
+.skeleton-collection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+}
+
+/* Release Details Skeleton */
+.skeleton-release-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-5);
+}
+
+.skeleton-release-details-body {
+  display: flex;
+  gap: var(--space-5);
+  margin-bottom: var(--space-5);
+}
+
+.skeleton-release-details-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.skeleton-release-details-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skeleton-release-track-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* New Releases Skeleton */
+.skeleton-new-releases-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+}
+
+.skeleton-release-card {
+  background: var(--surface-raised);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+}
+
+.skeleton-release-cover {
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.skeleton-release-card-info {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }

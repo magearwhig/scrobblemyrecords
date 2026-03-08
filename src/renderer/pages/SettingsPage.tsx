@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
+import './SettingsPage.page.css';
+
 import {
   SettingsConnectionsSection,
   SettingsIntegrationsSection,

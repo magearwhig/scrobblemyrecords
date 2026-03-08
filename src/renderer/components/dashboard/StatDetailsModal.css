@@ -16,9 +16,9 @@
   background: var(--accent-color);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   font-weight: 500;
   transition: all 0.15s;
 }
@@ -79,19 +79,19 @@
 .stat-details-item-name {
   font-weight: 500;
   color: var(--text-primary);
-  font-size: 0.9375rem;
+  font-size: var(--text-base);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .stat-details-item-meta {
-  font-size: 0.8125rem;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 
 .stat-details-item-count {
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   color: var(--text-secondary);
   font-weight: 500;
   margin-left: 1rem;

@@ -521,8 +521,9 @@ describe('ReleaseDetailsPage Error Handling and Loading States', () => {
 
     renderWithProviders(<ReleaseDetailsPage />);
 
-    expect(screen.getByText('Loading release details...')).toBeInTheDocument();
-    expect(document.querySelector('.spinner')).toBeInTheDocument();
+    expect(
+      document.querySelector('.skeleton-release-details-header')
+    ).toBeInTheDocument();
   });
 
   it('should show error when no release data is found in localStorage', async () => {

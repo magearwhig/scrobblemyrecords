@@ -1,5 +1,6 @@
 import { Check, XCircle } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
+import './ScrobblePage.page.css';
 
 import {
   CollectionItem,

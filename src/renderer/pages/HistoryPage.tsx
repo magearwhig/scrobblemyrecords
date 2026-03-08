@@ -1,6 +1,8 @@
 import { Check, Circle, Clock, FileText, XCircle } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
+import './HistoryPage.page.css';
+
 import { ScrobbleSession, ScrobbleTrack } from '../../shared/types';
 import LastFmHistoryTab from '../components/LastFmHistoryTab';
 import ScrobbleSessionCard from '../components/ScrobbleSessionCard';

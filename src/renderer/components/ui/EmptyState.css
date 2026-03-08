@@ -15,12 +15,12 @@
 }
 
 .empty-state-container--small .empty-state-icon {
-  font-size: 2rem;
+  font-size: var(--text-3xl);
   margin-bottom: 0.75rem;
 }
 
 .empty-state-container--small .empty-state-title {
-  font-size: 1rem;
+  font-size: var(--text-md);
 }
 
 .empty-state-container--medium {
@@ -37,12 +37,12 @@
 }
 
 .empty-state-container--large .empty-state-title {
-  font-size: 1.5rem;
+  font-size: var(--text-2xl);
 }
 
 /* Icon */
 .empty-state-icon {
-  font-size: 3rem;
+  font-size: var(--text-3xl);
   margin-bottom: 1rem;
   opacity: 0.8;
   line-height: 1;
@@ -50,7 +50,7 @@
 
 /* Title */
 .empty-state-title {
-  font-size: 1.25rem;
+  font-size: var(--text-xl);
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 0.5rem 0;
@@ -58,7 +58,7 @@
 
 /* Description */
 .empty-state-description {
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   color: var(--text-secondary);
   margin: 0 0 0.75rem 0;
   max-width: 400px;
@@ -67,7 +67,7 @@
 
 /* Suggestion */
 .empty-state-suggestion {
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   color: var(--text-muted);
   margin: 0 0 1.5rem 0;
   display: flex;
@@ -75,11 +75,11 @@
   gap: 0.5rem;
   background: var(--bg-tertiary);
   padding: 0.5rem 1rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .empty-state-suggestion-icon {
-  font-size: 1rem;
+  font-size: var(--text-md);
 }
 
 /* Actions */

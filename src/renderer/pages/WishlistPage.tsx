@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import './WishlistPage.page.css';
 
 import {
   AlbumIdentifier,

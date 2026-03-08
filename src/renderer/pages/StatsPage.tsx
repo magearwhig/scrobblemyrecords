@@ -1,6 +1,8 @@
 import { BarChart3, Disc3, Music, PlusCircle } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import './StatsPage.page.css';
+
 import {
   AlbumPlayCount,
   ArtistPlayCount,

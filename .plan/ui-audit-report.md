@@ -573,21 +573,21 @@ Foundation work that all subsequent phases depend on:
 - Primary button text changed to dark (#1a1a1a) for WCAG AA contrast on amber
 - Sidebar width updated (250→240px, 64→56px collapsed)
 
-### Phase 2: Visual Polish (parallel team of 3-4 agents)
+### Phase 2: Visual Polish (COMPLETED — March 2026)
 
-Depends on Phase 1 tokens being in place.
+- **Icon migration**: Installed `lucide-react`, replaced all emoji icons across ~20 components (Sidebar nav, AlbumCard, Header, NotificationBell, page-specific emojis) with Lucide SVG icons.
+- **Header redesign**: Rebranded from "Discogs to Last.fm Scrobbler" to "Listenography"; compact dark surface header, connection status moved to sidebar footer.
+- **Sidebar restructure**: Collapse toggle moved to bottom, Settings pushed down with spacer, active state uses left-border accent.
+- **Hardcoded color cleanup**: All `#1db954` and `rgba(29,185,84,...)` references migrated to amber token variables across chart components and Wrapped page.
 
-- **Icon migration**: Install `lucide-react`, create icon mapping, replace all emoji across ~20 components (Sidebar nav, AlbumCard, Header, NotificationBell, page-specific emojis). Independent — touches components, minimal CSS.
-- **Header redesign**: Compact from 56px→44px, dark surface bg instead of accent-colored, short brand name, move connection status to sidebar. Independent component restructure.
-- **Sidebar redesign**: Component restructure for the new layout (collapse toggle to bottom, Settings pushed down with spacer). Independent component restructure.
-- **Hardcoded color cleanup**: Migrate 8 hardcoded `rgba(29,185,84,...)` in styles.css, hardcoded `#1db954` in chart TSX files (PlayTrendChart, SourcePieChart, ListeningTimeline, etc.), Wrapped page green gradients. Can be done by one agent touching only color values.
+### Phase 3: Sequential Cleanup (COMPLETED — March 2026)
 
-### Phase 3: Sequential Cleanup
-
-- **Card/typography consistency audit**: Migrate all 26 font-size values to `--text-*` tokens, standardize card padding/radii to token values
-- **Page transitions**: Add CSS fade-in (120ms) on route change, standardize skeleton loading across all pages
-- **Form/input polish**: Consistent focus rings (already global from Phase 1), input padding, disabled states, custom select styling
-- **CSS modularization**: Begin splitting styles.css into co-located CSS modules, starting with isolated pages
+- **Typography token migration**: All ~610 hardcoded `font-size` values migrated to `--text-*` tokens across all pages and components.
+- **Border-radius token migration**: All ~290 hardcoded `border-radius` values migrated to `--radius-*` tokens.
+- **Page transitions**: CSS-only `fadeIn` animation (120ms, `prefers-reduced-motion` support) applied on route change.
+- **Shimmer skeleton system**: Reusable skeleton loading classes added; skeleton states applied to all major pages (including new `ReleaseDetails` and `NewReleases` skeletons).
+- **Form/input polish**: All form elements standardized — padding, font-size, borders, focus rings, disabled states, custom select arrows. Dark mode select arrow contrast improved.
+- **CSS modularization**: `styles.css` reduced from 12,424 → 3,048 lines (75.5% reduction). 10 page-specific CSS module files created: `Wrapped`, `Stats`, `Settings`, `CollectionAnalytics`, `Discovery`, `Suggestions`, `Home`, `History`, `Recommendations`, `Marketplace`.
 
 ---
 

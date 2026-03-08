@@ -1,6 +1,6 @@
 .rankings-over-time {
   background: var(--card-bg, #ffffff);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 1.5rem;
   box-shadow: 0 2px 0.5rem rgba(0, 0, 0, 0.1);
 }
@@ -12,14 +12,14 @@
 .rankings-over-time-header h2 {
   margin: 0 0 0.5rem 0;
   color: var(--text-primary, #000000);
-  font-size: 1.5rem;
+  font-size: var(--text-2xl);
   font-weight: 600;
 }
 
 .rankings-over-time-subtitle {
   margin: 0;
   color: var(--text-secondary, #666666);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
 }
 
 /* Tabs */
@@ -36,7 +36,7 @@
   background: none;
   border: none;
   color: var(--text-secondary, #666666);
-  font-size: 1rem;
+  font-size: var(--text-md);
   font-weight: 500;
   cursor: pointer;
   position: relative;
@@ -71,17 +71,17 @@
 
 .rankings-control-group label {
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   font-weight: 500;
 }
 
 .rankings-select {
   padding: 0.5rem 0.75rem;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-color, #e0e0e0);
   background: var(--bg-secondary);
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   cursor: pointer;
   outline: none;
   transition: border-color 0.2s ease;
@@ -122,7 +122,7 @@
 
 .rankings-over-time-loading p {
   color: var(--text-secondary, #666666);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   margin: 0;
 }
 
@@ -138,7 +138,7 @@
 
 .rankings-over-time-error p {
   color: var(--error-color, #e74c3c);
-  font-size: 1rem;
+  font-size: var(--text-md);
   margin: 0;
   text-align: center;
 }
@@ -148,8 +148,8 @@
   background: var(--accent-primary);
   color: #ffffff;
   border: none;
-  border-radius: 0.25rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-base);
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s ease;
@@ -170,7 +170,7 @@
   }
 
   .rankings-over-time-header h2 {
-    font-size: 1.25rem;
+    font-size: var(--text-xl);
   }
 
   .rankings-over-time-tabs {

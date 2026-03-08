@@ -92,9 +92,18 @@ src/
 
 ### Styling
 
-- **No inline `style={}` attributes** -- extract to CSS classes in `src/renderer/styles.css`
-- Only exception: truly dynamic values computed at runtime
-- Use existing global CSS classes (`.form-input`, `.btn`, `.card`) before creating new ones
+- **No inline `style={}` attributes** -- extract to CSS classes
+- Only exception: truly dynamic values computed at runtime (e.g., `width: ${percent}%`)
+- **Shared/global styles** live in `src/renderer/styles.css`
+- **Page-specific styles** live in co-located CSS module files (e.g., `HomePage.module.css`)
+- Use existing global CSS classes (`.form-input`, `.card`) before creating new ones
+- Always use design tokens for `font-size` (`--text-*`), `border-radius` (`--radius-*`), colors (`--surface-*`, `--accent-*`, `--text-*`)
+
+### Icons
+
+- **Use `lucide-react`** for all icons -- never emoji
+- Size: 16px inline/badges, 18px nav, 20px headers
+- Add `aria-hidden="true"` to decorative icons; `aria-label` to icon-only interactive elements
 
 ### Accessibility
 

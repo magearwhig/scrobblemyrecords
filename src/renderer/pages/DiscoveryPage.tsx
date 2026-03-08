@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 
+import './DiscoveryPage.page.css';
+
 import {
   MissingAlbum,
   MissingArtist,

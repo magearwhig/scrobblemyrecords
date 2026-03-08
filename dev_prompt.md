@@ -49,10 +49,31 @@ Before adding any new page or navigation item:
 
 ## Styling
 
-- **NEVER use inline `style={}` attributes** -- extract to CSS classes in `src/renderer/styles.css`
+- **NEVER use inline `style={}` attributes** -- extract to CSS classes
 - Only exception: truly dynamic values computed at runtime (e.g., `width: ${percent}%`)
-- Use existing global CSS classes (`.form-input`, `.btn`, `.card`, etc.) before creating new ones
+- Use existing global CSS classes (`.form-input`, `.card`, etc.) before creating new ones
+- **Shared/global styles** live in `src/renderer/styles.css`
+- **Page-specific styles** live in co-located CSS module files (e.g., `HomePage.module.css` next to `HomePage.tsx`)
+- Import module CSS in the page component: `import './PageName.module.css'` (no CSS Modules object needed -- classes are global within the file)
 - Check `src/renderer/styles.css` for existing patterns before writing new CSS
+
+## Icons
+
+- **NEVER use emoji as icons** -- use `lucide-react` for all icons
+- Import named icon components: `import { Home, Settings } from 'lucide-react'`
+- Size conventions: 16px for inline/badges, 18px for nav items, 20px for headers/actions
+- Icons inherit `currentColor` -- set color via parent CSS
+- Add `aria-hidden="true"` to purely decorative icons
+- Add `aria-label` to icon-only interactive elements (buttons with no text label)
+
+## Design Token Reference
+
+All values should use CSS custom properties from `src/renderer/styles.css`:
+- **Typography**: `--text-xs` (12px) through `--text-3xl` (32px)
+- **Border radius**: `--radius-sm` (4px), `--radius-md` (8px), `--radius-lg` (12px), `--radius-xl` (16px), `--radius-full` (9999px)
+- **Spacing**: `--space-1` (4px) through `--space-12` (48px)
+- **Colors**: `--surface-*`, `--accent-*`, `--text-*`, `--border-*`, `--shadow-*`, `--status-*`
+- Never hardcode `font-size`, `border-radius`, or color values -- always use a token
 
 ## Reusable UI Components
 

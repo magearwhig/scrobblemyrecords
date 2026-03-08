@@ -1,6 +1,8 @@
 import { AlertTriangle, Disc3, TrendingUp } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 
+import './CollectionAnalyticsPage.page.css';
+
 import { CollectionAnalyticsOverview } from '../../shared/types';
 import AnalyticsOverviewSection from '../components/collection-analytics/AnalyticsOverviewSection';
 import FormatDetailSection from '../components/collection-analytics/FormatDetailSection';

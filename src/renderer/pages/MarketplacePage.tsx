@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
+import './MarketplacePage.page.css';
+
 import MissingAlbumsContainer from '../components/marketplace/MissingAlbumsContainer';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';

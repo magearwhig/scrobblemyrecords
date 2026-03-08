@@ -12,6 +12,7 @@ import ReleaseCard from '../components/ReleaseCard';
 import { Modal, ModalFooter } from '../components/ui';
 import { Button } from '../components/ui/Button';
 import { ProgressBar } from '../components/ui/ProgressBar';
+import { NewReleasesSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -709,12 +710,7 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
       )}
 
       {/* Loading state */}
-      {loading && (
-        <div className='loading-state'>
-          <div className='spinner' />
-          <p>Loading releases...</p>
-        </div>
-      )}
+      {loading && <NewReleasesSkeleton />}
 
       {/* Empty state */}
       {!loading && !error && filteredReleases.length === 0 && (

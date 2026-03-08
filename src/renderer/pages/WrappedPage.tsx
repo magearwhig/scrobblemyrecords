@@ -1,6 +1,8 @@
 import { Music } from 'lucide-react';
 import React, { useState, useCallback, useMemo } from 'react';
 
+import './WrappedPage.page.css';
+
 import { WrappedData } from '../../shared/types';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';

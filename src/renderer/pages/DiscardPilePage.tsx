@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import './DiscardPilePage.page.css';
 
 import {
   DiscardPileItem,

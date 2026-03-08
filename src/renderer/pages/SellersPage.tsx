@@ -1,6 +1,8 @@
 import { AlertTriangle } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 
+import './MarketplacePage.page.css';
+
 import { MonitoredSeller, SellerScanStatus } from '../../shared/types';
 import SellerCard from '../components/SellerCard';
 import { Modal, ModalFooter } from '../components/ui';

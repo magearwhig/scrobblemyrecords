@@ -1,0 +1,406 @@
+/* CollectionAnalyticsPage styles */
+/* Co-located CSS extracted from styles.css */
+
+/* ============================================
+   Collection Analytics (Feature 13)
+   ============================================ */
+
+.collection-analytics-page {
+  padding: 0 24px 24px;
+  max-width: 1200px;
+}
+
+.collection-analytics-page h1 {
+  margin: 0 0 16px;
+  font-size: var(--text-2xl);
+  color: var(--text-primary);
+}
+
+/* Tab Navigation */
+.analytics-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+
+.analytics-tab {
+  padding: 8px 16px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition:
+    color 0.2s,
+    border-color 0.2s;
+  white-space: nowrap;
+}
+
+.analytics-tab:hover {
+  color: var(--text-primary);
+}
+
+.analytics-tab--active {
+  color: var(--accent-color);
+  border-bottom-color: var(--accent-color);
+}
+
+.analytics-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.analytics-tab-content {
+  min-height: 400px;
+}
+
+.analytics-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Summary Cards */
+.analytics-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.analytics-summary-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+}
+
+.analytics-summary-card-value {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.analytics-summary-card-label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.analytics-summary-card-sublabel {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+/* Chart Containers */
+.analytics-chart-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+  .analytics-chart-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.analytics-chart-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+
+.analytics-chart-card h3 {
+  margin: 0 0 12px;
+  font-size: var(--text-base);
+  color: var(--text-primary);
+}
+
+.analytics-chart-card p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+}
+
+.analytics-full-width-chart {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.analytics-full-width-chart h3 {
+  margin: 0 0 12px;
+  font-size: var(--text-base);
+  color: var(--text-primary);
+}
+
+/* Screen reader only text for chart accessibility */
+.analytics-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Value Estimation Section */
+.analytics-value-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.analytics-scan-section {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.analytics-scan-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.analytics-scan-info {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.analytics-scan-progress {
+  margin-top: 8px;
+}
+
+.analytics-scan-progress-text {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* Most Valuable List */
+.analytics-valuable-list {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.analytics-valuable-list h3 {
+  margin: 0 0 12px;
+  font-size: var(--text-base);
+  color: var(--text-primary);
+}
+
+.analytics-valuable-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.analytics-valuable-item:last-child {
+  border-bottom: none;
+}
+
+.analytics-valuable-cover {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--border-color);
+}
+
+.analytics-valuable-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.analytics-valuable-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.analytics-valuable-artist {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.analytics-valuable-meta {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.analytics-valuable-price {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--accent-color);
+  white-space: nowrap;
+}
+
+/* Format/Label Detail Lists */
+.analytics-detail-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.analytics-detail-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.analytics-detail-item:last-child {
+  border-bottom: none;
+}
+
+.analytics-detail-name {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.analytics-detail-count {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.analytics-detail-variants {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+/* Granularity Toggle */
+.analytics-granularity-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.analytics-granularity-btn {
+  padding: 4px 12px;
+  border: 1px solid var(--border-color);
+  background: none;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.analytics-granularity-btn--active {
+  background: var(--accent-color);
+  color: var(--text-inverse);
+  border-color: var(--accent-color);
+}
+
+/* Recharts Tooltip Theming */
+.analytics-chart-card .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.analytics-chart-card .recharts-tooltip-item {
+  color: var(--text-primary) !important;
+}
+
+.analytics-chart-card .recharts-tooltip-label {
+  color: var(--text-secondary) !important;
+}
+
+.analytics-overview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.analytics-chart-half {
+  flex: 1;
+  min-width: 0;
+  background: var(--card-bg);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+}
+
+.analytics-chart-half h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: var(--text-md);
+  color: var(--text-primary);
+}
+
+.analytics-chart-full {
+  background: var(--card-bg);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+}
+
+.analytics-chart-full h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: var(--text-md);
+  color: var(--text-primary);
+}
+
+.analytics-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-top: 0.75rem;
+  padding: 0 0.5rem;
+}
+
+.analytics-chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.analytics-chart-legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.analytics-chart-legend-label {
+  color: var(--text-primary);
+}
+
+.analytics-chart-legend-value {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}

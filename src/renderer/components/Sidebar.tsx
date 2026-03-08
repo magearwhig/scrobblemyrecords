@@ -203,6 +203,11 @@ const Sidebar: React.FC<SidebarProps> = ({
               }
             }}
             disabled={!item.enabled}
+            aria-label={
+              !item.enabled && item.disabledReason
+                ? `${item.label} — ${item.disabledReason}`
+                : item.label
+            }
             title={
               !item.enabled && item.disabledReason
                 ? item.disabledReason

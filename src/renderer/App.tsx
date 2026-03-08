@@ -100,7 +100,9 @@ const App: React.FC = () => {
                 />
                 <div className='content'>
                   <ErrorBoundary>
-                    <MainContent currentPage={currentPage} />
+                    <div key={currentPage} className='page-enter'>
+                      <MainContent currentPage={currentPage} />
+                    </div>
                   </ErrorBoundary>
                 </div>
               </div>

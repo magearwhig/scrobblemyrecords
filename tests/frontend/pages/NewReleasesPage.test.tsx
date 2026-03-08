@@ -267,10 +267,14 @@ describe('NewReleasesPage', () => {
   it('renders loading state initially', async () => {
     renderNewReleasesPage();
 
-    expect(screen.getByText('Loading releases...')).toBeInTheDocument();
+    expect(
+      document.querySelector('.skeleton-new-releases-grid')
+    ).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.queryByText('Loading releases...')).not.toBeInTheDocument();
+      expect(
+        document.querySelector('.skeleton-new-releases-grid')
+      ).not.toBeInTheDocument();
     });
   });
 

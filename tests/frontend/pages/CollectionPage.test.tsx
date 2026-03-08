@@ -342,7 +342,9 @@ describe('CollectionPage', () => {
 
       renderWithProviders(<CollectionPage />);
 
-      expect(screen.getByText('Loading collection...')).toBeInTheDocument();
+      expect(
+        document.querySelector('.skeleton-collection-grid')
+      ).toBeInTheDocument();
     });
 
     it('displays collection items when loaded', async () => {

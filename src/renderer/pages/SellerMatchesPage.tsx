@@ -1,6 +1,8 @@
 import { Info } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 
+import './MarketplacePage.page.css';
+
 import {
   AlbumIdentifier,
   AlbumPlayCountResult,
