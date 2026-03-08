@@ -2576,3 +2576,41 @@ export interface CollectionAnalyticsOverview {
   decades: DecadeHistogram;
   growth: GrowthTimeline;
 }
+
+// ============================================
+// Analytics Trio Types
+// ============================================
+
+export interface RoiScoreItem {
+  artist: string;
+  album: string;
+  playCount: number;
+  medianPrice: number;
+  currency: string;
+  roiScore: number; // playCount / medianPrice
+  releaseId: number;
+  coverUrl?: string;
+}
+
+export interface AlbumArcBucket {
+  period: string; // YYYY-MM
+  playCount: number;
+  trackCount: number;
+}
+
+export interface TasteDriftGenre {
+  name: string;
+  weight: number;
+  playCount: number;
+}
+
+export interface TasteDriftSnapshot {
+  period: string; // YYYY-QN
+  genres: TasteDriftGenre[];
+}
+
+export interface TasteDriftResult {
+  snapshots: TasteDriftSnapshot[];
+  totalQuarters: number;
+  topGenresOverall: string[];
+}

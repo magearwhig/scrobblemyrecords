@@ -1,9 +1,11 @@
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 import './ArtistDetailPage.page.css';
 
 import { ArtistDetailResponse } from '../../shared/types';
 import PlayTrendChart from '../components/PlayTrendChart';
+import { AlbumListeningArc } from '../components/stats/AlbumListeningArc';
 import TrackLink from '../components/TrackLink';
 import { Badge } from '../components/ui/Badge';
 import { IconButton } from '../components/ui/Button';
@@ -49,6 +51,7 @@ const ArtistDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [trendPeriod, setTrendPeriod] = useState<'month' | 'week'>('month');
+  const [expandedArcAlbum, setExpandedArcAlbum] = useState<string | null>(null);
   /** The page to navigate back to — derived from `?from=` URL param. */
   const previousPage = useMemo<string>(() => {
     const hash = window.location.hash.replace('#', '');
@@ -369,42 +372,78 @@ const ArtistDetailPage: React.FC = () => {
           ) : (
             <div className='detail-page-albums'>
               {data.albums.map(album => (
-                <div key={album.album} className='detail-page-album-item'>
-                  {album.coverUrl ? (
-                    <img
-                      className='detail-page-album-cover'
-                      src={album.coverUrl}
-                      alt={album.album}
+                <div key={album.album} className='detail-page-album-entry'>
+                  <div className='detail-page-album-item'>
+                    {album.coverUrl ? (
+                      <img
+                        className='detail-page-album-cover'
+                        src={album.coverUrl}
+                        alt={album.album}
+                      />
+                    ) : (
+                      <div
+                        className='detail-page-album-cover-placeholder'
+                        aria-hidden='true'
+                      >
+                        &#9835;
+                      </div>
+                    )}
+                    <div className='detail-page-album-info'>
+                      <div className='detail-page-album-name'>
+                        {album.album}
+                      </div>
+                      <div className='detail-page-album-meta'>
+                        {album.playCount.toLocaleString()} plays
+                        {album.inCollection && (
+                          <>
+                            {' '}
+                            <Badge variant='success' size='small'>
+                              In Collection
+                            </Badge>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <IconButton
+                      icon={
+                        expandedArcAlbum === album.album ? (
+                          <ChevronUp size={16} aria-hidden='true' />
+                        ) : (
+                          <ChevronDown size={16} aria-hidden='true' />
+                        )
+                      }
+                      size='small'
+                      variant='ghost'
+                      onClick={() =>
+                        setExpandedArcAlbum(prev =>
+                          prev === album.album ? null : album.album
+                        )
+                      }
+                      aria-label={
+                        expandedArcAlbum === album.album
+                          ? `Hide listening arc for ${album.album}`
+                          : `Show listening arc for ${album.album}`
+                      }
+                      title='Toggle listening arc'
                     />
-                  ) : (
-                    <div
-                      className='detail-page-album-cover-placeholder'
-                      aria-hidden='true'
-                    >
-                      &#9835;
+                    <IconButton
+                      icon={<>&#9654;</>}
+                      size='small'
+                      onClick={() =>
+                        playAlbumOnSpotify(data.artist, album.album)
+                      }
+                      aria-label={`Play ${album.album} on Spotify`}
+                      title={`Play ${album.album} on Spotify`}
+                    />
+                  </div>
+                  {expandedArcAlbum === album.album && (
+                    <div className='detail-page-album-arc'>
+                      <AlbumListeningArc
+                        artist={data.artist}
+                        album={album.album}
+                      />
                     </div>
                   )}
-                  <div className='detail-page-album-info'>
-                    <div className='detail-page-album-name'>{album.album}</div>
-                    <div className='detail-page-album-meta'>
-                      {album.playCount.toLocaleString()} plays
-                      {album.inCollection && (
-                        <>
-                          {' '}
-                          <Badge variant='success' size='small'>
-                            In Collection
-                          </Badge>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <IconButton
-                    icon={<>&#9654;</>}
-                    size='small'
-                    onClick={() => playAlbumOnSpotify(data.artist, album.album)}
-                    aria-label={`Play ${album.album} on Spotify`}
-                    title={`Play ${album.album} on Spotify`}
-                  />
                 </div>
               ))}
             </div>

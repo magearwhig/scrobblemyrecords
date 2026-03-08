@@ -1,4 +1,5 @@
 import {
+  AlbumArcBucket,
   AlbumPlayCount,
   AlbumTracksPlayedResponse,
   ApiResponse,
@@ -23,10 +24,12 @@ import {
   MilestoneInfo,
   NewArtistDetail,
   RankingsOverTimeResponse,
+  RoiScoreItem,
   ScrobbleCounts,
   SourceBreakdownItem,
   StatsOverview,
   StreakInfo,
+  TasteDriftResult,
   TimelineDataPoint,
   TrackDetailResponse,
   TrackPlayCount,
@@ -397,6 +400,41 @@ export const statsApi = {
     const response = await fetch(
       `${API_BASE}/stats/genres?limit=${limit}&maxTags=${maxTags}`
     );
+    return response.json();
+  },
+
+  /**
+   * Get collection ROI score leaderboard
+   * @param limit - Maximum number of items to return
+   */
+  async getCollectionROI(limit?: number): Promise<ApiResponse<RoiScoreItem[]>> {
+    const params = limit ? `?limit=${limit}` : '';
+    const response = await fetch(`${API_BASE}/stats/collection-roi${params}`);
+    return response.json();
+  },
+
+  /**
+   * Get album listening arc (monthly play counts over album lifetime)
+   * @param artist - Artist name
+   * @param album - Album name
+   */
+  async getAlbumListeningArc(
+    artist: string,
+    album: string
+  ): Promise<ApiResponse<AlbumArcBucket[]>> {
+    const response = await fetch(
+      `${API_BASE}/stats/album-arc?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}`
+    );
+    return response.json();
+  },
+
+  /**
+   * Get taste drift — genre share over time by quarter
+   * @param months - Number of months to look back (default: all)
+   */
+  async getTasteDrift(months?: number): Promise<ApiResponse<TasteDriftResult>> {
+    const params = months ? `?months=${months}` : '';
+    const response = await fetch(`${API_BASE}/stats/taste-drift${params}`);
     return response.json();
   },
 };

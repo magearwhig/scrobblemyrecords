@@ -32,6 +32,8 @@ jest.mock('../../../src/renderer/services/statsApi', () => ({
     getNewArtists: jest.fn(),
     getListeningHours: jest.fn(),
     getRankingsOverTime: jest.fn(),
+    getCollectionROI: jest.fn(),
+    getTasteDrift: jest.fn(),
   },
   imagesApi: {
     batchGetAlbumCovers: jest.fn(),

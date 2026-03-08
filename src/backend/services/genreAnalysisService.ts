@@ -2,6 +2,8 @@ import {
   ArtistTagsCacheStore,
   GenreData,
   GenreDistributionResult,
+  TasteDriftResult,
+  TasteDriftSnapshot,
 } from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
@@ -248,6 +250,154 @@ export class GenreAnalysisService {
       genres,
       totalArtistsAnalyzed: artistsWithTags,
       lastUpdated: Date.now(),
+    };
+  }
+
+  /**
+   * Get taste drift: rolling genre share per quarter.
+   * Buckets all plays by quarter (YYYY-QN), identifies top 20 artists per quarter
+   * by play count, looks up their tags from the local cache, and aggregates
+   * to the top 10 genres per quarter. Does NOT make new API calls.
+   *
+   * @param months - Number of months of history to include (default: 24 = 8 quarters)
+   */
+  async getTasteDrift(months: number = 24): Promise<TasteDriftResult> {
+    const index = await this.historyStorage.getIndex();
+    if (!index) {
+      return { snapshots: [], totalQuarters: 0, topGenresOverall: [] };
+    }
+
+    // Determine cutoff timestamp
+    const nowMs = Date.now();
+    const cutoffMs = nowMs - months * 30 * 24 * 60 * 60 * 1000;
+    const cutoffSeconds = cutoffMs / 1000;
+
+    // Bucket plays by quarter: YYYY-QN
+    // Each quarter bucket maps artist -> play count
+    const quarterArtistPlays = new Map<string, Map<string, number>>();
+
+    for (const [key, albumHistory] of Object.entries(index.albums)) {
+      const [artist] = key.split('|');
+      const normalizedArtist = artist.toLowerCase();
+
+      for (const play of albumHistory.plays) {
+        if (play.timestamp < cutoffSeconds) continue;
+
+        const date = new Date(play.timestamp * 1000);
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1; // 1-12
+        const quarter = Math.ceil(month / 3);
+        const period = `${year}-Q${quarter}`;
+
+        let artistMap = quarterArtistPlays.get(period);
+        if (!artistMap) {
+          artistMap = new Map<string, number>();
+          quarterArtistPlays.set(period, artistMap);
+        }
+        artistMap.set(
+          normalizedArtist,
+          (artistMap.get(normalizedArtist) || 0) + 1
+        );
+      }
+    }
+
+    if (quarterArtistPlays.size === 0) {
+      return { snapshots: [], totalQuarters: 0, topGenresOverall: [] };
+    }
+
+    // Load tag cache (read-only, no API calls)
+    const cache = await this.loadTagCache();
+
+    const sortedPeriods = Array.from(quarterArtistPlays.keys()).sort();
+    const overallGenreWeights = new Map<string, number>();
+    const snapshots: TasteDriftSnapshot[] = [];
+
+    for (const period of sortedPeriods) {
+      const artistMap = quarterArtistPlays.get(period)!;
+
+      // Total plays this quarter
+      let totalPlays = 0;
+      for (const plays of artistMap.values()) {
+        totalPlays += plays;
+      }
+
+      // Top 20 artists by play count this quarter
+      const topArtists = Array.from(artistMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 20);
+
+      // Accumulate genre weights for this quarter
+      const quarterGenreWeights = new Map<string, number>();
+
+      for (const [artist, plays] of topArtists) {
+        const cached = cache.tags[artist];
+        if (!cached || !cached.tags || cached.tags.length === 0) continue;
+
+        const artistWeight = plays / totalPlays;
+
+        for (const tag of cached.tags) {
+          if (tag.count < 20) continue;
+
+          const normalizedTag = this.normalizeTag(tag.name);
+          if (!normalizedTag) continue;
+
+          const tagWeight = artistWeight * (tag.count / 100);
+          quarterGenreWeights.set(
+            normalizedTag,
+            (quarterGenreWeights.get(normalizedTag) || 0) + tagWeight
+          );
+          overallGenreWeights.set(
+            normalizedTag,
+            (overallGenreWeights.get(normalizedTag) || 0) + tagWeight
+          );
+        }
+      }
+
+      // Top 10 genres for this quarter
+      const topGenres = Array.from(quarterGenreWeights.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+
+      const totalWeight = topGenres.reduce((s, g) => s + g[1], 0);
+
+      const quarterTopArtistPlays = new Map(topArtists);
+
+      const genres = topGenres.map(([name, weight]) => {
+        // Calculate approximate play count attributed to this genre
+        let playCount = 0;
+        for (const [artist, plays] of quarterTopArtistPlays.entries()) {
+          const cached = cache.tags[artist];
+          if (!cached) continue;
+          const tag = cached.tags.find(
+            t => this.normalizeTag(t.name) === name && t.count >= 20
+          );
+          if (tag) {
+            playCount += Math.round(plays * (tag.count / 100));
+          }
+        }
+        return {
+          name,
+          weight:
+            totalWeight > 0
+              ? Math.round((weight / totalWeight) * 1000) / 1000
+              : 0,
+          playCount,
+        };
+      });
+
+      snapshots.push({ period, genres });
+    }
+
+    // Top genres overall (top 10 by accumulated weight)
+    const topGenresOverall = Array.from(overallGenreWeights.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name]) => name);
+
+    return {
+      snapshots,
+      totalQuarters: snapshots.length,
+      topGenresOverall,
     };
   }
 

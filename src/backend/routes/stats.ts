@@ -1595,6 +1595,98 @@ export default function createStatsRouter(
   });
 
   // ============================================
+  // Analytics Trio
+  // ============================================
+
+  /**
+   * GET /api/v1/stats/collection-roi?limit=10
+   * Get plays-per-dollar ROI leaderboard for collection albums.
+   */
+  router.get('/collection-roi', async (req: Request, res: Response) => {
+    try {
+      const limitParam = req.query.limit as string | undefined;
+      const limit = limitParam ? parseInt(limitParam, 10) : undefined;
+
+      if (limit !== undefined && (isNaN(limit) || limit < 1)) {
+        return res.status(400).json({
+          success: false,
+          error: 'limit must be a positive integer',
+        });
+      }
+
+      const data = await statsService.getCollectionROI(limit);
+      res.json({ success: true, data });
+    } catch (error) {
+      logger.error('Error getting collection ROI', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * GET /api/v1/stats/album-arc?artist=X&album=Y
+   * Get monthly listening arc for a specific album.
+   */
+  router.get('/album-arc', async (req: Request, res: Response) => {
+    try {
+      const artist = req.query.artist as string | undefined;
+      const album = req.query.album as string | undefined;
+
+      if (!artist || !album) {
+        return res.status(400).json({
+          success: false,
+          error: 'artist and album query parameters are required',
+        });
+      }
+
+      const data = await statsService.getAlbumListeningArc(artist, album);
+      res.json({ success: true, data });
+    } catch (error) {
+      logger.error('Error getting album arc', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * GET /api/v1/stats/taste-drift?months=24
+   * Get rolling genre share per quarter for the last N months.
+   */
+  router.get('/taste-drift', async (req: Request, res: Response) => {
+    try {
+      if (!genreAnalysisService) {
+        return res.status(503).json({
+          success: false,
+          error: 'Genre analysis service not available',
+        });
+      }
+
+      const monthsParam = req.query.months as string | undefined;
+      const months = monthsParam ? parseInt(monthsParam, 10) : 24;
+
+      if (isNaN(months) || months < 1) {
+        return res.status(400).json({
+          success: false,
+          error: 'months must be a positive integer',
+        });
+      }
+
+      const data = await genreAnalysisService.getTasteDrift(months);
+      res.json({ success: true, data });
+    } catch (error) {
+      logger.error('Error getting taste drift', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // ============================================
   // History Index Merge (Split Entry Consolidation)
   // ============================================
 

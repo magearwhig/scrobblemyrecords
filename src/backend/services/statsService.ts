@@ -1,10 +1,12 @@
 import {
+  AlbumArcBucket,
   AlbumPlayCount,
   ArtistDetailResponse,
   ArtistPlayCount,
   CalendarHeatmapData,
   CollectionCoverage,
   CollectionItem,
+  CollectionValueCacheStore,
   DateAlbumsResult,
   DayOfWeekDistributionResult,
   DustyCornerAlbum,
@@ -14,6 +16,7 @@ import {
   MilestoneInfo,
   OnThisDayResult,
   OnThisDayYear,
+  RoiScoreItem,
   ScrobbleCounts,
   ScrobbleSession,
   SourceBreakdownItem,
@@ -32,6 +35,8 @@ import { ArtistNameResolver } from './artistNameResolver';
 import { MappingService } from './mappingService';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 import { TrackMappingService } from './trackMappingService';
+
+const VALUE_CACHE_PATH = 'collection-analytics/value-cache.json';
 
 const STATS_CACHE_FILE = 'stats/stats-cache.json';
 
@@ -2489,5 +2494,182 @@ export class StatsService {
     } catch (error) {
       this.logger.error('Failed to save stats cache', error);
     }
+  }
+
+  /**
+   * Get collection ROI score: plays-per-dollar leaderboard.
+   * Cross-references history play counts with Discogs collection + value cache.
+   * Only includes albums that have both play history and a known median price.
+   *
+   * @param limit - Maximum number of items to return (default: all)
+   */
+  async getCollectionROI(limit?: number): Promise<RoiScoreItem[]> {
+    const index = await this.historyStorage.getIndex();
+    if (!index) {
+      return [];
+    }
+
+    // Load collection
+    let collection: CollectionItem[] = [];
+    try {
+      const raw = await this.fileStorage.readJSON<{ items?: CollectionItem[] }>(
+        'collection/releases.json'
+      );
+      if (raw && Array.isArray(raw.items)) {
+        collection = raw.items;
+      } else if (Array.isArray(raw)) {
+        collection = raw as CollectionItem[];
+      }
+    } catch {
+      this.logger.warn('Could not read collection for ROI calculation');
+      return [];
+    }
+
+    if (collection.length === 0) {
+      return [];
+    }
+
+    // Load value cache
+    let valueCache: CollectionValueCacheStore | null = null;
+    try {
+      valueCache =
+        await this.fileStorage.readJSON<CollectionValueCacheStore>(
+          VALUE_CACHE_PATH
+        );
+    } catch {
+      this.logger.warn('Value cache not available for ROI calculation');
+    }
+
+    if (!valueCache || !valueCache.items) {
+      return [];
+    }
+
+    // Build fuzzy collection map using the canonical pattern
+    const collectionByFuzzyKey = await this.buildFuzzyCollectionMap(collection);
+
+    const results: RoiScoreItem[] = [];
+
+    for (const [key, albumHistory] of Object.entries(index.albums)) {
+      const [artist, album] = key.split('|');
+      const playCount = albumHistory.playCount;
+
+      if (playCount === 0) continue;
+
+      // Find collection item via fuzzy map
+      const collectionItem = this.lookupCollectionItem(
+        collectionByFuzzyKey,
+        artist,
+        album
+      );
+      if (!collectionItem) continue;
+
+      const releaseId = collectionItem.release.id;
+      const cachedValue = valueCache.items[releaseId];
+      if (
+        !cachedValue ||
+        !cachedValue.medianPrice ||
+        cachedValue.medianPrice <= 0
+      ) {
+        continue;
+      }
+
+      const roiScore = playCount / cachedValue.medianPrice;
+
+      results.push({
+        artist: this.capitalizeArtist(artist),
+        album: this.capitalizeTitle(album),
+        playCount,
+        medianPrice: cachedValue.medianPrice,
+        currency: cachedValue.currency,
+        roiScore,
+        releaseId,
+        coverUrl: collectionItem.release.cover_image,
+      });
+    }
+
+    // Sort by roiScore descending
+    results.sort((a, b) => b.roiScore - a.roiScore);
+
+    return limit !== undefined ? results.slice(0, limit) : results;
+  }
+
+  /**
+   * Get the listening arc for a specific album: monthly play counts over its lifetime.
+   * Returns non-cumulative buckets per YYYY-MM period.
+   *
+   * @param artist - Artist name
+   * @param album - Album title
+   */
+  async getAlbumListeningArc(
+    artist: string,
+    album: string
+  ): Promise<AlbumArcBucket[]> {
+    const index = await this.historyStorage.getIndex();
+    if (!index) {
+      return [];
+    }
+
+    // Use fuzzy matching to find the album entry
+    const fuzzyKey = this.historyStorage.fuzzyNormalizeKey(artist, album);
+
+    // Gather all matching entries (may have multiple fuzzy matches)
+    const matchingKeys: string[] = [];
+    for (const exactKey of Object.keys(index.albums)) {
+      const [entryArtist, entryAlbum] = exactKey.split('|');
+      const entryFuzzyKey = this.historyStorage.fuzzyNormalizeKey(
+        entryArtist,
+        entryAlbum
+      );
+      if (entryFuzzyKey === fuzzyKey) {
+        matchingKeys.push(exactKey);
+      }
+    }
+
+    if (matchingKeys.length === 0) {
+      return [];
+    }
+
+    // Bucket plays by YYYY-MM
+    const buckets = new Map<
+      string,
+      { playCount: number; tracks: Set<string> }
+    >();
+
+    for (const key of matchingKeys) {
+      const albumHistory = index.albums[key];
+      if (!albumHistory) continue;
+
+      for (const play of albumHistory.plays) {
+        const date = new Date(play.timestamp * 1000);
+        const period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+        const existing = buckets.get(period);
+        if (existing) {
+          existing.playCount++;
+          if (play.track) {
+            existing.tracks.add(play.track.toLowerCase());
+          }
+        } else {
+          const tracks = new Set<string>();
+          if (play.track) {
+            tracks.add(play.track.toLowerCase());
+          }
+          buckets.set(period, { playCount: 1, tracks });
+        }
+      }
+    }
+
+    if (buckets.size === 0) {
+      return [];
+    }
+
+    // Sort chronologically and return
+    return Array.from(buckets.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([period, data]) => ({
+        period,
+        playCount: data.playCount,
+        trackCount: data.tracks.size,
+      }));
   }
 }

@@ -1,0 +1,27 @@
+.taste-drift-container {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+}
+
+.taste-drift-header {
+  margin-bottom: var(--space-5);
+}
+
+.taste-drift-header h3 {
+  margin: 0 0 var(--space-1) 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.taste-drift-description {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.taste-drift-chart {
+  width: 100%;
+}

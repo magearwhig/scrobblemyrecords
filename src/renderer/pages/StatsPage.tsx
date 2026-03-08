@@ -24,6 +24,7 @@ import {
   TrackPlayCount,
 } from '../../shared/types';
 import { CalendarHeatmap } from '../components/stats/CalendarHeatmap';
+import { CollectionROIChart } from '../components/stats/CollectionROIChart';
 import { DayOfWeekChart } from '../components/stats/DayOfWeekChart';
 import { DustyCornersSection } from '../components/stats/DustyCornersSection';
 import { GenreTreemap } from '../components/stats/GenreTreemap';
@@ -38,6 +39,7 @@ import { RankingsOverTime } from '../components/stats/RankingsOverTime';
 import { SourcePieChart } from '../components/stats/SourcePieChart';
 import { StatCard } from '../components/stats/StatCard';
 import { StreakCard } from '../components/stats/StreakCard';
+import { TasteDriftChart } from '../components/stats/TasteDriftChart';
 import { TopList } from '../components/stats/TopList';
 import { Button } from '../components/ui/Button';
 import { StatsPageSkeleton } from '../components/ui/Skeleton';
@@ -694,6 +696,16 @@ export const StatsPage: React.FC = () => {
           totalArtists={genreTotalArtists}
           loading={genreLoading}
         />
+      </section>
+
+      {/* Taste Drift (lazy loaded on scroll) */}
+      <section className='stats-section'>
+        <TasteDriftChart />
+      </section>
+
+      {/* Collection ROI (lazy loaded on scroll) */}
+      <section className='stats-section'>
+        <CollectionROIChart />
       </section>
 
       {/* Top lists side by side */}
