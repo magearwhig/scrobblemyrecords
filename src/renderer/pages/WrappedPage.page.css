@@ -86,7 +86,7 @@
   inset: 0;
   z-index: 1000;
   background: linear-gradient(135deg, #0d0d0d 0%, #1a1a2e 50%, #16213e 100%);
-  color: var(--text-inverse);
+  color: #ffffff;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -128,7 +128,7 @@
   font-size: var(--text-2xl);
   font-weight: 700;
   margin: 0;
-  color: var(--text-inverse);
+  color: #ffffff;
 }
 
 .wrapped-big-number {
@@ -227,7 +227,7 @@
 .wrapped-rank-name {
   font-weight: 600;
   font-size: var(--text-base);
-  color: var(--text-inverse);
+  color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -304,6 +304,7 @@
 .wrapped-new-artist-name {
   font-weight: 600;
   font-size: var(--text-base);
+  color: #ffffff;
 }
 
 .wrapped-new-artist-plays {
@@ -376,7 +377,7 @@
   font-size: var(--text-xl);
   font-weight: 700;
   margin: 0;
-  color: var(--text-inverse);
+  color: #ffffff;
 }
 
 .wrapped-featured-album {
@@ -466,7 +467,7 @@
 }
 
 .wrapped-heatmap-container .calendar-heatmap-header h3 {
-  color: var(--text-inverse);
+  color: #ffffff;
 }
 
 .wrapped-heatmap-container .calendar-heatmap-description {
@@ -494,7 +495,7 @@
 }
 
 .wrapped-nav .button--ghost:hover:not(:disabled) {
-  color: var(--text-inverse);
+  color: #ffffff;
   background: rgba(255, 255, 255, 0.1);
 }
 

@@ -429,7 +429,7 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
             >
               {expanded
                 ? 'Show less'
-                : `Show all ${sortedPlays.length} scrobbles`}
+                : `Show all ${history.playCount} scrobbles`}
             </button>
           )}
         </div>
