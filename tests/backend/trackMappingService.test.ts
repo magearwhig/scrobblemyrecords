@@ -34,6 +34,7 @@ describe('TrackMappingService', () => {
     mockFileStorage = {
       readJSON: jest.fn().mockResolvedValue(null),
       writeJSON: jest.fn().mockResolvedValue(undefined),
+      writeJSONWithBackup: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<FileStorage>;
 
     service = new TrackMappingService(mockFileStorage);
@@ -115,7 +116,7 @@ describe('TrackMappingService', () => {
 
       await service.addTrackMapping(mapping);
 
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'mappings/track-mappings.json',
         expect.objectContaining({
           schemaVersion: 1,
@@ -196,7 +197,7 @@ describe('TrackMappingService', () => {
 
     it('should persist changes after removal', async () => {
       await service.addTrackMapping(createMockMapping());
-      mockFileStorage.writeJSON.mockClear();
+      mockFileStorage.writeJSONWithBackup.mockClear();
 
       await service.removeTrackMapping(
         'El-p',
@@ -204,7 +205,7 @@ describe('TrackMappingService', () => {
         'Request Denied'
       );
 
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'mappings/track-mappings.json',
         expect.objectContaining({
           schemaVersion: 1,

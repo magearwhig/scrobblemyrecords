@@ -13,7 +13,7 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | done/wishlist-enhancements-plan.md | Complete -- all 4 enhancements implemented, tested, verified |
 | spotify-integration-plan.md | Backlog -- Spotify genre enrichment for embeddings |
 | cancelled/smart-scrobble-scheduling-plan.md | Cancelled -- superseded by memory-scrobble-plan |
-| memory-scrobble-plan.md | Backlog -- not started |
+| done/memory-scrobble-plan.md | Complete -- all 4 phases implemented: saved collections with CSV import, track remap, duration lookup, batch scrobble with retry |
 | done/consolidation-plan.md | Complete -- Marketplace hub + What to Play page |
 | done/cross-feature-data-enrichment-plan.md | Complete -- Feature 12, all 7 phases implemented |
 | done/wrapped-plan.md | Complete -- all 6 phases implemented |

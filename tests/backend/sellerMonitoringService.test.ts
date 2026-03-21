@@ -63,6 +63,9 @@ describe('SellerMonitoringService', () => {
     mockFileStorage = new FileStorage('test') as jest.Mocked<FileStorage>;
     mockFileStorage.readJSON = jest.fn();
     mockFileStorage.writeJSON = jest.fn().mockResolvedValue(undefined);
+    mockFileStorage.writeJSONWithBackup = jest
+      .fn()
+      .mockResolvedValue(undefined);
     mockFileStorage.delete = jest.fn().mockResolvedValue(undefined);
 
     // Mock AuthService
@@ -185,7 +188,7 @@ describe('SellerMonitoringService', () => {
         vinylFormatsOnly: true,
       });
 
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'sellers/settings.json',
         expect.objectContaining({
           scanFrequencyDays: 3,
@@ -346,7 +349,7 @@ describe('SellerMonitoringService', () => {
       expect(result.inventorySize).toBe(500);
       expect(result.matchCount).toBe(0);
 
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'sellers/monitored-sellers.json',
         expect.objectContaining({
           schemaVersion: 1,
@@ -434,7 +437,7 @@ describe('SellerMonitoringService', () => {
       expect(result).toBe(true);
 
       // Check sellers file was updated
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'sellers/monitored-sellers.json',
         expect.objectContaining({
           sellers: [],
@@ -442,7 +445,7 @@ describe('SellerMonitoringService', () => {
       );
 
       // Check matches file was updated (only OtherShop matches remain)
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'sellers/matches.json',
         expect.objectContaining({
           matches: expect.arrayContaining([
@@ -564,7 +567,7 @@ describe('SellerMonitoringService', () => {
 
       await sellerMonitoringService.markMatchAsSeen('123');
 
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'sellers/matches.json',
         expect.objectContaining({
           matches: expect.arrayContaining([
@@ -585,7 +588,7 @@ describe('SellerMonitoringService', () => {
       await sellerMonitoringService.markMatchAsSeen('nonexistent');
 
       // Should not write when nothing changed
-      expect(mockFileStorage.writeJSON).not.toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).not.toHaveBeenCalled();
     });
   });
 
@@ -603,7 +606,7 @@ describe('SellerMonitoringService', () => {
 
       await sellerMonitoringService.markMatchAsNotified('123');
 
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'sellers/matches.json',
         expect.objectContaining({
           matches: expect.arrayContaining([
@@ -636,7 +639,7 @@ describe('SellerMonitoringService', () => {
       const removed = await sellerMonitoringService.removeStaleMatches();
 
       expect(removed).toBe(1);
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'sellers/matches.json',
         expect.objectContaining({
           matches: expect.arrayContaining([
@@ -660,7 +663,7 @@ describe('SellerMonitoringService', () => {
       const removed = await sellerMonitoringService.removeStaleMatches();
 
       expect(removed).toBe(0);
-      expect(mockFileStorage.writeJSON).not.toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).not.toHaveBeenCalled();
     });
   });
 
@@ -810,7 +813,7 @@ describe('SellerMonitoringService', () => {
       // Wait longer due to API_CALL_DELAY_MS (200ms per API call)
       await jest.advanceTimersByTimeAsync(500);
 
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'sellers/matches.json',
         expect.objectContaining({
           matches: expect.arrayContaining([
@@ -859,7 +862,7 @@ describe('SellerMonitoringService', () => {
       // Wait longer due to API_CALL_DELAY_MS (200ms per API call)
       await jest.advanceTimersByTimeAsync(500);
 
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'sellers/matches.json',
         expect.objectContaining({
           matches: expect.arrayContaining([
@@ -903,7 +906,7 @@ describe('SellerMonitoringService', () => {
       await jest.advanceTimersByTimeAsync(200);
 
       // Matches should be empty because CD is not vinyl
-      const matchesCall = mockFileStorage.writeJSON.mock.calls.find(
+      const matchesCall = mockFileStorage.writeJSONWithBackup.mock.calls.find(
         call => call[0] === 'sellers/matches.json'
       ) as [string, SellerMatchesStore] | undefined;
       expect(matchesCall?.[1].matches).toHaveLength(0);
@@ -1068,7 +1071,7 @@ describe('SellerMonitoringService', () => {
       await jest.advanceTimersByTimeAsync(800);
 
       // Only item 1002 should be in matches (its master_id 12345 is in wishlist)
-      const matchesCall = mockFileStorage.writeJSON.mock.calls.find(
+      const matchesCall = mockFileStorage.writeJSONWithBackup.mock.calls.find(
         call => call[0] === 'sellers/matches.json'
       ) as [string, SellerMatchesStore] | undefined;
       expect(matchesCall?.[1].matches).toHaveLength(1);
@@ -1169,7 +1172,7 @@ describe('SellerMonitoringService', () => {
       // Wait longer due to API_CALL_DELAY_MS (200ms per API call)
       await jest.advanceTimersByTimeAsync(500);
 
-      const matchesCall = mockFileStorage.writeJSON.mock.calls.find(
+      const matchesCall = mockFileStorage.writeJSONWithBackup.mock.calls.find(
         call => call[0] === 'sellers/matches.json'
       ) as [string, SellerMatchesStore] | undefined;
       expect(matchesCall?.[1].matches[0].id).toBe('987654321');
@@ -1706,8 +1709,8 @@ describe('SellerMonitoringService', () => {
       expect(result.status).toBe('active');
 
       // Check that store was updated
-      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
-      const savedStore = mockFileStorage.writeJSON.mock
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
+      const savedStore = mockFileStorage.writeJSONWithBackup.mock
         .calls[0][1] as SellerMatchesStore;
       const savedMatch = savedStore.matches.find(
         (m: SellerMatch) => m.id === 'match-1'
@@ -1731,7 +1734,7 @@ describe('SellerMonitoringService', () => {
       expect(result.updated).toBe(false); // Status unchanged
       expect(result.status).toBe('sold');
 
-      const savedStore = mockFileStorage.writeJSON.mock
+      const savedStore = mockFileStorage.writeJSONWithBackup.mock
         .calls[0][1] as SellerMatchesStore;
       const savedMatch = savedStore.matches.find(
         (m: SellerMatch) => m.id === 'match-1'
@@ -1961,9 +1964,10 @@ describe('SellerMonitoringService', () => {
       expect(cancelledStatusCall).toBeDefined();
 
       // Should have saved partial matches
-      const matchesSaveCall = mockFileStorage.writeJSON.mock.calls.find(
-        call => call[0] === 'sellers/matches.json'
-      );
+      const matchesSaveCall =
+        mockFileStorage.writeJSONWithBackup.mock.calls.find(
+          call => call[0] === 'sellers/matches.json'
+        );
       expect(matchesSaveCall).toBeDefined();
 
       // Should NOT have scanned all 3 sellers (scan was cancelled after first)

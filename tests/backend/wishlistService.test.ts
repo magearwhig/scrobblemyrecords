@@ -213,7 +213,7 @@ describe('WishlistService', () => {
       expect(result.priceThreshold).toBe(100);
       expect(result.currency).toBe('USD'); // default preserved
       expect(result.schemaVersion).toBe(1);
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'wishlist/settings.json',
         expect.objectContaining({ priceThreshold: 100, schemaVersion: 1 })
       );
@@ -434,7 +434,7 @@ describe('WishlistService', () => {
       expect(item.vinylStatus).toBe('unknown');
       expect(item.masterId).toBe(400);
       expect(item.coverImage).toBe('https://example.com/cover.jpg');
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'wishlist/local-want-list.json',
         expect.objectContaining({ schemaVersion: 1 })
       );
@@ -470,8 +470,8 @@ describe('WishlistService', () => {
       });
 
       expect(item.id).toBe(expectedId);
-      // writeJSON should not have been called since it's a duplicate
-      expect(mockFileStorage.writeJSON).not.toHaveBeenCalled();
+      // writeJSONWithBackup should not have been called since it's a duplicate
+      expect(mockFileStorage.writeJSONWithBackup).not.toHaveBeenCalled();
     });
 
     it('should handle Discogs search failure gracefully', async () => {
@@ -501,7 +501,7 @@ describe('WishlistService', () => {
       const result = await service.removeFromLocalWantList('item-1');
 
       expect(result).toBe(true);
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'wishlist/local-want-list.json',
         expect.objectContaining({
           schemaVersion: 1,
@@ -530,7 +530,7 @@ describe('WishlistService', () => {
 
       await service.markLocalWantAsNotified('item-1');
 
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'wishlist/local-want-list.json',
         expect.objectContaining({
           items: expect.arrayContaining([
@@ -545,7 +545,7 @@ describe('WishlistService', () => {
 
       await service.markLocalWantAsNotified('nonexistent');
 
-      expect(mockFileStorage.writeJSON).not.toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).not.toHaveBeenCalled();
     });
   });
 
@@ -667,7 +667,7 @@ describe('WishlistService', () => {
 
       await service.dismissNewRelease('rel-1');
 
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'wishlist/new-releases.json',
         expect.objectContaining({
           releases: expect.arrayContaining([
@@ -713,7 +713,7 @@ describe('WishlistService', () => {
       ]);
 
       expect(count).toBe(2); // rel-3 was already dismissed
-      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
     });
 
     it('should return 0 when no releases match', async () => {
@@ -727,7 +727,7 @@ describe('WishlistService', () => {
       const count = await service.dismissNewReleasesBulk(['nonexistent']);
 
       expect(count).toBe(0);
-      expect(mockFileStorage.writeJSON).not.toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).not.toHaveBeenCalled();
     });
   });
 
@@ -747,7 +747,7 @@ describe('WishlistService', () => {
       const count = await service.dismissAllNewReleases();
 
       expect(count).toBe(2);
-      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
     });
 
     it('should return 0 when all are already dismissed', async () => {
@@ -761,7 +761,7 @@ describe('WishlistService', () => {
       const count = await service.dismissAllNewReleases();
 
       expect(count).toBe(0);
-      expect(mockFileStorage.writeJSON).not.toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).not.toHaveBeenCalled();
     });
   });
 
@@ -795,7 +795,7 @@ describe('WishlistService', () => {
       const removedCount = await service.cleanupDismissedReleases(90);
 
       expect(removedCount).toBe(1); // only old-dismissed removed
-      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
     });
 
     it('should not remove anything when all releases are recent', async () => {
@@ -833,7 +833,7 @@ describe('WishlistService', () => {
 
       await service.markNewReleasesAsNotified(['rel-1']);
 
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'wishlist/new-releases.json',
         expect.objectContaining({
           releases: expect.arrayContaining([
@@ -854,7 +854,7 @@ describe('WishlistService', () => {
 
       await service.markNewReleasesAsNotified(['rel-1']);
 
-      expect(mockFileStorage.writeJSON).not.toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).not.toHaveBeenCalled();
     });
   });
 

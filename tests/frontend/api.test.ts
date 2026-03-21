@@ -304,10 +304,15 @@ describe('API Service', () => {
 
       const result = await api.scrobbleBatch(tracks, 1234567890);
 
-      expect(mockPost).toHaveBeenCalledWith('/scrobble/batch', {
-        tracks,
-        baseTimestamp: 1234567890,
-      });
+      expect(mockPost).toHaveBeenCalledWith(
+        '/scrobble/batch',
+        {
+          tracks,
+          baseTimestamp: 1234567890,
+          collectionRelease: undefined,
+        },
+        { timeout: 300000 }
+      );
       expect(result).toEqual(mockResponse.data.data.results);
     });
 

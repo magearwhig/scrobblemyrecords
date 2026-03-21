@@ -165,6 +165,7 @@ describe('Scrobble Routes', () => {
         failed: 0,
         ignored: 0,
         errors: [],
+        failedTracks: [],
         sessionId: 'session-123',
       };
 
@@ -215,6 +216,7 @@ describe('Scrobble Routes', () => {
         failed: 0,
         ignored: 0,
         errors: [],
+        failedTracks: [],
         sessionId: 'session-123',
       };
 

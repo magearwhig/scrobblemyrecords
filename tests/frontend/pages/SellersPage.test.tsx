@@ -374,7 +374,7 @@ describe('SellersPage', () => {
     renderSellersPage();
 
     await waitFor(() => {
-      expect(screen.getByText(/Scanning vinylshop/)).toBeInTheDocument();
+      expect(screen.getByText(/Fetching vinylshop/)).toBeInTheDocument();
     });
 
     expect(screen.getByTestId('progress-bar')).toBeInTheDocument();

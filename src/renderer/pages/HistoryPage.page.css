@@ -372,6 +372,9 @@
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   border-radius: var(--radius-md) var(--radius-md) 0 0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .lastfm-history-header-btn {
@@ -393,7 +396,7 @@
 }
 
 .lastfm-history-list {
-  max-height: 500px;
+  max-height: 540px;
   overflow-y: auto;
 }
 
@@ -419,6 +422,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
   font-size: var(--text-base);
   color: var(--text-primary);
 }
@@ -504,17 +508,18 @@
 
 /* Track view styles */
 .lastfm-history-track-header {
-  grid-template-columns: 2fr 1.5fr 1.5fr 70px 100px;
+  grid-template-columns: 2fr 1.5fr 1.5fr 70px 100px 100px;
 }
 
 .lastfm-history-track-item {
-  grid-template-columns: 2fr 1.5fr 1.5fr 70px 100px;
+  grid-template-columns: 2fr 1.5fr 1.5fr 70px 100px 100px;
 }
 
 .lastfm-history-col-track {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
   font-size: var(--text-base);
   font-weight: 500;
   color: var(--text-primary);
@@ -525,6 +530,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
   font-size: var(--text-sm);
   color: var(--text-secondary);
 }

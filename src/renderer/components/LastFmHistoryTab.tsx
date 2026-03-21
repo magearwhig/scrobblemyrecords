@@ -472,39 +472,37 @@ const LastFmHistoryTab: React.FC = () => {
       {/* Album list */}
       {viewMode === 'albums' && albums.length > 0 && (
         <div className='card lastfm-history-list-card'>
-          {/* Header row */}
-          <div className={`lastfm-history-list-header${enrichedClass}`}>
-            <button
-              className={`lastfm-history-header-btn lastfm-history-col-artist ${albumSortBy === 'artist' ? 'active' : ''}`}
-              onClick={() => handleAlbumSortChange('artist')}
-            >
-              Artist{getAlbumSortIndicator('artist')}
-            </button>
-            <button
-              className={`lastfm-history-header-btn lastfm-history-col-album ${albumSortBy === 'album' ? 'active' : ''}`}
-              onClick={() => handleAlbumSortChange('album')}
-            >
-              Album{getAlbumSortIndicator('album')}
-            </button>
-            <button
-              className={`lastfm-history-header-btn lastfm-history-col-plays ${albumSortBy === 'playCount' ? 'active' : ''}`}
-              onClick={() => handleAlbumSortChange('playCount')}
-            >
-              Plays{getAlbumSortIndicator('playCount')}
-            </button>
-            <button
-              className={`lastfm-history-header-btn lastfm-history-col-last ${albumSortBy === 'lastPlayed' ? 'active' : ''}`}
-              onClick={() => handleAlbumSortChange('lastPlayed')}
-            >
-              Last Played{getAlbumSortIndicator('lastPlayed')}
-            </button>
-            {hasCollection && (
-              <div className='lastfm-history-col-collection'>Collection</div>
-            )}
-          </div>
-
-          {/* Album rows */}
+          {/* Scrollable container with sticky header */}
           <div className='lastfm-history-list'>
+            <div className={`lastfm-history-list-header${enrichedClass}`}>
+              <button
+                className={`lastfm-history-header-btn lastfm-history-col-artist ${albumSortBy === 'artist' ? 'active' : ''}`}
+                onClick={() => handleAlbumSortChange('artist')}
+              >
+                Artist{getAlbumSortIndicator('artist')}
+              </button>
+              <button
+                className={`lastfm-history-header-btn lastfm-history-col-album ${albumSortBy === 'album' ? 'active' : ''}`}
+                onClick={() => handleAlbumSortChange('album')}
+              >
+                Album{getAlbumSortIndicator('album')}
+              </button>
+              <button
+                className={`lastfm-history-header-btn lastfm-history-col-plays ${albumSortBy === 'playCount' ? 'active' : ''}`}
+                onClick={() => handleAlbumSortChange('playCount')}
+              >
+                Plays{getAlbumSortIndicator('playCount')}
+              </button>
+              <button
+                className={`lastfm-history-header-btn lastfm-history-col-last ${albumSortBy === 'lastPlayed' ? 'active' : ''}`}
+                onClick={() => handleAlbumSortChange('lastPlayed')}
+              >
+                Last Played{getAlbumSortIndicator('lastPlayed')}
+              </button>
+              {hasCollection && (
+                <div className='lastfm-history-col-collection'>Collection</div>
+              )}
+            </div>
             {albums.map((album, index) => {
               const collectionItem = lookupInCollection(
                 collectionMap,
@@ -564,47 +562,45 @@ const LastFmHistoryTab: React.FC = () => {
       {/* Track list */}
       {viewMode === 'tracks' && tracks.length > 0 && (
         <div className='card lastfm-history-list-card'>
-          {/* Header row */}
-          <div
-            className={`lastfm-history-list-header lastfm-history-track-header${enrichedClass}`}
-          >
-            <button
-              className={`lastfm-history-header-btn lastfm-history-col-track ${trackSortBy === 'track' ? 'active' : ''}`}
-              onClick={() => handleTrackSortChange('track')}
-            >
-              Track{getTrackSortIndicator('track')}
-            </button>
-            <button
-              className={`lastfm-history-header-btn lastfm-history-col-artist-sm ${trackSortBy === 'artist' ? 'active' : ''}`}
-              onClick={() => handleTrackSortChange('artist')}
-            >
-              Artist{getTrackSortIndicator('artist')}
-            </button>
-            <button
-              className={`lastfm-history-header-btn lastfm-history-col-album-sm ${trackSortBy === 'album' ? 'active' : ''}`}
-              onClick={() => handleTrackSortChange('album')}
-            >
-              Album{getTrackSortIndicator('album')}
-            </button>
-            <button
-              className={`lastfm-history-header-btn lastfm-history-col-plays ${trackSortBy === 'playCount' ? 'active' : ''}`}
-              onClick={() => handleTrackSortChange('playCount')}
-            >
-              Plays{getTrackSortIndicator('playCount')}
-            </button>
-            <button
-              className={`lastfm-history-header-btn lastfm-history-col-last ${trackSortBy === 'lastPlayed' ? 'active' : ''}`}
-              onClick={() => handleTrackSortChange('lastPlayed')}
-            >
-              Last Played{getTrackSortIndicator('lastPlayed')}
-            </button>
-            <div className='lastfm-history-col-actions'>
-              {hasCollection && 'Collection'}
-            </div>
-          </div>
-
-          {/* Track rows */}
+          {/* Scrollable container with sticky header */}
           <div className='lastfm-history-list'>
+            <div
+              className={`lastfm-history-list-header lastfm-history-track-header${enrichedClass}`}
+            >
+              <button
+                className={`lastfm-history-header-btn lastfm-history-col-track ${trackSortBy === 'track' ? 'active' : ''}`}
+                onClick={() => handleTrackSortChange('track')}
+              >
+                Track{getTrackSortIndicator('track')}
+              </button>
+              <button
+                className={`lastfm-history-header-btn lastfm-history-col-artist-sm ${trackSortBy === 'artist' ? 'active' : ''}`}
+                onClick={() => handleTrackSortChange('artist')}
+              >
+                Artist{getTrackSortIndicator('artist')}
+              </button>
+              <button
+                className={`lastfm-history-header-btn lastfm-history-col-album-sm ${trackSortBy === 'album' ? 'active' : ''}`}
+                onClick={() => handleTrackSortChange('album')}
+              >
+                Album{getTrackSortIndicator('album')}
+              </button>
+              <button
+                className={`lastfm-history-header-btn lastfm-history-col-plays ${trackSortBy === 'playCount' ? 'active' : ''}`}
+                onClick={() => handleTrackSortChange('playCount')}
+              >
+                Plays{getTrackSortIndicator('playCount')}
+              </button>
+              <button
+                className={`lastfm-history-header-btn lastfm-history-col-last ${trackSortBy === 'lastPlayed' ? 'active' : ''}`}
+                onClick={() => handleTrackSortChange('lastPlayed')}
+              >
+                Last Played{getTrackSortIndicator('lastPlayed')}
+              </button>
+              <div className='lastfm-history-col-actions'>
+                {hasCollection && 'Collection'}
+              </div>
+            </div>
             {tracks.map((track, index) => {
               const collectionItem = lookupInCollection(
                 collectionMap,
@@ -687,41 +683,39 @@ const LastFmHistoryTab: React.FC = () => {
       {/* Artist list */}
       {viewMode === 'artists' && artists.length > 0 && (
         <div className='card lastfm-history-list-card'>
-          {/* Header row */}
-          <div
-            className={`lastfm-history-list-header lastfm-history-artist-header${enrichedClass}`}
-          >
-            <button
-              className={`lastfm-history-header-btn lastfm-history-col-artist ${artistSortBy === 'artist' ? 'active' : ''}`}
-              onClick={() => handleArtistSortChange('artist')}
-            >
-              Artist{getArtistSortIndicator('artist')}
-            </button>
-            <button
-              className={`lastfm-history-header-btn lastfm-history-col-albums ${artistSortBy === 'albumCount' ? 'active' : ''}`}
-              onClick={() => handleArtistSortChange('albumCount')}
-            >
-              Albums{getArtistSortIndicator('albumCount')}
-            </button>
-            <button
-              className={`lastfm-history-header-btn lastfm-history-col-plays ${artistSortBy === 'playCount' ? 'active' : ''}`}
-              onClick={() => handleArtistSortChange('playCount')}
-            >
-              Plays{getArtistSortIndicator('playCount')}
-            </button>
-            <button
-              className={`lastfm-history-header-btn lastfm-history-col-last ${artistSortBy === 'lastPlayed' ? 'active' : ''}`}
-              onClick={() => handleArtistSortChange('lastPlayed')}
-            >
-              Last Played{getArtistSortIndicator('lastPlayed')}
-            </button>
-            {hasCollection && (
-              <div className='lastfm-history-col-collection'>Owned</div>
-            )}
-          </div>
-
-          {/* Artist rows */}
+          {/* Scrollable container with sticky header */}
           <div className='lastfm-history-list'>
+            <div
+              className={`lastfm-history-list-header lastfm-history-artist-header${enrichedClass}`}
+            >
+              <button
+                className={`lastfm-history-header-btn lastfm-history-col-artist ${artistSortBy === 'artist' ? 'active' : ''}`}
+                onClick={() => handleArtistSortChange('artist')}
+              >
+                Artist{getArtistSortIndicator('artist')}
+              </button>
+              <button
+                className={`lastfm-history-header-btn lastfm-history-col-albums ${artistSortBy === 'albumCount' ? 'active' : ''}`}
+                onClick={() => handleArtistSortChange('albumCount')}
+              >
+                Albums{getArtistSortIndicator('albumCount')}
+              </button>
+              <button
+                className={`lastfm-history-header-btn lastfm-history-col-plays ${artistSortBy === 'playCount' ? 'active' : ''}`}
+                onClick={() => handleArtistSortChange('playCount')}
+              >
+                Plays{getArtistSortIndicator('playCount')}
+              </button>
+              <button
+                className={`lastfm-history-header-btn lastfm-history-col-last ${artistSortBy === 'lastPlayed' ? 'active' : ''}`}
+                onClick={() => handleArtistSortChange('lastPlayed')}
+              >
+                Last Played{getArtistSortIndicator('lastPlayed')}
+              </button>
+              {hasCollection && (
+                <div className='lastfm-history-col-collection'>Owned</div>
+              )}
+            </div>
             {artists.map((artist, index) => {
               const ownedCount = collectionArtistCounts.get(
                 normalizeForMatching(artist.artist)

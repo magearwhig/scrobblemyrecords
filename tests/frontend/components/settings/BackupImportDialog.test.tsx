@@ -56,6 +56,7 @@ const makePreview = (
     hiddenReleases: createSummaryCategory(0, 0),
     excludedArtists: createSummaryCategory(0, 0),
     discardPileItems: createSummaryCategory(0, 0),
+    savedCollections: createSummaryCategory(0, 0),
     settingsWillMerge: true,
   },
   ...overrides,

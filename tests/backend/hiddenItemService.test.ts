@@ -22,6 +22,7 @@ describe('HiddenItemService', () => {
     mockFileStorage = {
       readJSON: jest.fn().mockResolvedValue(null),
       writeJSON: jest.fn().mockResolvedValue(undefined),
+      writeJSONWithBackup: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<FileStorage>;
 
     service = new HiddenItemService(mockFileStorage);
@@ -131,8 +132,8 @@ describe('HiddenItemService', () => {
 
       await service.hideAlbum('Radiohead', 'OK Computer');
 
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledTimes(2);
-      const albumsArg = mockFileStorage.writeJSON.mock.calls[0];
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledTimes(2);
+      const albumsArg = mockFileStorage.writeJSONWithBackup.mock.calls[0];
       expect(albumsArg[0]).toBe('discovery/hidden-albums.json');
       const savedStore = albumsArg[1] as HiddenAlbumsStore;
       expect(savedStore.schemaVersion).toBe(1);
@@ -159,8 +160,8 @@ describe('HiddenItemService', () => {
 
       await service.hideArtist('Nickelback');
 
-      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
-      const artistsArg = mockFileStorage.writeJSON.mock.calls[1];
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
+      const artistsArg = mockFileStorage.writeJSONWithBackup.mock.calls[1];
       expect(artistsArg[0]).toBe('discovery/hidden-artists.json');
       const savedStore = artistsArg[1] as HiddenArtistsStore;
       expect(savedStore.items).toHaveLength(1);
@@ -331,9 +332,10 @@ describe('HiddenItemService', () => {
       const albums = await service.getAllHiddenAlbums();
       expect(albums).toHaveLength(0);
       // Should have written empty items array
-      const lastAlbumWrite = mockFileStorage.writeJSON.mock.calls.filter(
-        call => call[0] === 'discovery/hidden-albums.json'
-      );
+      const lastAlbumWrite =
+        mockFileStorage.writeJSONWithBackup.mock.calls.filter(
+          call => call[0] === 'discovery/hidden-albums.json'
+        );
       const lastWrite = lastAlbumWrite[lastAlbumWrite.length - 1];
       expect((lastWrite[1] as HiddenAlbumsStore).items).toHaveLength(0);
     });

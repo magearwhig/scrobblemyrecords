@@ -318,6 +318,7 @@ describe('BackupService', () => {
           hiddenReleases: [],
           excludedArtists: [],
           discardPileItems: [],
+          savedCollections: [],
         },
       };
 

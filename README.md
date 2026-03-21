@@ -119,6 +119,7 @@ npm run start:web
 - **Artist & Track Deep Dives**: Clickable artist/track names throughout the app link to rich detail pages
 - **What to Play Hub**: Play Suggestions, Forgotten Favorites, and Dusty Corners in one place
 - **Marketplace Hub**: Wishlist, New Releases, Local Sellers, Seller Matches, and Missing Albums
+- **Memory Scrobble**: Retroactively scrobble tracks from offline listening sessions — pick tracks from saved collections, set a time window, and submit with accurate timestamps
 - **Wrapped**: Spotify Wrapped-style period-in-review slideshow for any date range
 - **Discard Pile**: Track records to sell, gift, or remove with marketplace integration
 - **Cache Management**: Force reload collection data when needed
@@ -265,6 +266,19 @@ Albums in your collection you haven't played in 6+ months:
 - Sorted by how long since last played
 - Spotify play buttons for quick rediscovery
 - Configurable dormancy threshold
+
+### 🧠 Memory Scrobble
+Retroactively scrobble tracks from offline listening sessions — swimming, driving, or anywhere you can't scrobble live.
+
+- **Saved Collections**: Named track lists (e.g., "OpenSwim Pro") with CSV import
+- **Track Picker**: Select which tracks from a collection you actually listened to
+- **CSV Import**: Format: `artist,track,album,duration` (album and duration optional, duration supports MM:SS or seconds)
+- **History Validation**: Imported tracks are checked against your Last.fm history with fuzzy matching
+- **Track Remapping**: Fix unmatched imports by searching your history for the correct track
+- **Duration Lookup**: Automatic duration resolution via Discogs cache and Last.fm API
+- **Session Time Window**: Set start/end times, timestamps auto-generate sequentially
+- **Timeline Bar**: Visual progress showing total track duration vs session window
+- **Batch Retry**: Failed scrobbles (e.g., Last.fm 502s) stay in the list for easy retry
 
 ### 📊 Scrobble History Sync
 Sync your complete Last.fm history for smarter suggestions:
@@ -718,7 +732,8 @@ src/
 │   │   ├── wrapped.ts             # Wrapped/period-in-review
 │   │   ├── collectionAnalytics.ts # Collection analytics & value estimation
 │   │   ├── embeddings.ts          # Embedding management endpoints
-│   │   └── recommendations.ts     # Embedding-based recommendations
+│   │   ├── recommendations.ts     # Embedding-based recommendations
+│   │   └── memoryScrobble.ts      # Memory scrobble & saved collections
 │   ├── services/                  # Business logic
 │   │   ├── authService.ts         # Encrypted credential storage
 │   │   ├── discogsService.ts      # Discogs API client (rate-limited)
@@ -755,7 +770,9 @@ src/
 │   │   ├── scoringEngineService.ts     # Cosine similarity scoring engine
 │   │   ├── recommendationService.ts    # Embedding-based recommendation orchestration
 │   │   ├── collectionAnalyticsService.ts # Collection analytics & value estimation
-│   │   └── collectionIndexerService.ts   # Collection index for batch lookups
+│   │   ├── collectionIndexerService.ts   # Collection index for batch lookups
+│   │   ├── savedCollectionService.ts     # Saved collection CRUD & CSV import
+│   │   └── durationLookupService.ts      # Track duration lookup chain
 │   └── utils/                     # Utilities
 │       ├── fileStorage.ts         # File-based JSON storage
 │       ├── logger.ts              # Secure logger with redaction
@@ -789,6 +806,7 @@ src/
 │   │   ├── CollectionPage.tsx     # Discogs collection browser
 │   │   ├── ReleaseDetailsPage.tsx # Album detail & scrobble
 │   │   ├── ScrobblePage.tsx       # Quick scrobble
+│   │   ├── MemoryScrobblePage.tsx # Offline session scrobbling
 │   │   ├── HistoryPage.tsx        # Scrobble history & Last.fm
 │   │   ├── WhatToPlayPage.tsx     # What to Play hub (suggestions, forgotten, dusty)
 │   │   ├── SuggestionsPage.tsx    # Play suggestions & AI

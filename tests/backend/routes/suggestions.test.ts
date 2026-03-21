@@ -136,6 +136,9 @@ describe('Suggestions Routes', () => {
 
     mockFileStorage.readJSON = jest.fn().mockResolvedValue(null);
     mockFileStorage.writeJSON = jest.fn().mockResolvedValue(undefined);
+    mockFileStorage.writeJSONWithBackup = jest
+      .fn()
+      .mockResolvedValue(undefined);
 
     mockSuggestionService.getSuggestions = jest.fn().mockResolvedValue([]);
     mockSuggestionService.dismissSuggestion = jest.fn();
@@ -408,7 +411,7 @@ describe('Suggestions Routes', () => {
       // Assert
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
     });
 
     it('should use defaults when weights not provided', async () => {
@@ -701,7 +704,9 @@ describe('Suggestions Routes', () => {
 
     it('POST /settings should handle errors gracefully', async () => {
       // Arrange
-      mockFileStorage.writeJSON.mockRejectedValue(new Error('Write error'));
+      mockFileStorage.writeJSONWithBackup.mockRejectedValue(
+        new Error('Write error')
+      );
 
       // Act
       const response = await request(app)

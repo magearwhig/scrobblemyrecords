@@ -46,6 +46,7 @@ describe('ReleaseTrackingService', () => {
     mockFileStorage = {
       readJSON: jest.fn().mockResolvedValue(null),
       writeJSON: jest.fn().mockResolvedValue(undefined),
+      writeJSONWithBackup: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<FileStorage>;
 
     mockDiscogsService = {
@@ -178,7 +179,7 @@ describe('ReleaseTrackingService', () => {
         includeSingles: true,
         includeEps: true, // Default preserved
       });
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'releases/settings.json',
         expect.objectContaining({
           schemaVersion: 1,
@@ -332,7 +333,7 @@ describe('ReleaseTrackingService', () => {
         mbid: 'mbid-radiohead',
         confirmedBy: 'user',
       });
-      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
     });
 
     it('should update existing mapping', async () => {
@@ -400,7 +401,7 @@ describe('ReleaseTrackingService', () => {
 
       // Assert
       expect(result).toBe(true);
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'releases/artist-mbid-map.json',
         expect.objectContaining({
           mappings: [],
@@ -502,7 +503,7 @@ describe('ReleaseTrackingService', () => {
         candidates,
       });
       expect(disambiguation.id).toBeDefined();
-      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
     });
 
     it('should update existing pending disambiguation', async () => {
@@ -571,7 +572,7 @@ describe('ReleaseTrackingService', () => {
       // Assert
       expect(result?.status).toBe('resolved');
       expect(result?.selectedMbid).toBe('mbid-selected');
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledTimes(2); // One for disambiguation, one for mapping
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledTimes(2); // One for disambiguation, one for mapping
     });
 
     it('should return null if disambiguation not found', async () => {
@@ -634,7 +635,7 @@ describe('ReleaseTrackingService', () => {
       // Assert
       expect(result).toBe(true);
       // Should have written the disambiguation store with skipped status
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'releases/pending-disambiguations.json',
         expect.objectContaining({
           pending: expect.arrayContaining([
@@ -646,7 +647,7 @@ describe('ReleaseTrackingService', () => {
         })
       );
       // Should have written a null mapping to prevent re-prompting
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'releases/artist-mbid-map.json',
         expect.objectContaining({
           mappings: expect.arrayContaining([
@@ -719,7 +720,7 @@ describe('ReleaseTrackingService', () => {
 
       // Assert
       expect(removed).toBe(1);
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'releases/pending-disambiguations.json',
         expect.objectContaining({
           pending: expect.arrayContaining([
@@ -1534,7 +1535,7 @@ describe('ReleaseTrackingService', () => {
         200,
         'Added from New Releases tracking'
       );
-      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
     });
 
     it('should prefer exact artist and title match', async () => {
@@ -1677,7 +1678,7 @@ describe('ReleaseTrackingService', () => {
       await service.addToWishlist('rg-1');
 
       // Assert - verify the saved release has discogsMasterId set
-      const savedStore = mockFileStorage.writeJSON.mock
+      const savedStore = mockFileStorage.writeJSONWithBackup.mock
         .calls[0][1] as TrackedReleasesStore;
       expect(savedStore.releases[0].inWishlist).toBe(true);
       expect(savedStore.releases[0].discogsMasterId).toBe(42);
@@ -2025,7 +2026,7 @@ describe('ReleaseTrackingService', () => {
       // Assert
       expect(count).toBe(2);
       expect(mockMusicBrainzService.getCoverArtUrl).toHaveBeenCalledTimes(2);
-      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
     });
 
     it('should handle partial success when some cover art is not found', async () => {
@@ -2070,7 +2071,7 @@ describe('ReleaseTrackingService', () => {
 
       // Assert
       expect(count).toBe(1);
-      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
     });
 
     it('should not save if no cover art was found', async () => {
@@ -2101,7 +2102,7 @@ describe('ReleaseTrackingService', () => {
 
       // Assert
       expect(count).toBe(0);
-      expect(mockFileStorage.writeJSON).not.toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).not.toHaveBeenCalled();
     });
   });
 
@@ -2195,7 +2196,7 @@ describe('ReleaseTrackingService', () => {
         'Radiohead',
         'OK Computer'
       );
-      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
     });
 
     it('should mark release as not-found if no search results', async () => {
@@ -2225,7 +2226,7 @@ describe('ReleaseTrackingService', () => {
       await service.checkVinylAvailability();
 
       // Assert
-      const savedStore = mockFileStorage.writeJSON.mock
+      const savedStore = mockFileStorage.writeJSONWithBackup.mock
         .calls[0][1] as TrackedReleasesStore;
       expect(savedStore.releases[0].vinylStatus).toBe('not-found');
     });
@@ -2277,7 +2278,7 @@ describe('ReleaseTrackingService', () => {
       await service.checkVinylAvailability();
 
       // Assert
-      const savedStore = mockFileStorage.writeJSON.mock
+      const savedStore = mockFileStorage.writeJSONWithBackup.mock
         .calls[0][1] as TrackedReleasesStore;
       expect(savedStore.releases[0].vinylStatus).toBe('cd-only');
     });
@@ -2350,7 +2351,7 @@ describe('ReleaseTrackingService', () => {
       await service.checkVinylAvailability();
 
       // Assert
-      const savedStore = mockFileStorage.writeJSON.mock
+      const savedStore = mockFileStorage.writeJSONWithBackup.mock
         .calls[0][1] as TrackedReleasesStore;
       expect(savedStore.releases[0].vinylStatus).toBe('available');
       expect(savedStore.releases[0].vinylPriceRange).toEqual({
@@ -2389,7 +2390,7 @@ describe('ReleaseTrackingService', () => {
       await service.checkVinylAvailability();
 
       // Assert
-      const savedStore = mockFileStorage.writeJSON.mock
+      const savedStore = mockFileStorage.writeJSONWithBackup.mock
         .calls[0][1] as TrackedReleasesStore;
       expect(savedStore.releases[0].vinylStatus).toBe('unknown');
     });
@@ -2471,7 +2472,7 @@ describe('ReleaseTrackingService', () => {
       expect(result?.discogsMasterId).toBe(42);
       expect(result?.discogsUrl).toBe('https://www.discogs.com/master/42');
       expect(result?.vinylCheckedAt).toBeDefined();
-      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
     });
 
     it('should mark as not-found if no Discogs results', async () => {

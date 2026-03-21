@@ -14,6 +14,7 @@ describe('HiddenReleasesService', () => {
     mockFileStorage = {
       readJSON: jest.fn().mockResolvedValue(null),
       writeJSON: jest.fn().mockResolvedValue(undefined),
+      writeJSONWithBackup: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<FileStorage>;
 
     service = new HiddenReleasesService(mockFileStorage);
@@ -140,7 +141,7 @@ describe('HiddenReleasesService', () => {
     it('should save data to storage after changes', async () => {
       await service.hideRelease('mbid123', 'Test Album', 'Test Artist');
 
-      expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
     });
   });
 });

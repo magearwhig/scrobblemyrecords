@@ -447,6 +447,7 @@ describe('LastFmService', () => {
         failed: 0,
         ignored: 0,
         errors: [],
+        failedTracks: [],
         sessionId: 'session-123',
       });
 
@@ -484,6 +485,7 @@ describe('LastFmService', () => {
         failed: 1,
         ignored: 0,
         errors: ['Artist 2 - Track 2: Network error'],
+        failedTracks: expect.any(Array),
         sessionId: 'session-123',
       });
     });
@@ -496,6 +498,7 @@ describe('LastFmService', () => {
         failed: 0,
         ignored: 0,
         errors: [],
+        failedTracks: [],
         sessionId: 'session-123',
       });
     });
