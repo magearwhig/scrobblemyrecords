@@ -337,14 +337,17 @@ export class LastFmService {
           const scrobbleResult = await this.scrobbleTrack(track);
           if (scrobbleResult.success) {
             results.success++;
+            track.scrobbleStatus = 'success';
           } else if (scrobbleResult.ignored > 0) {
             results.ignored++;
+            track.scrobbleStatus = 'ignored';
             results.failedTracks.push(track);
             results.errors.push(
               `${track.artist} - ${track.track}: ${scrobbleResult.message}`
             );
           } else {
             results.failed++;
+            track.scrobbleStatus = 'failed';
             results.failedTracks.push(track);
             results.errors.push(
               `${track.artist} - ${track.track}: ${scrobbleResult.message}`
@@ -366,6 +369,7 @@ export class LastFmService {
           );
         } catch (error) {
           results.failed++;
+          track.scrobbleStatus = 'failed';
           results.failedTracks.push(track);
           results.errors.push(
             `${track.artist} - ${track.track}: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -437,23 +441,29 @@ export class LastFmService {
 
     for (let i = 0; i < tracks.length; i++) {
       const track = tracks[i];
+      // Skip already-successful tracks
+      if (track.scrobbleStatus === 'success') continue;
       try {
         const scrobbleResult = await this.scrobbleTrack(track);
         if (scrobbleResult.success) {
           results.success++;
+          track.scrobbleStatus = 'success';
         } else if (scrobbleResult.ignored > 0) {
           results.ignored++;
+          track.scrobbleStatus = 'ignored';
           results.errors.push(
             `${track.artist} - ${track.track}: ${scrobbleResult.message}`
           );
         } else {
           results.failed++;
+          track.scrobbleStatus = 'failed';
           results.errors.push(
             `${track.artist} - ${track.track}: ${scrobbleResult.message}`
           );
         }
       } catch (error) {
         results.failed++;
+        track.scrobbleStatus = 'failed';
         results.errors.push(
           `${track.artist} - ${track.track}: ${error instanceof Error ? error.message : 'Unknown error'}`
         );

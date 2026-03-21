@@ -1,3 +1,4 @@
+import { Check, RefreshCw, XCircle } from 'lucide-react';
 import React from 'react';
 
 import { ScrobbleSession, ScrobbleTrack } from '../../shared/types';
@@ -19,6 +20,7 @@ interface ScrobbleSessionCardProps {
   formatTrackTimestamp: (timestampMs: number) => string;
   onDelete: (sessionId: string) => void;
   onResubmit: (sessionId: string) => void;
+  onResubmitTrack: (sessionId: string, trackIndex: number) => void;
   actionLoading: string | null;
   getUniqueAlbumCovers: (tracks: ScrobbleTrack[]) => UniqueAlbum[];
 }
@@ -45,6 +47,7 @@ const ScrobbleSessionCard: React.FC<ScrobbleSessionCardProps> = ({
   formatTrackTimestamp,
   onDelete,
   onResubmit,
+  onResubmitTrack,
   actionLoading,
   getUniqueAlbumCovers,
 }) => {
@@ -108,27 +111,34 @@ const ScrobbleSessionCard: React.FC<ScrobbleSessionCardProps> = ({
           </Button>
 
           {(session.status === 'pending' || session.status === 'failed') && (
-            <>
-              <Button
-                variant='danger'
-                size='small'
-                onClick={() => onDelete(session.id)}
-                disabled={actionLoading === `delete-${session.id}`}
-              >
-                {actionLoading === `delete-${session.id}`
-                  ? 'Deleting...'
-                  : 'Delete'}
-              </Button>
-              <Button
-                size='small'
-                onClick={() => onResubmit(session.id)}
-                disabled={actionLoading === `resubmit-${session.id}`}
-              >
-                {actionLoading === `resubmit-${session.id}`
-                  ? 'Resubmitting...'
+            <Button
+              variant='danger'
+              size='small'
+              onClick={() => onDelete(session.id)}
+              disabled={actionLoading === `delete-${session.id}`}
+            >
+              {actionLoading === `delete-${session.id}`
+                ? 'Deleting...'
+                : 'Delete'}
+            </Button>
+          )}
+          {(session.tracks.some(
+            t => t.scrobbleStatus && t.scrobbleStatus !== 'success'
+          ) ||
+            ((session.status === 'pending' || session.status === 'failed') &&
+              !session.tracks.some(t => t.scrobbleStatus))) && (
+            <Button
+              size='small'
+              onClick={() => onResubmit(session.id)}
+              disabled={actionLoading === `resubmit-${session.id}`}
+            >
+              <RefreshCw size={14} aria-hidden='true' />{' '}
+              {actionLoading === `resubmit-${session.id}`
+                ? 'Resubmitting...'
+                : session.tracks.some(t => t.scrobbleStatus)
+                  ? 'Resubmit Failed'
                   : 'Resubmit'}
-              </Button>
-            </>
+            </Button>
           )}
         </div>
       </div>
@@ -147,15 +157,64 @@ const ScrobbleSessionCard: React.FC<ScrobbleSessionCardProps> = ({
 
           <div className='history-session-tracklist'>
             {session.tracks.map((track, index) => (
-              <div key={index} className='history-session-track'>
-                <div className='history-session-track-title'>{track.track}</div>
-                <div className='history-session-track-meta'>
-                  {track.artist} &bull; {track.album}
-                </div>
-                {track.timestamp && (
-                  <div className='history-session-track-timestamp'>
-                    Scrobbled: {formatTrackTimestamp(track.timestamp * 1000)}
+              <div
+                key={index}
+                className='history-session-track'
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.5rem',
+                }}
+              >
+                {track.scrobbleStatus && (
+                  <span
+                    className='history-session-track-status'
+                    title={track.scrobbleStatus}
+                  >
+                    {track.scrobbleStatus === 'success' ? (
+                      <Check
+                        size={14}
+                        color='var(--success-color)'
+                        aria-label='Success'
+                      />
+                    ) : (
+                      <XCircle
+                        size={14}
+                        color='var(--error-color)'
+                        aria-label='Failed'
+                      />
+                    )}
+                  </span>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className='history-session-track-title'>
+                    {track.track}
                   </div>
+                  <div className='history-session-track-meta'>
+                    {track.artist} &bull; {track.album}
+                  </div>
+                  {track.timestamp && (
+                    <div className='history-session-track-timestamp'>
+                      Scrobbled: {formatTrackTimestamp(track.timestamp * 1000)}
+                    </div>
+                  )}
+                </div>
+                {track.scrobbleStatus && track.scrobbleStatus !== 'success' && (
+                  <Button
+                    size='small'
+                    onClick={() => onResubmitTrack(session.id, index)}
+                    disabled={
+                      actionLoading === `resubmit-track-${session.id}-${index}`
+                    }
+                    title='Resubmit this track'
+                  >
+                    {actionLoading ===
+                    `resubmit-track-${session.id}-${index}` ? (
+                      '...'
+                    ) : (
+                      <RefreshCw size={14} aria-hidden='true' />
+                    )}
+                  </Button>
                 )}
               </div>
             ))}

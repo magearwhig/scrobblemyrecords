@@ -508,11 +508,14 @@ export default function createScrobbleRouter(
           });
         }
 
-        // Only allow resubmission of pending or failed sessions
-        if (session.status === 'completed') {
+        // Check if there are any non-successful tracks to retry
+        const failedTracks = session.tracks.filter(
+          t => t.scrobbleStatus !== 'success'
+        );
+        if (failedTracks.length === 0) {
           return res.status(400).json({
             success: false,
-            error: 'Cannot resubmit completed sessions',
+            error: 'All tracks already scrobbled successfully',
           });
         }
 
@@ -527,28 +530,31 @@ export default function createScrobbleRouter(
 
         // Update session status to in-progress
         session.status = 'in-progress';
-        session.progress = {
-          current: 0,
-          total: session.tracks.length,
-          success: 0,
-          failed: 0,
-          ignored: 0,
-        };
         session.error = undefined;
-
         await fileStorage.writeJSON(sessionPath, session);
 
-        // Start resubmitting tracks (without creating a new session)
+        // Only resubmit non-successful tracks (updates scrobbleStatus in place)
         const results = await lastfmService.resubmitTracks(session.tracks);
 
-        // Update session with results
-        session.status = results.success > 0 ? 'completed' : 'failed';
+        // Recalculate session-level counts from per-track statuses
+        const successCount = session.tracks.filter(
+          t => t.scrobbleStatus === 'success'
+        ).length;
+        const failedCount = session.tracks.filter(
+          t => t.scrobbleStatus === 'failed'
+        ).length;
+        const ignoredCount = session.tracks.filter(
+          t => t.scrobbleStatus === 'ignored'
+        ).length;
+
+        session.status =
+          failedCount === 0 && ignoredCount === 0 ? 'completed' : 'failed';
         session.progress = {
           current: session.tracks.length,
           total: session.tracks.length,
-          success: results.success,
-          failed: results.failed,
-          ignored: results.ignored,
+          success: successCount,
+          failed: failedCount,
+          ignored: ignoredCount,
         };
         session.error = results.errors?.join('; ') || undefined;
 
@@ -568,6 +574,111 @@ export default function createScrobbleRouter(
             error instanceof Error
               ? error.message
               : 'Failed to resubmit session',
+        });
+      }
+    }
+  );
+
+  // Resubmit a single track within a session
+  router.post(
+    '/session/:sessionId/resubmit-track/:trackIndex',
+    async (req: Request, res: Response) => {
+      try {
+        const { sessionId, trackIndex: trackIndexStr } = req.params;
+        const trackIndex = parseInt(trackIndexStr, 10);
+
+        if (!validateSessionId(sessionId)) {
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid session ID format',
+          });
+        }
+
+        const sessionPath = `scrobbles/session-${sessionId}.json`;
+        const session =
+          await fileStorage.readJSON<ScrobbleSession>(sessionPath);
+
+        if (!session) {
+          return res.status(404).json({
+            success: false,
+            error: 'Session not found',
+          });
+        }
+
+        if (
+          isNaN(trackIndex) ||
+          trackIndex < 0 ||
+          trackIndex >= session.tracks.length
+        ) {
+          return res.status(400).json({
+            success: false,
+            error: 'Invalid track index',
+          });
+        }
+
+        const track = session.tracks[trackIndex];
+
+        const testResult = await lastfmService.testConnection();
+        if (!testResult.success) {
+          return res.status(500).json({
+            success: false,
+            error: testResult.message,
+          });
+        }
+
+        const scrobbleResult = await lastfmService.scrobbleTrack(track);
+
+        if (scrobbleResult.success) {
+          track.scrobbleStatus = 'success';
+        } else if (scrobbleResult.ignored > 0) {
+          track.scrobbleStatus = 'ignored';
+        } else {
+          track.scrobbleStatus = 'failed';
+        }
+
+        // Recalculate session-level counts
+        const successCount = session.tracks.filter(
+          t => t.scrobbleStatus === 'success'
+        ).length;
+        const failedCount = session.tracks.filter(
+          t => t.scrobbleStatus === 'failed'
+        ).length;
+        const ignoredCount = session.tracks.filter(
+          t => t.scrobbleStatus === 'ignored'
+        ).length;
+
+        session.status =
+          failedCount === 0 && ignoredCount === 0 ? 'completed' : 'failed';
+        session.progress = {
+          current: session.tracks.length,
+          total: session.tracks.length,
+          success: successCount,
+          failed: failedCount,
+          ignored: ignoredCount,
+        };
+        if (failedCount === 0 && ignoredCount === 0) {
+          session.error = undefined;
+        }
+
+        await fileStorage.writeJSON(sessionPath, session);
+
+        res.json({
+          success: scrobbleResult.success,
+          data: {
+            trackIndex,
+            scrobbleStatus: track.scrobbleStatus,
+            message: scrobbleResult.message,
+            session: {
+              status: session.status,
+              progress: session.progress,
+            },
+          },
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          error:
+            error instanceof Error ? error.message : 'Failed to resubmit track',
         });
       }
     }

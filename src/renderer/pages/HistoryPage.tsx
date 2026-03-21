@@ -150,6 +150,20 @@ const HistoryPage: React.FC = () => {
     }
   };
 
+  const handleResubmitTrack = async (sessionId: string, trackIndex: number) => {
+    setActionLoading(`resubmit-track-${sessionId}-${trackIndex}`);
+    try {
+      await api.resubmitSessionTrack(sessionId, trackIndex);
+      await loadHistory();
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : 'Failed to resubmit track'
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleBackfillCovers = async () => {
     if (!authStatus.discogs.authenticated || !authStatus.discogs.username) {
       setError('Discogs authentication required to backfill album covers');
@@ -369,6 +383,7 @@ const HistoryPage: React.FC = () => {
                   formatTrackTimestamp={formatLocalTimeClean}
                   onDelete={handleDeleteSession}
                   onResubmit={handleResubmitSession}
+                  onResubmitTrack={handleResubmitTrack}
                   actionLoading={actionLoading}
                   getUniqueAlbumCovers={getUniqueAlbumCovers}
                 />

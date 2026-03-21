@@ -47,6 +47,7 @@ export interface ScrobbleTrack {
   timestamp?: number;
   duration?: number;
   albumCover?: string;
+  scrobbleStatus?: 'success' | 'failed' | 'ignored';
 }
 
 export interface ScrobbleSession {

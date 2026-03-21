@@ -429,6 +429,24 @@ class ApiService {
     return response.data.data;
   }
 
+  async resubmitSessionTrack(
+    sessionId: string,
+    trackIndex: number
+  ): Promise<{
+    trackIndex: number;
+    scrobbleStatus: string;
+    message: string;
+    session: {
+      status: string;
+      progress: { success: number; failed: number; ignored: number };
+    };
+  }> {
+    const response = await this.api.post(
+      `/scrobble/session/${sessionId}/resubmit-track/${trackIndex}`
+    );
+    return response.data.data;
+  }
+
   // Artist mapping methods
   async getArtistMappings(): Promise<{
     mappings: ScrobbleArtistMapping[];
