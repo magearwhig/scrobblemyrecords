@@ -132,6 +132,15 @@ export default function createScrobbleRouter(
       // Trigger incremental sync after successful scrobble
       // Delay to give Last.fm time to index the scrobbles before we fetch them back
       if (results.success > 0 && scrobbleHistorySyncService) {
+        // Adjust sync timestamp for backdated scrobbles (e.g., memory scrobbles)
+        // so the incremental sync picks them up
+        const earliestTimestamp = Math.min(
+          ...tracksWithTimestamps.map(t => t.timestamp)
+        );
+        await scrobbleHistorySyncService
+          .adjustSyncTimestampForBackdatedScrobbles(earliestTimestamp)
+          .catch(err => logger.error('Failed to adjust sync timestamp:', err));
+
         const jobId = jobStatusService.startJob(
           'sync',
           'Syncing scrobble history...'

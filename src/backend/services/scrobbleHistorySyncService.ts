@@ -633,6 +633,30 @@ export class ScrobbleHistorySyncService extends EventEmitter {
   }
 
   /**
+   * Lower the lastSyncTimestamp so the next incremental sync picks up
+   * backdated scrobbles (e.g., memory scrobbles with past timestamps).
+   * Only lowers — never raises the timestamp.
+   */
+  async adjustSyncTimestampForBackdatedScrobbles(
+    earliestTimestampSeconds: number
+  ): Promise<void> {
+    const index = await this.getHistoryIndex();
+    if (!index) return;
+
+    const earliestMs = earliestTimestampSeconds * 1000;
+    // Subtract a small buffer (60s) to ensure the sync window covers the track
+    const adjustedMs = earliestMs - 60000;
+
+    if (adjustedMs < index.lastSyncTimestamp) {
+      this.logger.info(
+        `Adjusting sync timestamp for backdated scrobbles: ${new Date(index.lastSyncTimestamp).toISOString()} → ${new Date(adjustedMs).toISOString()}`
+      );
+      index.lastSyncTimestamp = adjustedMs;
+      await this.saveIndex(index);
+    }
+  }
+
+  /**
    * Check if the index needs a sync (hasn't been synced in 24 hours)
    */
   async needsSync(): Promise<boolean> {
