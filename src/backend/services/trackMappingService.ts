@@ -76,7 +76,7 @@ export class TrackMappingService {
       mappings: Array.from(this.trackMappings.values()),
     };
 
-    await this.fileStorage.writeJSON(TRACK_MAPPINGS_FILE, store);
+    await this.fileStorage.writeJSONWithBackup(TRACK_MAPPINGS_FILE, store);
   }
 
   /**

@@ -24,6 +24,9 @@ const SettingsPage = React.lazy(() => import('../pages/SettingsPage'));
 const StatsPage = React.lazy(() => import('../pages/StatsPage'));
 const TrackDetailPage = React.lazy(() => import('../pages/TrackDetailPage'));
 const WhatToPlayPage = React.lazy(() => import('../pages/WhatToPlayPage'));
+const MemoryScrobblePage = React.lazy(
+  () => import('../pages/MemoryScrobblePage')
+);
 const WrappedPage = React.lazy(() => import('../pages/WrappedPage'));
 
 const PageLoadingFallback: React.FC = () => (
@@ -89,6 +92,8 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
         return <TrackDetailPage key={trackKey} />;
       case ROUTES.RECOMMENDATIONS:
         return <RecommendationsPage />;
+      case ROUTES.MEMORY_SCROBBLE:
+        return <MemoryScrobblePage />;
       default:
         return <HomePage />;
     }

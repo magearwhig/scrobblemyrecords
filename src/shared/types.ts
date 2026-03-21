@@ -1529,6 +1529,9 @@ export interface BackupData {
 
   // Discard Pile
   discardPileItems: DiscardPileItem[];
+
+  // Saved Collections (Memory Scrobble)
+  savedCollections: SavedCollection[];
 }
 
 /**
@@ -1568,6 +1571,7 @@ export interface BackupPreview {
   hiddenReleasesCount: number;
   excludedArtistsCount: number;
   discardPileItemsCount: number;
+  savedCollectionsCount: number;
 }
 
 /**
@@ -1600,6 +1604,7 @@ export interface BackupImportPreview {
     hiddenReleases: ImportCategorySummary;
     excludedArtists: ImportCategorySummary;
     discardPileItems: ImportCategorySummary;
+    savedCollections: ImportCategorySummary;
     settingsWillMerge: boolean;
   };
 }
@@ -2613,4 +2618,76 @@ export interface TasteDriftResult {
   snapshots: TasteDriftSnapshot[];
   totalQuarters: number;
   topGenresOverall: string[];
+}
+
+// ============================================
+// Memory Scrobble Types
+// ============================================
+
+/**
+ * A track within a saved collection (e.g., swimming playlist).
+ * Duration is in seconds (0 = unknown, resolve lazily via DurationLookupService).
+ */
+export interface SavedCollectionTrack {
+  artist: string;
+  track: string;
+  album?: string;
+  duration: number; // seconds (0 = unknown)
+  position: number; // order in collection
+  lastfmMatch: boolean; // validated against Last.fm history on import
+}
+
+/**
+ * A named collection of tracks for offline listening sessions.
+ */
+export interface SavedCollection {
+  id: string;
+  name: string; // e.g., "OpenSwim Pro"
+  description?: string;
+  tracks: SavedCollectionTrack[];
+  createdAt: number; // ms (Date.now())
+  updatedAt: number; // ms (Date.now())
+}
+
+/**
+ * Versioned store for saved track collections.
+ */
+export interface SavedCollectionsStore extends VersionedStore {
+  schemaVersion: 1;
+  collections: SavedCollection[];
+}
+
+/**
+ * A track in the memory scrobble list, extending ScrobbleTrack with source info.
+ */
+export interface MemoryScrobbleTrack extends ScrobbleTrack {
+  source: 'history' | 'collection' | 'freeform';
+  sourceCollectionId?: string;
+  order: number;
+}
+
+/**
+ * Result from the unified typeahead search across history and saved collections.
+ */
+export interface TrackSearchResult {
+  artist: string;
+  track: string;
+  album?: string;
+  duration?: number; // seconds, if known
+  source: 'history' | 'collection';
+  sourceCollectionId?: string;
+  sourceCollectionName?: string;
+  playCount?: number; // history only
+  lastPlayed?: number; // history only, ms
+}
+
+/**
+ * Result from the duration lookup chain.
+ * Duration is in seconds; null if not found anywhere.
+ */
+export interface DurationLookupResult {
+  artist: string;
+  track: string;
+  duration: number | null; // seconds, null if not found
+  source: 'discogs_collection' | 'lastfm' | 'discogs_search' | 'not_found';
 }

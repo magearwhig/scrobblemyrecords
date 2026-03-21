@@ -26,6 +26,7 @@ import {
   DiscardPileItem,
   DiscardPileStats,
   DiscogsRelease,
+  DurationLookupResult,
   EmbeddingStatus,
   EnrichedWishlistItem,
   EntireCollectionResponse,
@@ -50,6 +51,8 @@ import {
   RecommendationSettings,
   ReleaseTrackingSyncStatus,
   ReleaseVersion,
+  SavedCollection,
+  SavedCollectionTrack,
   ScrobbleArtistMapping,
   ScrobbleArtistMappingStats,
   ScrobbleTrack,
@@ -64,6 +67,7 @@ import {
   SyncStatus,
   TrackedRelease,
   TrackMapping,
+  TrackSearchResult,
   UpdateDiscardPileItemRequest,
   WishlistNewRelease,
   WishlistSettings,
@@ -344,13 +348,20 @@ class ApiService {
     failed: number;
     ignored: number;
     errors: string[];
+    failedTracks: ScrobbleTrack[];
     sessionId: string;
   }> {
-    const response = await this.api.post('/scrobble/batch', {
-      tracks,
-      baseTimestamp,
-      collectionRelease,
-    });
+    const response = await this.api.post(
+      '/scrobble/batch',
+      {
+        tracks,
+        baseTimestamp,
+        collectionRelease,
+      },
+      {
+        timeout: 300000, // 5 minutes — each track can take 10s+ with Last.fm retries
+      }
+    );
     return response.data.data.results;
   }
 
@@ -1947,6 +1958,156 @@ class ApiService {
 
   async cancelEmbeddingRebuild(): Promise<ApiResponse<{ success: boolean }>> {
     const response = await this.api.post('/embeddings/cancel');
+    return response.data;
+  }
+
+  // ============================================
+  // Memory Scrobble methods
+  // ============================================
+
+  async getMemoryScrobbleCollections(): Promise<
+    ApiResponse<SavedCollection[]>
+  > {
+    const response = await this.api.get('/memory-scrobble/collections');
+    return response.data;
+  }
+
+  async createMemoryScrobbleCollection(
+    name: string,
+    description?: string
+  ): Promise<ApiResponse<SavedCollection>> {
+    const response = await this.api.post('/memory-scrobble/collections', {
+      name,
+      description,
+    });
+    return response.data;
+  }
+
+  async getMemoryScrobbleCollection(
+    id: string
+  ): Promise<ApiResponse<SavedCollection>> {
+    const response = await this.api.get(`/memory-scrobble/collections/${id}`);
+    return response.data;
+  }
+
+  async updateMemoryScrobbleCollection(
+    id: string,
+    name?: string,
+    description?: string
+  ): Promise<ApiResponse<SavedCollection>> {
+    const response = await this.api.put(`/memory-scrobble/collections/${id}`, {
+      name,
+      description,
+    });
+    return response.data;
+  }
+
+  async deleteMemoryScrobbleCollection(id: string): Promise<ApiResponse<void>> {
+    const response = await this.api.delete(
+      `/memory-scrobble/collections/${id}`
+    );
+    return response.data;
+  }
+
+  async importMemoryScrobbleCollectionCsv(
+    id: string,
+    csvContent: string
+  ): Promise<
+    ApiResponse<{
+      imported: number;
+      errors: string[];
+      unmatched: SavedCollectionTrack[];
+    }>
+  > {
+    const response = await this.api.post(
+      `/memory-scrobble/collections/${id}/import`,
+      { csvContent }
+    );
+    return response.data;
+  }
+
+  async addMemoryScrobbleCollectionTrack(
+    id: string,
+    track: {
+      artist: string;
+      track: string;
+      album?: string;
+      duration?: number;
+      lastfmMatch?: boolean;
+    }
+  ): Promise<ApiResponse<SavedCollection>> {
+    const response = await this.api.post(
+      `/memory-scrobble/collections/${id}/tracks`,
+      track
+    );
+    return response.data;
+  }
+
+  async removeMemoryScrobbleCollectionTrack(
+    id: string,
+    position: number
+  ): Promise<ApiResponse<void>> {
+    const response = await this.api.delete(
+      `/memory-scrobble/collections/${id}/tracks/${position}`
+    );
+    return response.data;
+  }
+
+  async replaceMemoryScrobbleCollectionTrack(
+    id: string,
+    position: number,
+    track: {
+      artist: string;
+      track: string;
+      album?: string;
+      duration?: number;
+      lastfmMatch?: boolean;
+    }
+  ): Promise<ApiResponse<SavedCollectionTrack>> {
+    const response = await this.api.put(
+      `/memory-scrobble/collections/${id}/tracks/${position}`,
+      track
+    );
+    return response.data;
+  }
+
+  async searchMemoryScrobbleTracks(
+    query: string,
+    limit?: number
+  ): Promise<ApiResponse<TrackSearchResult[]>> {
+    const response = await this.api.get('/memory-scrobble/search', {
+      params: { q: query, limit },
+    });
+    return response.data;
+  }
+
+  async lookupMemoryScrobbleDuration(
+    artist: string,
+    track: string,
+    album?: string
+  ): Promise<ApiResponse<DurationLookupResult>> {
+    const response = await this.api.get('/memory-scrobble/duration', {
+      params: { artist, track, album },
+    });
+    return response.data;
+  }
+
+  async prepareMemoryScrobble(
+    sessionStart: number,
+    sessionEnd: number,
+    tracks: Array<{
+      artist: string;
+      track: string;
+      album?: string;
+      duration?: number;
+      source: string;
+    }>
+  ): Promise<ApiResponse<{ tracks: ScrobbleTrack[]; overflows: boolean }>> {
+    const response = await this.api.post('/memory-scrobble/prepare', {
+      sessionStart,
+      sessionEnd,
+      tracks,
+    });
     return response.data;
   }
 

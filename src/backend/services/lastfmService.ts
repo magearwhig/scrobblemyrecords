@@ -306,6 +306,7 @@ export class LastFmService {
     failed: number;
     ignored: number;
     errors: string[];
+    failedTracks: ScrobbleTrack[];
     sessionId: string;
   }> {
     const results = {
@@ -313,6 +314,7 @@ export class LastFmService {
       failed: 0,
       ignored: 0,
       errors: [] as string[],
+      failedTracks: [] as ScrobbleTrack[],
     };
 
     // Create scrobble session
@@ -337,11 +339,13 @@ export class LastFmService {
             results.success++;
           } else if (scrobbleResult.ignored > 0) {
             results.ignored++;
+            results.failedTracks.push(track);
             results.errors.push(
               `${track.artist} - ${track.track}: ${scrobbleResult.message}`
             );
           } else {
             results.failed++;
+            results.failedTracks.push(track);
             results.errors.push(
               `${track.artist} - ${track.track}: ${scrobbleResult.message}`
             );
@@ -362,6 +366,7 @@ export class LastFmService {
           );
         } catch (error) {
           results.failed++;
+          results.failedTracks.push(track);
           results.errors.push(
             `${track.artist} - ${track.track}: ${error instanceof Error ? error.message : 'Unknown error'}`
           );
@@ -403,6 +408,7 @@ export class LastFmService {
         failed: results.failed,
         ignored: results.ignored,
         errors: results.errors,
+        failedTracks: results.failedTracks,
         sessionId: session.id,
       };
     } catch (error) {
@@ -973,6 +979,68 @@ export class LastFmService {
     } catch {
       this.logger.debug('Error getting track top tags', { artist, track });
       return [];
+    }
+  }
+
+  /**
+   * Get track info from Last.fm.
+   *
+   * API endpoint: track.getInfo (read-only, API key only — no session/signature needed)
+   * Returns duration in ms (as provided by Last.fm), plus track name, artist, and album.
+   * Returns null on error for graceful degradation.
+   *
+   * @param artist - Artist name
+   * @param track - Track name
+   */
+  async getTrackInfo(
+    artist: string,
+    track: string
+  ): Promise<{
+    name: string;
+    artist: string;
+    duration: number; // ms from Last.fm API
+    album?: string;
+  } | null> {
+    try {
+      const credentials = await this.authService.getLastFmCredentials();
+      if (!credentials.apiKey) {
+        return null;
+      }
+
+      const response = await this.axios.get('', {
+        params: {
+          method: 'track.getInfo',
+          api_key: credentials.apiKey,
+          artist,
+          track,
+          format: 'json',
+        },
+      });
+
+      if (response.data.error) {
+        this.logger.debug('Last.fm track.getInfo error', {
+          error: response.data.error,
+          message: response.data.message,
+          artist,
+          track,
+        });
+        return null;
+      }
+
+      const trackData = response.data.track;
+      if (!trackData) {
+        return null;
+      }
+
+      return {
+        name: trackData.name,
+        artist: trackData.artist?.name || artist,
+        duration: parseInt(trackData.duration || '0', 10),
+        album: trackData.album?.title,
+      };
+    } catch {
+      this.logger.debug('Error getting track info', { artist, track });
+      return null;
     }
   }
 

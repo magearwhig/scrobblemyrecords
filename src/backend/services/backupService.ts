@@ -50,6 +50,8 @@ import {
   MonitoredSeller,
   MonitoredSellersStore,
   ReleaseTrackingSettings,
+  SavedCollection,
+  SavedCollectionsStore,
   SellerMonitoringSettings,
   SuggestionSettings,
   SyncSettings,
@@ -81,6 +83,7 @@ const FILE_PATHS = {
   hiddenReleases: 'releases/hidden-releases.json',
   excludedArtists: 'releases/excluded-artists.json',
   discardPile: 'collections/discard-pile.json',
+  savedCollections: 'collections/saved-collections.json',
   backupSettings: 'settings/backup-settings.json',
 } as const;
 
@@ -353,6 +356,13 @@ export class BackupService {
     return store?.items ?? [];
   }
 
+  private async loadSavedCollections(): Promise<SavedCollection[]> {
+    const store = await this.fileStorage.readJSON<SavedCollectionsStore>(
+      FILE_PATHS.savedCollections
+    );
+    return store?.collections ?? [];
+  }
+
   // ============================================
   // Backup Preview
   // ============================================
@@ -380,6 +390,7 @@ export class BackupService {
       hiddenReleases,
       excludedArtists,
       discardPileItems,
+      savedCollections,
     ] = await Promise.all([
       this.loadUserSettings(false),
       this.loadSuggestionSettings(),
@@ -399,6 +410,7 @@ export class BackupService {
       this.loadHiddenReleases(),
       this.loadExcludedArtists(),
       this.loadDiscardPile(),
+      this.loadSavedCollections(),
     ]);
 
     return {
@@ -420,6 +432,7 @@ export class BackupService {
       hiddenReleasesCount: hiddenReleases.length,
       excludedArtistsCount: excludedArtists.length,
       discardPileItemsCount: discardPileItems.length,
+      savedCollectionsCount: savedCollections.length,
     };
   }
 
@@ -459,6 +472,7 @@ export class BackupService {
       hiddenReleases,
       excludedArtists,
       discardPileItems,
+      savedCollections,
     ] = await Promise.all([
       this.loadUserSettings(includeCredentials),
       this.loadSuggestionSettings(),
@@ -478,6 +492,7 @@ export class BackupService {
       this.loadHiddenReleases(),
       this.loadExcludedArtists(),
       this.loadDiscardPile(),
+      this.loadSavedCollections(),
     ]);
 
     // Build backup data
@@ -500,6 +515,7 @@ export class BackupService {
       hiddenReleases,
       excludedArtists,
       discardPileItems,
+      savedCollections,
     };
 
     // Encrypt credentials if included
@@ -611,6 +627,7 @@ export class BackupService {
       currentHiddenReleases,
       currentExcludedArtists,
       currentDiscardPileItems,
+      currentSavedCollections,
     ] = await Promise.all([
       this.loadAlbumMappings(),
       this.loadArtistMappings(),
@@ -623,6 +640,7 @@ export class BackupService {
       this.loadHiddenReleases(),
       this.loadExcludedArtists(),
       this.loadDiscardPile(),
+      this.loadSavedCollections(),
     ]);
 
     // Calculate summary
@@ -682,6 +700,11 @@ export class BackupService {
         currentDiscardPileItems,
         (item: DiscardPileItem) => item.id
       ),
+      savedCollections: this.compareMappings(
+        backup.data.savedCollections ?? [],
+        currentSavedCollections,
+        (c: SavedCollection) => c.id
+      ),
       settingsWillMerge: true,
     };
 
@@ -708,6 +731,7 @@ export class BackupService {
       hiddenReleases: { new: 0, existing: 0 },
       excludedArtists: { new: 0, existing: 0 },
       discardPileItems: { new: 0, existing: 0 },
+      savedCollections: { new: 0, existing: 0 },
       settingsWillMerge: false,
     };
   }
@@ -1132,6 +1156,24 @@ export class BackupService {
       updated += result.updated;
     } catch (e) {
       errors.push(`Discard pile items: ${e instanceof Error ? e.message : e}`);
+    }
+
+    // Import saved collections
+    if (data.savedCollections) {
+      try {
+        const result = await this.mergeAndSave(
+          FILE_PATHS.savedCollections,
+          data.savedCollections,
+          (c: SavedCollection) => c.id,
+          'collections',
+          merge,
+          (a, b) => (a.updatedAt > b.updatedAt ? a : b)
+        );
+        added += result.added;
+        updated += result.updated;
+      } catch (e) {
+        errors.push(`Saved collections: ${e instanceof Error ? e.message : e}`);
+      }
     }
 
     return { added, updated, errors };

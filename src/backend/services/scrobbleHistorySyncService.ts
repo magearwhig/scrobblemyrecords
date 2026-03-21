@@ -147,7 +147,10 @@ export class ScrobbleHistorySyncService extends EventEmitter {
 
   async saveSyncSettings(settings: Partial<SyncSettings>): Promise<void> {
     this.syncSettings = { ...this.syncSettings, ...settings };
-    await this.fileStorage.writeJSON(SYNC_SETTINGS_FILE, this.syncSettings);
+    await this.fileStorage.writeJSONWithBackup(
+      SYNC_SETTINGS_FILE,
+      this.syncSettings
+    );
   }
 
   getSyncSettings(): SyncSettings {

@@ -224,7 +224,7 @@ export class WishlistService {
       schemaVersion: 1,
     };
 
-    await this.fileStorage.writeJSON(this.SETTINGS_FILE, updated);
+    await this.fileStorage.writeJSONWithBackup(this.SETTINGS_FILE, updated);
     this.logger.info('Wishlist settings saved');
     return updated;
   }
@@ -495,7 +495,10 @@ export class WishlistService {
           schemaVersion: 1,
           items: localWantItems,
         };
-        await this.fileStorage.writeJSON(this.LOCAL_WANT_LIST_FILE, localStore);
+        await this.fileStorage.writeJSONWithBackup(
+          this.LOCAL_WANT_LIST_FILE,
+          localStore
+        );
         this.logger.info(
           `Also checked ${localVinylChecks} local want items for vinyl`
         );
@@ -1051,7 +1054,10 @@ export class WishlistService {
       items: wantList,
     };
 
-    await this.fileStorage.writeJSON(this.LOCAL_WANT_LIST_FILE, store);
+    await this.fileStorage.writeJSONWithBackup(
+      this.LOCAL_WANT_LIST_FILE,
+      store
+    );
     this.logger.info(
       `Added to local want list: ${item.artist} - ${item.album}`
     );
@@ -1077,7 +1083,10 @@ export class WishlistService {
       items: wantList,
     };
 
-    await this.fileStorage.writeJSON(this.LOCAL_WANT_LIST_FILE, store);
+    await this.fileStorage.writeJSONWithBackup(
+      this.LOCAL_WANT_LIST_FILE,
+      store
+    );
     this.logger.info(`Removed from local want list: ${id}`);
 
     return true;
@@ -1142,7 +1151,10 @@ export class WishlistService {
       schemaVersion: 1,
       items: wantList,
     };
-    await this.fileStorage.writeJSON(this.LOCAL_WANT_LIST_FILE, store);
+    await this.fileStorage.writeJSONWithBackup(
+      this.LOCAL_WANT_LIST_FILE,
+      store
+    );
 
     return newlyAvailable;
   }
@@ -1161,7 +1173,10 @@ export class WishlistService {
         schemaVersion: 1,
         items: wantList,
       };
-      await this.fileStorage.writeJSON(this.LOCAL_WANT_LIST_FILE, store);
+      await this.fileStorage.writeJSONWithBackup(
+        this.LOCAL_WANT_LIST_FILE,
+        store
+      );
     }
   }
 
@@ -1447,7 +1462,7 @@ export class WishlistService {
       store.releases.push(...newReleases);
     }
     store.lastCheck = Date.now();
-    await this.fileStorage.writeJSON(this.NEW_RELEASES_FILE, store);
+    await this.fileStorage.writeJSONWithBackup(this.NEW_RELEASES_FILE, store);
   }
 
   /**
@@ -1458,7 +1473,7 @@ export class WishlistService {
     const release = store.releases.find(r => r.id === releaseId);
     if (release) {
       release.dismissed = true;
-      await this.fileStorage.writeJSON(this.NEW_RELEASES_FILE, store);
+      await this.fileStorage.writeJSONWithBackup(this.NEW_RELEASES_FILE, store);
     }
   }
 
@@ -1478,7 +1493,7 @@ export class WishlistService {
     }
 
     if (dismissedCount > 0) {
-      await this.fileStorage.writeJSON(this.NEW_RELEASES_FILE, store);
+      await this.fileStorage.writeJSONWithBackup(this.NEW_RELEASES_FILE, store);
     }
 
     return dismissedCount;
@@ -1499,7 +1514,7 @@ export class WishlistService {
     }
 
     if (dismissedCount > 0) {
-      await this.fileStorage.writeJSON(this.NEW_RELEASES_FILE, store);
+      await this.fileStorage.writeJSONWithBackup(this.NEW_RELEASES_FILE, store);
     }
 
     return dismissedCount;
@@ -1517,7 +1532,7 @@ export class WishlistService {
       r => !r.dismissed || r.detectedAt > cutoff
     );
 
-    await this.fileStorage.writeJSON(this.NEW_RELEASES_FILE, store);
+    await this.fileStorage.writeJSONWithBackup(this.NEW_RELEASES_FILE, store);
     return originalCount - store.releases.length;
   }
 
@@ -1710,7 +1725,7 @@ export class WishlistService {
     }
 
     if (modified) {
-      await this.fileStorage.writeJSON(this.NEW_RELEASES_FILE, store);
+      await this.fileStorage.writeJSONWithBackup(this.NEW_RELEASES_FILE, store);
     }
   }
 }

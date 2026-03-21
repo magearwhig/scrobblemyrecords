@@ -1,0 +1,635 @@
+/* SavedCollectionManager */
+
+.collection-manager-modal {
+  max-height: 80vh;
+}
+
+/* Error banner */
+
+.collection-manager-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  background: rgba(220, 53, 69, 0.1);
+  border: 1px solid var(--status-error);
+  border-radius: var(--radius-sm);
+  color: var(--status-error);
+  font-size: var(--text-sm);
+}
+
+.collection-manager-error-dismiss {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--status-error);
+  cursor: pointer;
+  padding: var(--space-1);
+}
+
+/* Back button */
+
+.collection-manager-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: var(--text-sm);
+  color: var(--accent-primary);
+  cursor: pointer;
+  font-weight: var(--weight-medium);
+}
+
+.collection-manager-back:hover {
+  text-decoration: underline;
+}
+
+/* Loading */
+
+.collection-manager-loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* List view */
+
+.collection-manager-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.collection-manager-item {
+  position: relative;
+}
+
+.collection-manager-item-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--surface-default);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  font-size: var(--text-base);
+  color: var(--text-default);
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.collection-manager-item-info:hover {
+  border-color: var(--accent-primary);
+  background: var(--surface-raised);
+}
+
+.collection-manager-item-name {
+  flex: 1;
+  font-weight: var(--weight-medium);
+}
+
+.collection-manager-item-actions {
+  position: absolute;
+  right: var(--space-2);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Delete confirmation */
+
+.collection-manager-delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  margin-top: var(--space-1);
+  background: rgba(220, 53, 69, 0.05);
+  border: 1px solid var(--status-error);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--text-default);
+}
+
+/* Footer */
+
+.collection-manager-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Form (create/edit) */
+
+.collection-manager-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.collection-manager-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+
+.collection-manager-input {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-base);
+  color: var(--text-default);
+  background: var(--surface-default);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+
+.collection-manager-input:focus {
+  border-color: var(--accent-primary);
+}
+
+.collection-manager-textarea {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-base);
+  color: var(--text-default);
+  background: var(--surface-default);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  outline: none;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.collection-manager-textarea:focus {
+  border-color: var(--accent-primary);
+}
+
+.collection-manager-form-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* Detail view */
+
+.collection-manager-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.collection-manager-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.collection-manager-detail-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--text-default);
+}
+
+.collection-manager-detail-desc {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.collection-manager-detail-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.collection-manager-file-input {
+  display: none;
+}
+
+/* Track list */
+
+.collection-manager-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.collection-manager-track {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-default);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.collection-manager-track-position {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  min-width: 20px;
+  text-align: right;
+}
+
+.collection-manager-track-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.collection-manager-track-artist {
+  font-weight: var(--weight-medium);
+  color: var(--text-default);
+}
+
+.collection-manager-track-separator {
+  color: var(--text-tertiary);
+}
+
+.collection-manager-track-name {
+  color: var(--text-default);
+}
+
+.collection-manager-track-matched {
+  color: var(--status-success);
+  flex-shrink: 0;
+}
+
+.collection-manager-track-unmatched {
+  color: var(--status-warning);
+  flex-shrink: 0;
+}
+
+/* Import preview */
+
+.collection-manager-import-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.collection-manager-import-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-default);
+}
+
+.collection-manager-import-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid var(--status-warning);
+  border-radius: var(--radius-sm);
+  color: var(--warning-text);
+  font-size: var(--text-sm);
+}
+
+.collection-manager-import-empty {
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  text-align: center;
+  padding: var(--space-4);
+}
+
+.collection-manager-import-list {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.collection-manager-import-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-default);
+}
+
+.collection-manager-import-num {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  min-width: 20px;
+  text-align: right;
+}
+
+.collection-manager-import-artist {
+  font-weight: var(--weight-medium);
+}
+
+.collection-manager-import-separator {
+  color: var(--text-tertiary);
+}
+
+.collection-manager-import-track {
+  color: var(--text-default);
+}
+
+.collection-manager-import-album {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.collection-manager-import-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.collection-manager-track-legend {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.collection-manager-track-legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Track remap UI */
+
+.collection-manager-track-unmatched-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.collection-manager-remap-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-default);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.collection-manager-remap-btn:hover {
+  background: var(--surface-raised);
+  color: var(--text-default);
+}
+
+.collection-manager-remap-panel {
+  margin: var(--space-1) 0 var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.collection-manager-remap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.collection-manager-remap-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-default);
+}
+
+.collection-manager-remap-close {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+}
+
+.collection-manager-remap-close:hover {
+  color: var(--text-default);
+  background: var(--surface-raised);
+}
+
+.collection-manager-remap-original {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.collection-manager-remap-input {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-default);
+  color: var(--text-default);
+  font-size: var(--text-sm);
+}
+
+.collection-manager-remap-input:focus {
+  outline: none;
+  border-color: var(--accent-default);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+
+.collection-manager-remap-results {
+  margin-top: var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.collection-manager-remap-result {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-default);
+  color: var(--text-default);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  text-align: left;
+}
+
+.collection-manager-remap-result:last-child {
+  border-bottom: none;
+}
+
+.collection-manager-remap-result:hover {
+  background: var(--surface-raised);
+}
+
+.collection-manager-remap-result-artist {
+  font-weight: var(--weight-medium);
+}
+
+.collection-manager-remap-result-album {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.collection-manager-remap-loading,
+.collection-manager-remap-empty {
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+/* Track picker view */
+
+.collection-manager-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.collection-manager-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.collection-manager-picker-select-all {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: var(--weight-medium);
+}
+
+.collection-manager-picker-select-all:hover {
+  color: var(--text-default);
+}
+
+.collection-manager-picker-count {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.collection-manager-picker-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-default);
+  border-radius: var(--radius-xs);
+  flex-shrink: 0;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+  color: var(--surface-default);
+}
+
+.collection-manager-picker-checkbox--checked {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.collection-manager-picker-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.collection-manager-picker-track {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-default);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  font-size: var(--text-sm);
+  color: var(--text-default);
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+  width: 100%;
+}
+
+.collection-manager-picker-track:hover {
+  background: var(--surface-raised);
+}
+
+.collection-manager-picker-track--selected {
+  border-color: var(--accent-primary);
+  background: var(--surface-raised);
+}
+
+.collection-manager-picker-track-position {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  min-width: 20px;
+  text-align: right;
+}
+
+.collection-manager-picker-track-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.collection-manager-picker-track-artist {
+  font-weight: var(--weight-medium);
+}
+
+.collection-manager-picker-track-name {
+  color: var(--text-default);
+}
+
+.collection-manager-picker-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.collection-manager-csv-hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.collection-manager-csv-hint code {
+  font-size: var(--text-xs);
+  background: var(--surface-sunken);
+  padding: 1px var(--space-1);
+  border-radius: var(--radius-sm);
+}

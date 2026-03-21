@@ -107,8 +107,11 @@ export class MappingService {
       mappings: Array.from(this.artistMappings.values()),
     };
 
-    await this.fileStorage.writeJSON(ALBUM_MAPPINGS_FILE, albumStore);
-    await this.fileStorage.writeJSON(ARTIST_MAPPINGS_FILE, artistStore);
+    await this.fileStorage.writeJSONWithBackup(ALBUM_MAPPINGS_FILE, albumStore);
+    await this.fileStorage.writeJSONWithBackup(
+      ARTIST_MAPPINGS_FILE,
+      artistStore
+    );
   }
 
   /**

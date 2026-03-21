@@ -97,8 +97,14 @@ export class HiddenReleasesService {
       items: Array.from(this.excludedArtists.values()),
     };
 
-    await this.fileStorage.writeJSON(HIDDEN_RELEASES_FILE, releasesStore);
-    await this.fileStorage.writeJSON(EXCLUDED_ARTISTS_FILE, artistsStore);
+    await this.fileStorage.writeJSONWithBackup(
+      HIDDEN_RELEASES_FILE,
+      releasesStore
+    );
+    await this.fileStorage.writeJSONWithBackup(
+      EXCLUDED_ARTISTS_FILE,
+      artistsStore
+    );
   }
 
   // ============================================

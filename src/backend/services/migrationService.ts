@@ -315,6 +315,13 @@ export class MigrationService {
       optional: true,
     });
 
+    this.register('saved-collections', {
+      path: 'collections/saved-collections.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
     // ============================================
     // Embedding & Recommendation Files
     // ============================================

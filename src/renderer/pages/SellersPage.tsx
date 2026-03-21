@@ -515,11 +515,10 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
               </>
             ) : (
               <>
-                Scanning {scanStatus.currentSeller || '...'}
+                Fetching {scanStatus.currentSeller || '...'} inventory
                 {scanStatus.currentPage && scanStatus.totalPages
-                  ? ` (page ${scanStatus.currentPage}/${scanStatus.totalPages})`
-                  : ''}
-                ... ({scanStatus.progress}%)
+                  ? ` (page ${scanStatus.currentPage} of ${scanStatus.totalPages})`
+                  : '...'}
               </>
             )}
           </div>
@@ -531,7 +530,11 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
                       scanStatus.matchingProgress.totalItems) *
                       100
                   )
-                : scanStatus.progress
+                : scanStatus.currentPage && scanStatus.totalPages
+                  ? Math.round(
+                      (scanStatus.currentPage / scanStatus.totalPages) * 100
+                    )
+                  : scanStatus.progress
             }
             size='small'
             animated

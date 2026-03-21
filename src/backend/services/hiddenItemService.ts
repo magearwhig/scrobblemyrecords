@@ -105,8 +105,11 @@ export class HiddenItemService {
       items: Array.from(this.hiddenArtists.values()),
     };
 
-    await this.fileStorage.writeJSON(HIDDEN_ALBUMS_FILE, albumsStore);
-    await this.fileStorage.writeJSON(HIDDEN_ARTISTS_FILE, artistsStore);
+    await this.fileStorage.writeJSONWithBackup(HIDDEN_ALBUMS_FILE, albumsStore);
+    await this.fileStorage.writeJSONWithBackup(
+      HIDDEN_ARTISTS_FILE,
+      artistsStore
+    );
   }
 
   /**

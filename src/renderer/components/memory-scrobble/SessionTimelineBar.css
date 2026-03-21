@@ -1,0 +1,50 @@
+/* SessionTimelineBar */
+
+.timeline-bar-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.timeline-bar-track {
+  width: 100%;
+  height: 12px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.timeline-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition:
+    width 0.3s ease,
+    background-color 0.3s ease;
+}
+
+.timeline-bar-fill--empty {
+  width: 0;
+}
+
+.timeline-bar-fill--normal {
+  background: var(--status-success);
+}
+
+.timeline-bar-fill--warning {
+  background: var(--status-warning);
+}
+
+.timeline-bar-fill--error {
+  background: var(--status-error);
+}
+
+.timeline-bar-label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.timeline-bar-overflow-text {
+  color: var(--status-error);
+  font-weight: var(--weight-medium);
+}

@@ -20,6 +20,7 @@ import createDiscardPileRouter from './backend/routes/discardPile';
 import { createEmbeddingsRouter } from './backend/routes/embeddings';
 import createImagesRouter from './backend/routes/images';
 import jobsRouter from './backend/routes/jobs';
+import { createMemoryScrobbleRouter } from './backend/routes/memoryScrobble';
 import { createRecommendationsRouter } from './backend/routes/recommendations';
 import createReleasesRouter from './backend/routes/releases';
 import createScrobbleRouter from './backend/routes/scrobble';
@@ -41,6 +42,7 @@ import { CollectionIndexerService } from './backend/services/collectionIndexerSe
 import { DiscardPileService } from './backend/services/discardPileService';
 import { DiscogsGenreEnricherService } from './backend/services/discogsGenreEnricherService';
 import { DiscogsService } from './backend/services/discogsService';
+import { DurationLookupService } from './backend/services/durationLookupService';
 import { EmbeddingStorageService } from './backend/services/embeddingStorageService';
 import { GenreAnalysisService } from './backend/services/genreAnalysisService';
 import { HiddenItemService } from './backend/services/hiddenItemService';
@@ -60,6 +62,7 @@ import { RankingsService } from './backend/services/rankingsService';
 import { RecommendationLogService } from './backend/services/recommendationLogService';
 import { RecommendationService } from './backend/services/recommendationService';
 import { ReleaseTrackingService } from './backend/services/releaseTrackingService';
+import { SavedCollectionService } from './backend/services/savedCollectionService';
 import { ScoringEngineService } from './backend/services/scoringEngineService';
 import { ScrobbleHistoryStorage } from './backend/services/scrobbleHistoryStorage';
 import { ScrobbleHistorySyncService } from './backend/services/scrobbleHistorySyncService';
@@ -256,9 +259,12 @@ app.use(
 );
 
 // Rate limiting for API routes
+// Single-user local app with 3s job polling (~300 reqs/15min from poller alone),
+// plus sync status, preferences, and navigation requests. Set high to avoid
+// blocking legitimate use while still protecting against runaway loops.
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 300, // 300 requests per window per IP
+  limit: 1500, // 1500 requests per window per IP
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: {
@@ -344,6 +350,12 @@ const releaseTrackingService = new ReleaseTrackingService(
 );
 const backupService = new BackupService(fileStorage, 'data');
 const discardPileService = new DiscardPileService(fileStorage);
+const savedCollectionService = new SavedCollectionService(fileStorage);
+const durationLookupService = new DurationLookupService(
+  fileStorage,
+  lastfmService,
+  discogsService
+);
 const genreAnalysisService = new GenreAnalysisService(
   lastfmService,
   historyStorage,
@@ -408,6 +420,14 @@ app.use(
   '/api/v1/discard-pile',
   createDiscardPileRouter(discardPileService, wishlistService)
 );
+app.use(
+  '/api/v1/memory-scrobble',
+  createMemoryScrobbleRouter(
+    savedCollectionService,
+    durationLookupService,
+    historyStorage
+  )
+);
 app.use('/api/v1/wrapped', createWrappedRouter(wrappedService));
 app.use(
   '/api/v1/collection-analytics',
@@ -436,6 +456,7 @@ app.get('/api/v1', (req, res) => {
       releases: '/api/v1/releases',
       backup: '/api/v1/backup',
       discardPile: '/api/v1/discard-pile',
+      memoryScrobble: '/api/v1/memory-scrobble',
       wrapped: '/api/v1/wrapped',
       collectionAnalytics: '/api/v1/collection-analytics',
       jobs: '/api/v1/jobs',

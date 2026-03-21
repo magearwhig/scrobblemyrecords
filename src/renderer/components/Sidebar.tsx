@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Brain,
   ChevronLeft,
   ChevronRight,
   Dices,
@@ -127,6 +128,13 @@ const Sidebar: React.FC<SidebarProps> = ({
           id: ROUTES.HISTORY,
           label: 'Scrobble History',
           icon: <FileText size={18} aria-hidden='true' />,
+          enabled: authStatus.lastfm.authenticated,
+          disabledReason: lastfmReason,
+        },
+        {
+          id: ROUTES.MEMORY_SCROBBLE,
+          label: 'Memory Scrobble',
+          icon: <Brain size={18} aria-hidden='true' />,
           enabled: authStatus.lastfm.authenticated,
           disabledReason: lastfmReason,
         },

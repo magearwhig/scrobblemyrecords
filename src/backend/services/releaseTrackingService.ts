@@ -193,7 +193,7 @@ export class ReleaseTrackingService {
       schemaVersion: 1,
     };
 
-    await this.fileStorage.writeJSON(SETTINGS_FILE, updated);
+    await this.fileStorage.writeJSONWithBackup(SETTINGS_FILE, updated);
     this.logger.info('Release tracking settings saved');
     return updated;
   }
@@ -318,7 +318,7 @@ export class ReleaseTrackingService {
       mappings,
     };
 
-    await this.fileStorage.writeJSON(ARTIST_MAPPINGS_FILE, store);
+    await this.fileStorage.writeJSONWithBackup(ARTIST_MAPPINGS_FILE, store);
     this.logger.info(`Artist mapping saved: ${artistName} -> ${mbid}`);
 
     return mapping;
@@ -343,7 +343,7 @@ export class ReleaseTrackingService {
       mappings,
     };
 
-    await this.fileStorage.writeJSON(ARTIST_MAPPINGS_FILE, store);
+    await this.fileStorage.writeJSONWithBackup(ARTIST_MAPPINGS_FILE, store);
     this.logger.info(`Artist mapping removed: ${artistName}`);
 
     return true;
@@ -417,7 +417,10 @@ export class ReleaseTrackingService {
     if (existing) {
       // Update candidates
       existing.candidates = candidates;
-      await this.fileStorage.writeJSON(PENDING_DISAMBIGUATIONS_FILE, store);
+      await this.fileStorage.writeJSONWithBackup(
+        PENDING_DISAMBIGUATIONS_FILE,
+        store
+      );
       return existing;
     }
 
@@ -432,7 +435,10 @@ export class ReleaseTrackingService {
     };
 
     store.pending.push(disambiguation);
-    await this.fileStorage.writeJSON(PENDING_DISAMBIGUATIONS_FILE, store);
+    await this.fileStorage.writeJSONWithBackup(
+      PENDING_DISAMBIGUATIONS_FILE,
+      store
+    );
 
     this.logger.info(`Created disambiguation request for: ${artistName}`);
     return disambiguation;
@@ -462,7 +468,10 @@ export class ReleaseTrackingService {
     disambiguation.selectedMbid = selectedMbid;
     disambiguation.resolvedAt = Date.now();
 
-    await this.fileStorage.writeJSON(PENDING_DISAMBIGUATIONS_FILE, store);
+    await this.fileStorage.writeJSONWithBackup(
+      PENDING_DISAMBIGUATIONS_FILE,
+      store
+    );
 
     // Save the mapping
     await this.setArtistMapping(
@@ -499,7 +508,10 @@ export class ReleaseTrackingService {
     disambiguation.status = 'skipped';
     disambiguation.resolvedAt = Date.now();
 
-    await this.fileStorage.writeJSON(PENDING_DISAMBIGUATIONS_FILE, store);
+    await this.fileStorage.writeJSONWithBackup(
+      PENDING_DISAMBIGUATIONS_FILE,
+      store
+    );
 
     // Store a null mapping to prevent this artist from being prompted again
     await this.setArtistMapping(disambiguation.artistName, null, 'user');
@@ -534,7 +546,10 @@ export class ReleaseTrackingService {
     const removedCount = originalLength - store.pending.length;
 
     if (removedCount > 0) {
-      await this.fileStorage.writeJSON(PENDING_DISAMBIGUATIONS_FILE, store);
+      await this.fileStorage.writeJSONWithBackup(
+        PENDING_DISAMBIGUATIONS_FILE,
+        store
+      );
       this.logger.info(`Cleaned up ${removedCount} old disambiguations`);
     }
 
@@ -699,7 +714,7 @@ export class ReleaseTrackingService {
       releases,
     };
 
-    await this.fileStorage.writeJSON(TRACKED_RELEASES_FILE, store);
+    await this.fileStorage.writeJSONWithBackup(TRACKED_RELEASES_FILE, store);
   }
 
   /**

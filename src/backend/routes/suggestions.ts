@@ -208,7 +208,7 @@ export default function createSuggestionsRouter(
         preferNeverPlayed: preferNeverPlayed ?? false,
       };
 
-      await fileStorage.writeJSON(SUGGESTION_SETTINGS_FILE, settings);
+      await fileStorage.writeJSONWithBackup(SUGGESTION_SETTINGS_FILE, settings);
 
       res.json({
         success: true,
@@ -1161,7 +1161,7 @@ export default function createSuggestionsRouter(
         DEFAULT_OLLAMA_SETTINGS;
       const updated = { ...current, ...settings };
 
-      await fileStorage.writeJSON(AI_SETTINGS_FILE, updated);
+      await fileStorage.writeJSONWithBackup(AI_SETTINGS_FILE, updated);
 
       // Update the service instance
       const ollama = await getOllamaService();

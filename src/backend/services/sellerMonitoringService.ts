@@ -303,7 +303,7 @@ export class SellerMonitoringService {
       schemaVersion: 1,
     };
 
-    await this.fileStorage.writeJSON(this.SETTINGS_FILE, updated);
+    await this.fileStorage.writeJSONWithBackup(this.SETTINGS_FILE, updated);
     this.logger.info('Seller monitoring settings saved');
     return updated;
   }
@@ -442,7 +442,7 @@ export class SellerMonitoringService {
       sellers,
     };
 
-    await this.fileStorage.writeJSON(this.SELLERS_FILE, store);
+    await this.fileStorage.writeJSONWithBackup(this.SELLERS_FILE, store);
     this.logger.info(`Added seller: ${seller.username}`);
 
     return seller;
@@ -468,7 +468,7 @@ export class SellerMonitoringService {
       sellers,
     };
 
-    await this.fileStorage.writeJSON(this.SELLERS_FILE, store);
+    await this.fileStorage.writeJSONWithBackup(this.SELLERS_FILE, store);
 
     // Also remove cached inventory
     try {
@@ -485,7 +485,7 @@ export class SellerMonitoringService {
     matchesStore.matches = matchesStore.matches.filter(
       m => m.sellerId.toLowerCase() !== username.toLowerCase()
     );
-    await this.fileStorage.writeJSON(this.MATCHES_FILE, matchesStore);
+    await this.fileStorage.writeJSONWithBackup(this.MATCHES_FILE, matchesStore);
 
     this.logger.info(`Removed seller: ${username}`);
     return true;
@@ -546,7 +546,7 @@ export class SellerMonitoringService {
     if (match) {
       match.status = 'seen';
       store.lastUpdated = Date.now();
-      await this.fileStorage.writeJSON(this.MATCHES_FILE, store);
+      await this.fileStorage.writeJSONWithBackup(this.MATCHES_FILE, store);
       this.logger.debug(`Marked match ${matchId} as seen`);
     }
   }
@@ -561,7 +561,7 @@ export class SellerMonitoringService {
     if (match) {
       match.notified = true;
       store.lastUpdated = Date.now();
-      await this.fileStorage.writeJSON(this.MATCHES_FILE, store);
+      await this.fileStorage.writeJSONWithBackup(this.MATCHES_FILE, store);
       this.logger.debug(`Marked match ${matchId} as notified`);
     }
   }
@@ -638,7 +638,7 @@ export class SellerMonitoringService {
       match.statusConfidence = 'unverified';
       match.lastVerifiedAt = Date.now();
       store.lastUpdated = Date.now();
-      await this.fileStorage.writeJSON(this.MATCHES_FILE, store);
+      await this.fileStorage.writeJSONWithBackup(this.MATCHES_FILE, store);
       return { updated: true, status: match.status, error: result.error };
     }
 
@@ -669,7 +669,7 @@ export class SellerMonitoringService {
     this.logger.info(
       `[verifyAndUpdateMatch] Saving match with new status: ${match.status} (was: ${previousStatus})`
     );
-    await this.fileStorage.writeJSON(this.MATCHES_FILE, store);
+    await this.fileStorage.writeJSONWithBackup(this.MATCHES_FILE, store);
     this.logger.info(`[verifyAndUpdateMatch] Saved successfully`);
 
     // Update seller's matchCount if status changed
@@ -689,7 +689,10 @@ export class SellerMonitoringService {
           schemaVersion: 1,
           sellers,
         };
-        await this.fileStorage.writeJSON(this.SELLERS_FILE, sellersStore);
+        await this.fileStorage.writeJSONWithBackup(
+          this.SELLERS_FILE,
+          sellersStore
+        );
         this.logger.info(
           `[verifyAndUpdateMatch] Updated ${seller.displayName} matchCount to ${seller.matchCount}`
         );
@@ -766,7 +769,7 @@ export class SellerMonitoringService {
 
     if (removed > 0) {
       store.lastUpdated = Date.now();
-      await this.fileStorage.writeJSON(this.MATCHES_FILE, store);
+      await this.fileStorage.writeJSONWithBackup(this.MATCHES_FILE, store);
       this.logger.info(`Pruned ${removed} stale matches`);
     }
 
@@ -1999,6 +2002,15 @@ export class SellerMonitoringService {
       existingMatches
     );
 
+    // If scan was cancelled during matching, don't replace existing matches
+    // with incomplete results — that would delete valid matches
+    if (this.scanAborted) {
+      this.logger.info(
+        `Scan was cancelled — preserving existing matches for ${seller.username}`
+      );
+      return { newMatches: [], updatedMatches: [] };
+    }
+
     // Determine new vs updated
     const existingIds = new Set(existingMatches.map(m => m.id));
     const newMatches = matches.filter(m => !existingIds.has(m.id));
@@ -2246,7 +2258,10 @@ export class SellerMonitoringService {
           });
           // Save any partial matches accumulated so far
           matchesStore.lastUpdated = Date.now();
-          await this.fileStorage.writeJSON(this.MATCHES_FILE, matchesStore);
+          await this.fileStorage.writeJSONWithBackup(
+            this.MATCHES_FILE,
+            matchesStore
+          );
           return; // The finally block will set scanInProgress = false
         }
 
@@ -2297,11 +2312,17 @@ export class SellerMonitoringService {
         schemaVersion: 1,
         sellers,
       };
-      await this.fileStorage.writeJSON(this.SELLERS_FILE, sellersStore);
+      await this.fileStorage.writeJSONWithBackup(
+        this.SELLERS_FILE,
+        sellersStore
+      );
 
       // Save updated matches (includes sold matches that were marked during scanning)
       matchesStore.lastUpdated = Date.now();
-      await this.fileStorage.writeJSON(this.MATCHES_FILE, matchesStore);
+      await this.fileStorage.writeJSONWithBackup(
+        this.MATCHES_FILE,
+        matchesStore
+      );
 
       // Prune stale matches (sold > 30 days)
       await this.removeStaleMatches();
