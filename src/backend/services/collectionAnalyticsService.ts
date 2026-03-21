@@ -691,6 +691,22 @@ export class CollectionAnalyticsService {
       };
     }
 
+    // Detect stale/zombie scans: persisted status says "scanning" but no scan
+    // is actually running in memory (e.g. server restarted mid-scan)
+    if (statusStore.status.status === 'scanning' && !this.scanning) {
+      log.warn(
+        'Detected stale scan status — scan is not running in memory. Resetting to idle.'
+      );
+      const resetStatus: ValueScanStatus = {
+        status: 'idle',
+        itemsScanned: statusStore.status.itemsScanned,
+        totalItems: statusStore.status.totalItems,
+        progress: statusStore.status.progress,
+      };
+      await this.updateScanStatus(resetStatus);
+      return resetStatus;
+    }
+
     return statusStore.status;
   }
 
