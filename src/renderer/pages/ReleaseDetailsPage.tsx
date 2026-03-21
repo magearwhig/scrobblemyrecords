@@ -218,6 +218,14 @@ const ReleaseDetailsPage: React.FC = () => {
       });
       setRelease(fullRelease);
 
+      // Fetch marketplace stats in background
+      setLoadingMarketplaceStats(true);
+      api
+        .getMarketplaceStats(fullRelease.id)
+        .then(stats => setMarketplaceStats(stats))
+        .catch(err => logger.warn('Failed to fetch marketplace stats', err))
+        .finally(() => setLoadingMarketplaceStats(false));
+
       // Select all actual tracks by default (filter out section headers)
       const actualTrackIndices =
         fullRelease.tracklist
@@ -264,35 +272,22 @@ const ReleaseDetailsPage: React.FC = () => {
     setDiscardModalOpen(true);
     setDiscardReason('selling');
     setDiscardReasonNote('');
-    setDiscardEstimatedValue('');
     setDiscardNotes('');
-    setMarketplaceStats(null);
 
-    // Fetch marketplace stats in background
-    setLoadingMarketplaceStats(true);
-    try {
-      const stats = await api.getMarketplaceStats(release.id);
-      setMarketplaceStats(stats);
-      // Auto-populate estimated value from marketplace data
-      if (stats) {
-        const autoValue =
-          stats.priceSuggestions?.veryGoodPlus?.value ??
-          stats.medianPrice ??
-          stats.lowestPrice;
-        if (autoValue != null) {
-          setDiscardEstimatedValue(autoValue.toFixed(2));
-        }
-      }
-    } catch (err) {
-      logger.error('Failed to fetch marketplace stats', err);
-    } finally {
-      setLoadingMarketplaceStats(false);
+    // Auto-populate estimated value from already-fetched marketplace data
+    if (marketplaceStats) {
+      const autoValue =
+        marketplaceStats.priceSuggestions?.veryGoodPlus?.value ??
+        marketplaceStats.medianPrice ??
+        marketplaceStats.lowestPrice;
+      setDiscardEstimatedValue(autoValue != null ? autoValue.toFixed(2) : '');
+    } else {
+      setDiscardEstimatedValue('');
     }
   };
 
   const handleCloseDiscardModal = () => {
     setDiscardModalOpen(false);
-    setMarketplaceStats(null);
   };
 
   const handleAddToDiscardPile = async () => {
@@ -860,6 +855,120 @@ const ReleaseDetailsPage: React.FC = () => {
                 Catalog: {release.catalog_number}
               </p>
             )}
+
+            {/* Marketplace pricing */}
+            <div className='marketplace-stats-info'>
+              {loadingMarketplaceStats ? (
+                <div className='marketplace-stats-loading'>
+                  Loading marketplace prices...
+                </div>
+              ) : marketplaceStats ? (
+                <div className='marketplace-stats-content'>
+                  <div className='marketplace-stats-prices'>
+                    <span className='marketplace-stats-label'>
+                      Discogs Marketplace:
+                    </span>
+                    {marketplaceStats.lowestPrice !== undefined ? (
+                      <>
+                        <span className='marketplace-stats-range'>
+                          {marketplaceStats.highestPrice !== undefined &&
+                          marketplaceStats.highestPrice !==
+                            marketplaceStats.lowestPrice ? (
+                            <>
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency: marketplaceStats.currency || 'USD',
+                              }).format(marketplaceStats.lowestPrice)}
+                              {' - '}
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency: marketplaceStats.currency || 'USD',
+                              }).format(marketplaceStats.highestPrice)}
+                            </>
+                          ) : (
+                            <>
+                              from{' '}
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency: marketplaceStats.currency || 'USD',
+                              }).format(marketplaceStats.lowestPrice)}
+                            </>
+                          )}
+                        </span>
+                        <span className='marketplace-stats-count'>
+                          ({marketplaceStats.numForSale} for sale)
+                        </span>
+                      </>
+                    ) : (
+                      <span className='marketplace-stats-none'>
+                        No listings
+                      </span>
+                    )}
+                  </div>
+                  {marketplaceStats.priceSuggestions ? (
+                    <div className='marketplace-stats-suggestions'>
+                      <span className='marketplace-stats-suggestion-label'>
+                        Suggested prices by condition:
+                      </span>
+                      <div className='marketplace-stats-condition-list'>
+                        {marketplaceStats.priceSuggestions.nearMint && (
+                          <span className='condition-price'>
+                            NM:{' '}
+                            {new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency:
+                                marketplaceStats.priceSuggestions.nearMint
+                                  .currency || 'USD',
+                            }).format(
+                              marketplaceStats.priceSuggestions.nearMint.value
+                            )}
+                          </span>
+                        )}
+                        {marketplaceStats.priceSuggestions.veryGoodPlus && (
+                          <span className='condition-price'>
+                            VG+:{' '}
+                            {new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency:
+                                marketplaceStats.priceSuggestions.veryGoodPlus
+                                  .currency || 'USD',
+                            }).format(
+                              marketplaceStats.priceSuggestions.veryGoodPlus
+                                .value
+                            )}
+                          </span>
+                        )}
+                        {marketplaceStats.priceSuggestions.veryGood && (
+                          <span className='condition-price'>
+                            VG:{' '}
+                            {new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency:
+                                marketplaceStats.priceSuggestions.veryGood
+                                  .currency || 'USD',
+                            }).format(
+                              marketplaceStats.priceSuggestions.veryGood.value
+                            )}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    marketplaceStats.lowestPrice !== undefined && (
+                      <div className='marketplace-stats-suggestions'>
+                        <span className='marketplace-stats-no-suggestions'>
+                          Seller profile required for price suggestions
+                        </span>
+                      </div>
+                    )
+                  )}
+                </div>
+              ) : (
+                <div className='marketplace-stats-unavailable'>
+                  Marketplace data unavailable
+                </div>
+              )}
+            </div>
 
             {/* Play on Spotify button */}
             <div className='release-details-button-container'>
