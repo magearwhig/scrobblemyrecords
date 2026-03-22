@@ -64,10 +64,12 @@ Extend `WishlistSettings`:
 ```typescript
 export interface WishlistSettings {
   // ... existing fields ...
-  regionFilter?: string;         // e.g., "United States" — filter by ships_from
+  regionFilter?: string;         // e.g., "United States" — global preference, scopes all marketplace features to this region
   priceAlertEnabled: boolean;    // global toggle for price alerts
 }
 ```
+
+The `regionFilter` is the user's shipping region preference. When set, it filters price alerts (only fire for matching-region listings), price history snapshots, version modal results, and seller matches. Set via dropdown on WishlistPage. When unset, all regions are shown.
 
 ### 1c. Auto-Scan Config
 
@@ -261,12 +263,17 @@ In seller settings section:
 
 ### 3d. Region Filter
 
-Add region filter dropdown to:
-- `SellerMatchesPage.tsx` — filter displayed matches
-- `WishlistPage.tsx` — settings area, default region preference
-- `PriceHistoryChart` — filter snapshots
+The region filter is a **global user preference** stored in `WishlistSettings.regionFilter` (e.g., "United States"). It scopes all marketplace features to listings that ship from the user's preferred region.
 
-Populated from `GET /api/v1/sellers/regions`.
+**Where it applies:**
+- **Price alerts** — `checkPriceAlerts()` only triggers for matches where `shipsFrom` matches the user's region preference (or if no preference is set, all regions)
+- **Price history** — `getPriceHistory()` and `PriceHistoryChart` filter snapshots by region
+- **Wishlist versions modal** — filter version rows to only show versions with marketplace listings shipping from the preferred region
+- **Seller matches** — filter displayed matches by `shipsFrom`
+
+**UI location:** `WishlistPage.tsx` settings/filter area — a dropdown populated from `GET /api/v1/sellers/regions`. This is the single place the user sets their region preference; all other pages read from it.
+
+**Important:** The `ships_from` field is free-form text from Discogs sellers. "US", "USA", and "United States" are different values. The UI must note this. Consider normalizing common variants (e.g., mapping "US" and "USA" to "United States") in `getAvailableRegions()`.
 
 ### 3e. API Service Extensions
 
@@ -349,12 +356,26 @@ The Discogs inventory API returns a `ships_from` string on each listing (e.g., "
 
 **Capture:** Add `shipsFrom: listing.ships_from` to `SellerInventoryItem` construction in `fetchSellerInventory()`.
 
-**Filter:** Build distinct `shipsFrom` values from cached inventories, present as dropdown. Case-insensitive comparison.
+**Storage:** The user's region preference is stored in `WishlistSettings.regionFilter`. This is a global preference that scopes all marketplace features — price alerts only fire for matching-region listings, price history filters by region, and version modals filter by region.
+
+**`getAvailableRegions()` implementation:**
+- Build distinct `shipsFrom` values from inventory cache files (read directly, ignore cache TTL — region data doesn't go stale like pricing)
+- Also include regions from matches
+- Normalize common US variants: map "US", "USA" → "United States"
+- Sort alphabetically, treat empty/undefined as "Unknown"
+
+**Where region filter is applied:**
+- `checkPriceAlerts()` — skip matches where `shipsFrom` doesn't match user's `regionFilter`
+- `getPriceHistory()` — filter snapshots by `shipsFrom`
+- `PriceHistoryChart` — pass region filter from settings
+- Wishlist versions modal — filter version rows (requires fetching listing-level `ships_from` data per version)
+- Seller matches display — filter by `shipsFrom`
 
 **Edge cases:**
 - `ships_from` may be undefined/empty — treat as "Unknown"
 - Sellers can change between scans — each snapshot records value at scan time
-- Free-form text means "US", "USA", "United States" are all different — note this in the UI
+- Free-form text: note variation in UI, normalize common variants server-side
+- If user has no region preference set, show all regions (no filtering)
 
 ---
 
