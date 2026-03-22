@@ -113,6 +113,13 @@
   top: 2.2rem;
 }
 
+.wishlist-card-image .album-play-count-badge {
+  top: auto;
+  bottom: 0.5rem;
+  left: 0.5rem;
+  right: auto;
+}
+
 .wishlist-toggle {
   display: flex;
   align-items: center;
@@ -291,4 +298,43 @@
 .wishlist-card-plays {
   font-size: var(--text-sm);
   color: var(--text-secondary);
+}
+
+/* Price Alert Styles */
+.wishlist-alert-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.125rem;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s;
+  margin-left: 0.25rem;
+  vertical-align: middle;
+}
+
+.wishlist-alert-btn:hover {
+  color: var(--accent-color);
+}
+
+.wishlist-alert-btn-active {
+  color: var(--accent-color);
+}
+
+.wishlist-alert-info {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+.wishlist-alert-info-triggered {
+  color: var(--status-success, #22c55e);
+  font-weight: 500;
+}
+
+.wishlist-card-alert-triggered {
+  border-color: var(--status-success, #22c55e);
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.15);
 }
