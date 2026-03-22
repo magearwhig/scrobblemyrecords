@@ -362,6 +362,28 @@ All components wrapped with `React.memo`. Inline styles replaced with CSS classe
 | # | Finding | Severity | Quick Win? |
 |---|---------|----------|------------|
 | C1 | Coverage thresholds (50–63%) vs 90% target | **Critical** | No (ongoing) |
+| H8 | Rename `src/renderer/` to `src/client/` | **High** | No |
+| H9 | Duplicate logger implementation (~170 lines) | **High** | Yes |
+| H10 | Singleton services bypass constructor DI | **High** | No |
+| H11 | Toast icons use unicode instead of lucide-react | **High** | Yes |
+| H12 | EmptyState.css hardcoded font-size | **High** | Yes |
+| H13 | Missing `--accent-warning` design token | **High** | Yes |
+| H14 | 4 pages missing skeleton loading UI | **High** | No |
+| M21 | Z-index scale tokens needed | Medium | Yes |
+| M22 | Breakpoint scale documentation | Medium | Yes |
+| M23 | Notification system consolidation | Medium | No |
+| M24 | Destructive actions missing confirmation | Medium | No |
+| M25 | Standardize route handlers on apiResponse helpers | Medium | No |
+| M26 | Backend pagination parameter naming | Medium | No |
+| M27 | statsService silent errors + file size | Medium | No |
+| M28 | Page component test coverage | Medium | No |
+| M29 | Frontend service test coverage | Medium | No |
+| M30 | Keyboard navigation coverage | Medium | No |
+| L13 | Large service files (seller, release tracking) | Low | No |
+| L14 | Large frontend component files (4 files) | Low | No |
+| L15 | Context/hook test coverage | Low | No |
+| L16 | E2E test coverage (17 tests) | Low | No |
+| L17 | Icon-only button aria-label audit | Low | Yes |
 | ~~H7~~ | ~~Three disconnected mapping services cause split artist entries~~ | ~~**High**~~ | ~~DONE~~ |
 | ~~H1~~ | ~~No React Error Boundary~~ | ~~**High**~~ | ~~DONE~~ |
 | ~~H2~~ | ~~Empty-string fallbacks for API secrets~~ | ~~**High**~~ | ~~DONE~~ |
@@ -402,7 +424,288 @@ All components wrapped with `React.memo`. Inline styles replaced with CSS classe
 | ~~L12~~ | ~~Sidebar reorganization~~ | ~~Low~~ | ~~DONE~~ |
 | ~~M20~~ | ~~Button system consolidation (.btn → Button.tsx)~~ | ~~Medium~~ | ~~DONE~~ |
 
-**Total open**: 1 item (C1 — ongoing coverage improvement) -- 39 completed/resolved (February 2026)
+**Total open**: 23 items (C1 ongoing + 22 from March 2026 audit) -- 39 completed/resolved (February 2026)
+
+---
+
+## Consistency Audit Findings (March 2026)
+
+Added from 8-agent codebase consistency audit on 2026-03-22.
+
+### H8. Rename `src/renderer/` to `src/client/`
+
+**Severity**: High | **Effort**: Medium | **Quick Win**: No
+
+The frontend directory uses Electron-style naming despite this being a standard web app. 612 occurrences across 122 files.
+
+**Action:**
+- [ ] Rename `src/renderer/` to `src/client/`
+- [ ] Update all imports, webpack config, tsconfig paths
+
+**Files:** All files referencing `src/renderer/`
+
+---
+
+### H9. Duplicate logger implementation
+
+**Severity**: High | **Effort**: Low | **Quick Win**: Yes
+
+`src/renderer/utils/logger.ts` and `src/backend/utils/logger.ts` are nearly identical (~170 lines duplicated). Both implement SecureLogger with identical SENSITIVE_PATTERNS and redaction logic.
+
+**Action:**
+- [ ] Extract shared logger to `src/shared/utils/logger.ts`
+- [ ] Import from both backend and renderer
+
+**Files:** `src/renderer/utils/logger.ts`, `src/backend/utils/logger.ts`
+
+---
+
+### H10. Singleton services bypass constructor DI
+
+**Severity**: High | **Effort**: Medium | **Quick Win**: No
+
+`artistMappingService` and `jobStatusService` export pre-instantiated singletons while 45+ other services use constructor-based dependency injection.
+
+**Action:**
+- [ ] Refactor both to constructor DI pattern
+- [ ] Instantiate in `src/server.ts` and pass into route factories
+
+**Files:** `src/backend/services/artistMappingService.ts`, `src/backend/services/jobStatusService.ts`, `src/server.ts`
+
+---
+
+### H11. Toast icons use unicode instead of lucide-react
+
+**Severity**: High (violates CLAUDE.md) | **Effort**: Low | **Quick Win**: Yes
+
+`ToastContainer.tsx` uses unicode symbols (`✓`, `✗`, `⚠`, `✉`) instead of lucide-react icons.
+
+**Action:**
+- [ ] Replace unicode with `Check`, `X`, `AlertTriangle`, `Mail` from lucide-react
+
+**Files:** `src/renderer/components/ToastContainer.tsx`
+
+---
+
+### H12. EmptyState.css hardcoded font-size
+
+**Severity**: High (violates CLAUDE.md) | **Effort**: Low | **Quick Win**: Yes
+
+`EmptyState.css:35` uses hardcoded `font-size: 4rem` instead of design token.
+
+**Action:**
+- [ ] Replace `4rem` with `var(--text-3xl)`
+
+**Files:** `src/renderer/components/ui/EmptyState.css`
+
+---
+
+### H13. Missing `--accent-warning` design token
+
+**Severity**: High | **Effort**: Low | **Quick Win**: Yes
+
+`Button.css` references `--accent-warning` which doesn't exist; uses CSS fallback `#f59e0b`.
+
+**Action:**
+- [ ] Add `--accent-warning` to `:root` and `.dark-mode` in `styles.css`
+
+**Files:** `src/renderer/styles.css`
+
+---
+
+### H14. Pages missing skeleton loading UI
+
+**Severity**: High | **Effort**: Medium | **Quick Win**: No
+
+Four pages lack skeleton/placeholder UI during data fetching.
+
+**Action:**
+- [ ] Add skeleton loading to `TrackDetailPage.tsx`
+- [ ] Add skeleton loading to `ArtistDetailPage.tsx`
+- [ ] Add skeleton loading to `SuggestionsPage.tsx`
+- [ ] Add skeleton loading to `MemoryScrobblePage.tsx`
+
+**Files:** `src/renderer/pages/TrackDetailPage.tsx`, `ArtistDetailPage.tsx`, `SuggestionsPage.tsx`, `MemoryScrobblePage.tsx`
+
+---
+
+### M21. Z-index scale tokens
+
+**Severity**: Medium | **Effort**: Low | **Quick Win**: Yes
+
+Z-index uses ad-hoc raw values (1, 2, 100, 1000, 9999) with no centralized scale.
+
+**Action:**
+- [ ] Add z-index tokens to `styles.css`: `--z-dropdown: 100`, `--z-sticky: 200`, `--z-modal: 1000`, `--z-toast: 9999`
+- [ ] Replace raw z-index values across all CSS files
+
+**Files:** `src/renderer/styles.css`, all CSS files with z-index
+
+---
+
+### M22. Breakpoint scale documentation
+
+**Severity**: Medium | **Effort**: Low | **Quick Win**: Yes
+
+Media query breakpoints (mostly 768px, 900px) are undocumented with minor variance.
+
+**Action:**
+- [ ] Document breakpoint scale in `styles.css` as comments or custom properties
+
+**Files:** `src/renderer/styles.css`
+
+---
+
+### M23. Notification system consolidation
+
+**Severity**: Medium | **Effort**: High | **Quick Win**: No
+
+Two competing notification systems: `ToastContext` (ephemeral) and `useNotifications` (persistent/localStorage). Some pages use both, some neither.
+
+**Action:**
+- [ ] Document which system to use for what (short-term)
+- [ ] Consolidate into single system with optional persistence (long-term)
+
+**Files:** `src/renderer/context/ToastContext.tsx`, `src/renderer/hooks/useNotifications.ts`
+
+---
+
+### M24. Destructive actions missing confirmation dialogs
+
+**Severity**: Medium | **Effort**: Medium | **Quick Win**: No
+
+`useConfirmModal` exists but only 3 pages use it. 5+ pages with destructive actions (delete, remove, clear) skip confirmation.
+
+**Action:**
+- [ ] Audit all pages with destructive actions
+- [ ] Add `useConfirmModal` to each
+
+---
+
+### M25. Standardize route handlers on apiResponse helpers
+
+**Severity**: Medium | **Effort**: Medium | **Quick Win**: No
+
+Only 3 of ~15+ route files use `sendError`/`sendSuccess` from `src/backend/utils/apiResponse.ts`. Rest use inline `res.status().json()`.
+
+**Action:**
+- [ ] Migrate all route handlers to use `sendError`/`sendSuccess`
+
+**Files:** `src/backend/routes/*.ts`
+
+---
+
+### M26. Backend pagination parameter naming
+
+**Severity**: Medium | **Effort**: Medium | **Quick Win**: No
+
+Backend uses `page`+`per_page`, `limit`, and `perPage` interchangeably.
+
+**Action:**
+- [ ] Standardize on `page` + `perPage` naming across all endpoints
+
+---
+
+### M27. statsService silent error swallowing + file size
+
+**Severity**: Medium | **Effort**: High | **Quick Win**: No
+
+`statsService.ts` (2,675 lines) silently catches errors (logging only) while other services rethrow. Also an extreme file size outlier.
+
+**Action:**
+- [ ] Fix silent error catches to propagate to route handlers
+- [ ] Consider splitting into focused sub-services (StreakAnalyzer, DistributionCalculator, etc.)
+
+**Files:** `src/backend/services/statsService.ts`
+
+---
+
+### M28. Page component test coverage
+
+**Severity**: Medium | **Effort**: High | **Quick Win**: No
+
+No page-level component tests exist. Only card/UI primitive components are tested.
+
+**Action:**
+- [ ] Add smoke-render tests for all page components
+
+---
+
+### M29. Frontend service test coverage
+
+**Severity**: Medium | **Effort**: Medium | **Quick Win**: No
+
+Only 2 frontend service test files (`api.test.ts`, `statsApi.test.ts`).
+
+**Action:**
+- [ ] Expand test coverage for other critical frontend services
+
+---
+
+### M30. Keyboard navigation coverage
+
+**Severity**: Medium | **Effort**: Medium | **Quick Win**: No
+
+Only 3 pages use `useTabKeyNavigation`. Most interactive pages lack keyboard support.
+
+**Action:**
+- [ ] Expand `useTabKeyNavigation` usage to all interactive list/table pages
+
+---
+
+### L13. Large service files
+
+**Severity**: Low | **Effort**: High | **Quick Win**: No
+
+`sellerMonitoringService.ts` (2,346 lines) and `releaseTrackingService.ts` (1,547 lines) are large monoliths.
+
+**Action:**
+- [ ] Consider splitting into focused sub-services
+
+---
+
+### L14. Large frontend component files
+
+**Severity**: Low | **Effort**: Medium | **Quick Win**: No
+
+`CollectionPage.tsx` (1,889 lines), `ReleaseDetailsPage.tsx` (1,698 lines), `SettingsMappingsSection.tsx` (1,153 lines), `SavedCollectionManager.tsx` (1,081 lines).
+
+**Action:**
+- [ ] Consider extracting sub-components to reduce file size
+
+---
+
+### L15. Context/hook test coverage
+
+**Severity**: Low | **Effort**: Medium | **Quick Win**: No
+
+No tests for `ToastContext`, `useNotifications`, or most custom hooks (only `useKeyboardShortcuts` tested).
+
+**Action:**
+- [ ] Add tests for shared contexts and hooks
+
+---
+
+### L16. E2E test coverage
+
+**Severity**: Low | **Effort**: High | **Quick Win**: No
+
+Only 17 Playwright tests covering basic navigation and page loads.
+
+**Action:**
+- [ ] Expand E2E coverage for critical user flows (scrobbling, collection management)
+
+---
+
+### L17. Icon-only button aria-label audit
+
+**Severity**: Low | **Effort**: Low | **Quick Win**: Yes
+
+Some icon-only buttons may be missing `aria-label` attributes.
+
+**Action:**
+- [ ] Audit all icon-only buttons across components
+- [ ] Add missing `aria-label` attributes
 
 ---
 

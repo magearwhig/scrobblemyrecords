@@ -162,3 +162,46 @@ This app has several mapping layers that translate between Discogs and Last.fm d
 **Methods that correctly use this pattern:** `getCollectionCoverage()`, `getDustyCorners()`, `getHeavyRotation()`, `getTopAlbums()`, `getArtistDetail()`, `getTrackDetail()`, dashboard recent albums route, AI suggestion avoid-set (suggestions route), `ImageService.getAlbumCoverFromCollection()`.
 
 When implementing features that display or process tracks/artists, check if any of these mappings should be applied. The `trackNormalization.ts` utilities help with fuzzy matching.
+
+---
+
+## Codebase Consistency Rules (Audit 2026-03-22)
+
+### Service Initialization
+- All services must use constructor-based dependency injection
+- Do not use singleton module-level instances or lazy setter patterns
+
+### Error Propagation
+- Services should throw typed errors up to route handlers — do not silently swallow errors in service layers
+- Route handlers catch and return structured `{ success, error }` responses
+
+### API Response Helpers
+- Use `sendError`/`sendSuccess` from `src/backend/utils/apiResponse.ts` in all route handlers
+
+### Notifications
+- Use `ToastContext` for all user-facing notifications
+- Do not use `useNotifications` (persistent/localStorage) for new features
+
+### Design Tokens: Z-index, Breakpoints, Warning Color
+- All z-index values must use scale tokens: `--z-dropdown: 100`, `--z-sticky: 200`, `--z-modal: 1000`, `--z-toast: 9999`
+- Use `--accent-warning` for warning-colored UI
+- Use documented breakpoint scale: `768px` (tablet), `900px` (desktop)
+
+### Loading States
+- All pages that fetch data must show skeleton/placeholder UI during loading
+- Use the `Skeleton` component from `src/renderer/components/ui/Skeleton.tsx`
+
+### Keyboard Navigation
+- All interactive lists and data tables must support keyboard navigation via `useTabKeyNavigation` or equivalent
+
+### Destructive Actions
+- All destructive actions (delete, remove, clear, reset) must show a confirmation dialog via `useConfirmModal` before executing
+
+### Pagination
+- Use `page` + `perPage` as the standard pagination parameter names across all APIs
+- All data-heavy list pages (>100 items) should implement pagination
+
+### Search & Filter
+- Use the `SearchBar` component with debounce for all search/filter inputs
+- Do not implement inline search with raw input handlers
+
