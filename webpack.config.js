@@ -1,106 +1,119 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const TerserPlugin = require('terser-webpack-plugin');
 const webpack = require('webpack');
 require('dotenv').config();
 
-const isDev = process.env.NODE_ENV === 'development';
 const FRONTEND_PORT = parseInt(process.env.FRONTEND_PORT || '8080', 10);
 const BACKEND_PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT || '3001', 10);
 
-// Web app configuration (formerly renderer config)
-const webConfig = {
-  mode: isDev ? 'development' : 'production',
-  entry: './src/renderer/index.tsx',
-  target: 'web',
-  devtool: isDev ? 'source-map' : false,
-  module: {
-    rules: [
-      {
-        test: /\.tsx?$/,
-        use: {
-          loader: 'swc-loader',
-          options: {
-            jsc: {
-              parser: {
-                syntax: 'typescript',
-                tsx: true,
-              },
-              transform: {
-                react: {
-                  runtime: 'automatic',
+// Export a function so webpack passes the --mode flag to us
+module.exports = (env, argv) => {
+  const isDev = (argv.mode || 'development') !== 'production';
+
+  return {
+    mode: isDev ? 'development' : 'production',
+    entry: './src/renderer/index.tsx',
+    target: 'web',
+    devtool: isDev ? 'eval-source-map' : false,
+    module: {
+      rules: [
+        {
+          test: /\.tsx?$/,
+          use: {
+            loader: 'swc-loader',
+            options: {
+              jsc: {
+                parser: {
+                  syntax: 'typescript',
+                  tsx: true,
+                },
+                transform: {
+                  react: {
+                    runtime: 'automatic',
+                  },
                 },
               },
             },
           },
+          exclude: /node_modules/,
         },
-        exclude: /node_modules/,
+        {
+          test: /\.css$/,
+          use: ['style-loader', 'css-loader'],
+        },
+        {
+          test: /\.(png|jpe?g|gif|svg)$/,
+          type: 'asset/resource',
+        },
+      ],
+    },
+    resolve: {
+      extensions: ['.tsx', '.ts', '.js', '.jsx'],
+    },
+    output: {
+      filename: '[name].[contenthash].js',
+      chunkFilename: '[name].[contenthash].chunk.js',
+      path: path.resolve(__dirname, 'dist/web'),
+      clean: true,
+      publicPath: '/',
+      environment: {
+        globalThis: true,
       },
-      {
-        test: /\.css$/,
-        use: ['style-loader', 'css-loader'],
+    },
+    optimization: {
+      runtimeChunk: 'single',
+      minimizer: isDev
+        ? []
+        : [
+            new TerserPlugin({
+              minify: TerserPlugin.swcMinify,
+              terserOptions: {
+                compress: true,
+                mangle: true,
+              },
+            }),
+          ],
+      splitChunks: {
+        chunks: 'all',
+        cacheGroups: {
+          vendor: {
+            test: /[\\/]node_modules[\\/]/,
+            name: 'vendors',
+            chunks: 'all',
+            priority: 10,
+          },
+          recharts: {
+            test: /[\\/]node_modules[\\/](recharts|d3-.*|victory-.*)[\\/]/,
+            name: 'recharts',
+            chunks: 'all',
+            priority: 20,
+          },
+        },
       },
-      {
-        test: /\.(png|jpe?g|gif|svg)$/,
-        type: 'asset/resource',
-      },
+    },
+    plugins: [
+      new HtmlWebpackPlugin({
+        template: './public/index.html',
+        filename: 'index.html',
+        title: 'Discogs to Last.fm Scrobbler',
+      }),
+      new webpack.DefinePlugin({
+        'process.env.REACT_APP_BACKEND_PORT': JSON.stringify(BACKEND_PORT),
+      }),
     ],
-  },
-  resolve: {
-    extensions: ['.tsx', '.ts', '.js', '.jsx'],
-  },
-  output: {
-    filename: '[name].[contenthash].js',
-    chunkFilename: '[name].[contenthash].chunk.js',
-    path: path.resolve(__dirname, 'dist/web'),
-    clean: true,
-    publicPath: '/',
-    environment: {
-      globalThis: true,
+    performance: {
+      // Local-first app — default 244 KiB thresholds are for public websites
+      hints: false,
     },
-  },
-  optimization: {
-    runtimeChunk: 'single',
-    splitChunks: {
-      chunks: 'all',
-      cacheGroups: {
-        vendor: {
-          test: /[\\/]node_modules[\\/]/,
-          name: 'vendors',
-          chunks: 'all',
-          priority: 10,
-        },
-        recharts: {
-          test: /[\\/]node_modules[\\/](recharts|d3-.*|victory-.*)[\\/]/,
-          name: 'recharts',
-          chunks: 'all',
-          priority: 20,
-        },
+    devServer: {
+      port: FRONTEND_PORT,
+      hot: true,
+      static: {
+        directory: path.join(__dirname, 'public'),
       },
+      historyApiFallback: true,
+      open: true,
     },
-  },
-  plugins: [
-    new HtmlWebpackPlugin({
-      template: './public/index.html',
-      filename: 'index.html',
-      title: 'Discogs to Last.fm Scrobbler',
-    }),
-    new webpack.DefinePlugin({
-      'process.env.REACT_APP_BACKEND_PORT': JSON.stringify(BACKEND_PORT),
-    }),
-  ],
-  performance: {
-    // Local-first app — default 244 KiB thresholds are for public websites
-    hints: false,
-  },
-  devServer: {
-    port: FRONTEND_PORT,
-    hot: true,
-    static: {
-      directory: path.join(__dirname, 'public'),
-    },
-    historyApiFallback: true,
-    open: true,
-  },
+  };
 };
-
-module.exports = webConfig;
