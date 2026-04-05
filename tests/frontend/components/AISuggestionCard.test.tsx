@@ -241,14 +241,14 @@ describe('AISuggestionCard', () => {
   });
 
   describe('actions', () => {
-    it('should navigate to collection when View in Collection is clicked', async () => {
+    it('should navigate to release details when View in Collection is clicked', async () => {
       render(<AISuggestionCard suggestion={mockSuggestion} />);
 
       await user.click(
         screen.getByRole('button', { name: 'View in Collection' })
       );
 
-      expect(window.location.hash).toBe('#collection?highlight=123');
+      expect(window.location.hash).toBe('#release-details');
     });
 
     it('should navigate to release details when Details is clicked', async () => {
@@ -267,26 +267,24 @@ describe('AISuggestionCard', () => {
       expect(window.location.hash).toBe('#release-details');
     });
 
-    it('should not navigate when album id is falsy', async () => {
-      const noIdSuggestion = {
+    it('should render empty state when release is missing', () => {
+      const noReleaseSuggestion = {
         album: {
-          id: 0, // Use falsy id
+          id: 123,
           folder_id: 0,
           rating: 4,
           date_added: '2024-01-01T00:00:00Z',
-          release: mockRelease,
+          release: undefined,
         },
         reasoning: mockSuggestion.reasoning,
         confidence: mockSuggestion.confidence,
       } as unknown as AISuggestion;
-      render(<AISuggestionCard suggestion={noIdSuggestion} />);
+      render(<AISuggestionCard suggestion={noReleaseSuggestion} />);
 
-      await user.click(
-        screen.getByRole('button', { name: 'View in Collection' })
-      );
-
-      // Hash should be empty since navigation didn't happen (id is falsy)
-      expect(window.location.hash).toBe('');
+      // No action buttons rendered in empty state
+      expect(
+        screen.queryByRole('button', { name: 'View in Collection' })
+      ).not.toBeInTheDocument();
     });
 
     it('should show refresh button when onRefresh is provided', async () => {

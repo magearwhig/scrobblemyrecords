@@ -26,8 +26,9 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
   const release = album?.release;
 
   const handleViewInCollection = () => {
-    if (album?.id) {
-      navigate(`collection?highlight=${album.id}`);
+    if (release) {
+      localStorage.setItem('selectedRelease', JSON.stringify(release));
+      navigate('release-details');
     }
   };
 

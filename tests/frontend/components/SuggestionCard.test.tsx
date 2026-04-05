@@ -225,13 +225,13 @@ describe('SuggestionCard', () => {
     expect(screen.getByText(/2020.*•.*Vinyl/)).toBeInTheDocument();
   });
 
-  it('navigates to collection when View in Collection is clicked', async () => {
+  it('navigates to release details when View in Collection is clicked', async () => {
     render(<SuggestionCard suggestion={mockSuggestion} />);
 
     const viewButton = screen.getByText('View in Collection');
     await user.click(viewButton);
 
-    expect(window.location.hash).toBe('#collection?highlight=123');
+    expect(window.location.hash).toBe('#release-details');
   });
 
   it('stores release data and navigates when Details button is clicked', async () => {

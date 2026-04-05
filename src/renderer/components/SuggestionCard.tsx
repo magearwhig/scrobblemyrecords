@@ -73,8 +73,8 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
   };
 
   const handleViewInCollection = () => {
-    // Navigate to collection with this album highlighted using hash routing
-    navigate(`collection?highlight=${album.id}`);
+    localStorage.setItem('selectedRelease', JSON.stringify(release));
+    navigate('release-details');
   };
 
   const handleViewDetails = () => {
