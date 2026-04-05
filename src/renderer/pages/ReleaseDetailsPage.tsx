@@ -1,4 +1,11 @@
-import { AlertTriangle, Check, Package, Play, XCircle } from 'lucide-react';
+import {
+  AlertTriangle,
+  Check,
+  ExternalLink,
+  Package,
+  Play,
+  XCircle,
+} from 'lucide-react';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import './ReleaseDetailsPage.page.css';
 
@@ -970,7 +977,7 @@ const ReleaseDetailsPage: React.FC = () => {
               )}
             </div>
 
-            {/* Play on Spotify button */}
+            {/* Play on Spotify / View on Discogs buttons */}
             <div className='release-details-button-container'>
               <Button
                 variant='outline'
@@ -983,6 +990,15 @@ const ReleaseDetailsPage: React.FC = () => {
               >
                 <Play size={14} aria-hidden='true' /> Play on Spotify
               </Button>
+              <a
+                href={`https://www.discogs.com/release/${release.id}`}
+                target='_blank'
+                rel='noopener noreferrer'
+              >
+                <Button variant='outline' size='small' title='View on Discogs'>
+                  <ExternalLink size={14} aria-hidden='true' /> View on Discogs
+                </Button>
+              </a>
             </div>
 
             {/* Discard pile button */}
