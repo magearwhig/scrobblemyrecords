@@ -114,7 +114,7 @@ export default function createCollectionRouter(
               'Refreshing collection cache...'
             );
             discogsService
-              .preloadAllCollectionPages(username)
+              .preloadAllCollectionPages(username, forceReload)
               .then(() =>
                 jobStatusService.completeJob(
                   jobId,
@@ -173,7 +173,7 @@ export default function createCollectionRouter(
           'Fetching collection from Discogs...'
         );
         discogsService
-          .preloadAllCollectionPages(username)
+          .preloadAllCollectionPages(username, forceReload)
           .then(() =>
             jobStatusService.completeJob(
               jobId,

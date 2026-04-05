@@ -472,7 +472,10 @@ export class DiscogsService {
     }
   }
 
-  async preloadAllCollectionPages(username: string): Promise<void> {
+  async preloadAllCollectionPages(
+    username: string,
+    forceReload: boolean = false
+  ): Promise<void> {
     const progressKey = `collections/${username}-progress.json`;
 
     // Check if preloading is already in progress for this user
@@ -495,7 +498,11 @@ export class DiscogsService {
       const existingProgress =
         await this.fileStorage.readJSON<DiscogsCollectionProgress>(progressKey);
 
-      if (existingProgress && existingProgress.status === 'completed') {
+      if (
+        !forceReload &&
+        existingProgress &&
+        existingProgress.status === 'completed'
+      ) {
         // Check if the cache is still recent (less than 12 hours old)
         const cacheAge = Date.now() - (existingProgress.endTime || 0);
         if (cacheAge < 43200000) {
@@ -775,14 +782,14 @@ export class DiscogsService {
   async clearCache(): Promise<void> {
     try {
       const files = await this.fileStorage.listFiles('collections');
-      // Only delete collection page cache files (username-page-N.json)
-      // Don't delete progress files, backup files, or other files in the directory
-      const cacheFiles = files.filter(file =>
-        file.match(/^[^-]+-page-\d+\.json$/)
+      // Delete collection page cache files and progress files
+      const cacheFiles = files.filter(
+        file =>
+          file.match(/^[^-]+-page-\d+\.json$/) || file.match(/-progress\.json$/)
       );
 
       this.logger.info(
-        `Clearing ${cacheFiles.length} collection cache files (${files.length} total files in directory)`
+        `Clearing ${cacheFiles.length} collection cache/progress files (${files.length} total files in directory)`
       );
 
       for (const file of cacheFiles) {
