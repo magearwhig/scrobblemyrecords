@@ -230,6 +230,32 @@ export default function createSellersRouter(
   // Routes with specific path prefixes + params
   // ============================================
 
+  // POST /api/v1/sellers/:username/scan - Scan a single seller
+  router.post('/:username/scan', async (req, res) => {
+    try {
+      const { username } = req.params;
+
+      if (!validateUsername(username)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid username format',
+        });
+      }
+
+      const status =
+        await sellerMonitoringService.startSingleSellerScan(username);
+      res.json({ success: true, data: status });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      const statusCode = message.includes('not found') ? 404 : 500;
+      logger.error('Error starting single seller scan', error);
+      res.status(statusCode).json({
+        success: false,
+        error: message,
+      });
+    }
+  });
+
   // POST /api/v1/sellers/matches/:matchId/seen - Mark as seen
   router.post('/matches/:matchId/seen', async (req, res) => {
     try {

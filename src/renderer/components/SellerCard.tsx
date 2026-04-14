@@ -10,6 +10,8 @@ interface SellerCardProps {
   formatRelativeTime: (timestamp: number) => string;
   onRemove: (username: string) => void;
   removing: boolean;
+  onScan: (username: string) => void;
+  scanDisabled: boolean;
 }
 
 const SellerCard: React.FC<SellerCardProps> = ({
@@ -17,7 +19,14 @@ const SellerCard: React.FC<SellerCardProps> = ({
   formatRelativeTime,
   onRemove,
   removing,
+  onScan,
+  scanDisabled,
 }) => {
+  const lastActivity = Math.max(
+    seller.lastScanned || 0,
+    seller.lastQuickCheck || 0
+  );
+
   return (
     <div className='seller-card'>
       <div className='seller-card-header'>
@@ -33,11 +42,18 @@ const SellerCard: React.FC<SellerCardProps> = ({
         </div>
       </div>
       <div className='seller-card-meta'>
-        {seller.lastScanned
-          ? `Last scanned: ${formatRelativeTime(seller.lastScanned)}`
+        {lastActivity > 0
+          ? `Last scanned: ${formatRelativeTime(lastActivity)}`
           : 'Not yet scanned'}
       </div>
       <div className='seller-card-actions'>
+        <Button
+          size='small'
+          onClick={() => onScan(seller.username)}
+          disabled={scanDisabled}
+        >
+          Scan
+        </Button>
         {(seller.matchCount || 0) > 0 && (
           <Button
             size='small'

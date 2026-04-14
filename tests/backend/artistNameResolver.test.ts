@@ -526,6 +526,57 @@ describe('ArtistNameResolver', () => {
     });
   });
 
+  describe('compilation album handling', () => {
+    it('should not link different artists via "Various" collection artist', async () => {
+      // Arrange - simulate a compilation album where multiple track artists
+      // are mapped to collectionArtist "Various"
+      mockMappingService.getAllAlbumMappings.mockResolvedValue([
+        createAlbumMapping({
+          historyArtist: 'DJ Quik',
+          historyAlbum: 'Murder Was The Case (The Soundtrack)',
+          collectionArtist: 'Various',
+        }),
+        createAlbumMapping({
+          historyArtist: 'Young Soldierz',
+          historyAlbum: 'Murder Was The Case (The Soundtrack)',
+          collectionArtist: 'Various',
+        }),
+        createAlbumMapping({
+          historyArtist: 'Snoop Dogg',
+          historyAlbum: 'Murder Was The Case (The Soundtrack)',
+          collectionArtist: 'Various',
+        }),
+      ]);
+
+      // Act
+      await resolver.rebuild();
+
+      // Assert - these are all different artists, not aliases
+      expect(resolver.areSameArtist('DJ Quik', 'Young Soldierz')).toBe(false);
+      expect(resolver.areSameArtist('DJ Quik', 'Snoop Dogg')).toBe(false);
+      expect(resolver.areSameArtist('Young Soldierz', 'Snoop Dogg')).toBe(
+        false
+      );
+    });
+
+    it('should not link different artists via "Various Artists" collection artist', async () => {
+      mockMappingService.getAllAlbumMappings.mockResolvedValue([
+        createAlbumMapping({
+          historyArtist: 'Artist A',
+          collectionArtist: 'Various Artists',
+        }),
+        createAlbumMapping({
+          historyArtist: 'Artist B',
+          collectionArtist: 'Various Artists',
+        }),
+      ]);
+
+      await resolver.rebuild();
+
+      expect(resolver.areSameArtist('Artist A', 'Artist B')).toBe(false);
+    });
+  });
+
   describe('rebuild', () => {
     it('should clear and rebuild from scratch', async () => {
       // Arrange - build with some mappings

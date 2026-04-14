@@ -56,6 +56,7 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
     staleMasters: number;
   } | null>(null);
   const [refreshingCache, setRefreshingCache] = useState(false);
+  const [cacheMessage, setCacheMessage] = useState<string | null>(null);
 
   // Load sellers
   const loadSellers = useCallback(async () => {
@@ -233,7 +234,7 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
     }
   };
 
-  // Handle trigger scan
+  // Handle trigger scan (all sellers)
   const handleTriggerScan = async (forceFresh = false) => {
     try {
       // If cache is empty, auto-refresh it first
@@ -250,6 +251,31 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
       }
 
       const status = await api.triggerSellerScan(forceFresh);
+      setScanStatus(status);
+    } catch (err) {
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to start scan'
+      );
+    }
+  };
+
+  // Handle scan single seller
+  const handleScanSeller = async (username: string) => {
+    try {
+      // If cache is empty, auto-refresh it first
+      if (cacheStats && cacheStats.totalMasters === 0) {
+        setRefreshingCache(true);
+        try {
+          await api.refreshReleaseCache();
+          const newStats = await api.getReleaseCacheStats();
+          setCacheStats(newStats);
+        } finally {
+          setRefreshingCache(false);
+        }
+      }
+
+      const status = await api.triggerSingleSellerScan(username);
       setScanStatus(status);
     } catch (err) {
       showToast(
@@ -281,19 +307,24 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
   const handleRefreshCache = async () => {
     try {
       setRefreshingCache(true);
+      setCacheMessage(null);
       const result = await api.refreshReleaseCache();
-      addNotification(
-        createSuccessNotification(
-          'Master/Release Cache Refreshed',
-          `Processed ${result.mastersProcessed} masters, added ${result.releasesAdded} releases`
-        )
-      );
+      if (result.mastersProcessed === 0 && result.mastersSkipped > 0) {
+        setCacheMessage('Cache is already up to date');
+      } else {
+        setCacheMessage(
+          `Processed ${result.mastersProcessed} masters, added ${result.releasesAdded} releases${
+            result.mastersSkipped > 0
+              ? ` (${result.mastersSkipped} already cached)`
+              : ''
+          }`
+        );
+      }
       // Reload cache stats
       const newStats = await api.getReleaseCacheStats();
       setCacheStats(newStats);
     } catch (err) {
-      showToast(
-        'error',
+      setCacheMessage(
         err instanceof Error ? err.message : 'Failed to refresh cache'
       );
     } finally {
@@ -476,6 +507,9 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
                 Last updated: {formatRelativeTime(cacheStats.lastUpdated)}
               </span>
             )}
+            {cacheMessage && (
+              <span className='sellers-cache-updated'>{cacheMessage}</span>
+            )}
           </div>
           {refreshingCache && (
             <div className='sellers-scan-progress'>
@@ -631,6 +665,12 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
               formatRelativeTime={formatRelativeTime}
               onRemove={handleRemoveSeller}
               removing={removingUsername === seller.username}
+              onScan={handleScanSeller}
+              scanDisabled={
+                scanStatus?.status === 'scanning' ||
+                scanStatus?.status === 'matching' ||
+                refreshingCache
+              }
             />
           ))}
         </div>

@@ -1367,6 +1367,13 @@ class ApiService {
     return response.data.data;
   }
 
+  async triggerSingleSellerScan(username: string): Promise<SellerScanStatus> {
+    const response = await this.api.post(
+      `/sellers/${encodeURIComponent(username)}/scan`
+    );
+    return response.data.data;
+  }
+
   async getSellerScanStatus(): Promise<SellerScanStatus> {
     const response = await this.api.get('/sellers/scan/status');
     return response.data.data;
@@ -1439,6 +1446,8 @@ class ApiService {
     mastersProcessed: number;
     releasesAdded: number;
     staleRefreshed: number;
+    mastersSkipped: number;
+    totalReleases: number;
   }> {
     // This can take a long time - increase timeout
     const response = await this.api.post(

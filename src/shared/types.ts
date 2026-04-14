@@ -1212,6 +1212,8 @@ export interface SellerScanStatus {
     limit: number;
     isThrottled: boolean;
   };
+  // Set when scanning a single seller (vs all sellers)
+  targetSeller?: string;
 }
 
 /**

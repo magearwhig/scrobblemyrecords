@@ -30,9 +30,6 @@ const STALE_MATCH_PRUNE_DAYS = 30;
 // Retry constants for rate limiting
 const MAX_RETRIES = 3;
 
-// Rate limit delay between API calls (in addition to existing 1s interceptor)
-const API_CALL_DELAY_MS = 200;
-
 // How old a master's cached releases can be before we refresh them (in days)
 // This catches new pressings/reissues for albums already in the cache
 const MASTER_RELEASE_REFRESH_DAYS = 30;
@@ -345,6 +342,10 @@ export class SellerMonitoringService {
   ): Promise<void> {
     const current = await this.getScanStatus();
     const updated = { ...current, ...update };
+    // Clear matching progress when transitioning to scanning phase
+    if (updated.status === 'scanning') {
+      delete updated.matchingProgress;
+    }
     await this.fileStorage.writeJSON(this.SCAN_STATUS_FILE, updated);
   }
 
@@ -1335,9 +1336,6 @@ export class SellerMonitoringService {
       let isFirstRelease = true;
 
       while (hasMore) {
-        // Rate limit delay
-        await new Promise(resolve => setTimeout(resolve, API_CALL_DELAY_MS));
-
         const response = await this.executeWithRetry(
           () =>
             this.axios.get(`/masters/${masterId}/versions`, {
@@ -1388,6 +1386,8 @@ export class SellerMonitoringService {
     mastersProcessed: number;
     releasesAdded: number;
     staleRefreshed: number;
+    mastersSkipped: number;
+    totalReleases: number;
   }> {
     await this.loadReleaseCache();
     const wishlistMasterIds = await this.getWishlistMasterIds();
@@ -1400,6 +1400,7 @@ export class SellerMonitoringService {
     );
 
     let mastersProcessed = 0;
+    let mastersSkipped = 0;
     let staleRefreshed = 0;
     let releasesAdded = 0;
     const startReleaseCount = Object.keys(
@@ -1417,6 +1418,7 @@ export class SellerMonitoringService {
         this.logger.debug(
           `Skipping master ${masterId} - have ${existingReleases} releases, fetched ${Math.round((now - fetchedAt) / (24 * 60 * 60 * 1000))} days ago`
         );
+        mastersSkipped++;
         continue;
       }
 
@@ -1441,14 +1443,21 @@ export class SellerMonitoringService {
 
     await this.saveReleaseCache();
 
-    releasesAdded =
-      Object.keys(this.releaseCache!.releaseToMaster).length -
-      startReleaseCount;
+    const totalReleases = Object.keys(
+      this.releaseCache!.releaseToMaster
+    ).length;
+    releasesAdded = totalReleases - startReleaseCount;
     this.logger.info(
-      `Release cache refresh complete: ${mastersProcessed} masters processed, ${staleRefreshed} stale refreshed, ${releasesAdded} new releases added`
+      `Release cache refresh complete: ${mastersProcessed} masters processed, ${mastersSkipped} skipped (up to date), ${staleRefreshed} stale refreshed, ${releasesAdded} new releases added`
     );
 
-    return { mastersProcessed, releasesAdded, staleRefreshed };
+    return {
+      mastersProcessed,
+      releasesAdded,
+      staleRefreshed,
+      mastersSkipped,
+      totalReleases,
+    };
   }
 
   /**
@@ -1520,13 +1529,16 @@ export class SellerMonitoringService {
     staleMasters: number;
   }> {
     const cache = await this.loadReleaseCache();
+    const wishlistMasterIds = await this.getWishlistMasterIds();
     const now = Date.now();
     const staleThreshold =
       now - MASTER_RELEASE_REFRESH_DAYS * 24 * 60 * 60 * 1000;
 
+    // Only count stale masters that are still on the wishlist
     let staleMasters = 0;
-    for (const data of Object.values(cache.masterToReleases)) {
-      if (data.fetchedAt < staleThreshold) {
+    for (const masterId of wishlistMasterIds) {
+      const data = cache.masterToReleases[masterId];
+      if (data && data.fetchedAt < staleThreshold) {
         staleMasters++;
       }
     }
@@ -1858,6 +1870,7 @@ export class SellerMonitoringService {
     );
 
     await this.updateScanStatus({
+      status: 'scanning',
       currentSeller: seller.displayName || seller.username,
     });
 
@@ -2166,6 +2179,51 @@ export class SellerMonitoringService {
   }
 
   /**
+   * Start a scan for a single seller (background).
+   * Always treats as forceFresh since the user explicitly requested this seller.
+   */
+  async startSingleSellerScan(username: string): Promise<SellerScanStatus> {
+    if (this.scanInProgress) {
+      this.logger.warn('Scan already in progress');
+      return this.getScanStatus();
+    }
+
+    const sellers = await this.getSellers();
+    const seller = sellers.find(
+      s => s.username.toLowerCase() === username.toLowerCase()
+    );
+    if (!seller) {
+      throw new Error(`Seller ${username} not found`);
+    }
+
+    this.scanInProgress = true;
+    this.scanAborted = false;
+
+    const initialStatus: SellerScanStatus = {
+      status: 'scanning',
+      progress: 0,
+      sellersScanned: 0,
+      totalSellers: 1,
+      newMatches: 0,
+      targetSeller: username,
+    };
+    await this.updateScanStatus(initialStatus);
+
+    // Always forceFresh=true for single-seller scans
+    this.runScanInBackground([seller], true).catch(error => {
+      this.logger.error('Background single-seller scan failed', error);
+      this.updateScanStatus({
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      this.scanInProgress = false;
+      this.scanAborted = false;
+    });
+
+    return initialStatus;
+  }
+
+  /**
    * Cancel a running scan. The scan will stop within one iteration of the
    * matching loop, save partial progress, and transition to 'cancelled' status.
    * Returns true if a scan was running and cancellation was requested.
@@ -2300,6 +2358,16 @@ export class SellerMonitoringService {
 
         totalNewMatches += newMatches.length;
 
+        // Save sellers incrementally so timestamps aren't lost if a later seller errors
+        const sellersStore: MonitoredSellersStore = {
+          schemaVersion: 1,
+          sellers,
+        };
+        await this.fileStorage.writeJSONWithBackup(
+          this.SELLERS_FILE,
+          sellersStore
+        );
+
         await this.updateScanStatus({
           sellersScanned: i + 1,
           progress: Math.round(((i + 1) / sellers.length) * 100),
@@ -2307,17 +2375,7 @@ export class SellerMonitoringService {
         });
       }
 
-      // Save updated sellers
-      const sellersStore: MonitoredSellersStore = {
-        schemaVersion: 1,
-        sellers,
-      };
-      await this.fileStorage.writeJSONWithBackup(
-        this.SELLERS_FILE,
-        sellersStore
-      );
-
-      // Save updated matches (includes sold matches that were marked during scanning)
+      // Save final matches (includes sold matches that were marked during scanning)
       matchesStore.lastUpdated = Date.now();
       await this.fileStorage.writeJSONWithBackup(
         this.MATCHES_FILE,

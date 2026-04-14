@@ -168,10 +168,17 @@ export class ArtistNameResolver {
     );
 
     // 3. Read mappingService album mappings -> union artists that differ
+    //    Skip generic compilation artists (e.g. "Various") to avoid transitively
+    //    linking all artists from a compilation into one equivalence class.
+    const GENERIC_COLLECTION_ARTISTS = new Set(['various', 'various artists']);
     const albumMappings = await this.mappingService.getAllAlbumMappings();
     let albumArtistUnions = 0;
     for (const mapping of albumMappings) {
       if (!mapping.historyArtist || !mapping.collectionArtist) continue;
+      if (
+        GENERIC_COLLECTION_ARTISTS.has(mapping.collectionArtist.toLowerCase())
+      )
+        continue;
       if (
         mapping.historyArtist.toLowerCase() !==
         mapping.collectionArtist.toLowerCase()
