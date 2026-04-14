@@ -1628,17 +1628,20 @@ describe('DiscogsService', () => {
 
     it('should not delete non-cache files', async () => {
       mockFileStorage.listFiles.mockResolvedValue([
-        'test-page-1.json', // Should be deleted
-        'test-progress.json', // Should NOT be deleted
+        'test-page-1.json', // Should be deleted (page cache)
+        'test-progress.json', // Should be deleted (progress file)
         'backup-file.json', // Should NOT be deleted
-        'user-page-2.json', // Should be deleted
+        'user-page-2.json', // Should be deleted (page cache)
       ]);
 
       await discogsService.clearCache();
 
-      expect(mockFileStorage.delete).toHaveBeenCalledTimes(2);
+      expect(mockFileStorage.delete).toHaveBeenCalledTimes(3);
       expect(mockFileStorage.delete).toHaveBeenCalledWith(
         'collections/test-page-1.json'
+      );
+      expect(mockFileStorage.delete).toHaveBeenCalledWith(
+        'collections/test-progress.json'
       );
       expect(mockFileStorage.delete).toHaveBeenCalledWith(
         'collections/user-page-2.json'

@@ -508,6 +508,14 @@ export default function createScrobbleRouter(
           });
         }
 
+        // Check if session is already completed
+        if (session.status === 'completed') {
+          return res.status(400).json({
+            success: false,
+            error: 'Cannot resubmit completed sessions',
+          });
+        }
+
         // Check if there are any non-successful tracks to retry
         const failedTracks = session.tracks.filter(
           t => t.scrobbleStatus !== 'success'

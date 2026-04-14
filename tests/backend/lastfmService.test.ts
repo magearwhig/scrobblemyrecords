@@ -911,13 +911,20 @@ describe('LastFmService', () => {
   });
 
   describe('resubmitTracks', () => {
-    const mockTracks = [
-      { artist: 'Artist 1', track: 'Track 1', timestamp: 1234567890 },
-      { artist: 'Artist 2', track: 'Track 2', timestamp: 1234567891 },
-    ];
+    let mockTracks: {
+      artist: string;
+      track: string;
+      timestamp: number;
+      scrobbleStatus?: 'success' | 'failed' | 'ignored';
+    }[];
 
     beforeEach(() => {
       process.env.LASTFM_SECRET = 'testsecret';
+      // Fresh tracks each test — resubmitTracks mutates scrobbleStatus in place
+      mockTracks = [
+        { artist: 'Artist 1', track: 'Track 1', timestamp: 1234567890 },
+        { artist: 'Artist 2', track: 'Track 2', timestamp: 1234567891 },
+      ];
     });
 
     afterEach(() => {

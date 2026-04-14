@@ -833,7 +833,7 @@ describe('Scrobble Routes', () => {
       const mockSession = {
         id: 'test-session',
         status: 'failed',
-        tracks: [],
+        tracks: [{ title: 'Track 1', scrobbleStatus: 'failed' }],
       };
       mockFileStorage.readJSON = jest.fn().mockResolvedValue(mockSession);
       mockLastFmService.testConnection.mockResolvedValue({

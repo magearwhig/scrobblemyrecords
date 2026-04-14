@@ -1411,7 +1411,8 @@ describe('CollectionAnalyticsService', () => {
     });
 
     it('should return stored scan status', async () => {
-      // Arrange
+      // Arrange - simulate an active scan in memory so stale detection doesn't reset it
+      (service as unknown as { scanning: boolean }).scanning = true;
       const storedStatus = {
         schemaVersion: 1,
         status: {
@@ -1433,6 +1434,9 @@ describe('CollectionAnalyticsService', () => {
       expect(result.totalItems).toBe(20);
       expect(result.progress).toBe(25);
       expect(result.currentItem).toBe('Radiohead - OK Computer');
+
+      // Cleanup
+      (service as unknown as { scanning: boolean }).scanning = false;
     });
   });
 

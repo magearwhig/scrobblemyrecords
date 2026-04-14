@@ -16,6 +16,7 @@ const mockApiService = {
   scrobbleBatch: jest.fn(),
   getScrobbleProgress: jest.fn(),
   getReleaseDetails: jest.fn(),
+  getMarketplaceStats: jest.fn().mockResolvedValue(null),
 };
 
 jest.mock('../../../src/renderer/services/api', () => ({
