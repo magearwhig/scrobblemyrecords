@@ -2209,8 +2209,9 @@ export class SellerMonitoringService {
     };
     await this.updateScanStatus(initialStatus);
 
-    // Always forceFresh=true for single-seller scans
-    this.runScanInBackground([seller], true).catch(error => {
+    // Pass full sellers array so incremental saves don't wipe other sellers.
+    // targetUsername ensures only the requested seller is scanned.
+    this.runScanInBackground(sellers, true, username).catch(error => {
       this.logger.error('Background single-seller scan failed', error);
       this.updateScanStatus({
         status: 'error',
@@ -2280,12 +2281,14 @@ export class SellerMonitoringService {
 
   /**
    * Run the scan in the background
-   * @param sellers Pre-fetched list of sellers to scan
+   * @param sellers Pre-fetched list of ALL sellers (for safe incremental saves)
    * @param forceFresh If true, always re-fetch inventory from API
+   * @param targetUsername If set, only scan this seller (skip others)
    */
   private async runScanInBackground(
     sellers: MonitoredSeller[],
-    forceFresh = false
+    forceFresh = false,
+    targetUsername?: string
   ): Promise<void> {
     if (sellers.length === 0) {
       await this.updateScanStatus({
@@ -2324,6 +2327,14 @@ export class SellerMonitoringService {
         }
 
         const seller = sellers[i];
+
+        // Skip non-target sellers when scanning a single seller
+        if (
+          targetUsername &&
+          seller.username.toLowerCase() !== targetUsername.toLowerCase()
+        ) {
+          continue;
+        }
 
         // Determine if full scan is needed based on timing
         const now = Date.now();
