@@ -48,12 +48,35 @@ describe('ArtistMappingService', () => {
   });
 
   describe('getLastfmName', () => {
-    it('should return original name when no mapping exists', () => {
+    it('should return original name when no mapping exists and no disambiguation', () => {
       // Act
       const result = artistMappingService.getLastfmName('Unknown Artist');
 
       // Assert
       expect(result).toBe('Unknown Artist');
+    });
+
+    it('should strip Discogs disambiguation suffix when no mapping exists', () => {
+      expect(artistMappingService.getLastfmName('Tool (2)')).toBe('Tool');
+      expect(artistMappingService.getLastfmName('Discovery (7)')).toBe(
+        'Discovery'
+      );
+      expect(artistMappingService.getLastfmName('Nirvana (12)')).toBe(
+        'Nirvana'
+      );
+    });
+
+    it('should not strip non-numeric parenthesized suffixes', () => {
+      // "Earth, Wind & Fire" should stay as-is — "(2)" pattern is digits only
+      expect(artistMappingService.getLastfmName('Sunn O)))')).toBe('Sunn O)))');
+      expect(artistMappingService.getLastfmName('Artist (UK)')).toBe(
+        'Artist (UK)'
+      );
+    });
+
+    it('should prefer explicit mapping over auto-stripping', () => {
+      artistMappingService.setMapping('Tool (2)', 'Tool');
+      expect(artistMappingService.getLastfmName('Tool (2)')).toBe('Tool');
     });
 
     it('should return mapped name when mapping exists', () => {

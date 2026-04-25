@@ -869,10 +869,11 @@ export class ReleaseTrackingService {
           if (!mapping) {
             // Use Last.fm name mapping if available (cleaner names without Discogs disambiguation)
             // e.g., "Tool (2)" -> "Tool", "Discovery (7)" -> "Discovery"
+            // Note: getLastfmName auto-strips " (N)" suffixes when no explicit mapping exists
             const searchName = artistMappingService.getLastfmName(artist.name);
             if (searchName !== artist.name) {
               this.logger.debug(
-                `Using Last.fm name for search: "${artist.name}" -> "${searchName}"`
+                `Using cleaned name for search: "${artist.name}" -> "${searchName}"`
               );
             }
 

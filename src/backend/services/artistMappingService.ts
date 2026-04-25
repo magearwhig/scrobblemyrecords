@@ -122,7 +122,9 @@ class ArtistMappingService {
       return mappedName;
     }
 
-    return discogsName;
+    // Strip Discogs disambiguation suffix " (N)" when no explicit mapping exists
+    // e.g., "Tool (2)" -> "Tool", "Discovery (7)" -> "Discovery"
+    return discogsName.replace(/\s+\(\d+\)$/, '');
   }
 
   /**
