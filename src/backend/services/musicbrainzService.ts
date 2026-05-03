@@ -40,6 +40,71 @@ interface MBReleaseGroup {
   }>;
 }
 
+/**
+ * Raw MusicBrainz `/release` search result shape (subset).
+ * Returned by the search query against `/ws/2/release`.
+ */
+interface MBReleaseSearchResult {
+  id: string;
+  title: string;
+  status?: string;
+  date?: string;
+  country?: string;
+  packaging?: string;
+  'artist-credit'?: Array<{
+    artist: {
+      id: string;
+      name: string;
+    };
+  }>;
+  'release-group'?: {
+    id: string;
+    title?: string;
+    'primary-type'?: string;
+    'secondary-types'?: string[];
+  };
+  'label-info'?: Array<{
+    label?: {
+      id?: string;
+      name?: string;
+    };
+    'catalog-number'?: string;
+  }>;
+}
+
+/**
+ * Lightweight projection of a MusicBrainz `/release` (individual pressing) entry.
+ * Distinct from MusicBrainzRelease which models a release-group.
+ */
+export interface MBReleaseLite {
+  /** Release MBID (NOT the release-group MBID) */
+  mbid: string;
+  title: string;
+  /** ISO date string (YYYY, YYYY-MM, or YYYY-MM-DD) or null */
+  date: string | null;
+  /** ISO country code (e.g. "US") */
+  country?: string;
+  /** "Official" / "Promotion" / etc. */
+  status?: string;
+  /** Parent release-group MBID — used for reissue detection */
+  releaseGroupMbid: string;
+  releaseGroupTitle?: string;
+  releaseGroupPrimaryType?: string;
+  releaseGroupSecondaryTypes?: string[];
+  /** Mapped release type derived from the release-group's primary/secondary types */
+  releaseType: MusicBrainzRelease['releaseType'];
+  artistName: string;
+  artistMbid: string;
+  /** First non-empty label name from `label-info[]` */
+  labelName?: string;
+  /**
+   * Parent release-group's `first-release-date` (the album's original release year).
+   * Populated by a follow-up `/release-group/{mbid}` lookup after the search call;
+   * may be `null` if the lookup failed or the field was not present on MB.
+   */
+  originalReleaseDate?: string | null;
+}
+
 export class MusicBrainzService {
   private axios: AxiosInstance;
   private coverArtAxios: AxiosInstance;
@@ -279,6 +344,159 @@ export class MusicBrainzService {
         // Will be set properly in ReleaseTrackingService with isUpcoming
       }));
     }, `getRecentAndUpcomingReleases(${artistMbid})`);
+  }
+
+  /**
+   * Get individual releases (pressings) for an artist filtered by `date`.
+   *
+   * Unlike `getRecentAndUpcomingReleases` (which queries `/release-group` by
+   * `firstreleasedate`), this queries `/release` by `date` — the date stamped
+   * on the individual pressing. A 2026 reissue of a 2003 album will appear
+   * here with `date: 2026` even though its release-group's first-release-date
+   * is still 2003. This is how reissues are surfaced.
+   *
+   * Returns a flat list of `MBReleaseLite`. The caller is responsible for
+   * deduping against already-tracked release-groups and for marking entries
+   * as reissues.
+   */
+  async getRecentReleases(
+    artistMbid: string,
+    monthsBack: number = 12
+  ): Promise<MBReleaseLite[]> {
+    // Calculate date range as YYYY-MM (per plan; MB accepts partial dates)
+    const pastDate = new Date();
+    pastDate.setMonth(pastDate.getMonth() - monthsBack);
+    const yyyy = pastDate.getUTCFullYear();
+    const mm = String(pastDate.getUTCMonth() + 1).padStart(2, '0');
+    const pastDateStr = `${yyyy}-${mm}`;
+
+    const results: MBReleaseLite[] = [];
+    const limit = 100;
+    /** Hard cap on releases per artist to bound rate-limit cost. */
+    const MAX_RELEASES = 500;
+    let offset = 0;
+    let total = 0;
+
+    do {
+      await this.enforceRateLimit();
+
+      const response = await this.executeWithBackoff(async () => {
+        return this.axios.get('/release', {
+          params: {
+            query: `arid:${artistMbid} AND date:[${pastDateStr} TO *] AND status:official`,
+            limit,
+            offset,
+            fmt: 'json',
+          },
+        });
+      }, `getRecentReleases(${artistMbid})`);
+
+      const rawReleases: MBReleaseSearchResult[] = response.data.releases || [];
+      total = response.data.count ?? rawReleases.length;
+
+      // Defensive: empty page with non-zero offset means MB has nothing more
+      // to give us regardless of `total`. Stop instead of looping forever.
+      if (rawReleases.length === 0) {
+        break;
+      }
+
+      for (const r of rawReleases) {
+        const rg = r['release-group'];
+        // Skip releases without a release-group reference
+        if (!rg?.id) {
+          continue;
+        }
+
+        const artistCredit = r['artist-credit']?.[0];
+        const artistName = artistCredit?.artist?.name || 'Unknown Artist';
+        const actualArtistMbid = artistCredit?.artist?.id || artistMbid;
+
+        // First label entry with a non-empty name (some entries have empty
+        // label-info or no label at all)
+        const labelEntry = r['label-info']?.find(li => li.label?.name);
+        const labelName = labelEntry?.label?.name;
+
+        results.push({
+          mbid: r.id,
+          title: r.title,
+          date: r.date || null,
+          country: r.country,
+          status: r.status,
+          releaseGroupMbid: rg.id,
+          releaseGroupTitle: rg.title,
+          releaseGroupPrimaryType: rg['primary-type'],
+          releaseGroupSecondaryTypes: rg['secondary-types'],
+          releaseType: this.mapReleaseType(
+            rg['primary-type'],
+            rg['secondary-types']
+          ),
+          artistName,
+          artistMbid: actualArtistMbid,
+          labelName,
+        });
+      }
+
+      offset += limit;
+    } while (offset < total && offset < MAX_RELEASES);
+
+    if (total > MAX_RELEASES) {
+      this.logger.warn(
+        `getRecentReleases: artist ${artistMbid} has ${total} releases since ${pastDateStr}; capped at ${MAX_RELEASES}`
+      );
+    }
+
+    await this.enrichWithReleaseGroupDates(results);
+
+    this.logger.debug(
+      `Found ${results.length} recent releases for artist ${artistMbid} (since ${pastDateStr})`
+    );
+
+    return results;
+  }
+
+  /**
+   * Populate `originalReleaseDate` on each entry by looking up its parent
+   * release-group's `first-release-date`. Dedupes by `releaseGroupMbid` so each
+   * unique release-group is fetched at most once per call. A lookup failure for
+   * a single release-group leaves `originalReleaseDate` undefined for entries
+   * sharing that MBID and does not abort the rest of the enrichment.
+   */
+  private async enrichWithReleaseGroupDates(
+    releases: MBReleaseLite[]
+  ): Promise<void> {
+    const uniqueRgMbids = Array.from(
+      new Set(releases.map(r => r.releaseGroupMbid).filter(Boolean))
+    );
+    if (uniqueRgMbids.length === 0) {
+      return;
+    }
+
+    const dateByRgMbid = new Map<string, string | null>();
+
+    for (const rgMbid of uniqueRgMbids) {
+      try {
+        await this.enforceRateLimit();
+        const response = await this.executeWithBackoff(async () => {
+          return this.axios.get(`/release-group/${rgMbid}`, {
+            params: { fmt: 'json' },
+          });
+        }, `enrichReleaseGroup(${rgMbid})`);
+        const firstReleaseDate: string | undefined =
+          response.data?.['first-release-date'];
+        dateByRgMbid.set(rgMbid, firstReleaseDate || null);
+      } catch (error) {
+        this.logger.warn(
+          `Failed to fetch release-group ${rgMbid} for original-date enrichment: ${(error as Error).message}`
+        );
+        // Leave undefined for entries sharing this RG so the UI can fall back.
+      }
+    }
+
+    for (const r of releases) {
+      if (dateByRgMbid.has(r.releaseGroupMbid)) {
+        r.originalReleaseDate = dateByRgMbid.get(r.releaseGroupMbid) ?? null;
+      }
+    }
   }
 
   /**

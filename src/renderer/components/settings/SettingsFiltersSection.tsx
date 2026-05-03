@@ -1,4 +1,4 @@
-import { Eye, Music } from 'lucide-react';
+import { Eye, Music, Settings } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import {
@@ -30,13 +30,56 @@ const SettingsFiltersSection: React.FC<SettingsFiltersSectionProps> = ({
   const [excludedArtists, setExcludedArtists] = useState<ExcludedArtist[]>([]);
   const [releasesLoading, setReleasesLoading] = useState(false);
 
+  // Release tracking type-toggles (EPs, singles, compilations, reissues)
+  type TrackingSettings = Awaited<
+    ReturnType<typeof api.getReleaseTrackingSettings>
+  >;
+  const [trackingSettings, setTrackingSettings] =
+    useState<TrackingSettings | null>(null);
+  const [savingTrackingSetting, setSavingTrackingSetting] = useState<
+    keyof TrackingSettings | null
+  >(null);
+
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
 
   useEffect(() => {
     loadHiddenItems();
     loadReleaseFilters();
+    loadTrackingSettings();
   }, []);
+
+  const loadTrackingSettings = async () => {
+    try {
+      const settings = await api.getReleaseTrackingSettings();
+      setTrackingSettings(settings);
+    } catch (error) {
+      logger.warn('Failed to load release tracking settings', error);
+    }
+  };
+
+  const handleToggleTrackingSetting = async (
+    key: keyof TrackingSettings,
+    value: boolean
+  ) => {
+    if (!trackingSettings) return;
+    const previous = trackingSettings;
+    setSavingTrackingSetting(key);
+    setTrackingSettings({ ...previous, [key]: value });
+    try {
+      const updated = await api.saveReleaseTrackingSettings({ [key]: value });
+      setTrackingSettings(updated);
+      setSuccess('Setting saved');
+      setTimeout(() => setSuccess(''), 1500);
+    } catch (error) {
+      setTrackingSettings(previous);
+      setError(
+        error instanceof Error ? error.message : 'Failed to save setting'
+      );
+    } finally {
+      setSavingTrackingSetting(null);
+    }
+  };
 
   const loadHiddenItems = async () => {
     try {
@@ -258,6 +301,90 @@ const SettingsFiltersSection: React.FC<SettingsFiltersSectionProps> = ({
                 )}
               </div>
             </>
+          )}
+        </div>
+      </div>
+
+      {/* Release Tracking Settings */}
+      <div className='settings-section-card'>
+        <div className='settings-section-header'>
+          <span className='settings-section-icon'>
+            <Settings size={18} aria-hidden='true' />
+          </span>
+          <div>
+            <h3>Release Tracking Settings</h3>
+            <p className='settings-section-description'>
+              Which release types are surfaced when syncing new releases
+            </p>
+          </div>
+        </div>
+
+        <div className='settings-section-content'>
+          {!trackingSettings ? (
+            <div className='loading-container'>
+              <div className='loading-spinner' />
+              <p>Loading settings...</p>
+            </div>
+          ) : (
+            <div className='tracking-toggle-list'>
+              {(
+                [
+                  {
+                    key: 'includeReissues' as const,
+                    label: 'Include reissues',
+                    description:
+                      'Surface reissue pressings of albums in your tracked artists. Adds extra MusicBrainz lookups during sync.',
+                  },
+                  {
+                    key: 'includeEps' as const,
+                    label: 'Include EPs',
+                    description: 'Show EPs in new releases.',
+                  },
+                  {
+                    key: 'includeSingles' as const,
+                    label: 'Include singles',
+                    description: 'Show singles in new releases.',
+                  },
+                  {
+                    key: 'includeCompilations' as const,
+                    label: 'Include compilations',
+                    description: 'Show compilations in new releases.',
+                  },
+                  {
+                    key: 'autoCheckOnStartup' as const,
+                    label: 'Auto-check on startup',
+                    description:
+                      'Automatically sync new releases when the app starts.',
+                  },
+                  {
+                    key: 'notifyOnNewRelease' as const,
+                    label: 'Notify on new release',
+                    description: 'Show a toast when a new release is found.',
+                  },
+                ] satisfies Array<{
+                  key: keyof TrackingSettings;
+                  label: string;
+                  description: string;
+                }>
+              ).map(({ key, label, description }) => (
+                <label key={key} className='tracking-toggle-row'>
+                  <input
+                    type='checkbox'
+                    checked={Boolean(trackingSettings[key])}
+                    disabled={savingTrackingSetting === key}
+                    onChange={e =>
+                      handleToggleTrackingSetting(key, e.target.checked)
+                    }
+                  />
+                  <span className='tracking-toggle-text'>
+                    <span className='tracking-toggle-title'>{label}</span>
+                    <span className='tracking-toggle-description'>
+                      {description}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
           )}
         </div>
       </div>

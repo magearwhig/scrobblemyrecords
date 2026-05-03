@@ -1359,6 +1359,14 @@ export interface TrackedRelease {
   isUpcoming: boolean; // Release date is in the future
   inWishlist: boolean; // Already in user's wishlist
   vinylCheckedAt?: number; // When vinyl availability was last checked
+
+  // Reissue / discovery source metadata (Feature: Reissue Detection)
+  isReissue?: boolean; // True when discovered via MB /release endpoint as a reissue of an existing release group
+  releaseGroupMbid?: string; // Parent release-group MBID (when this entry represents an individual /release pressing)
+  originalReleaseDate?: string | null; // Parent release-group's first-release-date (the album's original release year), populated for reissues
+  sourceType?: 'musicbrainz' | 'discogs' | 'website'; // Discovery source — MB release-group/release, Discogs label monitoring, or website monitoring
+  labelName?: string; // Label name reported by MusicBrainz `/release` (e.g., "Backwoodz Studioz")
+  country?: string; // ISO country code reported by MusicBrainz `/release` (e.g., "US")
 }
 
 /**
@@ -1403,6 +1411,7 @@ export interface ReleaseTrackingSettings extends VersionedStore {
   includeEps: boolean; // Include EPs in results
   includeSingles: boolean; // Include singles in results
   includeCompilations: boolean; // Include compilations in results
+  includeReissues: boolean; // Query MusicBrainz /release endpoint for reissues (default: true)
 }
 
 /**
@@ -1493,6 +1502,191 @@ export interface ReleaseSyncStatusStore extends VersionedStore {
 }
 
 // ============================================
+// Label Monitoring Types (Feature: Label Discovery)
+// ============================================
+
+/**
+ * A Discogs label being monitored for new releases
+ */
+export interface MonitoredLabel {
+  id: string; // Local UUID for stable identity
+  discogsLabelId: number; // Discogs label ID
+  name: string; // Label display name
+  addedAt: number; // Unix timestamp (ms) when added
+  lastScannedAt?: number; // Unix timestamp (ms) of last completed scan
+  lookbackMonths: number; // How many months back to scan for releases
+}
+
+/**
+ * A release detected for a monitored label
+ */
+export interface LabelRelease {
+  id: string; // Local UUID for stable identity
+  labelId: string; // MonitoredLabel.id (local UUID)
+  discogsReleaseId: number; // Discogs release ID
+  title: string;
+  artist: string;
+  year?: number; // Release year reported by Discogs
+  format: string[]; // Format descriptors (e.g., ['Vinyl', 'LP'])
+  thumbUrl?: string; // Cover thumbnail URL from Discogs
+  addedAt: number; // Unix timestamp (ms) when first detected
+  isInCollection: boolean; // Match exists in user's Discogs collection
+  isInWishlist: boolean; // Match exists in user's Discogs wantlist
+  status: 'new' | 'in-collection' | 'in-wishlist' | 'seen' | 'dismissed';
+}
+
+/**
+ * Scan status for label monitoring
+ */
+export interface LabelScanStatus {
+  status: 'idle' | 'scanning' | 'completed' | 'cancelled' | 'error';
+  currentLabelId?: string; // MonitoredLabel.id currently being scanned
+  currentLabelName?: string; // Display name for UI
+  totalLabels?: number; // Total labels in this scan
+  processedLabels?: number; // Labels completed so far
+  releasesFound?: number; // New releases discovered in this scan
+  startedAt?: number; // Unix timestamp (ms) when scan started
+  completedAt?: number; // Unix timestamp (ms) when scan finished
+  error?: string;
+}
+
+/**
+ * Settings for label monitoring
+ */
+export interface LabelMonitoringSettings extends VersionedStore {
+  schemaVersion: 1;
+  defaultLookbackMonths: number; // Default lookback window for new labels (default: 6)
+  autoScanIntervalHours?: number; // Optional auto-scan cadence in hours
+  maxReleasesPerLabel?: number; // Hard cap on releases fetched per label per scan
+}
+
+/**
+ * Versioned store for monitored labels
+ */
+export interface MonitoredLabelsStore extends VersionedStore {
+  schemaVersion: 1;
+  labels: MonitoredLabel[];
+}
+
+/**
+ * Versioned store for detected label releases
+ */
+export interface LabelReleasesStore extends VersionedStore {
+  schemaVersion: 1;
+  lastUpdated: number;
+  releases: LabelRelease[];
+}
+
+/**
+ * Versioned store for label scan status
+ */
+export interface LabelScanStatusStore extends VersionedStore {
+  schemaVersion: 1;
+  status: LabelScanStatus;
+}
+
+// ============================================
+// Website Monitoring Types (Feature: Website Discovery via Ollama)
+// ============================================
+
+/**
+ * A website being monitored for new music product listings
+ */
+export interface MonitoredWebsite {
+  id: string; // Local UUID for stable identity
+  name: string; // Friendly name for UI
+  url: string; // URL to fetch
+  cssSelector?: string; // Optional CSS selector to scope HTML extraction
+  useOllama: boolean; // Whether to extract structured data with Ollama
+  enabled: boolean; // Skip during scans when false
+  addedAt: number; // Unix timestamp (ms) when added
+  lastScannedAt?: number; // Unix timestamp (ms) of last completed scan
+}
+
+/**
+ * A product item extracted from a monitored website
+ */
+export interface WebsiteItem {
+  id: string; // Local UUID for stable identity
+  websiteId: string; // MonitoredWebsite.id
+  title: string;
+  artist?: string;
+  format?: string; // e.g., 'LP', '2xLP', '7"', 'CD'
+  /** Vinyl-classification of `format`. 'unknown' when format wasn't extractable. */
+  formatKind?: 'vinyl' | 'non-vinyl' | 'unknown';
+  releaseDate?: string; // ISO date string when known
+  price?: number; // Numeric price; currency tracked separately if needed
+  url?: string; // Direct product URL when extractable
+  extractedAt: number; // Unix timestamp (ms) when first detected
+  confidence: number; // 0-1 quality score from extraction (1 = high confidence)
+  status: 'new' | 'seen' | 'purchased' | 'dismissed';
+  rawText?: string; // Raw text snippet retained for fallback / debugging
+  /** Cross-reference flags computed at extraction time so the UI can highlight
+   *  items the user already cares about. All optional; absent = unmatched. */
+  matches?: {
+    onWishlist?: boolean; // Title+artist match against Discogs wishlist
+    onLocalWant?: boolean; // Title+artist match against local want list
+    artistInCollection?: boolean; // Artist appears in Discogs collection
+    artistInLastfmTop?: boolean; // Artist appears in Last.fm top artists
+  };
+}
+
+/**
+ * Scan status for website monitoring
+ */
+export interface WebsiteScanStatus {
+  status: 'idle' | 'scanning' | 'completed' | 'cancelled' | 'error';
+  currentWebsiteId?: string; // MonitoredWebsite.id currently being scanned
+  currentWebsiteName?: string; // Display name for UI
+  totalWebsites?: number; // Total websites in this scan
+  processedWebsites?: number; // Websites completed so far
+  itemsFound?: number; // New items discovered in this scan
+  startedAt?: number; // Unix timestamp (ms) when scan started
+  completedAt?: number; // Unix timestamp (ms) when scan finished
+  ollamaAvailable?: boolean; // Whether Ollama responded during scan
+  error?: string;
+}
+
+/**
+ * Settings for website monitoring
+ */
+export interface WebsiteMonitoringSettings extends VersionedStore {
+  schemaVersion: 1;
+  ollamaModel: string; // Ollama model used for structured extraction
+  ollamaEnabled: boolean; // Enable Ollama-based extraction
+  fetchTimeoutMs: number; // HTTP fetch timeout in milliseconds
+  maxBytes: number; // Maximum bytes to read from a single page
+  /** Filter mode for extracted items. 'vinyl-only' keeps explicit vinyl + items
+   *  whose format couldn't be determined; 'all' keeps everything. */
+  formatFilter?: 'vinyl-only' | 'all';
+}
+
+/**
+ * Versioned store for monitored websites
+ */
+export interface MonitoredWebsitesStore extends VersionedStore {
+  schemaVersion: 1;
+  websites: MonitoredWebsite[];
+}
+
+/**
+ * Versioned store for extracted website items
+ */
+export interface WebsiteItemsStore extends VersionedStore {
+  schemaVersion: 1;
+  lastUpdated: number;
+  items: WebsiteItem[];
+}
+
+/**
+ * Versioned store for website scan status
+ */
+export interface WebsiteScanStatusStore extends VersionedStore {
+  schemaVersion: 1;
+  status: WebsiteScanStatus;
+}
+
+// ============================================
 // Backup & Restore Types (Feature 10)
 // ============================================
 
@@ -1524,6 +1718,14 @@ export interface BackupData {
 
   // Sellers
   monitoredSellers: MonitoredSeller[];
+
+  // Labels (Feature B: Label Monitoring) — optional for backward compatibility
+  monitoredLabels?: MonitoredLabel[];
+  labelMonitoringSettings?: LabelMonitoringSettings | null;
+
+  // Websites (Feature C: Website Monitoring) — optional for backward compatibility
+  monitoredWebsites?: MonitoredWebsite[];
+  websiteMonitoringSettings?: WebsiteMonitoringSettings | null;
 
   // Release tracking
   artistMbidMappings: ArtistMbidMapping[];
@@ -1559,6 +1761,8 @@ export interface BackupPreview {
   hasAiSettings: boolean;
   hasWishlistSettings: boolean;
   hasSellerSettings: boolean;
+  hasLabelSettings?: boolean;
+  hasWebsiteSettings?: boolean;
   hasReleaseSettings: boolean;
   hasSyncSettings: boolean;
 
@@ -1570,6 +1774,8 @@ export interface BackupPreview {
   hiddenArtistsCount: number;
   localWantListCount: number;
   monitoredSellersCount: number;
+  monitoredLabelsCount?: number;
+  monitoredWebsitesCount?: number;
   artistMbidMappingsCount: number;
   hiddenReleasesCount: number;
   excludedArtistsCount: number;
@@ -1603,6 +1809,8 @@ export interface BackupImportPreview {
     hiddenArtists: ImportCategorySummary;
     localWantList: ImportCategorySummary;
     monitoredSellers: ImportCategorySummary;
+    monitoredLabels?: ImportCategorySummary;
+    monitoredWebsites?: ImportCategorySummary;
     artistMbidMappings: ImportCategorySummary;
     hiddenReleases: ImportCategorySummary;
     excludedArtists: ImportCategorySummary;

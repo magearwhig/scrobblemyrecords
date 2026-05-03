@@ -421,6 +421,290 @@ describe('MusicBrainzService', () => {
     });
   });
 
+  describe('getRecentReleases (reissue detection)', () => {
+    it('should query /release endpoint with arid + date + status filters', async () => {
+      mockMusicBrainzAxios.get.mockResolvedValue({
+        data: { releases: [], count: 0 },
+      });
+
+      await service.getRecentReleases('artist-mbid', 12);
+
+      expect(mockMusicBrainzAxios.get).toHaveBeenCalledWith('/release', {
+        params: expect.objectContaining({
+          query: expect.stringMatching(
+            /^arid:artist-mbid AND date:\[\d{4}-\d{2} TO \*\] AND status:official$/
+          ),
+          limit: 100,
+          offset: 0,
+          fmt: 'json',
+        }),
+      });
+    });
+
+    it('should default to 12 months back', async () => {
+      mockMusicBrainzAxios.get.mockResolvedValue({
+        data: { releases: [], count: 0 },
+      });
+
+      await service.getRecentReleases('artist-mbid');
+
+      const call = mockMusicBrainzAxios.get.mock.calls[0];
+      const query = (call[1] as { params: { query: string } }).params.query;
+      // 12 months back from "now" → year-1 should be in the query
+      const expectedYear = new Date().getUTCFullYear() - 1;
+      expect(query).toContain(`date:[${expectedYear}`);
+    });
+
+    it('should map release entries with release-group + artist credit + label info', async () => {
+      mockMusicBrainzAxios.get.mockImplementation((url: string) => {
+        if (url === '/release') {
+          return Promise.resolve({
+            data: {
+              releases: [
+                {
+                  id: 'release-1',
+                  title: 'Reissue Album',
+                  date: '2026-01-15',
+                  country: 'US',
+                  status: 'Official',
+                  'artist-credit': [
+                    { artist: { id: 'artist-1', name: 'Artist Name' } },
+                  ],
+                  'release-group': {
+                    id: 'rg-1',
+                    title: 'Reissue Album',
+                    'primary-type': 'Album',
+                    'secondary-types': [],
+                  },
+                  'label-info': [
+                    { label: { id: 'l1', name: 'Indie Label' } },
+                    { label: { name: 'Distributor' } },
+                  ],
+                },
+              ],
+              count: 1,
+            },
+          });
+        }
+        if (url === '/release-group/rg-1') {
+          return Promise.resolve({
+            data: { id: 'rg-1', 'first-release-date': '2003-06-01' },
+          });
+        }
+        return Promise.reject(new Error(`unmocked URL: ${url}`));
+      });
+
+      const releases = await service.getRecentReleases('artist-1', 12);
+
+      expect(releases).toHaveLength(1);
+      expect(releases[0]).toEqual({
+        mbid: 'release-1',
+        title: 'Reissue Album',
+        date: '2026-01-15',
+        country: 'US',
+        status: 'Official',
+        releaseGroupMbid: 'rg-1',
+        releaseGroupTitle: 'Reissue Album',
+        releaseGroupPrimaryType: 'Album',
+        releaseGroupSecondaryTypes: [],
+        releaseType: 'album',
+        artistName: 'Artist Name',
+        artistMbid: 'artist-1',
+        labelName: 'Indie Label',
+        originalReleaseDate: '2003-06-01',
+      });
+    });
+
+    it('should skip releases missing a release-group reference', async () => {
+      mockMusicBrainzAxios.get.mockResolvedValue({
+        data: {
+          releases: [
+            {
+              id: 'release-1',
+              title: 'Orphan',
+              date: '2026-01-15',
+              'artist-credit': [{ artist: { id: 'artist-1', name: 'Artist' } }],
+              // No release-group
+            },
+            {
+              id: 'release-2',
+              title: 'Good',
+              'release-group': { id: 'rg-2' },
+              'artist-credit': [{ artist: { id: 'artist-1', name: 'Artist' } }],
+            },
+          ],
+          count: 2,
+        },
+      });
+
+      const releases = await service.getRecentReleases('artist-1', 12);
+
+      expect(releases).toHaveLength(1);
+      expect(releases[0].mbid).toBe('release-2');
+    });
+
+    it('should fall back gracefully when label-info is empty or missing names', async () => {
+      mockMusicBrainzAxios.get.mockResolvedValue({
+        data: {
+          releases: [
+            {
+              id: 'r1',
+              title: 'No Label',
+              'release-group': { id: 'rg-1' },
+              'artist-credit': [{ artist: { id: 'a1', name: 'Artist' } }],
+              'label-info': [{ label: {} }, { label: { name: '' } }],
+            },
+          ],
+          count: 1,
+        },
+      });
+
+      const releases = await service.getRecentReleases('a1', 12);
+
+      expect(releases).toHaveLength(1);
+      expect(releases[0].labelName).toBeUndefined();
+    });
+
+    it('should page through results up to a 500-release cap', async () => {
+      // All releases share a single release-group so enrichment is a single
+      // rate-limited lookup, not 500 — keeps the test bounded while still
+      // exercising the 5-page search cap.
+      const makeReleases = (start: number, n: number) =>
+        Array.from({ length: n }, (_, i) => ({
+          id: `r-${start + i}`,
+          title: `Release ${start + i}`,
+          'release-group': { id: 'rg-shared' },
+          'artist-credit': [{ artist: { id: 'a1', name: 'Artist' } }],
+        }));
+
+      // Simulate 600 total — service should stop at 500
+      mockMusicBrainzAxios.get.mockImplementation((url: string, config) => {
+        if (url === '/release') {
+          const offset =
+            (config as { params?: { offset?: number } }).params?.offset || 0;
+          return Promise.resolve({
+            data: {
+              releases: makeReleases(offset, 100),
+              count: 600,
+            },
+          });
+        }
+        // Enrichment lookup — return nothing useful, just resolve
+        return Promise.resolve({ data: { 'first-release-date': null } });
+      });
+
+      const releases = await service.getRecentReleases('a1', 12);
+
+      // Cap at 500 — five pages of 100
+      expect(releases).toHaveLength(500);
+      const searchCalls = mockMusicBrainzAxios.get.mock.calls.filter(
+        c => c[0] === '/release'
+      );
+      expect(searchCalls).toHaveLength(5);
+      const offsets = searchCalls.map(
+        c => (c[1] as { params: { offset: number } }).params.offset
+      );
+      expect(offsets).toEqual([0, 100, 200, 300, 400]);
+    }, 10000);
+
+    it('should stop paging when results exhausted (count satisfied)', async () => {
+      let searchCallCount = 0;
+      mockMusicBrainzAxios.get.mockImplementation((url: string) => {
+        if (url === '/release') {
+          searchCallCount++;
+          return Promise.resolve({
+            data: {
+              releases:
+                searchCallCount === 1
+                  ? [
+                      {
+                        id: 'r1',
+                        title: 'Only',
+                        'release-group': { id: 'rg-1' },
+                        'artist-credit': [
+                          { artist: { id: 'a1', name: 'Artist' } },
+                        ],
+                      },
+                    ]
+                  : [],
+              count: 1,
+            },
+          });
+        }
+        return Promise.resolve({
+          data: { 'first-release-date': '1999-01-01' },
+        });
+      });
+
+      const releases = await service.getRecentReleases('a1', 12);
+
+      expect(releases).toHaveLength(1);
+      // Only one search call needed since offset(100) > count(1)
+      expect(searchCallCount).toBe(1);
+    });
+
+    it('should retry on rate limit errors via executeWithBackoff', async () => {
+      jest.useFakeTimers();
+      try {
+        const rateLimitError = Object.assign(new Error('Rate limited'), {
+          isAxiosError: true,
+          response: { status: 429 },
+        });
+        mockMusicBrainzAxios.get
+          .mockRejectedValueOnce(rateLimitError)
+          .mockResolvedValueOnce({
+            data: {
+              releases: [
+                {
+                  id: 'r1',
+                  title: 'After retry',
+                  'release-group': { id: 'rg-1' },
+                  'artist-credit': [{ artist: { id: 'a1', name: 'Artist' } }],
+                },
+              ],
+              count: 1,
+            },
+          })
+          // Enrichment lookup for rg-1
+          .mockResolvedValueOnce({
+            data: { 'first-release-date': '1985-04-12' },
+          });
+
+        const promise = service.getRecentReleases('a1', 12);
+        // Drain backoff timer
+        await jest.runAllTimersAsync();
+        const releases = await promise;
+
+        expect(releases).toHaveLength(1);
+        // 1 failed search + 1 retried search + 1 enrichment lookup = 3
+        expect(mockMusicBrainzAxios.get).toHaveBeenCalledTimes(3);
+        expect(releases[0].originalReleaseDate).toBe('1985-04-12');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('should use status:official to exclude promo / bootleg pressings', async () => {
+      mockMusicBrainzAxios.get.mockResolvedValue({
+        data: { releases: [], count: 0 },
+      });
+
+      await service.getRecentReleases('a1', 6);
+
+      const call = mockMusicBrainzAxios.get.mock.calls[0];
+      const query = (call[1] as { params: { query: string } }).params.query;
+      expect(query).toContain('status:official');
+    });
+
+    it('should propagate non-rate-limit errors', async () => {
+      mockMusicBrainzAxios.get.mockRejectedValue(new Error('Bad gateway'));
+
+      await expect(service.getRecentReleases('a1', 12)).rejects.toThrow(
+        'Bad gateway'
+      );
+    });
+  });
+
   describe('getCoverArtUrl', () => {
     it('should return front cover URL when available', async () => {
       // Arrange

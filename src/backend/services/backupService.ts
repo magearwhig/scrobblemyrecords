@@ -45,10 +45,15 @@ import {
   HiddenReleasesStore,
   HistoryArtistMappingsStore,
   ImportCategorySummary,
+  LabelMonitoringSettings,
   LocalWantItem,
   LocalWantStore,
+  MonitoredLabel,
+  MonitoredLabelsStore,
   MonitoredSeller,
   MonitoredSellersStore,
+  MonitoredWebsite,
+  MonitoredWebsitesStore,
   ReleaseTrackingSettings,
   SavedCollection,
   SavedCollectionsStore,
@@ -56,6 +61,7 @@ import {
   SuggestionSettings,
   SyncSettings,
   UserSettings,
+  WebsiteMonitoringSettings,
   WishlistSettings,
 } from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
@@ -70,6 +76,8 @@ const FILE_PATHS = {
   aiSettings: 'settings/ai-settings.json',
   wishlistSettings: 'wishlist/settings.json',
   sellerSettings: 'sellers/settings.json',
+  labelSettings: 'labels/settings.json',
+  websiteSettings: 'websites/settings.json',
   releaseSettings: 'releases/settings.json',
   syncSettings: 'history/sync-settings.json',
   albumMappings: 'mappings/album-mappings.json',
@@ -79,6 +87,8 @@ const FILE_PATHS = {
   hiddenArtists: 'discovery/hidden-artists.json',
   localWantList: 'wishlist/local-want-list.json',
   monitoredSellers: 'sellers/monitored-sellers.json',
+  monitoredLabels: 'labels/monitored-labels.json',
+  monitoredWebsites: 'websites/monitored-websites.json',
   artistMbidMappings: 'releases/artist-mbid-map.json',
   hiddenReleases: 'releases/hidden-releases.json',
   excludedArtists: 'releases/excluded-artists.json',
@@ -269,6 +279,18 @@ export class BackupService {
     );
   }
 
+  private async loadLabelSettings(): Promise<LabelMonitoringSettings | null> {
+    return this.fileStorage.readJSON<LabelMonitoringSettings>(
+      FILE_PATHS.labelSettings
+    );
+  }
+
+  private async loadWebsiteSettings(): Promise<WebsiteMonitoringSettings | null> {
+    return this.fileStorage.readJSON<WebsiteMonitoringSettings>(
+      FILE_PATHS.websiteSettings
+    );
+  }
+
   private async loadReleaseSettings(): Promise<ReleaseTrackingSettings | null> {
     return this.fileStorage.readJSON<ReleaseTrackingSettings>(
       FILE_PATHS.releaseSettings
@@ -328,6 +350,20 @@ export class BackupService {
     return store?.sellers ?? [];
   }
 
+  private async loadMonitoredLabels(): Promise<MonitoredLabel[]> {
+    const store = await this.fileStorage.readJSON<MonitoredLabelsStore>(
+      FILE_PATHS.monitoredLabels
+    );
+    return store?.labels ?? [];
+  }
+
+  private async loadMonitoredWebsites(): Promise<MonitoredWebsite[]> {
+    const store = await this.fileStorage.readJSON<MonitoredWebsitesStore>(
+      FILE_PATHS.monitoredWebsites
+    );
+    return store?.websites ?? [];
+  }
+
   private async loadArtistMbidMappings(): Promise<ArtistMbidMapping[]> {
     const store = await this.fileStorage.readJSON<ArtistMbidMappingsStore>(
       FILE_PATHS.artistMbidMappings
@@ -377,6 +413,8 @@ export class BackupService {
       aiSettings,
       wishlistSettings,
       sellerSettings,
+      labelSettings,
+      websiteSettings,
       releaseSettings,
       syncSettings,
       albumMappings,
@@ -386,6 +424,8 @@ export class BackupService {
       hiddenArtists,
       localWantList,
       monitoredSellers,
+      monitoredLabels,
+      monitoredWebsites,
       artistMbidMappings,
       hiddenReleases,
       excludedArtists,
@@ -397,6 +437,8 @@ export class BackupService {
       this.loadAiSettings(),
       this.loadWishlistSettings(),
       this.loadSellerSettings(),
+      this.loadLabelSettings(),
+      this.loadWebsiteSettings(),
       this.loadReleaseSettings(),
       this.loadSyncSettings(),
       this.loadAlbumMappings(),
@@ -406,6 +448,8 @@ export class BackupService {
       this.loadHiddenArtists(),
       this.loadLocalWantList(),
       this.loadMonitoredSellers(),
+      this.loadMonitoredLabels(),
+      this.loadMonitoredWebsites(),
       this.loadArtistMbidMappings(),
       this.loadHiddenReleases(),
       this.loadExcludedArtists(),
@@ -419,6 +463,8 @@ export class BackupService {
       hasAiSettings: aiSettings !== null,
       hasWishlistSettings: wishlistSettings !== null,
       hasSellerSettings: sellerSettings !== null,
+      hasLabelSettings: labelSettings !== null,
+      hasWebsiteSettings: websiteSettings !== null,
       hasReleaseSettings: releaseSettings !== null,
       hasSyncSettings: syncSettings !== null,
       albumMappingsCount: albumMappings.length,
@@ -428,6 +474,8 @@ export class BackupService {
       hiddenArtistsCount: hiddenArtists.length,
       localWantListCount: localWantList.length,
       monitoredSellersCount: monitoredSellers.length,
+      monitoredLabelsCount: monitoredLabels.length,
+      monitoredWebsitesCount: monitoredWebsites.length,
       artistMbidMappingsCount: artistMbidMappings.length,
       hiddenReleasesCount: hiddenReleases.length,
       excludedArtistsCount: excludedArtists.length,
@@ -459,6 +507,8 @@ export class BackupService {
       aiSettings,
       wishlistSettings,
       sellerSettings,
+      labelSettings,
+      websiteSettings,
       releaseSettings,
       syncSettings,
       albumMappings,
@@ -468,6 +518,8 @@ export class BackupService {
       hiddenArtists,
       localWantList,
       monitoredSellers,
+      monitoredLabels,
+      monitoredWebsites,
       artistMbidMappings,
       hiddenReleases,
       excludedArtists,
@@ -479,6 +531,8 @@ export class BackupService {
       this.loadAiSettings(),
       this.loadWishlistSettings(),
       this.loadSellerSettings(),
+      this.loadLabelSettings(),
+      this.loadWebsiteSettings(),
       this.loadReleaseSettings(),
       this.loadSyncSettings(),
       this.loadAlbumMappings(),
@@ -488,6 +542,8 @@ export class BackupService {
       this.loadHiddenArtists(),
       this.loadLocalWantList(),
       this.loadMonitoredSellers(),
+      this.loadMonitoredLabels(),
+      this.loadMonitoredWebsites(),
       this.loadArtistMbidMappings(),
       this.loadHiddenReleases(),
       this.loadExcludedArtists(),
@@ -502,6 +558,8 @@ export class BackupService {
       aiSettings,
       wishlistSettings,
       sellerMonitoringSettings: sellerSettings,
+      labelMonitoringSettings: labelSettings,
+      websiteMonitoringSettings: websiteSettings,
       releaseTrackingSettings: releaseSettings,
       syncSettings,
       albumMappings,
@@ -511,6 +569,8 @@ export class BackupService {
       hiddenArtists,
       localWantList,
       monitoredSellers,
+      monitoredLabels,
+      monitoredWebsites,
       artistMbidMappings,
       hiddenReleases,
       excludedArtists,
@@ -623,6 +683,8 @@ export class BackupService {
       currentHiddenArtists,
       currentLocalWantList,
       currentMonitoredSellers,
+      currentMonitoredLabels,
+      currentMonitoredWebsites,
       currentArtistMbidMappings,
       currentHiddenReleases,
       currentExcludedArtists,
@@ -636,6 +698,8 @@ export class BackupService {
       this.loadHiddenArtists(),
       this.loadLocalWantList(),
       this.loadMonitoredSellers(),
+      this.loadMonitoredLabels(),
+      this.loadMonitoredWebsites(),
       this.loadArtistMbidMappings(),
       this.loadHiddenReleases(),
       this.loadExcludedArtists(),
@@ -679,6 +743,16 @@ export class BackupService {
         backup.data.monitoredSellers,
         currentMonitoredSellers,
         (s: MonitoredSeller) => s.username
+      ),
+      monitoredLabels: this.compareMappings(
+        backup.data.monitoredLabels ?? [],
+        currentMonitoredLabels,
+        (l: MonitoredLabel) => `${l.discogsLabelId}`
+      ),
+      monitoredWebsites: this.compareMappings(
+        backup.data.monitoredWebsites ?? [],
+        currentMonitoredWebsites,
+        (w: MonitoredWebsite) => w.url
       ),
       artistMbidMappings: this.compareMappings(
         backup.data.artistMbidMappings,
@@ -727,6 +801,8 @@ export class BackupService {
       hiddenArtists: { new: 0, existing: 0 },
       localWantList: { new: 0, existing: 0 },
       monitoredSellers: { new: 0, existing: 0 },
+      monitoredLabels: { new: 0, existing: 0 },
+      monitoredWebsites: { new: 0, existing: 0 },
       artistMbidMappings: { new: 0, existing: 0 },
       hiddenReleases: { new: 0, existing: 0 },
       excludedArtists: { new: 0, existing: 0 },
@@ -878,6 +954,22 @@ export class BackupService {
         await this.fileStorage.writeJSONWithBackup(
           FILE_PATHS.sellerSettings,
           backup.data.sellerMonitoringSettings
+        );
+        settingsMerged = true;
+      }
+
+      if (backup.data.labelMonitoringSettings) {
+        await this.fileStorage.writeJSONWithBackup(
+          FILE_PATHS.labelSettings,
+          backup.data.labelMonitoringSettings
+        );
+        settingsMerged = true;
+      }
+
+      if (backup.data.websiteMonitoringSettings) {
+        await this.fileStorage.writeJSONWithBackup(
+          FILE_PATHS.websiteSettings,
+          backup.data.websiteMonitoringSettings
         );
         settingsMerged = true;
       }
@@ -1090,6 +1182,44 @@ export class BackupService {
       updated += result.updated;
     } catch (e) {
       errors.push(`Monitored sellers: ${e instanceof Error ? e.message : e}`);
+    }
+
+    // Import monitored labels (Feature B)
+    if (data.monitoredLabels && data.monitoredLabels.length > 0) {
+      try {
+        const result = await this.mergeAndSave(
+          FILE_PATHS.monitoredLabels,
+          data.monitoredLabels,
+          (l: MonitoredLabel) => `${l.discogsLabelId}`,
+          'labels',
+          merge,
+          (a, b) => (a.addedAt > b.addedAt ? a : b)
+        );
+        added += result.added;
+        updated += result.updated;
+      } catch (e) {
+        errors.push(`Monitored labels: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+
+    // Import monitored websites (Feature C)
+    if (data.monitoredWebsites && data.monitoredWebsites.length > 0) {
+      try {
+        const result = await this.mergeAndSave(
+          FILE_PATHS.monitoredWebsites,
+          data.monitoredWebsites,
+          (w: MonitoredWebsite) => w.url,
+          'websites',
+          merge,
+          (a, b) => (a.addedAt > b.addedAt ? a : b)
+        );
+        added += result.added;
+        updated += result.updated;
+      } catch (e) {
+        errors.push(
+          `Monitored websites: ${e instanceof Error ? e.message : e}`
+        );
+      }
     }
 
     // Import artist MBID mappings

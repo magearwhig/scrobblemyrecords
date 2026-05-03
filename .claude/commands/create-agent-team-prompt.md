@@ -81,9 +81,29 @@ Based on the work description and user answers, design the agent team. For each 
 
 **Principles Enforcer Agent** *(REQUIRED — always include)* - Reads dev_prompt.md and enforces all conventions. Has veto authority on convention violations. No code ships without this agent's sign-off.
 
-**Auditor Agent** *(REQUIRED — always include)* - Runs AFTER all other agents finish. Performs **functional end-to-end verification**, not just code-existence checks. Must: (1) start the dev server (`npm run start:web` or equivalent), (2) hit every new/modified API endpoint with curl and verify response shapes contain real data, (3) test actual user flows (open pages, trigger modals, verify data loads), (4) check that data persists across server restarts, (5) run the full test suite. Reports PASS/FAIL per item with evidence from actual server responses, not just file:line grep results. "Method exists at line 500" is NOT a pass — "endpoint returns 3 price snapshots with correct schema" IS a pass. If any item fails, the Auditor fixes it directly. This agent must be spawned as a full general-purpose agent (NOT Explore/read-only) so it can run the server and execute commands.
+**Auditor Agent** *(REQUIRED — always include)* - Runs AFTER all other agents finish. Performs **functional end-to-end verification**, not just code-existence checks. Must:
+  1. Start the SANDBOX server (`npm run sandbox` — never the real `./data` server) for any mutation verification.
+  2. Hit every new/modified API endpoint with curl and verify response shapes contain real data — including reading the actual JSON, not just trusting the declared TypeScript type. Field-name drift between backend and frontend is invisible to TypeScript and is the #1 source of "looks right but doesn't work" bugs.
+  3. Run the **abuse checklist** on every mutation:
+     - **Refresh test:** trigger the mutation, then re-fetch state. Does it survive? Catches read-modify-write races, optimistic-only updates, file-write loss.
+     - **Concurrency test:** trigger N parallel calls. Do all N persist or do some vanish? Required for any service method that touches a shared file.
+     - **Cross-stack contract:** trace one real backend response through the API client into a render. Confirm field names match end-to-end.
+     - **Empty / scale:** zero items, one item, many items.
+     - **Error paths:** offline backend, offline external API (Ollama, Discogs, MB), garbage input.
+  4. Verify data persists across server restarts (stop sandbox, restart with same `DATA_DIR`, confirm state survived).
+  5. Run the full test suite (`npm test`) and `tsc --noEmit` and `npm run build`.
+  6. Report PASS/FAIL per item with **evidence from actual server responses**, not just file:line grep results. "Method exists at line 500" is NOT a pass — "endpoint returns 3 price snapshots with correct schema, persists across refresh, 5 concurrent calls all survive" IS a pass. Sandbox curl output (`:3091`) is required evidence; `:3001` curl for a write operation is automatic FAIL.
+  7. If any item fails, the Auditor fixes it directly.
 
-**Quality Engineer Agent** - Error handling patterns, logging, observability, edge cases, graceful degradation. Reviews all agents for silent failures and untestable code.
+This agent must be spawned as a full general-purpose agent (NOT Explore/read-only) so it can run the sandbox, execute commands, and modify code.
+
+**Quality Engineer Agent** - Error handling patterns, logging, observability, edge cases, graceful degradation. Reviews all agents for silent failures and untestable code. Additionally, reviews for:
+  - **Partial-update safety**: Any handler that accepts a subset of a settings/state object (PATCH-style or partial POST) MUST merge with the existing on-disk value, with `undefined` fields stripped before merge. Verify by code-reading every `saveSettings`/`updateSettings`/`writeJSON*` call site:
+    - Service merge layer must filter out `undefined` entries before `{ ...current, ...updates }` (because `{...{a:1}, ...{a: undefined}}` overwrites `a` with `undefined`).
+    - Route handlers must NOT destructure-and-forward fields that weren't actually present in `req.body` — either pass `req.body` through directly or build an object only from defined keys.
+    - For any user-curated store (settings, monitored entities, preferences), confirm `writeJSONWithBackup` is used so a botched write leaves a recoverable `.bak`.
+  - **Cross-field clobber regression**: For every settings endpoint, write a test that toggles ONE field and asserts the OTHER fields retain their prior values.
+  - **Schema migration safety**: Any new field added to an existing `VersionedStore` must have a sensible default in `getSettings()` for stores written before the field existed; the read path must not return `undefined` for required fields.
 
 **Tech Debt / Architecture Agent** - Long-term codebase health, coupling/cohesion, abstraction quality, migration readiness. Tracks any new debt introduced with a remediation plan.
 
@@ -125,10 +145,25 @@ The generated prompt MUST follow this structure:
 ## Pre-Implementation Setup
 
 Before any work begins:
-1. Read `dev_prompt.md` — these are the LAW. Every convention, pattern, and constraint in this file is mandatory. No exceptions.
+1. Read `dev_prompt.md` — these are the LAW. Every convention, pattern, and constraint in this file is mandatory. No exceptions. Pay special attention to the "Definition of Done" section — those rules are not advisory, they are the bar for marking any task complete.
 2. Read `.plan/README.md` and `roadmap.md` for project context
 3. Read `src/shared/types.ts` for existing type patterns
 4. [Any additional files the agents need to read first]
+
+## Sandbox Discipline (MANDATORY)
+
+**Any task that mutates persisted state — adds/removes/edits records, toggles settings, marks items as seen, runs a scan that writes to disk — MUST be verified against the sandbox, never against the real `./data` directory.**
+
+The sandbox script (`npm run sandbox`) snapshots `./data` into a temp directory and starts a second backend instance on port 3091 with `DATA_DIR` pointed at the snapshot. The temp dir is `rm -rf`'d on Ctrl-C. Real `./data` is never touched.
+
+Implementation agents must:
+- Run `npm run sandbox` (or `npm run sandbox:fresh` for an empty data dir) before any mutation verification
+- Hit endpoints with `curl http://localhost:3091/...`, not `http://localhost:3001/...`
+- Stop the sandbox when done so the temp dir gets cleaned up
+
+Read-only verification (e.g., `GET /api/v1/labels`) can run against the real server. **Anything that writes — POST, PATCH, DELETE, scan triggers, settings saves — runs in the sandbox.**
+
+The Auditor agent must enforce this: any agent that submits a "PASS" with curl output from `:3001` for a write operation gets sent back. Evidence of sandbox use (command output showing `:3091`) is required.
 
 ## Agent Definitions
 
@@ -166,13 +201,15 @@ The Plan Validator agent runs BEFORE any implementation. It reads the plan/spec 
 
 ### Phase 4: Audit
 The Auditor agent runs AFTER all implementation and review agents complete. It performs **functional end-to-end verification** by:
-1. Starting the dev server and hitting every new/modified endpoint with curl
-2. Verifying response shapes contain real data (not just that the endpoint exists)
-3. Testing actual user flows — opening pages, triggering actions, checking data loads
-4. Verifying data persists across server restarts
-5. Running the full test suite
-6. Reporting PASS/FAIL per item with evidence from actual server responses
-7. Fixing any failures directly
+1. Starting the SANDBOX server (`npm run sandbox`) — never the real `./data` server — and hitting every new/modified endpoint with curl against `:3091`
+2. Verifying response shapes contain real data AND match the frontend's declared types (catches contract drift that TypeScript can't see)
+3. Running the abuse checklist on every mutation: refresh test (state survives), concurrency test (parallel calls all persist), empty/scale, error paths
+4. Testing actual user flows — opening pages, triggering actions, checking data loads
+5. Verifying data persists across server restarts (stop sandbox, restart with same `DATA_DIR`)
+6. Running the full test suite, `tsc --noEmit`, and `npm run build`
+7. Reporting PASS/FAIL per item with **evidence from actual sandbox server responses** (curl output from `:3091` is required; `:3001` curl for write operations is automatic FAIL)
+8. Fixing any failures directly
+9. Stopping the sandbox so the temp directory gets cleaned up
 
 ### Phase 5: Finalization
 [Define final checks, documentation, compliance verification — runs after Auditor passes everything]
@@ -185,10 +222,26 @@ The Auditor agent runs AFTER all implementation and review agents complete. It p
 
 [Detailed specs for the feature: API endpoints, database schemas, UI mockups/descriptions, algorithm definitions, configuration format, etc.]
 
+## Definition of Done (per-agent)
+
+Every implementation agent must satisfy these BEFORE marking their task complete via TaskUpdate. `tsc` and `jest` passing is **not enough** — they don't catch the bug classes that have repeatedly broken this codebase (file-write races, contract drift, partial-update wipe, missing UI wiring, relative URLs, duplicated utils).
+
+For any task that **adds or modifies code** the agent owns:
+1. **Used the feature.** Curled the new endpoint against the SANDBOX (`:3091`), pasted the actual JSON response in the SendMessage report, OR rendered the new UI and described what they saw. "It compiles" is not evidence.
+2. **Refresh test.** For any mutation: triggered it, then re-fetched. Confirmed state survived. Pasted before/after.
+3. **Concurrency test.** For any service method that does read-modify-write on a shared file: a jest test that fires N parallel calls and asserts all N persist. Reference `markItemsAsSeen` / `markReleasesAsSeen` for the canonical bulk-endpoint pattern.
+4. **Cross-stack contract.** For any new endpoint and frontend caller pair: confirmed the actual JSON shape matches what the API client claims to return. TypeScript does not catch this — `response.data.data as T` lies.
+5. **Greppable existing utils.** Before writing a new normalizer, classifier, formatter, or response shape, ran `grep -rn "<concept>" src/shared/utils src/backend src/renderer` and either found nothing or extended the existing one. Half the recent bugs came from rolling new versions of utils that already existed.
+6. **PATCH discipline.** Any new partial-update endpoint filters `undefined` out of the merge object before `{...current, ...partial}` (canonical pattern: `releaseTrackingService.saveSettings`).
+7. **Bulk discipline.** Any frontend bulk action calls a single bulk endpoint that does one read-mutate-write — never `Promise.allSettled(items.map(api.singleItem))` against single-item endpoints touching shared state.
+
+The Auditor enforces these. An agent that submits a "task complete" without evidence of items 1-3 (or items 6-7 where applicable) gets sent back automatically.
+
 ## Output Requirements
 
 For each piece of work, produce:
 - **Implemented code:** Production-ready, reviewed, and approved by all agents
+- **Sandbox verification evidence:** Curl outputs from `:3091` for every new write endpoint, before/after refresh tests for every mutation, and concurrent-call test results for every read-modify-write service method
 - **Consensus items:** Decisions all agents agreed on
 - **Tradeoff decisions:** Where agents disagreed, what was decided and why
 - **Remaining action items:** Anything deferred, grouped by severity

@@ -9,6 +9,8 @@
     "dev": "nodemon --exec ts-node src/server.ts",
     "dev:web": "NODE_OPTIONS='--max-old-space-size=8192' webpack serve --mode=development",
     "dev:app": "concurrently \"npm run dev\" \"npm run dev:web\"",
+    "sandbox": "./scripts/sandbox.sh",
+    "sandbox:fresh": "./scripts/sandbox.sh --fresh",
     "start": "node dist/server.js",
     "start:web": "npm run build && concurrently \"npm run start\" \"npx serve dist/web -p 8080\"",
     "test": "jest",
@@ -40,6 +42,7 @@
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.18",
     "axios": "^1.10.0",
+    "cheerio": "^1.2.0",
     "cors": "^2.8.5",
     "dotenv": "^17.0.1",
     "express": "^4.21.2",

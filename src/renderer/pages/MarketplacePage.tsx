@@ -10,9 +10,11 @@ import { ROUTES, navigate } from '../routes';
 import { getApiService } from '../services/api';
 import { getTabFromUrl } from '../utils/tabUtils';
 
+import LabelsPage from './LabelsPage';
 import NewReleasesPage from './NewReleasesPage';
 import SellerMatchesPage from './SellerMatchesPage';
 import SellersPage from './SellersPage';
+import WebsitesPage from './WebsitesPage';
 import WishlistPage from './WishlistPage';
 
 type MarketplaceTab =
@@ -20,7 +22,9 @@ type MarketplaceTab =
   | 'new-releases'
   | 'sellers'
   | 'matches'
-  | 'missing-albums';
+  | 'missing-albums'
+  | 'labels'
+  | 'websites';
 
 const VALID_TABS: MarketplaceTab[] = [
   'wishlist',
@@ -28,6 +32,8 @@ const VALID_TABS: MarketplaceTab[] = [
   'sellers',
   'matches',
   'missing-albums',
+  'labels',
+  'websites',
 ];
 
 const TAB_LABELS: Record<MarketplaceTab, string> = {
@@ -36,6 +42,8 @@ const TAB_LABELS: Record<MarketplaceTab, string> = {
   sellers: 'Local Sellers',
   matches: 'Seller Matches',
   'missing-albums': 'Missing Albums',
+  labels: 'Labels',
+  websites: 'Websites',
 };
 
 const MarketplacePage: React.FC = () => {
@@ -135,6 +143,8 @@ const MarketplacePage: React.FC = () => {
         {activeTab === 'sellers' && <SellersPage embedded />}
         {activeTab === 'matches' && <SellerMatchesPage embedded />}
         {activeTab === 'missing-albums' && <MissingAlbumsContainer />}
+        {activeTab === 'labels' && <LabelsPage embedded />}
+        {activeTab === 'websites' && <WebsitesPage embedded />}
       </div>
     </div>
   );

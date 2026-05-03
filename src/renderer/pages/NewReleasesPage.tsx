@@ -24,7 +24,7 @@ import {
 } from '../hooks/useNotifications';
 import { getApiService } from '../services/api';
 
-type TabType = 'all' | 'upcoming' | 'recent' | 'vinyl';
+type TabType = 'all' | 'upcoming' | 'recent' | 'vinyl' | 'reissues';
 type SortOption = 'releaseDate' | 'artistName' | 'title' | 'firstSeen';
 
 interface DisambiguationModalState {
@@ -62,6 +62,7 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
   const [sortBy, setSortBy] = useState<SortOption>('releaseDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['album', 'ep']);
+  const [artistFilter, setArtistFilter] = useState<string>('');
 
   // Sync state
   const [isPolling, setIsPolling] = useState(false);
@@ -212,6 +213,17 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
       case 'vinyl':
         filtered = filtered.filter(r => r.vinylStatus === 'available');
         break;
+      case 'reissues':
+        filtered = filtered.filter(r => r.isReissue === true);
+        break;
+    }
+
+    // Artist filter (free-text contains, case-insensitive)
+    const artistQuery = artistFilter.trim().toLowerCase();
+    if (artistQuery) {
+      filtered = filtered.filter(r =>
+        r.artistName.toLowerCase().includes(artistQuery)
+      );
     }
 
     // Sort
@@ -235,7 +247,36 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
     });
 
     return filtered;
-  }, [releases, hiddenReleases, activeTab, sortBy, sortOrder]);
+  }, [releases, hiddenReleases, activeTab, sortBy, sortOrder, artistFilter]);
+
+  // Build a release-group → original first-release-date lookup so reissue
+  // cards can show "Orig. 2003 → Reissue 2026" without a backend round-trip.
+  // The release-group's own TrackedRelease (when it exists) is the entry
+  // whose `mbid === releaseGroupMbid` — that row's `releaseDate` is the
+  // first-release-date from MusicBrainz.
+  const originalReleaseDates = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const r of releases) {
+      // Only the release-group entries (non-reissues) have first-release dates
+      if (!r.isReissue) {
+        map.set(r.mbid, r.releaseDate);
+      }
+    }
+    return map;
+  }, [releases]);
+
+  // Distinct artists in current tab — used for an artist filter datalist.
+  const artistOptions = useMemo(() => {
+    let pool = releases.filter(r => !hiddenReleases.has(r.mbid));
+    if (activeTab === 'reissues') pool = pool.filter(r => r.isReissue === true);
+    else if (activeTab === 'upcoming') pool = pool.filter(r => r.isUpcoming);
+    else if (activeTab === 'recent') pool = pool.filter(r => !r.isUpcoming);
+    else if (activeTab === 'vinyl')
+      pool = pool.filter(r => r.vinylStatus === 'available');
+    return Array.from(new Set(pool.map(r => r.artistName))).sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }, [releases, hiddenReleases, activeTab]);
 
   // Open disambiguation modal
   const openDisambiguationModal = (
@@ -653,6 +694,13 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
           Vinyl Available (
           {releases.filter(r => r.vinylStatus === 'available').length})
         </button>
+        <button
+          className={`tab ${activeTab === 'reissues' ? 'active' : ''}`}
+          onClick={() => setActiveTab('reissues')}
+          title='Reissues and repressings of older release groups detected via MusicBrainz /release endpoint'
+        >
+          Reissues ({releases.filter(r => r.isReissue === true).length})
+        </button>
       </div>
 
       {/* Filters */}
@@ -677,6 +725,33 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
           >
             {sortOrder === 'asc' ? '↑' : '↓'}
           </button>
+        </div>
+
+        <div className='filter-group'>
+          <label htmlFor='release-artist-filter'>Artist:</label>
+          <input
+            id='release-artist-filter'
+            type='search'
+            list='release-artist-options'
+            placeholder='Filter by artist...'
+            value={artistFilter}
+            onChange={e => setArtistFilter(e.target.value)}
+          />
+          <datalist id='release-artist-options'>
+            {artistOptions.map(name => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+          {artistFilter && (
+            <button
+              className='sort-order-btn'
+              onClick={() => setArtistFilter('')}
+              title='Clear artist filter'
+              aria-label='Clear artist filter'
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         <div className='filter-group'>
@@ -742,6 +817,15 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
               onAddToWishlist={handleAddToWishlist}
               onHide={handleHideRelease}
               onExcludeArtist={handleExcludeArtist}
+              originalReleaseDate={
+                release.isReissue
+                  ? (release.originalReleaseDate ??
+                    (release.releaseGroupMbid
+                      ? (originalReleaseDates.get(release.releaseGroupMbid) ??
+                        null)
+                      : null))
+                  : null
+              }
             />
           ))}
         </div>

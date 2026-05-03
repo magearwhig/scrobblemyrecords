@@ -329,6 +329,54 @@ describe('Releases Routes - Hidden/Excluded', () => {
       );
     });
 
+    it('should pass reissuesOnly=true through to the service', async () => {
+      mockReleaseTrackingService.getFilteredReleases.mockResolvedValue(
+        [] as never
+      );
+
+      await request(app).get('/api/v1/releases?reissuesOnly=true');
+
+      expect(
+        mockReleaseTrackingService.getFilteredReleases
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reissuesOnly: true,
+        })
+      );
+    });
+
+    it('should pass reissuesOnly=false through to the service', async () => {
+      mockReleaseTrackingService.getFilteredReleases.mockResolvedValue(
+        [] as never
+      );
+
+      await request(app).get('/api/v1/releases?reissuesOnly=false');
+
+      expect(
+        mockReleaseTrackingService.getFilteredReleases
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reissuesOnly: false,
+        })
+      );
+    });
+
+    it('should default reissuesOnly to false when omitted', async () => {
+      mockReleaseTrackingService.getFilteredReleases.mockResolvedValue(
+        [] as never
+      );
+
+      await request(app).get('/api/v1/releases');
+
+      expect(
+        mockReleaseTrackingService.getFilteredReleases
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reissuesOnly: false,
+        })
+      );
+    });
+
     it('should filter out invalid types', async () => {
       mockReleaseTrackingService.getFilteredReleases.mockResolvedValue(
         [] as never

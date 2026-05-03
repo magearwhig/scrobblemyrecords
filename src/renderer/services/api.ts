@@ -35,6 +35,9 @@ import {
   HiddenAlbum,
   HiddenArtist,
   HiddenRelease,
+  LabelMonitoringSettings,
+  LabelRelease,
+  LabelScanStatus,
   LastFmConnectionTestResult,
   LastFmRecentTrack,
   LastFmSessionKeyInfo,
@@ -44,7 +47,9 @@ import {
   MarketplaceStats,
   MissingAlbum,
   MissingArtist,
+  MonitoredLabel,
   MonitoredSeller,
+  MonitoredWebsite,
   MusicBrainzArtistMatch,
   NewReleaseSyncStatus,
   RecommendationResult,
@@ -69,6 +74,9 @@ import {
   TrackMapping,
   TrackSearchResult,
   UpdateDiscardPileItemRequest,
+  WebsiteItem,
+  WebsiteMonitoringSettings,
+  WebsiteScanStatus,
   WishlistNewRelease,
   WishlistSettings,
   WishlistSyncStatus,
@@ -1461,6 +1469,302 @@ class ApiService {
   }
 
   // ============================================
+  // Label Monitoring methods (Feature: Label Discovery)
+  // ============================================
+
+  async getLabels(): Promise<MonitoredLabel[]> {
+    const response = await this.api.get('/labels');
+    return response.data.data;
+  }
+
+  async addLabel(
+    discogsLabelId: number,
+    displayName?: string,
+    lookbackMonths?: number
+  ): Promise<MonitoredLabel> {
+    const response = await this.api.post('/labels', {
+      discogsLabelId,
+      displayName,
+      lookbackMonths,
+    });
+    return response.data.data;
+  }
+
+  async removeLabel(labelId: string): Promise<void> {
+    await this.api.delete(`/labels/${encodeURIComponent(labelId)}`);
+  }
+
+  async searchDiscogsLabels(query: string): Promise<
+    Array<{
+      id: number;
+      name: string;
+      thumbUrl?: string;
+    }>
+  > {
+    const response = await this.api.get('/labels/search', {
+      params: { q: query },
+    });
+    return response.data.data;
+  }
+
+  async getWishlistLabelOptions(): Promise<
+    Array<{
+      name: string;
+      artists: string[];
+      count: number;
+    }>
+  > {
+    const response = await this.api.get('/labels/wishlist-label-options');
+    return response.data.data;
+  }
+
+  async getWishlistArtistOptions(): Promise<
+    Array<{
+      name: string;
+      count: number;
+      sources: Array<'wishlist' | 'local-want'>;
+    }>
+  > {
+    const response = await this.api.get('/labels/wishlist-artist-options');
+    return response.data.data;
+  }
+
+  async getArtistWebsiteUrls(artistName: string): Promise<
+    Array<{
+      url: string;
+      kind: 'bandcamp' | 'soundcloud' | 'homepage' | 'other';
+    }>
+  > {
+    const response = await this.api.get('/labels/artist-urls', {
+      params: { artistName },
+    });
+    return response.data.data;
+  }
+
+  async getWebsiteSuggestions(excludeUrls: string[] = []): Promise<
+    Array<{
+      url: string;
+      suggestedName: string;
+      sourceType: 'label' | 'artist';
+      sourceName: string;
+      kind: 'bandcamp' | 'soundcloud' | 'homepage' | 'other';
+    }>
+  > {
+    const params: Record<string, string> = {};
+    if (excludeUrls.length > 0) params.exclude = excludeUrls.join(',');
+    const response = await this.api.get('/labels/website-suggestions', {
+      params,
+    });
+    return response.data.data;
+  }
+
+  async scanLabels(): Promise<LabelScanStatus> {
+    const response = await this.api.post('/labels/scan');
+    return response.data.data;
+  }
+
+  async scanSingleLabel(labelId: string): Promise<LabelScanStatus> {
+    const response = await this.api.post(
+      `/labels/${encodeURIComponent(labelId)}/scan`
+    );
+    return response.data.data;
+  }
+
+  async cancelLabelScan(): Promise<{ cancelled: boolean }> {
+    const response = await this.api.post('/labels/scan/cancel');
+    return response.data.data;
+  }
+
+  async getLabelScanStatus(): Promise<LabelScanStatus> {
+    const response = await this.api.get('/labels/scan/status');
+    return response.data.data;
+  }
+
+  async getLabelReleases(labelId?: string): Promise<LabelRelease[]> {
+    const response = await this.api.get('/labels/releases', {
+      params: labelId ? { labelId } : undefined,
+    });
+    return response.data.data;
+  }
+
+  async bulkMarkLabelReleasesSeen(
+    releaseIds: string[]
+  ): Promise<{ updated: number; missing: string[] }> {
+    const response = await this.api.post('/labels/releases/bulk-seen', {
+      releaseIds,
+    });
+    return response.data.data;
+  }
+
+  async bulkDismissLabelReleases(
+    releaseIds: string[]
+  ): Promise<{ updated: number; missing: string[] }> {
+    const response = await this.api.post('/labels/releases/bulk-dismiss', {
+      releaseIds,
+    });
+    return response.data.data;
+  }
+
+  async markLabelReleaseSeen(releaseId: string): Promise<void> {
+    await this.api.post(
+      `/labels/releases/${encodeURIComponent(releaseId)}/seen`
+    );
+  }
+
+  async dismissLabelRelease(releaseId: string): Promise<void> {
+    await this.api.post(
+      `/labels/releases/${encodeURIComponent(releaseId)}/dismiss`
+    );
+  }
+
+  async getLabelSettings(): Promise<LabelMonitoringSettings> {
+    const response = await this.api.get('/labels/settings');
+    return response.data.data;
+  }
+
+  async updateLabelSettings(
+    settings: Partial<LabelMonitoringSettings>
+  ): Promise<LabelMonitoringSettings> {
+    const response = await this.api.post('/labels/settings', settings);
+    return response.data.data;
+  }
+
+  // ============================================
+  // Website Monitoring methods (Feature: Website Discovery via Ollama)
+  // ============================================
+
+  async getWebsites(): Promise<MonitoredWebsite[]> {
+    const response = await this.api.get('/websites');
+    return response.data.data;
+  }
+
+  async addWebsite(input: {
+    name: string;
+    url: string;
+    cssSelector?: string;
+    useOllama?: boolean;
+    enabled?: boolean;
+  }): Promise<MonitoredWebsite> {
+    const response = await this.api.post('/websites', input);
+    return response.data.data;
+  }
+
+  async updateWebsite(
+    id: string,
+    updates: Partial<
+      Pick<
+        MonitoredWebsite,
+        'name' | 'url' | 'cssSelector' | 'useOllama' | 'enabled'
+      >
+    >
+  ): Promise<MonitoredWebsite> {
+    const response = await this.api.patch(
+      `/websites/${encodeURIComponent(id)}`,
+      updates
+    );
+    return response.data.data;
+  }
+
+  async removeWebsite(id: string): Promise<void> {
+    await this.api.delete(`/websites/${encodeURIComponent(id)}`);
+  }
+
+  async previewWebsite(input: {
+    url: string;
+    cssSelector?: string;
+    useOllama?: boolean;
+  }): Promise<{
+    items: WebsiteItem[];
+    rawText?: string;
+    ollamaAvailable: boolean;
+    warning?: string;
+    suggestedCssSelector?: string;
+  }> {
+    const response = await this.api.post('/websites/preview', input, {
+      timeout: 90000, // Ollama extraction can be slow
+    });
+    return response.data.data;
+  }
+
+  async scanWebsites(): Promise<WebsiteScanStatus> {
+    const response = await this.api.post('/websites/scan');
+    return response.data.data;
+  }
+
+  async scanSingleWebsite(id: string): Promise<WebsiteScanStatus> {
+    const response = await this.api.post(
+      `/websites/${encodeURIComponent(id)}/scan`
+    );
+    return response.data.data;
+  }
+
+  async cancelWebsiteScan(): Promise<{ cancelled: boolean }> {
+    const response = await this.api.post('/websites/scan/cancel');
+    return response.data.data;
+  }
+
+  async getWebsiteScanStatus(): Promise<WebsiteScanStatus> {
+    const response = await this.api.get('/websites/scan/status');
+    return response.data.data;
+  }
+
+  async getWebsiteItems(websiteId?: string): Promise<WebsiteItem[]> {
+    const response = await this.api.get('/websites/items', {
+      params: websiteId ? { websiteId } : undefined,
+    });
+    return response.data.data;
+  }
+
+  async bulkMarkWebsiteItemsSeen(
+    itemIds: string[]
+  ): Promise<{ updated: number; missing: string[] }> {
+    const response = await this.api.post('/websites/items/bulk-seen', {
+      itemIds,
+    });
+    return response.data.data;
+  }
+
+  async bulkDismissWebsiteItems(
+    itemIds: string[]
+  ): Promise<{ updated: number; missing: string[] }> {
+    const response = await this.api.post('/websites/items/bulk-dismiss', {
+      itemIds,
+    });
+    return response.data.data;
+  }
+
+  async markWebsiteItemSeen(itemId: string): Promise<void> {
+    await this.api.post(`/websites/items/${encodeURIComponent(itemId)}/seen`);
+  }
+
+  async dismissWebsiteItem(itemId: string): Promise<void> {
+    await this.api.post(
+      `/websites/items/${encodeURIComponent(itemId)}/dismiss`
+    );
+  }
+
+  async getWebsiteSettings(): Promise<WebsiteMonitoringSettings> {
+    const response = await this.api.get('/websites/settings');
+    return response.data.data;
+  }
+
+  async updateWebsiteSettings(
+    settings: Partial<WebsiteMonitoringSettings>
+  ): Promise<WebsiteMonitoringSettings> {
+    const response = await this.api.post('/websites/settings', settings);
+    return response.data.data;
+  }
+
+  async getOllamaStatus(): Promise<{
+    available: boolean;
+    model?: string;
+    error?: string;
+  }> {
+    const response = await this.api.get('/websites/ollama/status');
+    return response.data.data;
+  }
+
+  // ============================================
   // Release Tracking methods (Feature 5)
   // ============================================
 
@@ -1468,6 +1772,7 @@ class ApiService {
     types?: string;
     vinylOnly?: boolean;
     upcomingOnly?: boolean;
+    reissuesOnly?: boolean;
     artistMbid?: string;
     sortBy?: string;
     sortOrder?: string;
@@ -1512,6 +1817,7 @@ class ApiService {
     includeEps: boolean;
     includeSingles: boolean;
     includeCompilations: boolean;
+    includeReissues: boolean;
   }> {
     const response = await this.api.get('/releases/settings');
     return response.data.data;
@@ -1524,6 +1830,7 @@ class ApiService {
     includeEps?: boolean;
     includeSingles?: boolean;
     includeCompilations?: boolean;
+    includeReissues?: boolean;
   }): Promise<{
     autoCheckOnStartup: boolean;
     checkFrequencyDays: number;
@@ -1531,6 +1838,7 @@ class ApiService {
     includeEps: boolean;
     includeSingles: boolean;
     includeCompilations: boolean;
+    includeReissues: boolean;
   }> {
     const response = await this.api.post('/releases/settings', settings);
     return response.data.data;

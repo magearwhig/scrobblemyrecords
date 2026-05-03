@@ -52,3 +52,39 @@ export function createNormalizedTrackKey(
 ): string {
   return `${normalizeForMatching(artist)}|${normalizeForMatching(album)}|${normalizeForMatching(track)}`;
 }
+
+/**
+ * Normalize an artist name for cross-source matching.
+ *
+ * Stricter than `normalizeForMatching` — also strips a leading "The " and
+ * all non-alphanumeric characters. Required when matching artists across
+ * sources that disagree on the article ("The Von Bondies" / "Von Bondies")
+ * or punctuation ("Tyler, The Creator" / "Tyler the Creator").
+ */
+export function normalizeArtistName(name: string): string {
+  if (!name) return '';
+  return (
+    name
+      .toLowerCase()
+      // Strip Discogs disambiguation suffix "(2)", "(3)", …
+      .replace(/\s*\(\d+\)\s*$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      // Strip leading "the "
+      .replace(/^the\s+/i, '')
+      // Strip non-alphanumeric (keep spaces) — drops commas, ampersands, etc.
+      .replace(/[^\w\s]/g, '')
+      .trim()
+  );
+}
+
+/**
+ * Create a normalized "artist|album" key suitable for cross-source matching
+ * (e.g. wishlist albums vs. extracted website items). Uses the strict
+ * `normalizeArtistName` for the artist side and `normalizeForMatching` for
+ * the album side (album names rarely benefit from "The" stripping but
+ * commonly carry edition/remaster suffixes).
+ */
+export function createArtistAlbumKey(artist: string, album: string): string {
+  return `${normalizeArtistName(artist)}|${normalizeForMatching(album)}`;
+}

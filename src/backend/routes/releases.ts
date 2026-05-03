@@ -32,6 +32,7 @@ export default function createReleasesRouter(
    *   - types: comma-separated list of release types (album,ep,single,compilation)
    *   - vinylOnly: boolean - only show releases with vinyl available
    *   - upcomingOnly: boolean - only show upcoming releases
+   *   - reissuesOnly: boolean - only show releases flagged as reissues
    *   - artistMbid: string - filter by artist MusicBrainz ID
    *   - sortBy: releaseDate | artistName | title | firstSeen
    *   - sortOrder: asc | desc
@@ -43,6 +44,7 @@ export default function createReleasesRouter(
         types,
         vinylOnly,
         upcomingOnly,
+        reissuesOnly,
         artistMbid,
         sortBy,
         sortOrder,
@@ -62,6 +64,7 @@ export default function createReleasesRouter(
         types: parsedTypes,
         vinylOnly: vinylOnly === 'true',
         upcomingOnly: upcomingOnly === 'true',
+        reissuesOnly: reissuesOnly === 'true',
         artistMbid: artistMbid as string,
         sortBy: sortBy as 'releaseDate' | 'artistName' | 'title' | 'firstSeen',
         sortOrder: sortOrder as 'asc' | 'desc',
@@ -198,6 +201,7 @@ export default function createReleasesRouter(
         includeEps,
         includeSingles,
         includeCompilations,
+        includeReissues,
       } = req.body;
 
       const settings = await releaseTrackingService.saveSettings({
@@ -207,6 +211,7 @@ export default function createReleasesRouter(
         includeEps,
         includeSingles,
         includeCompilations,
+        includeReissues,
       });
 
       res.json({

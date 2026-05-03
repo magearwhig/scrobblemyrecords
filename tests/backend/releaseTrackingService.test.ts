@@ -123,6 +123,7 @@ describe('ReleaseTrackingService', () => {
         includeEps: true,
         includeSingles: false,
         includeCompilations: false,
+        includeReissues: true,
       });
     });
 
@@ -136,6 +137,7 @@ describe('ReleaseTrackingService', () => {
         includeEps: false,
         includeSingles: true,
         includeCompilations: true,
+        includeReissues: false,
       };
       mockFileStorage.readJSON.mockResolvedValue(storedSettings);
 
@@ -2635,6 +2637,500 @@ describe('ReleaseTrackingService', () => {
 
       // Assert
       expect(result?.vinylStatus).toBe('unknown');
+    });
+  });
+
+  // ============================================
+  // Reissue Detection (Feature A)
+  // ============================================
+  describe('toReissueTrackedRelease (private)', () => {
+    type MBReleaseLite =
+      Parameters<
+        typeof MusicBrainzService.prototype.getRecentReleases
+      > extends never[]
+        ? never
+        : ReturnType<
+              typeof MusicBrainzService.prototype.getRecentReleases
+            > extends Promise<infer R>
+          ? R extends Array<infer Item>
+            ? Item
+            : never
+          : never;
+
+    const callPrivate = (r: MBReleaseLite) =>
+      (
+        service as unknown as {
+          toReissueTrackedRelease: (rr: MBReleaseLite) => unknown;
+        }
+      ).toReissueTrackedRelease(r);
+
+    it('flags as reissue with releaseGroupMbid + sourceType=musicbrainz', () => {
+      const result = callPrivate({
+        mbid: 'release-mbid-2026',
+        title: '20th Anniversary Reissue',
+        date: '2026-04-01',
+        country: 'US',
+        status: 'Official',
+        releaseGroupMbid: 'rg-2003',
+        releaseGroupTitle: 'Original Album',
+        releaseGroupPrimaryType: 'Album',
+        releaseGroupSecondaryTypes: [],
+        releaseType: 'album',
+        artistName: 'WHY?',
+        artistMbid: 'why-mbid',
+        labelName: 'Anticon',
+      } as MBReleaseLite) as Record<string, unknown>;
+
+      expect(result).toMatchObject({
+        mbid: 'release-mbid-2026',
+        title: '20th Anniversary Reissue',
+        artistName: 'WHY?',
+        artistMbid: 'why-mbid',
+        releaseDate: '2026-04-01',
+        releaseType: 'album',
+        vinylStatus: 'unknown',
+        isReissue: true,
+        releaseGroupMbid: 'rg-2003',
+        sourceType: 'musicbrainz',
+        labelName: 'Anticon',
+        country: 'US',
+        inWishlist: false,
+      });
+    });
+
+    it('propagates originalReleaseDate from MBReleaseLite onto TrackedRelease', () => {
+      const result = callPrivate({
+        mbid: 'release-mbid-2026',
+        title: '20th Anniversary Reissue',
+        date: '2026-04-01',
+        country: 'US',
+        releaseGroupMbid: 'rg-2003',
+        releaseType: 'album',
+        artistName: 'WHY?',
+        artistMbid: 'why-mbid',
+        originalReleaseDate: '2003-09-23',
+      } as MBReleaseLite) as Record<string, unknown>;
+
+      expect(result.originalReleaseDate).toBe('2003-09-23');
+    });
+
+    it('stores null originalReleaseDate when MB lookup yielded none', () => {
+      const result = callPrivate({
+        mbid: 'r1',
+        title: 'Reissue with no parent date',
+        date: '2026-04-01',
+        releaseGroupMbid: 'rg-x',
+        releaseType: 'album',
+        artistName: 'A',
+        artistMbid: 'am',
+        originalReleaseDate: null,
+      } as MBReleaseLite) as Record<string, unknown>;
+
+      expect(result.originalReleaseDate).toBeNull();
+    });
+
+    it('marks as upcoming when date is future', () => {
+      const future = `${new Date().getUTCFullYear() + 5}-01-01`;
+      const result = callPrivate({
+        mbid: 'r1',
+        title: 'Future',
+        date: future,
+        releaseGroupMbid: 'rg-1',
+        releaseType: 'album',
+        artistName: 'A',
+        artistMbid: 'am',
+      } as MBReleaseLite) as Record<string, unknown>;
+      expect(result.isUpcoming).toBe(true);
+    });
+
+    it('handles null date without crashing', () => {
+      const result = callPrivate({
+        mbid: 'r1',
+        title: 'Unknown date',
+        date: null,
+        releaseGroupMbid: 'rg-1',
+        releaseType: 'album',
+        artistName: 'A',
+        artistMbid: 'am',
+      } as MBReleaseLite) as Record<string, unknown>;
+      expect(result.isUpcoming).toBe(false);
+      expect(result.releaseDate).toBeNull();
+    });
+  });
+
+  describe('getFilteredReleases reissuesOnly', () => {
+    const mixedStore: TrackedReleasesStore = {
+      schemaVersion: 1,
+      lastUpdated: Date.now(),
+      releases: [
+        {
+          mbid: 'rg-new',
+          title: 'New Album',
+          artistName: 'A',
+          artistMbid: 'a-mbid',
+          releaseDate: '2026-01-15',
+          releaseType: 'album',
+          vinylStatus: 'unknown',
+          firstSeen: Date.now(),
+          isUpcoming: false,
+          inWishlist: false,
+        },
+        {
+          mbid: 'release-2026-reissue',
+          title: '20th Anniversary',
+          artistName: 'A',
+          artistMbid: 'a-mbid',
+          releaseDate: '2026-04-01',
+          releaseType: 'album',
+          vinylStatus: 'unknown',
+          firstSeen: Date.now(),
+          isUpcoming: false,
+          inWishlist: false,
+          isReissue: true,
+          releaseGroupMbid: 'rg-2003',
+          sourceType: 'musicbrainz',
+          labelName: 'Anticon',
+        },
+      ],
+    };
+
+    it('returns only reissues when reissuesOnly=true', async () => {
+      mockFileStorage.readJSON.mockResolvedValue(mixedStore);
+      const releases = await service.getFilteredReleases({
+        reissuesOnly: true,
+      });
+      expect(releases).toHaveLength(1);
+      expect(releases[0].mbid).toBe('release-2026-reissue');
+      expect(releases[0].isReissue).toBe(true);
+    });
+
+    it('returns all releases when reissuesOnly is false/undefined', async () => {
+      mockFileStorage.readJSON.mockResolvedValue(mixedStore);
+      const releases = await service.getFilteredReleases({});
+      expect(releases).toHaveLength(2);
+    });
+  });
+
+  describe('syncReleases reissue branch', () => {
+    type MBLite = {
+      mbid: string;
+      title: string;
+      date: string | null;
+      country?: string;
+      status?: string;
+      releaseGroupMbid: string;
+      releaseGroupTitle?: string;
+      releaseGroupPrimaryType?: string;
+      releaseGroupSecondaryTypes?: string[];
+      releaseType: 'album' | 'ep' | 'single' | 'compilation' | 'other';
+      artistName: string;
+      artistMbid: string;
+      labelName?: string;
+    };
+
+    const SETTINGS = {
+      schemaVersion: 1,
+      autoCheckOnStartup: false,
+      checkFrequencyDays: 7,
+      notifyOnNewRelease: true,
+      includeEps: true,
+      includeSingles: false,
+      includeCompilations: false,
+    } as const;
+
+    const setupSyncFixture = (overrides: {
+      includeReissues: boolean;
+      reissuesByArtist?: Record<string, MBLite[]>;
+      releaseGroupsByArtist?: Record<
+        string,
+        Array<{
+          mbid: string;
+          title: string;
+          artistName: string;
+          artistMbid: string;
+          releaseDate: string | null;
+          releaseType: 'album' | 'ep';
+        }>
+      >;
+      existingTrackedMbids?: string[];
+      reissueError?: Error | null;
+    }) => {
+      const settings: ReleaseTrackingSettings = {
+        ...SETTINGS,
+        includeReissues: overrides.includeReissues,
+      };
+
+      // getSettings returns settings; getSyncStatus default; getTrackedReleases
+      // returns existing; getArtistMappings returns mappings. Use path-based
+      // routing for readJSON.
+      const existingReleasesStore: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: (overrides.existingTrackedMbids || []).map(mbid => ({
+          mbid,
+          title: `Existing ${mbid}`,
+          artistName: 'A',
+          artistMbid: 'a-mbid',
+          releaseDate: '2024-01-01',
+          releaseType: 'album',
+          vinylStatus: 'unknown',
+          firstSeen: Date.now(),
+          isUpcoming: false,
+          inWishlist: false,
+        })),
+      };
+
+      const mappingsStore: ArtistMbidMappingsStore = {
+        schemaVersion: 1,
+        mappings: [
+          {
+            discogsArtistName: 'Artist One',
+            normalizedName: 'artist one',
+            mbid: 'mbid-artist-one',
+            confirmedAt: Date.now(),
+            confirmedBy: 'user',
+          },
+          {
+            discogsArtistName: 'Artist Two',
+            normalizedName: 'artist two',
+            mbid: 'mbid-artist-two',
+            confirmedAt: Date.now(),
+            confirmedBy: 'user',
+          },
+        ],
+      };
+
+      const collectionCache: CollectionArtistsCacheStore = {
+        schemaVersion: 1,
+        fetchedAt: Date.now(),
+        artists: [
+          {
+            name: 'Artist One',
+            normalizedName: 'artist one',
+          },
+          {
+            name: 'Artist Two',
+            normalizedName: 'artist two',
+          },
+        ],
+      };
+
+      const syncStatusStore: ReleaseSyncStatusStore = {
+        schemaVersion: 1,
+        status: {
+          status: 'idle',
+          lastSync: null,
+          artistsProcessed: 0,
+          totalArtists: 0,
+          releasesFound: 0,
+          pendingDisambiguations: 0,
+          progress: 0,
+        },
+      };
+
+      const disambiguationsStore: PendingDisambiguationsStore = {
+        schemaVersion: 1,
+        pending: [],
+      };
+
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'releases/settings.json') return settings;
+        if (path === 'releases/sync-status.json') return syncStatusStore;
+        if (path === 'releases/tracked-releases.json')
+          return existingReleasesStore;
+        if (path === 'releases/artist-mbid-map.json') return mappingsStore;
+        if (path === 'releases/pending-disambiguations.json')
+          return disambiguationsStore;
+        if (path === 'releases/collection-artists-cache.json')
+          return collectionCache;
+        return null;
+      });
+
+      // Mock release-group fetch (main path) — returns nothing (no new RGs)
+      mockMusicBrainzService.getRecentAndUpcomingReleases.mockImplementation(
+        async (mbid: string) => {
+          return overrides.releaseGroupsByArtist?.[mbid] || [];
+        }
+      );
+
+      // Mock reissue fetch
+      mockMusicBrainzService.getRecentReleases = jest
+        .fn()
+        .mockImplementation(async (mbid: string) => {
+          if (overrides.reissueError) {
+            throw overrides.reissueError;
+          }
+          return overrides.reissuesByArtist?.[mbid] || [];
+        });
+
+      // No-op cover art fetcher
+      mockMusicBrainzService.batchGetCoverArtUrls.mockResolvedValue(new Map());
+    };
+
+    it('does NOT call getRecentReleases when includeReissues=false', async () => {
+      setupSyncFixture({ includeReissues: false });
+
+      await service.syncReleases('tester');
+
+      expect(mockMusicBrainzService.getRecentReleases).not.toHaveBeenCalled();
+    });
+
+    it('calls getRecentReleases per artist when includeReissues=true', async () => {
+      setupSyncFixture({
+        includeReissues: true,
+        reissuesByArtist: {
+          'mbid-artist-one': [],
+          'mbid-artist-two': [],
+        },
+      });
+
+      await service.syncReleases('tester');
+
+      expect(mockMusicBrainzService.getRecentReleases).toHaveBeenCalledWith(
+        'mbid-artist-one',
+        12
+      );
+      expect(mockMusicBrainzService.getRecentReleases).toHaveBeenCalledWith(
+        'mbid-artist-two',
+        12
+      );
+      expect(mockMusicBrainzService.getRecentReleases).toHaveBeenCalledTimes(2);
+    });
+
+    it('persists discovered reissues with isReissue=true', async () => {
+      setupSyncFixture({
+        includeReissues: true,
+        reissuesByArtist: {
+          'mbid-artist-one': [
+            {
+              mbid: 'release-2026-1',
+              title: 'Reissue 2026',
+              date: '2026-04-01',
+              country: 'US',
+              status: 'Official',
+              releaseGroupMbid: 'rg-2003',
+              releaseType: 'album',
+              artistName: 'Artist One',
+              artistMbid: 'mbid-artist-one',
+              labelName: 'Anticon',
+            },
+          ],
+          'mbid-artist-two': [],
+        },
+      });
+
+      await service.syncReleases('tester');
+
+      // Find the writeJSONWithBackup call for tracked-releases.json
+      const writes = mockFileStorage.writeJSONWithBackup.mock.calls.filter(
+        c => c[0] === 'releases/tracked-releases.json'
+      );
+      expect(writes.length).toBeGreaterThan(0);
+      const lastWrite = writes[writes.length - 1][1] as TrackedReleasesStore;
+      const reissueEntry = lastWrite.releases.find(
+        r => r.mbid === 'release-2026-1'
+      );
+      expect(reissueEntry).toBeDefined();
+      expect(reissueEntry?.isReissue).toBe(true);
+      expect(reissueEntry?.releaseGroupMbid).toBe('rg-2003');
+      expect(reissueEntry?.sourceType).toBe('musicbrainz');
+    });
+
+    it('dedupes reissues whose mbid already appears in tracked releases', async () => {
+      setupSyncFixture({
+        includeReissues: true,
+        existingTrackedMbids: ['existing-mbid'],
+        reissuesByArtist: {
+          'mbid-artist-one': [
+            {
+              mbid: 'existing-mbid', // collision
+              title: 'Should be skipped',
+              date: '2026-01-01',
+              releaseGroupMbid: 'rg-x',
+              releaseType: 'album',
+              artistName: 'Artist One',
+              artistMbid: 'mbid-artist-one',
+            },
+            {
+              mbid: 'unique-reissue-mbid',
+              title: 'Should appear',
+              date: '2026-01-01',
+              releaseGroupMbid: 'rg-y',
+              releaseType: 'album',
+              artistName: 'Artist One',
+              artistMbid: 'mbid-artist-one',
+            },
+          ],
+          'mbid-artist-two': [],
+        },
+      });
+
+      await service.syncReleases('tester');
+
+      const writes = mockFileStorage.writeJSONWithBackup.mock.calls.filter(
+        c => c[0] === 'releases/tracked-releases.json'
+      );
+      const lastWrite = writes[writes.length - 1][1] as TrackedReleasesStore;
+      const mbids = lastWrite.releases.map(r => r.mbid);
+      // Existing should NOT be duplicated — counted only once
+      expect(mbids.filter(m => m === 'existing-mbid')).toHaveLength(1);
+      expect(mbids).toContain('unique-reissue-mbid');
+    });
+
+    it('isolates reissue fetch failure: main sync still completes, status not error', async () => {
+      setupSyncFixture({
+        includeReissues: true,
+        reissueError: new Error('MB rate-limit blast radius'),
+      });
+
+      const status = await service.syncReleases('tester');
+
+      // Sync should NOT be marked errored because of reissue fetch failure
+      expect(status.status).not.toBe('error');
+      // Sync should still finalise
+      expect(['completed', 'idle', 'syncing', 'cancelled']).toContain(
+        status.status
+      );
+    });
+
+    it('filters reissues by enabled releaseTypes', async () => {
+      setupSyncFixture({
+        includeReissues: true,
+        reissuesByArtist: {
+          'mbid-artist-one': [
+            {
+              mbid: 'reissue-album',
+              title: 'Album reissue',
+              date: '2026-01-01',
+              releaseGroupMbid: 'rg-a',
+              releaseType: 'album',
+              artistName: 'Artist One',
+              artistMbid: 'mbid-artist-one',
+            },
+            {
+              mbid: 'reissue-single',
+              title: 'Single reissue',
+              date: '2026-01-01',
+              releaseGroupMbid: 'rg-s',
+              releaseType: 'single',
+              artistName: 'Artist One',
+              artistMbid: 'mbid-artist-one',
+            },
+          ],
+          'mbid-artist-two': [],
+        },
+      });
+
+      await service.syncReleases('tester');
+
+      const writes = mockFileStorage.writeJSONWithBackup.mock.calls.filter(
+        c => c[0] === 'releases/tracked-releases.json'
+      );
+      const lastWrite = writes[writes.length - 1][1] as TrackedReleasesStore;
+      const mbids = lastWrite.releases.map(r => r.mbid);
+      // Singles disabled (default), so 'reissue-single' must NOT be saved
+      expect(mbids).toContain('reissue-album');
+      expect(mbids).not.toContain('reissue-single');
     });
   });
 });

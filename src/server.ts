@@ -20,6 +20,7 @@ import createDiscardPileRouter from './backend/routes/discardPile';
 import { createEmbeddingsRouter } from './backend/routes/embeddings';
 import createImagesRouter from './backend/routes/images';
 import jobsRouter from './backend/routes/jobs';
+import createLabelsRouter from './backend/routes/labels';
 import { createMemoryScrobbleRouter } from './backend/routes/memoryScrobble';
 import { createRecommendationsRouter } from './backend/routes/recommendations';
 import createReleasesRouter from './backend/routes/releases';
@@ -27,6 +28,7 @@ import createScrobbleRouter from './backend/routes/scrobble';
 import createSellersRouter from './backend/routes/sellers';
 import createStatsRouter from './backend/routes/stats';
 import createSuggestionsRouter from './backend/routes/suggestions';
+import createWebsitesRouter from './backend/routes/websites';
 import createWishlistRouter from './backend/routes/wishlist';
 import createWrappedRouter from './backend/routes/wrapped';
 import { AnalyticsService } from './backend/services/analyticsService';
@@ -49,6 +51,7 @@ import { HiddenItemService } from './backend/services/hiddenItemService';
 import { HiddenReleasesService } from './backend/services/hiddenReleasesService';
 import { HistoryIndexMergeService } from './backend/services/historyIndexMergeService';
 import { ImageService } from './backend/services/imageService';
+import { LabelMonitoringService } from './backend/services/labelMonitoringService';
 import { LastFmService } from './backend/services/lastfmService';
 import { ListeningSessionStorageService } from './backend/services/listeningSessionStorageService';
 import { MappingService } from './backend/services/mappingService';
@@ -72,6 +75,7 @@ import { StatsService } from './backend/services/statsService';
 import { SuggestionService } from './backend/services/suggestionService';
 import { TagEnricherService } from './backend/services/tagEnricherService';
 import { TrackMappingService } from './backend/services/trackMappingService';
+import { WebsiteMonitoringService } from './backend/services/websiteMonitoringService';
 import { WishlistService } from './backend/services/wishlistService';
 import { WrappedService } from './backend/services/wrappedService';
 import { sendError } from './backend/utils/apiResponse';
@@ -340,6 +344,12 @@ const sellerMonitoringService = new SellerMonitoringService(
   authService,
   wishlistService
 );
+const labelMonitoringService = new LabelMonitoringService(
+  fileStorage,
+  authService,
+  wishlistService,
+  discogsService
+);
 const musicBrainzService = new MusicBrainzService();
 const releaseTrackingService = new ReleaseTrackingService(
   fileStorage,
@@ -407,6 +417,7 @@ app.use(
   '/api/v1/sellers',
   createSellersRouter(fileStorage, authService, sellerMonitoringService)
 );
+app.use('/api/v1/labels', createLabelsRouter(labelMonitoringService));
 app.use(
   '/api/v1/releases',
   createReleasesRouter(
@@ -453,6 +464,8 @@ app.get('/api/v1', (req, res) => {
       images: '/api/v1/images',
       wishlist: '/api/v1/wishlist',
       sellers: '/api/v1/sellers',
+      labels: '/api/v1/labels',
+      websites: '/api/v1/websites',
       releases: '/api/v1/releases',
       backup: '/api/v1/backup',
       discardPile: '/api/v1/discard-pile',
@@ -641,6 +654,11 @@ async function startServer() {
       musicBrainzGenreEnricherService
     );
     const ollamaService = new OllamaService();
+    const websiteMonitoringService = new WebsiteMonitoringService(
+      fileStorage,
+      ollamaService,
+      wishlistService
+    );
     const ollamaEmbedderService = new OllamaEmbedderService(ollamaService);
     const listeningSessionStorageService = new ListeningSessionStorageService(
       fileStorage
@@ -692,6 +710,10 @@ async function startServer() {
         authService,
         fileStorage
       )
+    );
+    app.use(
+      '/api/v1/websites',
+      createWebsitesRouter(websiteMonitoringService, ollamaService)
     );
 
     // Error handling middleware (registered after all routes including stats)

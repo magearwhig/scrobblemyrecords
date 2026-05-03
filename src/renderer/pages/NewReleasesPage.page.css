@@ -325,6 +325,26 @@
   color: var(--text-muted);
 }
 
+.release-reissue-meta {
+  margin: 0 0 0.5rem;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.release-date-original {
+  color: var(--text-muted);
+}
+
+.release-date-separator {
+  color: var(--text-muted);
+}
+
+.release-date-reissue {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
 .release-type {
   display: flex;
   flex-wrap: wrap;

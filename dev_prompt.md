@@ -21,6 +21,55 @@
 - ALWAYS CHECK IF UI COMPONENTS ALREADY EXIST BEFORE MAKING NEW ONES, (LIKE MODAL AND BUTTONS)
 - make sure to check all mappings in the codebase to see if they should be used in current feature working on
 
+## Definition of Done
+
+`tsc` and `jest` passing is **not** done. Those catch syntax + unit logic; they don't catch the things that have repeatedly broken in this codebase: contract drift between backend and frontend, file-write races, mutations that don't persist on refresh, duplicated utils, settings UIs that aren't wired up, relative URLs that resolve to `localhost`. Before claiming a task done, you must run through this list. Skipping it because "it should work" is what produces the bugs we keep hitting.
+
+### 1. Use the feature
+
+Run it. Click the button. Hit the endpoint with curl. Look at the actual response shape, not the declared TypeScript type — type assertions in API clients lie. If the task added or modified a UI flow and you didn't render it in a browser, the task is not done. If the task added an endpoint and you didn't curl it and inspect the JSON, the task is not done.
+
+### 2. Use the sandbox for any mutation
+
+ANY task that writes to disk, mutates persisted state, or could leave the data dir in a bad state must be verified against the **sandbox**, not the real `./data` directory:
+
+```
+npm run sandbox          # snapshot ./data into a temp dir, start backend on :3091
+npm run sandbox:fresh    # start with empty data dir
+```
+
+Real `./data` is read-only relative to the sandbox — it's snapshotted with `cp -a` and the sandbox dir is `rm -rf`'d on Ctrl-C. Trigger the feature against the sandbox URL, refresh, trigger again, abuse it. Never run mutation verification against the production `./data`.
+
+### 3. Run the abuse checklist
+
+Happy path is the easy 10%. Before declaring done, ask each of these and either confirm or test:
+
+- **Refresh test.** Trigger the mutation, then reload — does the state survive? (Catches read-modify-write races, optimistic-update-only bugs.)
+- **Concurrency test.** Trigger N times in parallel. Does every mutation persist, or do some vanish? (For any service method that touches a shared file, write a parallel-call jest test as a regression.)
+- **Empty + scale.** Zero items, one item, 500 items. Each should render and behave.
+- **Backend offline / Ollama offline / API error.** Does the UI degrade gracefully or crash?
+- **Cross-stack contract.** Trace one real response from backend → API client → render. Field-name drift (e.g. backend returns `title`, frontend reads `name`) is invisible to TypeScript and must be verified by inspection or by a render-time test.
+
+### 4. Grep before writing
+
+Before writing any helper, normalizer, status-classifier, formatter, or response shape, grep for existing ones:
+
+```
+grep -rn "normaliz" src/shared/utils
+grep -rn "formatRel" src/renderer
+grep -rn "<concept>" src/
+```
+
+Half of the bugs in this codebase came from rolling a new version of something already there. The first question on any new function is "is there one already?" If you didn't grep, you didn't try.
+
+### 5. PATCH endpoints filter undefined
+
+Any route that does partial updates (`{ ...current, ...partial }`) must filter undefined values out of `partial` first. JS spread overwrites with `undefined` rather than skipping, so destructuring optional fields from `req.body` and forwarding them silently wipes whatever the client didn't send. (See `releaseTrackingService.saveSettings` for the canonical pattern.)
+
+### 6. Bulk operations get bulk endpoints
+
+If the UI needs to update N items in response to one click, the backend gets a single bulk endpoint that does one read-mutate-write. **Never** loop `Promise.allSettled(items.map(api.update))` against single-item endpoints that touch a shared file — they race and silently lose mutations. (See `markItemsAsSeen` / `markReleasesAsSeen` for the canonical pattern.)
+
 ## UI Navigation Guidelines
 Before adding any new page or navigation item:
 1. Ask: "Which area does this belong to?" (Dashboard, Library, Listen, Discover, Marketplace, Settings)

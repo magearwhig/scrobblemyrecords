@@ -224,6 +224,68 @@ export class MigrationService {
     });
 
     // ============================================
+    // Label Monitoring Files (Feature B: Label Discovery)
+    // ============================================
+    this.register('monitored-labels', {
+      path: 'labels/monitored-labels.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('label-releases', {
+      path: 'labels/releases.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('label-scan-status', {
+      path: 'labels/scan-status.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('label-settings', {
+      path: 'labels/settings.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    // ============================================
+    // Website Monitoring Files (Feature C: Website Discovery)
+    // ============================================
+    this.register('monitored-websites', {
+      path: 'websites/monitored-websites.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('website-items', {
+      path: 'websites/items.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('website-scan-status', {
+      path: 'websites/scan-status.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('website-settings', {
+      path: 'websites/settings.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    // ============================================
     // Release Tracking Files (Feature 5)
     // ============================================
     this.register('release-artist-mappings', {

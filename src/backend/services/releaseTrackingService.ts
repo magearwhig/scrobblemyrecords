@@ -15,13 +15,14 @@ import {
   TrackedRelease,
   TrackedReleasesStore,
 } from '../../shared/types';
+import { normalizeArtistName as sharedNormalizeArtistName } from '../../shared/utils/trackNormalization';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
 import { artistMappingService } from './artistMappingService';
 import { DiscogsService } from './discogsService';
 import { HiddenReleasesService } from './hiddenReleasesService';
-import { MusicBrainzService } from './musicbrainzService';
+import { MBReleaseLite, MusicBrainzService } from './musicbrainzService';
 import { WishlistService } from './wishlistService';
 
 // Cache and cleanup settings
@@ -107,20 +108,12 @@ export class ReleaseTrackingService {
   // ============================================
 
   /**
-   * Normalize artist name for consistent comparison
+   * Normalize artist name for consistent comparison.
+   * Delegates to the shared util so cross-source matching stays consistent
+   * across services (release tracking, website monitoring, etc.).
    */
   normalizeArtistName(name: string): string {
-    return (
-      name
-        .toLowerCase()
-        .replace(/\s+/g, ' ')
-        .trim()
-        // Remove common prefixes like "The"
-        .replace(/^the\s+/i, '')
-        // Remove special characters (but keep alphanumeric and spaces)
-        .replace(/[^\w\s]/g, '')
-        .trim()
-    );
+    return sharedNormalizeArtistName(name);
   }
 
   /**
@@ -177,6 +170,7 @@ export class ReleaseTrackingService {
       includeEps: true,
       includeSingles: false,
       includeCompilations: false,
+      includeReissues: true,
     };
   }
 
@@ -187,9 +181,19 @@ export class ReleaseTrackingService {
     settings: Partial<ReleaseTrackingSettings>
   ): Promise<ReleaseTrackingSettings> {
     const current = await this.getSettings();
+    // Strip undefined entries so a partial PATCH doesn't clobber existing
+    // values when the caller omits keys (e.g. toggle one checkbox without
+    // re-sending the others). `{...a, ...b}` with `b.x === undefined` would
+    // overwrite `a.x` with undefined — explicit filter avoids that.
+    const filteredUpdates: Partial<ReleaseTrackingSettings> = {};
+    for (const [key, value] of Object.entries(settings)) {
+      if (value !== undefined) {
+        (filteredUpdates as Record<string, unknown>)[key] = value;
+      }
+    }
     const updated: ReleaseTrackingSettings = {
       ...current,
-      ...settings,
+      ...filteredUpdates,
       schemaVersion: 1,
     };
 
@@ -747,6 +751,46 @@ export class ReleaseTrackingService {
     };
   }
 
+  /**
+   * Convert a MusicBrainz `/release` entry (individual pressing) to a
+   * TrackedRelease flagged as a reissue.
+   *
+   * The `mbid` field stores the individual release MBID (NOT the
+   * release-group MBID); the parent release-group is captured in
+   * `releaseGroupMbid` so the UI can group reissues by album.
+   */
+  private toReissueTrackedRelease(r: MBReleaseLite): TrackedRelease {
+    const now = new Date();
+    let isUpcoming = false;
+
+    if (r.date) {
+      const releaseDate = new Date(r.date);
+      // new Date(YYYY) and new Date(YYYY-MM) parse to valid dates
+      if (!Number.isNaN(releaseDate.getTime())) {
+        isUpcoming = releaseDate > now;
+      }
+    }
+
+    return {
+      mbid: r.mbid,
+      title: r.title,
+      artistName: r.artistName,
+      artistMbid: r.artistMbid,
+      releaseDate: r.date,
+      releaseType: r.releaseType,
+      vinylStatus: 'unknown',
+      firstSeen: Date.now(),
+      isUpcoming,
+      inWishlist: false,
+      isReissue: true,
+      releaseGroupMbid: r.releaseGroupMbid,
+      originalReleaseDate: r.originalReleaseDate ?? null,
+      sourceType: 'musicbrainz',
+      labelName: r.labelName,
+      country: r.country,
+    };
+  }
+
   // ============================================
   // Main Sync Flow
   // ============================================
@@ -960,6 +1004,60 @@ export class ReleaseTrackingService {
             const tracked = this.toTrackedRelease(release);
             newReleases.push(tracked);
             existingMbids.add(release.mbid);
+          }
+
+          // ---- Reissue Detection (MusicBrainz /release endpoint) ----
+          // When enabled, also query individual pressings by `date` so a 2026
+          // repress of a 2003 album is surfaced (its release-group's
+          // first-release-date is still 2003 and would be missed above).
+          // Wrapped in its own try/catch so a reissue-fetch failure for one
+          // artist does not abort the entire sync.
+          if (settings.includeReissues) {
+            try {
+              const reissueLookbackMonths = 12;
+              const recentReleases =
+                await this.musicBrainzService.getRecentReleases(
+                  mapping.mbid,
+                  reissueLookbackMonths
+                );
+
+              for (const r of recentReleases) {
+                // Filter by enabled release types (using the release-group's
+                // primary/secondary types as already mapped by the MB service)
+                if (
+                  !(releaseTypes as ReadonlyArray<string>).includes(
+                    r.releaseType
+                  )
+                ) {
+                  continue;
+                }
+
+                // Dedupe by individual release MBID — skip if we already
+                // tracked this exact pressing (or if the MBID happens to
+                // collide with an existing tracked release-group, which is
+                // also a no-op we want)
+                if (existingMbids.has(r.mbid)) {
+                  continue;
+                }
+
+                const tracked = this.toReissueTrackedRelease(r);
+                newReleases.push(tracked);
+                existingMbids.add(r.mbid);
+              }
+
+              this.logger.debug(
+                `Reissue check for ${artist.name}: scanned ${recentReleases.length} releases`
+              );
+            } catch (reissueError) {
+              // Don't fail the whole sync; log and continue with the next
+              // artist. The main release-group fetch already succeeded above.
+              this.logger.warn(
+                `Reissue fetch failed for ${artist.name} (mbid=${mapping.mbid})`,
+                reissueError instanceof Error
+                  ? reissueError.message
+                  : 'Unknown error'
+              );
+            }
           }
 
           artistsProcessed++;
@@ -1375,6 +1473,7 @@ export class ReleaseTrackingService {
     types?: Array<'album' | 'ep' | 'single' | 'compilation' | 'other'>;
     vinylOnly?: boolean;
     upcomingOnly?: boolean;
+    reissuesOnly?: boolean;
     artistMbid?: string;
     sortBy?: 'releaseDate' | 'artistName' | 'title' | 'firstSeen';
     sortOrder?: 'asc' | 'desc';
@@ -1410,6 +1509,11 @@ export class ReleaseTrackingService {
     // Filter by upcoming
     if (options.upcomingOnly) {
       releases = releases.filter(r => r.isUpcoming);
+    }
+
+    // Filter by reissue flag
+    if (options.reissuesOnly) {
+      releases = releases.filter(r => r.isReissue === true);
     }
 
     // Filter by artist
