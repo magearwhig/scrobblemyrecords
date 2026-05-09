@@ -47,6 +47,17 @@ export class ScrobbleHistoryStorage {
   }
 
   /**
+   * Resolve an artist name to all canonical forms it should be attributed to.
+   * For compound artists, returns each component's canonical key.
+   */
+  private resolveArtistNames(name: string): string[] {
+    if (this.artistNameResolver) {
+      return this.artistNameResolver.resolveArtistMulti(name);
+    }
+    return [name.toLowerCase()];
+  }
+
+  /**
    * Normalize artist|album key for consistent matching with existing index
    * Uses simple lowercase/trim to match the format stored in the index
    */
@@ -619,20 +630,22 @@ export class ScrobbleHistoryStorage {
     >();
 
     for (const { artist, history } of albums) {
-      const key = this.resolveArtistName(artist);
-      const existing = artists.get(key);
-      if (existing) {
-        existing.playCount += history.playCount;
-        existing.albumCount++;
-        if (history.lastPlayed > existing.lastPlayed) {
-          existing.lastPlayed = history.lastPlayed;
+      const keys = this.resolveArtistNames(artist);
+      for (const key of keys) {
+        const existing = artists.get(key);
+        if (existing) {
+          existing.playCount += history.playCount;
+          existing.albumCount++;
+          if (history.lastPlayed > existing.lastPlayed) {
+            existing.lastPlayed = history.lastPlayed;
+          }
+        } else {
+          artists.set(key, {
+            playCount: history.playCount,
+            albumCount: 1,
+            lastPlayed: history.lastPlayed,
+          });
         }
-      } else {
-        artists.set(key, {
-          playCount: history.playCount,
-          albumCount: 1,
-          lastPlayed: history.lastPlayed,
-        });
       }
     }
 
@@ -849,24 +862,26 @@ export class ScrobbleHistoryStorage {
     >();
 
     for (const { artist, history } of allAlbums) {
-      const key = this.resolveArtistName(artist);
-      const existing = artistMap.get(key);
-      if (existing) {
-        existing.playCount += history.playCount;
-        existing.albumCount++;
-        if (history.lastPlayed > existing.lastPlayed) {
-          existing.lastPlayed = history.lastPlayed;
+      const keys = this.resolveArtistNames(artist);
+      for (const key of keys) {
+        const existing = artistMap.get(key);
+        if (existing) {
+          existing.playCount += history.playCount;
+          existing.albumCount++;
+          if (history.lastPlayed > existing.lastPlayed) {
+            existing.lastPlayed = history.lastPlayed;
+          }
+        } else {
+          const displayName = this.artistNameResolver
+            ? this.artistNameResolver.getDisplayName(key)
+            : artist;
+          artistMap.set(key, {
+            artist: displayName,
+            playCount: history.playCount,
+            albumCount: 1,
+            lastPlayed: history.lastPlayed,
+          });
         }
-      } else {
-        const displayName = this.artistNameResolver
-          ? this.artistNameResolver.getDisplayName(artist)
-          : artist;
-        artistMap.set(key, {
-          artist: displayName,
-          playCount: history.playCount,
-          albumCount: 1,
-          lastPlayed: history.lastPlayed,
-        });
       }
     }
 

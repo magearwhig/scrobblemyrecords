@@ -578,6 +578,50 @@ class ApiService {
   }
 
   // ============================================
+  // Compound artist mapping methods
+  // ============================================
+
+  async getCompoundArtistMappings(): Promise<{
+    mappings: Array<{
+      compoundName: string;
+      components: string[];
+      autoDetected: boolean;
+      createdAt: number;
+    }>;
+    total: number;
+  }> {
+    const response = await this.api.get('/compound-artist-mappings');
+    return response.data.data;
+  }
+
+  async addCompoundArtistMapping(
+    compoundName: string,
+    components: string[]
+  ): Promise<{ message: string; compoundName: string; components: string[] }> {
+    const response = await this.api.post('/compound-artist-mappings', {
+      compoundName,
+      components,
+    });
+    return response.data.data;
+  }
+
+  async deleteCompoundArtistMapping(
+    compoundName: string
+  ): Promise<{ message: string; compoundName: string }> {
+    const response = await this.api.delete(
+      `/compound-artist-mappings/${encodeURIComponent(compoundName)}`
+    );
+    return response.data.data;
+  }
+
+  async autoDetectCompoundArtists(): Promise<{ detected: number }> {
+    const response = await this.api.post(
+      '/compound-artist-mappings/auto-detect'
+    );
+    return response.data.data;
+  }
+
+  // ============================================
   // Suggestion methods
   // ============================================
 

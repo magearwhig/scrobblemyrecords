@@ -2,8 +2,13 @@ import {
   ArtistNameResolver,
   ArtistMappingServiceLike,
 } from '../../src/backend/services/artistNameResolver';
+import { CompoundArtistMappingServiceLike } from '../../src/backend/services/compoundArtistMappingService';
 import { MappingService } from '../../src/backend/services/mappingService';
-import { AlbumMapping, ArtistMapping } from '../../src/shared/types';
+import {
+  AlbumMapping,
+  ArtistMapping,
+  CompoundArtistMapping,
+} from '../../src/shared/types';
 
 // Factory functions for test data
 const createAlbumMapping = (
@@ -627,6 +632,306 @@ describe('ArtistNameResolver', () => {
       expect(resolver.areSameArtist('A', 'B')).toBe(true);
       expect(resolver.areSameArtist('C', 'D')).toBe(true);
       expect(resolver.areSameArtist('A', 'C')).toBe(false);
+    });
+  });
+
+  describe('Compound artist decomposition', () => {
+    let mockCompoundService: CompoundArtistMappingServiceLike;
+
+    beforeEach(() => {
+      mockCompoundService = {
+        getAllMappings: jest.fn().mockResolvedValue([]),
+        getMapping: jest.fn().mockResolvedValue(null),
+      };
+    });
+
+    it('should decompose compound artists into components via resolveArtistMulti', async () => {
+      const compoundMappings: CompoundArtistMapping[] = [
+        {
+          compoundName: 'Danny Brown (2), Jane Remover',
+          components: ['Danny Brown', 'Jane Remover'],
+          autoDetected: true,
+          createdAt: 1000,
+        },
+      ];
+      (mockCompoundService.getAllMappings as jest.Mock).mockResolvedValue(
+        compoundMappings
+      );
+
+      const r = new ArtistNameResolver(
+        mockArtistMappingService,
+        mockMappingService as unknown as MappingService,
+        mockCompoundService
+      );
+      await r.rebuild();
+
+      const resolved = r.resolveArtistMulti('Danny Brown (2), Jane Remover');
+      expect(resolved).toContain('danny brown');
+      expect(resolved).toContain('jane remover');
+      expect(resolved).toHaveLength(2);
+    });
+
+    it('should return single artist for non-compound names', async () => {
+      const r = new ArtistNameResolver(
+        mockArtistMappingService,
+        mockMappingService as unknown as MappingService,
+        mockCompoundService
+      );
+      await r.rebuild();
+
+      const resolved = r.resolveArtistMulti('Solo Artist');
+      expect(resolved).toEqual(['solo artist']);
+    });
+
+    it('should resolve components through union-find', async () => {
+      // Setup: "Danny Brown (2)" maps to "Danny Brown" via artist mappings
+      mockArtistMappingService.getAllMappings = jest.fn().mockReturnValue([
+        {
+          discogsName: 'Danny Brown (2)',
+          lastfmName: 'Danny Brown',
+          dateAdded: Date.now(),
+        },
+      ]);
+
+      const compoundMappings: CompoundArtistMapping[] = [
+        {
+          compoundName: 'Danny Brown (2), Jane Remover',
+          components: ['Danny Brown (2)', 'Jane Remover'],
+          autoDetected: true,
+          createdAt: 1000,
+        },
+      ];
+      (mockCompoundService.getAllMappings as jest.Mock).mockResolvedValue(
+        compoundMappings
+      );
+
+      const r = new ArtistNameResolver(
+        mockArtistMappingService,
+        mockMappingService as unknown as MappingService,
+        mockCompoundService
+      );
+      await r.rebuild();
+
+      const resolved = r.resolveArtistMulti('Danny Brown (2), Jane Remover');
+      // "Danny Brown (2)" should resolve to "danny brown" via union-find
+      expect(resolved).toContain('danny brown');
+      expect(resolved).toContain('jane remover');
+    });
+
+    it('getCompoundsForArtist should return compound names', async () => {
+      const compoundMappings: CompoundArtistMapping[] = [
+        {
+          compoundName: 'A, B',
+          components: ['A', 'B'],
+          autoDetected: true,
+          createdAt: 1000,
+        },
+      ];
+      (mockCompoundService.getAllMappings as jest.Mock).mockResolvedValue(
+        compoundMappings
+      );
+
+      const r = new ArtistNameResolver(
+        mockArtistMappingService,
+        mockMappingService as unknown as MappingService,
+        mockCompoundService
+      );
+      await r.rebuild();
+
+      const compounds = r.getCompoundsForArtist('A');
+      expect(compounds).toContain('a, b');
+    });
+
+    it('isCompound should return true for known compound names', async () => {
+      const compoundMappings: CompoundArtistMapping[] = [
+        {
+          compoundName: 'X, Y',
+          components: ['X', 'Y'],
+          autoDetected: false,
+          createdAt: 1000,
+        },
+      ];
+      (mockCompoundService.getAllMappings as jest.Mock).mockResolvedValue(
+        compoundMappings
+      );
+
+      const r = new ArtistNameResolver(
+        mockArtistMappingService,
+        mockMappingService as unknown as MappingService,
+        mockCompoundService
+      );
+      await r.rebuild();
+
+      expect(r.isCompound('X, Y')).toBe(true);
+      expect(r.isCompound('X')).toBe(false);
+    });
+  });
+
+  describe('Compound artist preferredRoot fix', () => {
+    it('should not let compound historyArtist become the root', async () => {
+      // Setup: compound "Danny Brown (2), Jane Remover" -> "Danny Brown (2)"
+      mockMappingService.getAllAlbumMappings.mockResolvedValue([
+        createAlbumMapping({
+          historyArtist: 'Danny Brown (2), Jane Remover',
+          collectionArtist: 'Danny Brown (2)',
+          historyAlbum: 'Stardust',
+          collectionAlbum: 'Stardust',
+        }),
+        createAlbumMapping({
+          historyArtist: 'Danny Brown',
+          collectionArtist: 'Danny Brown (2)',
+          historyAlbum: 'Quaranta',
+          collectionAlbum: 'Quaranta',
+        }),
+      ]);
+
+      await resolver.rebuild();
+
+      // The display name should NOT be the compound
+      const displayName = resolver.getDisplayName('Danny Brown (2)');
+      expect(displayName).not.toContain(', Jane Remover');
+    });
+
+    it('should handle pre-merged alias correctly with preferredRoot', async () => {
+      // Scenario: step 2 maps "Danny Brown (2)" → "Danny Brown" via artist mappings.
+      // Then step 3 album mapping unions compound "Danny Brown (2), Jane Remover"
+      // with "Danny Brown (2)". The preferredRoot is "Danny Brown (2)" which is
+      // already merged into the "Danny Brown" set. The root of that set should
+      // remain "Danny Brown", not flip to the compound.
+      mockArtistMappingService.getAllMappings = jest.fn().mockReturnValue([
+        {
+          discogsName: 'Danny Brown (2)',
+          lastfmName: 'Danny Brown',
+          dateAdded: Date.now(),
+        },
+      ]);
+
+      mockMappingService.getAllAlbumMappings.mockResolvedValue([
+        createAlbumMapping({
+          historyArtist: 'Danny Brown (2), Jane Remover',
+          collectionArtist: 'Danny Brown (2)',
+          historyAlbum: 'Stardust',
+          collectionAlbum: 'Stardust',
+        }),
+      ]);
+
+      await resolver.rebuild();
+
+      // "Danny Brown (2)" was already merged with "Danny Brown" in step 2.
+      // The compound should be attached to that set, NOT become the root.
+      expect(resolver.areSameArtist('Danny Brown', 'Danny Brown (2)')).toBe(
+        true
+      );
+      expect(
+        resolver.areSameArtist('Danny Brown', 'Danny Brown (2), Jane Remover')
+      ).toBe(true);
+
+      // Display name should be "Danny Brown", not the compound
+      const displayName = resolver.getDisplayName(
+        'Danny Brown (2), Jane Remover'
+      );
+      expect(displayName).not.toContain(', Jane Remover');
+    });
+  });
+
+  describe('Compound decomposition deduplication', () => {
+    it('should deduplicate components that resolve to the same canonical', async () => {
+      // "Danny Brown" and "Danny Brown (2)" both resolve to same canonical
+      mockArtistMappingService.getAllMappings = jest.fn().mockReturnValue([
+        {
+          discogsName: 'Danny Brown (2)',
+          lastfmName: 'Danny Brown',
+          dateAdded: Date.now(),
+        },
+      ]);
+
+      const mockCompoundService: CompoundArtistMappingServiceLike = {
+        getAllMappings: jest.fn().mockResolvedValue([
+          {
+            compoundName: 'Danny Brown (2), Jane Remover',
+            components: ['Danny Brown (2)', 'Jane Remover'],
+            autoDetected: true,
+            createdAt: 1000,
+          },
+        ]),
+        getMapping: jest.fn().mockResolvedValue(null),
+      };
+
+      const r = new ArtistNameResolver(
+        mockArtistMappingService,
+        mockMappingService as unknown as MappingService,
+        mockCompoundService
+      );
+      await r.rebuild();
+
+      const resolved = r.resolveArtistMulti('Danny Brown (2), Jane Remover');
+      // Should be exactly 2 unique canonicals, not 2x "danny brown"
+      expect(resolved).toHaveLength(2);
+      expect(new Set(resolved).size).toBe(2);
+    });
+  });
+
+  describe('Play-count-weighted display names', () => {
+    it('should pick display name by highest play count', async () => {
+      // Setup: "DB" and "Danny Brown" are aliases
+      mockArtistMappingService.getAllMappings = jest.fn().mockReturnValue([
+        {
+          discogsName: 'DB',
+          lastfmName: 'Danny Brown',
+          dateAdded: Date.now(),
+        },
+      ]);
+
+      const playCounts = new Map<string, number>();
+      playCounts.set('danny brown', 235);
+      playCounts.set('db', 5);
+
+      await resolver.rebuild(playCounts);
+
+      // Should pick "Danny Brown" because it has more plays
+      const displayName = resolver.getDisplayName('DB');
+      expect(displayName).toBe('Danny Brown');
+    });
+
+    it('should fallback to shortest alias when no play data', async () => {
+      mockArtistMappingService.getAllMappings = jest.fn().mockReturnValue([
+        {
+          discogsName: 'Long Artist Name Here',
+          lastfmName: 'Short',
+          dateAdded: Date.now(),
+        },
+      ]);
+
+      // Empty play counts - both have 0 plays, so shortest wins
+      const playCounts = new Map<string, number>();
+
+      await resolver.rebuild(playCounts);
+
+      const displayName = resolver.getDisplayName('Long Artist Name Here');
+      expect(displayName).toBe('Short');
+    });
+
+    it('should use playCountProvider when no explicit play counts passed', async () => {
+      mockArtistMappingService.getAllMappings = jest.fn().mockReturnValue([
+        {
+          discogsName: 'X',
+          lastfmName: 'Y',
+          dateAdded: Date.now(),
+        },
+      ]);
+
+      const provider = jest.fn().mockResolvedValue(
+        new Map<string, number>([
+          ['y', 100],
+          ['x', 1],
+        ])
+      );
+
+      resolver.setPlayCountProvider(provider);
+      await resolver.rebuild();
+
+      expect(provider).toHaveBeenCalled();
+      expect(resolver.getDisplayName('X')).toBe('Y');
     });
   });
 });

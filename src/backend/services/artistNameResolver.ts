@@ -2,6 +2,10 @@ import { AlbumMapping } from '../../shared/types';
 import { createLogger } from '../utils/logger';
 
 import { ArtistMapping as DiscogsArtistMapping } from './artistMappingService';
+import {
+  CompoundArtistMappingServiceLike,
+  isCompoundArtistName,
+} from './compoundArtistMappingService';
 import { MappingService } from './mappingService';
 
 const log = createLogger('artistNameResolver');
@@ -35,21 +39,42 @@ export class ArtistNameResolver {
   private canonicalToAliases: Map<string, Set<string>> = new Map();
   /** canonical lowercased -> preferred display casing */
   private displayNames: Map<string, string> = new Map();
+  /** lowercased name -> original casing (as encountered in mapping data) */
+  private originalCasing: Map<string, string> = new Map();
 
   /** Union-find parent pointers (lowercased name -> parent lowercased name) */
   private parent: Map<string, string> = new Map();
   /** Union-find rank for union-by-rank */
   private rank: Map<string, number> = new Map();
 
+  /** Compound artist decomposition: lowercased compound → canonical component keys */
+  private compoundToComponents: Map<string, string[]> = new Map();
+  /** Reverse: lowercased canonical component → set of compound keys */
+  private componentToCompounds: Map<string, Set<string>> = new Map();
+
   private artistMappingService: ArtistMappingServiceLike;
   private mappingService: MappingService;
+  private compoundMappingService?: CompoundArtistMappingServiceLike;
+
+  /** Optional callback to supply play counts for display name weighting */
+  private playCountProvider?: () => Promise<Map<string, number>>;
 
   constructor(
     artistMappingService: ArtistMappingServiceLike,
-    mappingService: MappingService
+    mappingService: MappingService,
+    compoundMappingService?: CompoundArtistMappingServiceLike
   ) {
     this.artistMappingService = artistMappingService;
     this.mappingService = mappingService;
+    this.compoundMappingService = compoundMappingService;
+  }
+
+  /**
+   * Register a callback that supplies artist play counts for display name
+   * selection. Called during rebuild() to weight display names by frequency.
+   */
+  setPlayCountProvider(fn: () => Promise<Map<string, number>>): void {
+    this.playCountProvider = fn;
   }
 
   // ---------------------------------------------------------------------------
@@ -111,8 +136,10 @@ export class ArtistNameResolver {
     const preferred = preferredRoot?.toLowerCase();
 
     if (preferred !== undefined) {
-      // Force the preferred name to be the root
-      if (preferred === rootB) {
+      // Resolve preferred through union-find — it may already be merged
+      // into an existing set, so its root could differ from the raw string.
+      const preferredRootKey = this.find(preferred);
+      if (preferredRootKey === rootB) {
         // Swap so rootA is the preferred root
         [rootA, rootB] = [rootB, rootA];
       }
@@ -145,14 +172,19 @@ export class ArtistNameResolver {
 
   /**
    * Clears and rebuilds the alias graph from all mapping sources.
+   * @param artistPlayCounts Optional pre-computed play counts per lowercased artist.
+   *   If not provided and a playCountProvider is set, it will be called automatically.
    */
-  async rebuild(): Promise<void> {
+  async rebuild(artistPlayCounts?: Map<string, number>): Promise<void> {
     // 1. Clear all maps
     this.aliasToCanonical.clear();
     this.canonicalToAliases.clear();
     this.displayNames.clear();
+    this.originalCasing.clear();
     this.parent.clear();
     this.rank.clear();
+    this.compoundToComponents.clear();
+    this.componentToCompounds.clear();
 
     // 2. Read artistMappingService.getAllMappings() -> union discogsName and lastfmName
     //    Prefer lastfmName as canonical (it's the scrobble history name)
@@ -160,6 +192,8 @@ export class ArtistNameResolver {
     for (const mapping of discogsArtistMappings) {
       if (!mapping.discogsName || !mapping.lastfmName) continue;
       this.union(mapping.discogsName, mapping.lastfmName, mapping.lastfmName);
+      this.recordOriginalCasing(mapping.discogsName);
+      this.recordOriginalCasing(mapping.lastfmName);
       // Record display name preference (Last.fm / history name)
       this.setDisplayNamePreference(mapping.lastfmName);
     }
@@ -170,6 +204,9 @@ export class ArtistNameResolver {
     // 3. Read mappingService album mappings -> union artists that differ
     //    Skip generic compilation artists (e.g. "Various") to avoid transitively
     //    linking all artists from a compilation into one equivalence class.
+    //    When historyArtist is a compound name (e.g. "Danny Brown (2), Jane Remover")
+    //    and collectionArtist is not, prefer collectionArtist as root so the
+    //    compound name doesn't hijack the equivalence class.
     const GENERIC_COLLECTION_ARTISTS = new Set(['various', 'various artists']);
     const albumMappings = await this.mappingService.getAllAlbumMappings();
     let albumArtistUnions = 0;
@@ -183,12 +220,26 @@ export class ArtistNameResolver {
         mapping.historyArtist.toLowerCase() !==
         mapping.collectionArtist.toLowerCase()
       ) {
+        // If historyArtist is compound but collectionArtist is not, use
+        // collectionArtist as the preferred root to avoid compound name
+        // becoming the canonical display name for all entries.
+        const historyIsCompound = isCompoundArtistName(mapping.historyArtist);
+        const collectionIsCompound = isCompoundArtistName(
+          mapping.collectionArtist
+        );
+        const preferredRoot =
+          historyIsCompound && !collectionIsCompound
+            ? mapping.collectionArtist
+            : mapping.historyArtist;
+
         this.union(
           mapping.historyArtist,
           mapping.collectionArtist,
-          mapping.historyArtist
+          preferredRoot
         );
-        this.setDisplayNamePreference(mapping.historyArtist);
+        this.recordOriginalCasing(mapping.historyArtist);
+        this.recordOriginalCasing(mapping.collectionArtist);
+        this.setDisplayNamePreference(preferredRoot);
         albumArtistUnions++;
       }
     }
@@ -210,6 +261,8 @@ export class ArtistNameResolver {
           mapping.collectionArtist,
           mapping.historyArtist
         );
+        this.recordOriginalCasing(mapping.historyArtist);
+        this.recordOriginalCasing(mapping.collectionArtist);
         this.setDisplayNamePreference(mapping.historyArtist);
       }
     }
@@ -217,15 +270,28 @@ export class ArtistNameResolver {
       `Processed ${historyArtistMappings.length} history artist mappings`
     );
 
-    // 5. Handle compound artists from album mappings
+    // 5. Handle compound artists from album mappings (legacy — ensures
+    //    component names exist in the graph even without persisted mappings)
     this.processCompoundArtists(albumMappings);
 
     // 6. Build final lookup maps from union-find structure
     this.buildLookupMaps();
 
+    // 7. Build compound decomposition maps from persisted + auto-detected mappings
+    await this.buildCompoundDecompositionMaps();
+
+    // 8. Assign play-count-weighted display names
+    const playCounts =
+      artistPlayCounts ??
+      (this.playCountProvider ? await this.playCountProvider() : undefined);
+    if (playCounts) {
+      this.assignPlayCountWeightedDisplayNames(playCounts);
+    }
+
     log.info(
       `Alias graph built: ${this.canonicalToAliases.size} canonical artists, ` +
-        `${this.aliasToCanonical.size} total aliases`
+        `${this.aliasToCanonical.size} total aliases, ` +
+        `${this.compoundToComponents.size} compound decompositions`
     );
   }
 
@@ -277,12 +343,20 @@ export class ArtistNameResolver {
   }
 
   /**
-   * Record a display name preference. The last call wins for a given canonical root.
+   * Record the original casing for a name (first seen wins).
+   */
+  private recordOriginalCasing(name: string): void {
+    const key = name.toLowerCase();
+    if (!this.originalCasing.has(key)) {
+      this.originalCasing.set(key, name);
+    }
+  }
+
+  /**
+   * Record a display name preference. First call wins for a given canonical root.
    */
   private setDisplayNamePreference(name: string): void {
     const root = this.find(name);
-    // Always prefer the Last.fm/history name; since we process those first and set
-    // them as preferred roots, the root should already be the preferred name.
     if (!this.displayNames.has(root)) {
       this.displayNames.set(root, name);
     }
@@ -306,6 +380,93 @@ export class ArtistNameResolver {
         this.canonicalToAliases.set(root, new Set());
       }
       this.canonicalToAliases.get(root)!.add(node);
+    }
+  }
+
+  /**
+   * Build compound decomposition maps from the CompoundArtistMappingService.
+   * Each compound name is mapped to the canonical keys of its component artists.
+   */
+  private async buildCompoundDecompositionMaps(): Promise<void> {
+    if (!this.compoundMappingService) return;
+
+    const mappings = await this.compoundMappingService.getAllMappings();
+    for (const mapping of mappings) {
+      const compoundKey = mapping.compoundName.toLowerCase();
+
+      // Resolve each component through union-find to get canonical key.
+      // Deduplicate: two component names may resolve to the same canonical
+      // (e.g., "Danny Brown" and "Danny Brown (2)" → both "danny brown").
+      const seen = new Set<string>();
+      const resolvedComponents: string[] = [];
+      for (const component of mapping.components) {
+        const canonical = this.resolveArtist(component);
+        if (!seen.has(canonical)) {
+          seen.add(canonical);
+          resolvedComponents.push(canonical);
+        }
+      }
+
+      this.compoundToComponents.set(compoundKey, resolvedComponents);
+
+      // Build reverse map
+      for (const canonical of resolvedComponents) {
+        if (!this.componentToCompounds.has(canonical)) {
+          this.componentToCompounds.set(canonical, new Set());
+        }
+        this.componentToCompounds.get(canonical)!.add(compoundKey);
+      }
+    }
+
+    if (mappings.length > 0) {
+      log.info(
+        `Built decomposition maps for ${mappings.length} compound artists`
+      );
+    }
+  }
+
+  /**
+   * For each equivalence class, pick the display name by highest play count
+   * among non-compound aliases. Falls back to shortest non-compound alias
+   * if no play data exists.
+   */
+  private assignPlayCountWeightedDisplayNames(
+    playCounts: Map<string, number>
+  ): void {
+    let updated = 0;
+
+    for (const [canonical, aliases] of this.canonicalToAliases) {
+      // Collect non-compound aliases with their play counts
+      const candidates: { key: string; plays: number }[] = [];
+      for (const alias of aliases) {
+        if (!isCompoundArtistName(alias)) {
+          candidates.push({
+            key: alias,
+            plays: playCounts.get(alias) ?? 0,
+          });
+        }
+      }
+
+      if (candidates.length === 0) continue; // all aliases are compound
+
+      // Sort: highest play count first, then shortest name as tiebreaker
+      candidates.sort((a, b) => {
+        if (b.plays !== a.plays) return b.plays - a.plays;
+        return a.key.length - b.key.length;
+      });
+
+      const best = candidates[0];
+      // Use original casing if available, otherwise the key itself
+      const displayName = this.originalCasing.get(best.key) ?? best.key;
+      const current = this.displayNames.get(canonical);
+      if (current !== displayName) {
+        this.displayNames.set(canonical, displayName);
+        updated++;
+      }
+    }
+
+    if (updated > 0) {
+      log.info(`Updated ${updated} display names using play count weighting`);
     }
   }
 
@@ -349,6 +510,51 @@ export class ArtistNameResolver {
   areSameArtist(a: string, b: string): boolean {
     if (!a || !b) return false;
     return this.resolveArtist(a) === this.resolveArtist(b);
+  }
+
+  /**
+   * Returns all canonical artist keys a name should be attributed to.
+   * For compound names with a decomposition mapping, returns each component's
+   * canonical key. For non-compound names, returns [resolveArtist(name)].
+   */
+  resolveArtistMulti(name: string): string[] {
+    if (!name) return [];
+    const key = name.toLowerCase();
+
+    // Check if this is a known compound with decomposition
+    const components = this.compoundToComponents.get(key);
+    if (components && components.length > 0) {
+      return components;
+    }
+
+    // Also check if the resolved canonical form is a known compound
+    const canonical = this.resolveArtist(name);
+    const canonicalComponents = this.compoundToComponents.get(canonical);
+    if (canonicalComponents && canonicalComponents.length > 0) {
+      return canonicalComponents;
+    }
+
+    return [canonical];
+  }
+
+  /**
+   * Reverse lookup: returns compound names that include the given artist
+   * as a component.
+   */
+  getCompoundsForArtist(name: string): string[] {
+    if (!name) return [];
+    const canonical = this.resolveArtist(name);
+    const compounds = this.componentToCompounds.get(canonical);
+    return compounds ? Array.from(compounds) : [];
+  }
+
+  /**
+   * Returns true if the name is a known compound artist with a decomposition.
+   */
+  isCompound(name: string): boolean {
+    if (!name) return false;
+    const key = name.toLowerCase();
+    return this.compoundToComponents.has(key);
   }
 
   // ---------------------------------------------------------------------------

@@ -16,6 +16,7 @@ import { createAuthRouter } from './backend/routes/auth';
 import createBackupRouter from './backend/routes/backup';
 import createCollectionRouter from './backend/routes/collection';
 import createCollectionAnalyticsRouter from './backend/routes/collectionAnalytics';
+import { createCompoundArtistRouter } from './backend/routes/compoundArtists';
 import createDiscardPileRouter from './backend/routes/discardPile';
 import { createEmbeddingsRouter } from './backend/routes/embeddings';
 import createImagesRouter from './backend/routes/images';
@@ -41,6 +42,7 @@ import { BackupService } from './backend/services/backupService';
 import { CleanupService } from './backend/services/cleanupService';
 import { CollectionAnalyticsService } from './backend/services/collectionAnalyticsService';
 import { CollectionIndexerService } from './backend/services/collectionIndexerService';
+import { CompoundArtistMappingService } from './backend/services/compoundArtistMappingService';
 import { DiscardPileService } from './backend/services/discardPileService';
 import { DiscogsGenreEnricherService } from './backend/services/discogsGenreEnricherService';
 import { DiscogsService } from './backend/services/discogsService';
@@ -539,12 +541,24 @@ async function startServer() {
       await Promise.allSettled([cleanupPromise, backupPromise]);
     }
 
+    // Build compound artist mapping service (persisted 1-to-N decompositions)
+    const compoundMappingService = new CompoundArtistMappingService(
+      fileStorage
+    );
+
     // Build artist name resolver from all mapping sources
     const artistNameResolver = new ArtistNameResolver(
       artistMappingService,
-      mappingService
+      mappingService,
+      compoundMappingService
     );
-    await artistNameResolver.rebuild();
+
+    // Build play counts for display name weighting, register provider
+    const playCountMap = await statsService.buildArtistPlayCountMap();
+    artistNameResolver.setPlayCountProvider(() =>
+      statsService.buildArtistPlayCountMap()
+    );
+    await artistNameResolver.rebuild(playCountMap);
 
     // Auto-detect and create missing artist mappings from album mappings
     const missingMappings =
@@ -559,7 +573,15 @@ async function startServer() {
       log.info(
         `Auto-created ${missingMappings.length} missing artist mappings`
       );
-      // Rebuild resolver with newly created mappings
+    }
+
+    // Auto-detect compound artist mappings from album mappings
+    const albumMappings = await mappingService.getAllAlbumMappings();
+    const detectedCompounds =
+      await compoundMappingService.autoDetectFromAlbumMappings(albumMappings);
+
+    // Rebuild if any new mappings were detected
+    if (missingMappings.length > 0 || detectedCompounds > 0) {
       await artistNameResolver.rebuild();
     }
 
@@ -567,6 +589,16 @@ async function startServer() {
     app.use(
       '/api/v1/artist-mappings',
       createArtistMappingRouter(artistNameResolver)
+    );
+
+    // Mount compound artist mapping routes
+    app.use(
+      '/api/v1/compound-artist-mappings',
+      createCompoundArtistRouter(
+        compoundMappingService,
+        mappingService,
+        artistNameResolver
+      )
     );
 
     // Mount suggestions routes now that artistNameResolver is available

@@ -109,11 +109,62 @@ export class StatsService {
     return name.toLowerCase();
   }
 
+  /**
+   * Returns all canonical artist keys a name should be attributed to.
+   * For compound artists with decomposition mappings, returns each component.
+   * For non-compound artists, returns [resolveArtistName(name)].
+   */
+  private resolveArtistNames(name: string): string[] {
+    if (this.artistNameResolver) {
+      return this.artistNameResolver.resolveArtistMulti(name);
+    }
+    return [name.toLowerCase()];
+  }
+
   private isSameArtist(a: string, b: string): boolean {
     if (this.artistNameResolver) {
       return this.artistNameResolver.areSameArtist(a, b);
     }
     return a.toLowerCase() === b.toLowerCase();
+  }
+
+  /**
+   * Returns true if the given artist entry should be attributed to the
+   * queried artist. Handles both direct alias match and compound decomposition.
+   */
+  private isArtistMatch(entryArtist: string, queriedArtist: string): boolean {
+    // Direct alias match via union-find
+    if (this.isSameArtist(entryArtist, queriedArtist)) {
+      return true;
+    }
+    // Check compound decomposition: if entryArtist is compound and decomposes
+    // to include the queried artist
+    if (this.artistNameResolver) {
+      const resolved = this.artistNameResolver.resolveArtistMulti(entryArtist);
+      const queriedCanonical =
+        this.artistNameResolver.resolveArtist(queriedArtist);
+      return resolved.includes(queriedCanonical);
+    }
+    return false;
+  }
+
+  /**
+   * Build a map of lowercased artist name → total play count from the raw
+   * scrobble index. This is used to weight display name selection and should
+   * be called BEFORE the resolver is built (it doesn't use the resolver).
+   */
+  async buildArtistPlayCountMap(): Promise<Map<string, number>> {
+    const index = await this.historyStorage.getIndex();
+    const counts = new Map<string, number>();
+    if (!index) return counts;
+
+    for (const [key, albumHistory] of Object.entries(index.albums)) {
+      const [artist] = key.split('|');
+      const lc = artist.toLowerCase();
+      counts.set(lc, (counts.get(lc) ?? 0) + albumHistory.playCount);
+    }
+
+    return counts;
   }
 
   /**
@@ -571,7 +622,9 @@ export class StatsService {
       cutoffTimestamp = this.getPeriodCutoff(period);
     }
 
-    // Count plays per artist in the period
+    // Count plays per artist in the period.
+    // Uses resolveArtistNames for multi-attribution: compound artists
+    // (e.g., "Danny Brown, Jane Remover") add a play to each component.
     const artistCounts = new Map<string, number>();
 
     for (const [key, albumHistory] of Object.entries(index.albums)) {
@@ -581,11 +634,10 @@ export class StatsService {
           play.timestamp >= cutoffTimestamp &&
           play.timestamp <= endTimestamp
         ) {
-          const normalizedArtist = this.resolveArtistName(artist);
-          artistCounts.set(
-            normalizedArtist,
-            (artistCounts.get(normalizedArtist) || 0) + 1
-          );
+          const canonicals = this.resolveArtistNames(artist);
+          for (const canonical of canonicals) {
+            artistCounts.set(canonical, (artistCounts.get(canonical) || 0) + 1);
+          }
         }
       }
     }
@@ -1284,28 +1336,30 @@ export class StatsService {
     const now = new Date();
     const monthStart = this.getStartOfMonth(now).getTime() / 1000;
 
-    // Find artists with their first play this month
+    // Find artists with their first play this month (multi-attribution aware)
     const artistFirstPlay = new Map<string, number>();
     const artistOriginalName = new Map<string, string>();
 
     for (const [key, albumHistory] of Object.entries(index.albums)) {
       const [artist] = key.split('|');
-      const normalizedArtist = this.resolveArtistName(artist);
+      const canonicals = this.resolveArtistNames(artist);
 
-      // Track original casing
-      if (!artistOriginalName.has(normalizedArtist)) {
-        artistOriginalName.set(
-          normalizedArtist,
-          this.artistNameResolver
-            ? this.artistNameResolver.getDisplayName(artist)
-            : artist
-        );
-      }
+      for (const normalizedArtist of canonicals) {
+        // Track original casing
+        if (!artistOriginalName.has(normalizedArtist)) {
+          artistOriginalName.set(
+            normalizedArtist,
+            this.artistNameResolver
+              ? this.artistNameResolver.getDisplayName(normalizedArtist)
+              : artist
+          );
+        }
 
-      for (const play of albumHistory.plays) {
-        const existing = artistFirstPlay.get(normalizedArtist);
-        if (!existing || play.timestamp < existing) {
-          artistFirstPlay.set(normalizedArtist, play.timestamp);
+        for (const play of albumHistory.plays) {
+          const existing = artistFirstPlay.get(normalizedArtist);
+          if (!existing || play.timestamp < existing) {
+            artistFirstPlay.set(normalizedArtist, play.timestamp);
+          }
         }
       }
     }
@@ -1323,7 +1377,7 @@ export class StatsService {
         let playCount = 0;
         for (const [key, albumHistory] of Object.entries(index.albums)) {
           const [artist] = key.split('|');
-          if (this.resolveArtistName(artist) === normalizedArtist) {
+          if (this.isArtistMatch(artist, normalizedArtist)) {
             playCount += albumHistory.plays.filter(
               p => p.timestamp >= monthStart
             ).length;
@@ -1803,7 +1857,7 @@ export class StatsService {
 
     for (const [key, albumHistory] of Object.entries(index.albums)) {
       const [artist, album] = key.split('|');
-      if (!this.isSameArtist(artist, artistName)) {
+      if (!this.isArtistMatch(artist, artistName)) {
         continue;
       }
 
@@ -1987,8 +2041,8 @@ export class StatsService {
     for (const [key, albumHistory] of Object.entries(index.albums)) {
       const [entryArtist, entryAlbum] = key.split('|');
 
-      // Filter by artist
-      if (!this.isSameArtist(entryArtist, artist)) {
+      // Filter by artist (includes compound decomposition)
+      if (!this.isArtistMatch(entryArtist, artist)) {
         continue;
       }
 

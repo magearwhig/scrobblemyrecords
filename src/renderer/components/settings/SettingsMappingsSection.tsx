@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Link2, Music } from 'lucide-react';
+import { ArrowLeftRight, Link2, Music, Users } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
 import { ArtistMapping } from '../../../backend/services/artistMappingService';
@@ -72,11 +72,24 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
   const [trackMappings, setTrackMappings] = useState<TrackMapping[]>([]);
   const [trackMappingsLoading, setTrackMappingsLoading] = useState(false);
 
+  // Compound artist mapping state
+  const [compoundMappings, setCompoundMappings] = useState<
+    Array<{
+      compoundName: string;
+      components: string[];
+      autoDetected: boolean;
+      createdAt: number;
+    }>
+  >([]);
+  const [compoundMappingsLoading, setCompoundMappingsLoading] = useState(false);
+  const [compoundAutoDetecting, setCompoundAutoDetecting] = useState(false);
+
   useEffect(() => {
     loadMappings();
     loadDiscoveryMappings();
     loadTrackMappings();
     loadMbidMappings();
+    loadCompoundMappings();
     if (authStatus.discogs.authenticated && authStatus.discogs.username) {
       loadArtists();
       loadSuggestions();
@@ -161,6 +174,61 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
       logger.warn('Failed to load MusicBrainz mappings', error);
     } finally {
       setMbidMappingsLoading(false);
+    }
+  };
+
+  const loadCompoundMappings = async () => {
+    try {
+      setCompoundMappingsLoading(true);
+      const result = await api.getCompoundArtistMappings();
+      setCompoundMappings(result.mappings);
+    } catch (error) {
+      logger.warn('Failed to load compound artist mappings', error);
+    } finally {
+      setCompoundMappingsLoading(false);
+    }
+  };
+
+  const handleDeleteCompoundMapping = async (compoundName: string) => {
+    const confirmed = await confirmAction(
+      `Are you sure you want to delete the compound mapping for "${compoundName}"?`,
+      { title: 'Delete Compound Mapping', confirmLabel: 'Delete' }
+    );
+    if (!confirmed) return;
+
+    try {
+      await api.deleteCompoundArtistMapping(compoundName);
+      setCompoundMappings(prev =>
+        prev.filter(
+          m => m.compoundName.toLowerCase() !== compoundName.toLowerCase()
+        )
+      );
+      setSuccess('Compound artist mapping deleted');
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : 'Failed to delete mapping'
+      );
+    }
+  };
+
+  const handleAutoDetectCompound = async () => {
+    try {
+      setCompoundAutoDetecting(true);
+      const result = await api.autoDetectCompoundArtists();
+      if (result.detected > 0) {
+        setSuccess(`Auto-detected ${result.detected} compound artist mappings`);
+        await loadCompoundMappings();
+      } else {
+        setSuccess('No new compound artist mappings detected');
+      }
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to auto-detect compound artists'
+      );
+    } finally {
+      setCompoundAutoDetecting(false);
     }
   };
 
@@ -842,6 +910,100 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                         </>
                       )}
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Compound Artist Mappings */}
+      <div className='settings-section-card'>
+        <div className='settings-section-header'>
+          <span className='settings-section-icon'>
+            <Users size={18} aria-hidden='true' />
+          </span>
+          <div>
+            <h3>Compound Artist Mappings</h3>
+            <p className='settings-section-description'>
+              When a scrobble credits multiple artists, plays count toward each
+              individual
+            </p>
+          </div>
+          <span className='settings-section-badge'>
+            {compoundMappings.length}
+          </span>
+        </div>
+
+        <div className='settings-section-content'>
+          <div className='settings-info-box'>
+            Compound artists like &quot;Artist A, Artist B&quot; are
+            automatically decomposed so plays appear under each individual
+            artist. Auto-detected mappings are created from your album mapping
+            data.
+          </div>
+
+          <div className='settings-actions-row'>
+            <Button
+              variant='secondary'
+              onClick={handleAutoDetectCompound}
+              disabled={compoundAutoDetecting}
+            >
+              {compoundAutoDetecting
+                ? 'Detecting...'
+                : 'Auto-Detect Compound Artists'}
+            </Button>
+          </div>
+
+          {compoundMappingsLoading ? (
+            <div className='loading'>
+              <div className='spinner'></div>
+              Loading compound artist mappings...
+            </div>
+          ) : compoundMappings.length === 0 ? (
+            <div className='settings-empty-text'>
+              No compound artist mappings yet. Click &quot;Auto-Detect&quot; to
+              scan your album mappings.
+            </div>
+          ) : (
+            <div className='settings-subsection'>
+              <h4>Current Mappings ({compoundMappings.length})</h4>
+              <div className='settings-discovery-list'>
+                {compoundMappings.map(mapping => (
+                  <div
+                    key={mapping.compoundName}
+                    className='settings-discovery-item'
+                  >
+                    <div className='settings-discovery-info'>
+                      <div className='settings-discovery-source'>
+                        <span className='settings-discovery-label source'>
+                          Compound:
+                        </span>
+                        {mapping.compoundName}
+                      </div>
+                      <div className='settings-discovery-target'>
+                        <span className='settings-discovery-label target'>
+                          Components:
+                        </span>
+                        {mapping.components.join(', ')}
+                      </div>
+                      <div className='settings-mapping-meta'>
+                        {mapping.autoDetected
+                          ? 'Auto-detected'
+                          : 'Manually added'}{' '}
+                        on {new Date(mapping.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <Button
+                      variant='danger'
+                      size='small'
+                      onClick={() =>
+                        handleDeleteCompoundMapping(mapping.compoundName)
+                      }
+                    >
+                      Delete
+                    </Button>
                   </div>
                 ))}
               </div>

@@ -1477,6 +1477,25 @@ export interface ExcludedArtistsStore extends VersionedStore {
 }
 
 /**
+ * Compound artist mapping — maps a multi-artist credit (e.g. "Danny Brown (2), Jane Remover")
+ * to its individual component artists so plays count toward each.
+ */
+export interface CompoundArtistMapping {
+  compoundName: string;
+  components: string[];
+  autoDetected: boolean;
+  createdAt: number;
+}
+
+/**
+ * Versioned store for compound artist mappings
+ */
+export interface CompoundArtistMappingsStore extends VersionedStore {
+  schemaVersion: 1;
+  mappings: CompoundArtistMapping[];
+}
+
+/**
  * Stored pending disambiguations
  */
 export interface PendingDisambiguationsStore extends VersionedStore {
