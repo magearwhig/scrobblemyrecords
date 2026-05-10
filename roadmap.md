@@ -1873,3 +1873,22 @@ Unified three disconnected mapping services (`artistMappingService`, `mappingSer
 **Implementation Plan:** See `.plan/done/mapping-resolution-plan.md`
 
 **Dependencies:** None (reads from existing mapping data files)
+
+---
+
+## Feature 17: Album Detail Page
+
+### Status: COMPLETE (May 2026)
+
+Third detail-page in the artist/track/album trio. Dedicated `#album` route showing listening history, per-track play stats, monthly listening arc, collection match, and all relevant mappings (album mapping, artist mapping, compound artist, album alias placeholder). Reachable from anywhere album titles appear (TopList, MonthlyHighlights, RecentAlbums, ArtistDetailPage, TrackDetailPage, LastFmHistoryTab).
+
+**Delivered:**
+- Backend: `statsService.getAlbumDetail()` + `GET /api/v1/stats/album-detail` route (16 tests)
+- Frontend: `AlbumDetailPage.tsx` + co-located `.page.css` (25 tests including pluralisation, title attribute, casing regression)
+- `AlbumLink` component + `statsApi.getAlbumDetail` + `ROUTES.ALBUM_DETAIL` (10 AlbumLink tests)
+- Integrations into ArtistDetailPage, TrackDetailPage, LastFmHistoryTab, TopList, MonthlyHighlights, RecentAlbums
+- Types: `AlbumDetailResponse` with nested `AlbumDetailTrack`, `AlbumDetailMappings`, plus forward-compat `AlbumAliasMapping` placeholder
+
+**Implementation Plan:** See `.plan/done/album-detail-page-plan.md`
+
+**Dependencies:** Feature 15 (Artist & Track Deep Dives) -- shares the detail-page link pattern and PlayTrendChart-style components

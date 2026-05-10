@@ -1,0 +1,217 @@
+/* AlbumDetailPage co-located styles.
+ * Reuses .detail-page, .detail-page-back-link, .detail-page-header,
+ * .detail-page-info, .detail-page-title, .detail-page-meta, and
+ * .detail-page-section from ArtistDetailPage.page.css. Adds album-specific
+ * cover sizing (square, larger than the artist circular image), a header
+ * action row, and the two-column tracks/mappings grid.
+ */
+
+/* ==========================================================================
+   Header — square cover, larger than the artist image
+   ========================================================================== */
+
+.album-detail-header {
+  align-items: flex-start;
+}
+
+.album-detail-cover,
+.album-detail-cover-placeholder {
+  width: 120px;
+  height: 120px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+  object-fit: cover;
+}
+
+.album-detail-cover-placeholder {
+  background-color: var(--bg-tertiary);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.album-detail-artist-line {
+  font-size: var(--text-md);
+}
+
+.album-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  align-items: center;
+}
+
+/* External-link <a> styled to match Button's outline appearance, since
+ * the design system has no Link button variant. */
+.album-detail-external-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+}
+
+.album-detail-external-link:hover {
+  background: var(--bg-hover);
+}
+
+.album-detail-external-link:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Listening arc — full-width, no constraining wrapper
+   ========================================================================== */
+
+.album-detail-arc-section {
+  margin-top: var(--space-5);
+  margin-bottom: var(--space-5);
+}
+
+/* ==========================================================================
+   Two-column content grid: tracks (left) | mappings (right)
+   ========================================================================== */
+
+.album-detail-content-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.album-detail-mappings-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ==========================================================================
+   Tracks list
+   ========================================================================== */
+
+.album-detail-tracks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.album-detail-track-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: var(--space-3);
+  align-items: baseline;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.album-detail-track-row:last-child {
+  border-bottom: none;
+}
+
+.album-detail-track-rank {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-align: right;
+  min-width: var(--space-6);
+}
+
+.album-detail-track-name {
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.album-detail-track-count {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.album-detail-track-last-played {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Mapping cards
+   ========================================================================== */
+
+.album-detail-mapping-card h3 {
+  margin-top: 0;
+}
+
+.album-detail-mapping-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-2) 0 0 0;
+  font-size: var(--text-sm);
+}
+
+.album-detail-mapping-grid dt {
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: var(--text-xs);
+  align-self: center;
+}
+
+.album-detail-mapping-grid dd {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.album-detail-component-list,
+.album-detail-alias-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+/* ==========================================================================
+   Responsive — single column on narrow viewports
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .album-detail-cover,
+  .album-detail-cover-placeholder {
+    width: 96px;
+    height: 96px;
+  }
+
+  .album-detail-content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .album-detail-track-row {
+    grid-template-columns: auto 1fr auto;
+  }
+
+  /* On narrow screens, drop the relative-time column into a second visual
+   * row to avoid horizontal overflow on long track titles. */
+  .album-detail-track-last-played {
+    grid-column: 2 / -1;
+    text-align: right;
+  }
+}

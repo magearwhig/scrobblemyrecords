@@ -1,5 +1,6 @@
 import {
   AlbumArcBucket,
+  AlbumDetailResponse,
   AlbumPlayCount,
   AlbumTracksPlayedResponse,
   ApiResponse,
@@ -366,6 +367,20 @@ export const statsApi = {
       params.set('album', album);
     }
     const response = await fetch(`${API_BASE}/stats/track?${params}`);
+    return response.json();
+  },
+
+  /**
+   * Get detailed stats for a specific album
+   * @param artist - Artist name
+   * @param album - Album title
+   */
+  async getAlbumDetail(
+    artist: string,
+    album: string
+  ): Promise<ApiResponse<AlbumDetailResponse>> {
+    const params = new URLSearchParams({ artist, album });
+    const response = await fetch(`${API_BASE}/stats/album-detail?${params}`);
     return response.json();
   },
 

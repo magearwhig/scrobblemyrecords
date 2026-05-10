@@ -20,6 +20,7 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | done/discard-pile-plan.md | Complete -- Feature 7 |
 | done/wishlist-new-release-tracking-plan.md | Complete -- Feature 5.5 |
 | done/artist-track-deep-dives-plan.md | Complete -- Feature 15, all 4 phases implemented |
+| done/album-detail-page-plan.md | Complete -- shipped 2026-05-09, Feature 17 backend endpoint, AlbumDetailPage, AlbumLink integrations across Stats/History/Collection |
 | done/traded-in-archive-plan.md | Complete -- Feature 7 extension, all 3 phases implemented |
 | missing-albums-page-plan.md | Backlog -- not started |
 | context-tags-plan.md | Backlog -- Effort F from backlog shark tank |
@@ -27,3 +28,7 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | backlog-shark-tank-2026-03-08.md | Reference -- 25 accepted items, 20 done, 5 remaining |
 | embedding-rec-system-plan.md | Complete -- embedding recommendation system implemented |
 | backlog_ideas.md | Reference -- consolidation proposals implemented |
+
+## Conventions
+
+**Detail page link convention.** ArtistLink, TrackLink, AlbumLink share a pattern: default-exported components that write `selectedXyz` to localStorage as JSON (or a string for the artist-only case), then call `navigate(ROUTES.XYZ_DETAIL, { from })` so the destination page can render a correct back link. Future detail-page links (e.g. LabelLink) should follow the same pattern.

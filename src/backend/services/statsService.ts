@@ -1,5 +1,7 @@
 import {
   AlbumArcBucket,
+  AlbumDetailResponse,
+  AlbumDetailTrack,
   AlbumPlayCount,
   ArtistDetailResponse,
   ArtistPlayCount,
@@ -27,11 +29,16 @@ import {
   TrackDetailResponse,
   TrackPlayCount,
 } from '../../shared/types';
-import { createNormalizedTrackKey } from '../../shared/utils/trackNormalization';
+import {
+  createNormalizedTrackKey,
+  normalizeForMatching,
+} from '../../shared/utils/trackNormalization';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
+import { artistMappingService } from './artistMappingService';
 import { ArtistNameResolver } from './artistNameResolver';
+import { CompoundArtistMappingServiceLike } from './compoundArtistMappingService';
 import { MappingService } from './mappingService';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 import { TrackMappingService } from './trackMappingService';
@@ -64,6 +71,8 @@ export class StatsService {
   private trackMappingService: TrackMappingService | null = null;
   private mappingService: MappingService | null = null;
   private artistNameResolver: ArtistNameResolver | null = null;
+  private compoundArtistMappingService: CompoundArtistMappingServiceLike | null =
+    null;
   private logger = createLogger('StatsService');
 
   // In-memory cache for forgotten favorites (5 minute TTL)
@@ -100,6 +109,13 @@ export class StatsService {
 
   setArtistNameResolver(resolver: ArtistNameResolver): void {
     this.artistNameResolver = resolver;
+  }
+
+  /** Optional: enables compound-artist surfacing on the album detail endpoint. */
+  setCompoundArtistMappingService(
+    service: CompoundArtistMappingServiceLike
+  ): void {
+    this.compoundArtistMappingService = service;
   }
 
   private resolveArtistName(name: string): string {
@@ -2725,5 +2741,167 @@ export class StatsService {
         playCount: data.playCount,
         trackCount: data.tracks.size,
       }));
+  }
+
+  /** Album detail: plays, tracks, arc, collection match, all relevant mappings. */
+  async getAlbumDetail(
+    artistName: string,
+    albumName: string,
+    collection?: CollectionItem[]
+  ): Promise<AlbumDetailResponse> {
+    // Fetch the album's plays via fuzzy match (handles "(Deluxe)" / "(2)" variants)
+    const historyResult = await this.historyStorage.getAlbumHistoryFuzzy(
+      artistName,
+      albumName
+    );
+
+    if (!historyResult.entry || historyResult.entry.playCount === 0) {
+      throw new Error('ALBUM_NOT_FOUND');
+    }
+
+    const { entry } = historyResult;
+    const plays = entry.plays;
+
+    // Per-track aggregation: dedupe variants via normalizeForMatching
+    const trackAgg = new Map<
+      string,
+      { displayTrack: string; playCount: number; lastPlayed: number }
+    >();
+    let firstPlayed: number | null = null;
+    let lastPlayed: number | null = null;
+
+    for (const play of plays) {
+      if (firstPlayed === null || play.timestamp < firstPlayed) {
+        firstPlayed = play.timestamp;
+      }
+      if (lastPlayed === null || play.timestamp > lastPlayed) {
+        lastPlayed = play.timestamp;
+      }
+
+      if (!play.track) continue;
+      const key = normalizeForMatching(play.track);
+      const existing = trackAgg.get(key);
+      if (existing) {
+        existing.playCount += 1;
+        if (play.timestamp > existing.lastPlayed) {
+          existing.lastPlayed = play.timestamp;
+        }
+      } else {
+        trackAgg.set(key, {
+          displayTrack: this.capitalizeTitle(play.track),
+          playCount: 1,
+          lastPlayed: play.timestamp,
+        });
+      }
+    }
+
+    const tracks: AlbumDetailTrack[] = Array.from(trackAgg.values())
+      .map(t => ({
+        track: t.displayTrack,
+        playCount: t.playCount,
+        lastPlayed: t.lastPlayed,
+      }))
+      .sort((a, b) => {
+        if (b.playCount !== a.playCount) return b.playCount - a.playCount;
+        return b.lastPlayed - a.lastPlayed;
+      });
+
+    // Listening arc (monthly buckets)
+    const arc = await this.getAlbumListeningArc(artistName, albumName);
+
+    // Collection lookup. Prefer the explicit albumMapping (yields collectionId
+    // directly) and reconcile against any provided collection items for cover URL.
+    const albumMapping = this.mappingService
+      ? await this.mappingService.getAlbumMapping(artistName, albumName)
+      : null;
+
+    let collectionItem: CollectionItem | undefined;
+    if (collection && collection.length > 0) {
+      if (albumMapping?.collectionId !== undefined) {
+        collectionItem = collection.find(
+          item => item.id === albumMapping.collectionId
+        );
+      }
+      if (!collectionItem) {
+        const fuzzyMap = await this.buildFuzzyCollectionMap(collection);
+        collectionItem = this.lookupCollectionItem(
+          fuzzyMap,
+          artistName,
+          albumName
+        );
+      }
+    }
+
+    // Artist mapping (Discogs ↔ Last.fm). Search both directions since the
+    // queried artistName could match either side of the recorded mapping.
+    let artistMappingProjection:
+      | { discogsName: string; lastfmName: string }
+      | undefined;
+    const allArtistMappings = artistMappingService.getAllMappings();
+    const lcArtist = artistName.toLowerCase();
+    const matchedArtistMapping = allArtistMappings.find(
+      m =>
+        m.discogsName.toLowerCase() === lcArtist ||
+        m.lastfmName.toLowerCase() === lcArtist
+    );
+    if (matchedArtistMapping) {
+      artistMappingProjection = {
+        discogsName: matchedArtistMapping.discogsName,
+        lastfmName: matchedArtistMapping.lastfmName,
+      };
+    }
+
+    // Compound artist mapping (e.g. "Run The Jewels" → ["El-P", "Killer Mike"])
+    let compoundProjection:
+      | { compoundName: string; components: string[] }
+      | undefined;
+    if (this.compoundArtistMappingService) {
+      const compound =
+        await this.compoundArtistMappingService.getMapping(artistName);
+      if (compound) {
+        compoundProjection = {
+          compoundName: compound.compoundName,
+          components: compound.components,
+        };
+      }
+    }
+
+    // Display name resolution (uses union-find aliases when resolver is wired)
+    const displayArtist = this.artistNameResolver
+      ? this.artistNameResolver.getDisplayName(artistName)
+      : this.capitalizeArtist(artistName);
+
+    const response: AlbumDetailResponse = {
+      artist: displayArtist,
+      album: this.capitalizeTitle(albumName),
+      playCount: entry.playCount,
+      firstPlayed,
+      lastPlayed,
+      tracks,
+      arc,
+      inCollection: !!collectionItem,
+      mappings: {
+        albumMapping: albumMapping
+          ? {
+              historyArtist: albumMapping.historyArtist,
+              historyAlbum: albumMapping.historyAlbum,
+              collectionArtist: albumMapping.collectionArtist,
+              collectionAlbum: albumMapping.collectionAlbum,
+            }
+          : undefined,
+        artistMapping: artistMappingProjection,
+        compoundArtist: compoundProjection,
+        // albumAliases stays undefined (forward-compat per .plan/album-name-aliasing-plan.md)
+      },
+    };
+
+    if (collectionItem) {
+      response.collectionReleaseId = collectionItem.release.id;
+      response.collectionArtist = collectionItem.release.artist;
+      response.collectionAlbum = collectionItem.release.title;
+      response.coverUrl = collectionItem.release.cover_image;
+    }
+
+    return response;
   }
 }

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import './TrackDetailPage.page.css';
 
 import { TrackDetailResponse } from '../../shared/types';
+import AlbumLink from '../components/AlbumLink';
 import ArtistLink from '../components/ArtistLink';
 import PlayTrendChart from '../components/PlayTrendChart';
 import { Badge } from '../components/ui/Badge';
@@ -295,7 +296,9 @@ const TrackDetailPage: React.FC = () => {
                   </div>
                 )}
                 <div className='detail-page-album-info'>
-                  <span className='detail-page-album-name'>{album.album}</span>
+                  <span className='detail-page-album-name'>
+                    <AlbumLink artist={album.artist} album={album.album} />
+                  </span>
                   <span className='detail-page-album-meta'>
                     {album.artist} &middot; {album.playCount.toLocaleString()}{' '}
                     plays

@@ -12,6 +12,7 @@ import { navigate } from '../routes';
 import { getApiService } from '../services/api';
 import { playTrackOnSpotify } from '../utils/spotifyUtils';
 
+import AlbumLink from './AlbumLink';
 import ArtistLink from './ArtistLink';
 import TrackLink from './TrackLink';
 import { Badge } from './ui/Badge';
@@ -521,7 +522,7 @@ const LastFmHistoryTab: React.FC = () => {
                     <ArtistLink artist={album.artist} />
                   </div>
                   <div className='lastfm-history-col-album' title={album.album}>
-                    {album.album}
+                    <AlbumLink artist={album.artist} album={album.album} />
                   </div>
                   <div className='lastfm-history-col-plays'>
                     {album.playCount.toLocaleString()}
@@ -629,7 +630,7 @@ const LastFmHistoryTab: React.FC = () => {
                     className='lastfm-history-col-album-sm'
                     title={track.album}
                   >
-                    {track.album}
+                    <AlbumLink artist={track.artist} album={track.album} />
                   </div>
                   <div className='lastfm-history-col-plays'>
                     {track.playCount.toLocaleString()}

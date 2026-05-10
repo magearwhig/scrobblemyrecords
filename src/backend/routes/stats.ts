@@ -1626,6 +1626,41 @@ export default function createStatsRouter(
   });
 
   /**
+   * GET /api/v1/stats/album-detail?artist=X&album=Y
+   * Album deep dive: plays, tracks, monthly arc, collection match, mappings.
+   */
+  router.get('/album-detail', async (req: Request, res: Response) => {
+    try {
+      const artist = req.query.artist as string | undefined;
+      const album = req.query.album as string | undefined;
+
+      if (!artist || !album) {
+        return res.status(400).json({
+          success: false,
+          error: 'artist and album query parameters are required',
+        });
+      }
+
+      const settings = await authService.getUserSettings();
+      const username = settings.discogs.username;
+      const collection = username ? await loadCollection(username) : [];
+
+      const data = await statsService.getAlbumDetail(artist, album, collection);
+      return res.json({ success: true, data });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      if (message === 'ALBUM_NOT_FOUND') {
+        return res.status(404).json({
+          success: false,
+          error: 'Album not found in scrobble history',
+        });
+      }
+      logger.error('Error getting album detail', error);
+      return res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  /**
    * GET /api/v1/stats/album-arc?artist=X&album=Y
    * Get monthly listening arc for a specific album.
    */

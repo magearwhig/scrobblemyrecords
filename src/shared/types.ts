@@ -760,6 +760,108 @@ export interface TrackDetailResponse {
 }
 
 // ============================================
+// Album Detail Types
+// ============================================
+
+/**
+ * A track entry within an album's detail response.
+ * Used to render the track-level breakdown on the album detail page.
+ */
+export interface AlbumDetailTrack {
+  track: string;
+  playCount: number;
+  lastPlayed: number; // Unix timestamp (seconds)
+}
+
+/**
+ * Manual album mapping fields surfaced on the album detail page.
+ * Display-only subset of {@link AlbumMapping} (omits collectionId, createdAt).
+ */
+export interface AlbumDetailAlbumMapping {
+  historyArtist: string;
+  historyAlbum: string;
+  collectionArtist: string;
+  collectionAlbum: string;
+}
+
+/**
+ * Manual artist mapping fields surfaced on the album detail page.
+ * Uses display-friendly aliases (discogsName / lastfmName) over the raw
+ * collectionArtist / historyArtist field names from {@link ArtistMapping}.
+ */
+export interface AlbumDetailArtistMapping {
+  discogsName: string;
+  lastfmName: string;
+}
+
+/**
+ * Compound artist mapping summary from compoundArtistMappingService.getMapping().
+ * Subset of the underlying mapping (omits autoDetected, createdAt) for UI display.
+ */
+export interface AlbumDetailCompoundArtist {
+  compoundName: string;
+  components: string[];
+}
+
+/**
+ * Manual / forward-compat mappings relevant to an album, surfaced for
+ * transparency on the album detail page.
+ */
+export interface AlbumDetailMappings {
+  albumMapping?: AlbumDetailAlbumMapping;
+  artistMapping?: AlbumDetailArtistMapping;
+  compoundArtist?: AlbumDetailCompoundArtist;
+  /**
+   * Forward-compat per .plan/album-name-aliasing-plan.md.
+   * Undefined until the album alias mapping service is wired up.
+   */
+  albumAliases?: AlbumAliasMapping[];
+}
+
+/**
+ * Response shape for the album deep-dive page (e.g. /api/album/:artist/:album).
+ * Mirrors {@link ArtistDetailResponse} and {@link TrackDetailResponse} for
+ * structural symmetry. Wrapped at the route boundary as `ApiResponse<AlbumDetailResponse>`.
+ */
+export interface AlbumDetailResponse {
+  artist: string; // Display name (resolved via artistNameResolver.getDisplayName)
+  album: string; // Album title as queried
+  playCount: number;
+  firstPlayed: number | null; // Unix timestamp (seconds)
+  lastPlayed: number | null; // Unix timestamp (seconds)
+  tracks: AlbumDetailTrack[];
+  arc: AlbumArcBucket[]; // Monthly listening pattern (reused from existing definition)
+
+  // Collection info
+  inCollection: boolean;
+  collectionReleaseId?: number;
+  collectionArtist?: string; // Discogs name (may differ from display name)
+  collectionAlbum?: string;
+  coverUrl?: string;
+
+  mappings: AlbumDetailMappings;
+}
+
+/**
+ * Forward-compat placeholder for album alias mappings.
+ * Mirrors the canonical shape proposed in .plan/album-name-aliasing-plan.md
+ * (lines 58-69). When that plan lands, the canonical declaration should
+ * subsume this one; the album detail surface already exposes the field
+ * as optional so no callers will need to change.
+ */
+export interface AlbumAliasMapping {
+  /** The canonical album key (artist|album, lowercased) to merge into */
+  canonicalArtist: string;
+  canonicalAlbum: string;
+  /** The alias album key that should be treated as the same album */
+  aliasArtist: string;
+  aliasAlbum: string;
+  /** Whether this was auto-detected or manually created */
+  autoDetected: boolean;
+  createdAt: number;
+}
+
+// ============================================
 // Notification System Types
 // ============================================
 

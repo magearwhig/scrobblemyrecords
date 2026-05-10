@@ -4,6 +4,7 @@ import React from 'react';
 import { DashboardRecentAlbum } from '../../../shared/types';
 import { navigate } from '../../routes';
 import { formatLocalTimeClean } from '../../utils/dateUtils';
+import AlbumLink from '../AlbumLink';
 
 interface RecentAlbumsProps {
   albums: DashboardRecentAlbum[];
@@ -63,12 +64,27 @@ export const RecentAlbums: React.FC<RecentAlbumsProps> = ({
       </div>
       <div className='dashboard-recent-albums'>
         {albums.map((album, index) => (
-          <button
+          <div
             key={`${album.artist}-${album.album}-${index}`}
             className={`dashboard-album-item ${album.inCollection ? 'dashboard-album-item-clickable' : ''}`}
             onClick={() => handleAlbumClick(album)}
-            type='button'
-            disabled={!album.inCollection}
+            role={album.inCollection ? 'button' : undefined}
+            tabIndex={album.inCollection ? 0 : undefined}
+            aria-label={
+              album.inCollection
+                ? `View ${album.album} by ${album.artist} in collection`
+                : undefined
+            }
+            onKeyDown={
+              album.inCollection
+                ? e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleAlbumClick(album);
+                    }
+                  }
+                : undefined
+            }
           >
             <div className='dashboard-album-cover'>
               {album.coverUrl ? (
@@ -80,13 +96,15 @@ export const RecentAlbums: React.FC<RecentAlbumsProps> = ({
               )}
             </div>
             <div className='dashboard-album-info'>
-              <div className='dashboard-album-title'>{album.album}</div>
+              <div className='dashboard-album-title'>
+                <AlbumLink artist={album.artist} album={album.album} />
+              </div>
               <div className='dashboard-album-artist'>{album.artist}</div>
             </div>
             <div className='dashboard-album-time'>
               {formatTimestamp(album.lastPlayed)}
             </div>
-          </button>
+          </div>
         ))}
       </div>
     </div>

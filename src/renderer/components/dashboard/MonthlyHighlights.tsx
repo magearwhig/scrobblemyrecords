@@ -2,6 +2,7 @@ import { Disc3 } from 'lucide-react';
 import React from 'react';
 
 import { DashboardTopAlbum, DashboardTopArtist } from '../../../shared/types';
+import AlbumLink from '../AlbumLink';
 import ArtistLink from '../ArtistLink';
 
 interface MonthlyHighlightsProps {
@@ -85,7 +86,7 @@ export const MonthlyHighlights: React.FC<MonthlyHighlightsProps> = ({
                   </div>
                   <div className='dashboard-highlight-info'>
                     <span className='dashboard-highlight-name'>
-                      {album.album}
+                      <AlbumLink artist={album.artist} album={album.album} />
                     </span>
                     <span className='dashboard-highlight-artist'>
                       <ArtistLink artist={album.artist} />

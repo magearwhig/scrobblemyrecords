@@ -545,6 +545,7 @@ async function startServer() {
     const compoundMappingService = new CompoundArtistMappingService(
       fileStorage
     );
+    statsService.setCompoundArtistMappingService(compoundMappingService);
 
     // Build artist name resolver from all mapping sources
     const artistNameResolver = new ArtistNameResolver(

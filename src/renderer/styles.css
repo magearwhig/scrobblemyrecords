@@ -2691,7 +2691,7 @@ select.form-input:disabled {
 }
 
 /* ==========================================================================
-   Artist Link & Track Link
+   Artist Link, Track Link & Album Link
    ========================================================================== */
 
 .artist-link {
@@ -2714,6 +2714,18 @@ select.form-input:disabled {
 }
 
 .track-link:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+.album-link {
+  color: var(--accent-color);
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.album-link:hover {
   color: var(--accent-hover);
   text-decoration: underline;
 }
@@ -2786,7 +2798,8 @@ select.form-input:disabled {
 .detail-page-external-links a:focus-visible,
 .detail-page-external-link-btn:focus-visible,
 .artist-link:focus-visible,
-.track-link:focus-visible {
+.track-link:focus-visible,
+.album-link:focus-visible {
   outline: 2px solid var(--accent-color);
   outline-offset: 2px;
 }

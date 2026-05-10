@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import './ArtistDetailPage.page.css';
 
 import { ArtistDetailResponse } from '../../shared/types';
+import AlbumLink from '../components/AlbumLink';
 import PlayTrendChart from '../components/PlayTrendChart';
 import { AlbumListeningArc } from '../components/stats/AlbumListeningArc';
 import TrackLink from '../components/TrackLink';
@@ -390,7 +391,7 @@ const ArtistDetailPage: React.FC = () => {
                     )}
                     <div className='detail-page-album-info'>
                       <div className='detail-page-album-name'>
-                        {album.album}
+                        <AlbumLink artist={data.artist} album={album.album} />
                       </div>
                       <div className='detail-page-album-meta'>
                         {album.playCount.toLocaleString()} plays

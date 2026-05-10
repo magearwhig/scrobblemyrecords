@@ -14,6 +14,7 @@ import {
   playTrackOnSpotify,
   playAlbumOnSpotify,
 } from '../../utils/spotifyUtils';
+import AlbumLink from '../AlbumLink';
 import ArtistLink from '../ArtistLink';
 import TrackLink from '../TrackLink';
 import { IconButton } from '../ui/Button';
@@ -285,7 +286,10 @@ export const TopList: React.FC<TopListProps> = ({
                       <>
                         <div className='top-list-name'>
                           <span className='top-list-name-text'>
-                            {item.album}
+                            <AlbumLink
+                              artist={item.artist}
+                              album={item.album}
+                            />
                           </span>
                           {((item as AlbumPlayCount).inCollection ||
                             (collectionMap &&
