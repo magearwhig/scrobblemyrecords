@@ -8,6 +8,7 @@ import {
 } from '../../shared/types';
 import { artistMappingService } from '../services/artistMappingService';
 import { AuthService } from '../services/authService';
+import { DurationLookupService } from '../services/durationLookupService';
 import { jobStatusService } from '../services/jobStatusService';
 import { LastFmService } from '../services/lastfmService';
 import { MappingService } from '../services/mappingService';
@@ -30,7 +31,8 @@ export default function createScrobbleRouter(
     ) => Promise<CollectionItem[]>;
   },
   scrobbleHistorySyncService?: ScrobbleHistorySyncService,
-  mappingService?: MappingService
+  mappingService?: MappingService,
+  durationLookupService?: DurationLookupService
 ) {
   const router = express.Router();
 
@@ -77,6 +79,111 @@ export default function createScrobbleRouter(
         data: {
           message: 'Track scrobbled successfully',
           track,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Scrobbling failed',
+      });
+    }
+  });
+
+  // Scrobble a track identified by an external recognizer (e.g. the Raspberry
+  // Pi vinyl audio detector). Accepts {artist, title, album?, timestamp?,
+  // source?} and uses the duration lookup chain (Discogs collection cache →
+  // Last.fm) to enrich the scrobble with a real duration when possible.
+  router.post('/recognized', async (req: Request, res: Response) => {
+    try {
+      const { artist, title, album, timestamp, source } = req.body ?? {};
+
+      if (
+        !artist ||
+        !title ||
+        typeof artist !== 'string' ||
+        typeof title !== 'string'
+      ) {
+        return res.status(400).json({
+          success: false,
+          error: 'artist and title are required and must be strings',
+        });
+      }
+
+      const trimmedArtist = artist.trim();
+      const trimmedTitle = title.trim();
+      const trimmedAlbum =
+        typeof album === 'string' && album.trim() ? album.trim() : undefined;
+
+      let duration: number | undefined;
+      let durationSource: string | undefined;
+      if (durationLookupService) {
+        try {
+          const lookup = await durationLookupService.lookupDuration(
+            trimmedArtist,
+            trimmedTitle,
+            trimmedAlbum
+          );
+          if (lookup.duration !== null) {
+            duration = lookup.duration;
+          }
+          durationSource = lookup.source;
+        } catch (err) {
+          // Treat a duration-lookup failure as non-fatal — we'd rather
+          // scrobble without a duration than not scrobble at all.
+          logger.warn('Duration lookup failed; scrobbling without duration', {
+            artist: trimmedArtist,
+            track: trimmedTitle,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      const track: ScrobbleTrack = {
+        artist: trimmedArtist,
+        track: trimmedTitle,
+        album: trimmedAlbum,
+        timestamp:
+          typeof timestamp === 'number' && Number.isFinite(timestamp)
+            ? Math.floor(timestamp)
+            : Math.floor(Date.now() / 1000),
+        duration,
+      };
+
+      const result = await lastfmService.scrobbleTrack(track);
+
+      logger.info('Scrobbled recognized track', {
+        artist: track.artist,
+        track: track.track,
+        album: track.album,
+        duration: track.duration,
+        durationSource: durationSource ?? 'not_looked_up',
+        source: typeof source === 'string' ? source : 'unknown',
+      });
+
+      // Trigger incremental sync after successful scrobble (same pattern as /track)
+      if (scrobbleHistorySyncService) {
+        const jobId = jobStatusService.startJob(
+          'sync',
+          'Syncing scrobble history...'
+        );
+        new Promise(resolve => setTimeout(resolve, 5000))
+          .then(() => scrobbleHistorySyncService.startIncrementalSync())
+          .then(() =>
+            jobStatusService.completeJob(jobId, 'Scrobble history synced')
+          )
+          .catch(err => {
+            logger.error('Failed to auto-sync after scrobble:', err);
+            jobStatusService.failJob(jobId, 'Failed to sync scrobble history');
+          });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          message: 'Recognized track scrobbled',
+          track,
+          durationSource: durationSource ?? 'not_looked_up',
+          scrobbleResult: result,
         },
       });
     } catch (error) {

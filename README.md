@@ -104,6 +104,80 @@ npm run dev:app
 npm run start:web
 ```
 
+### Headless / Pi Deployment (optional)
+
+The backend is fully separable from the React frontend, so you can run just the
+Express server on a headless machine (e.g. a Raspberry Pi sitting next to a
+turntable) and have your laptop browser point at it as the UI.
+
+```bash
+# On the headless machine
+npm ci
+npm run build:backend
+HOST=0.0.0.0 \
+FRONTEND_URL=http://your-laptop.local:8080 \
+ENCRYPTION_KEY=... \
+DISCOGS_CLIENT_ID=... \
+DISCOGS_CLIENT_SECRET=... \
+LASTFM_API_KEY=... \
+LASTFM_SECRET=... \
+node dist/server.js
+```
+
+Notes:
+
+- Set `HOST=0.0.0.0` so the backend listens on the LAN instead of just
+  loopback.
+- If you load the React UI from a different origin (e.g. your laptop), set
+  `FRONTEND_URL` so the CORS allowlist accepts it.
+- The `data/` directory is the authoritative store. If you want to migrate
+  state from a laptop install, `rsync` `data/` and copy the `ENCRYPTION_KEY`
+  from your laptop `.env` so the encrypted tokens decrypt.
+- For automated scrobbling pipelines (e.g. a vinyl audio recognizer), use the
+  `POST /api/v1/scrobble/recognized` endpoint described below.
+
+#### `POST /api/v1/scrobble/recognized`
+
+Intended for external recognizers (like an audio-fingerprinting daemon) that
+produce `{artist, title}` and want recordscrobbles to handle duration lookup
+and scrobbling.
+
+Request body:
+
+```json
+{
+  "artist": "The Beatles",
+  "title": "Hey Jude",
+  "album": "Hey Jude",
+  "timestamp": 1700000000,
+  "source": "vinyl-pi"
+}
+```
+
+- `artist`, `title` — required strings.
+- `album` — optional, used to refine the duration lookup.
+- `timestamp` — optional Unix seconds. Defaults to now.
+- `source` — optional free-form tag for logging (e.g. `"vinyl-pi"`).
+
+Response includes the resolved duration source so you can tell whether the
+scrobble got an exact duration from Discogs, a fallback from Last.fm, or
+none at all:
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Recognized track scrobbled",
+    "track": { "artist": "...", "track": "...", "duration": 261, "timestamp": 1700000000 },
+    "durationSource": "discogs_collection",
+    "scrobbleResult": { "success": true, "accepted": 1, "ignored": 0 }
+  }
+}
+```
+
+A failed duration lookup is non-fatal — the scrobble still goes out, just
+without a `duration` field.
+
 ## 🎯 Features
 
 ### Core Features

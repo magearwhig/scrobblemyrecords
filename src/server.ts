@@ -398,7 +398,8 @@ app.use(
     lastfmService,
     discogsService,
     syncService,
-    mappingService
+    mappingService,
+    durationLookupService
   )
 );
 // Artist mapping, suggestions, and stats routes are mounted in startServer() to inject runtime dependencies

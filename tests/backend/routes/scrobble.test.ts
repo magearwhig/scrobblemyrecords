@@ -5,6 +5,7 @@ import request from 'supertest';
 
 import createScrobbleRouter from '../../../src/backend/routes/scrobble';
 import { AuthService } from '../../../src/backend/services/authService';
+import { DurationLookupService } from '../../../src/backend/services/durationLookupService';
 import { LastFmService } from '../../../src/backend/services/lastfmService';
 import { FileStorage } from '../../../src/backend/utils/fileStorage';
 
@@ -150,6 +151,186 @@ describe('Scrobble Routes', () => {
           timestamp: expect.any(Number),
         })
       );
+    });
+  });
+
+  describe('POST /recognized', () => {
+    let mockDurationLookupService: jest.Mocked<DurationLookupService>;
+
+    const buildApp = (withDurationLookup: boolean) => {
+      const localApp = express();
+      localApp.use(helmet());
+      localApp.use(cors());
+      localApp.use(express.json());
+      localApp.use((_req, res, next) => {
+        res.set('Connection', 'close');
+        next();
+      });
+      localApp.use(
+        '/api/v1/scrobble',
+        createScrobbleRouter(
+          mockFileStorage,
+          mockAuthService,
+          mockLastFmService,
+          undefined,
+          undefined,
+          undefined,
+          withDurationLookup ? mockDurationLookupService : undefined
+        )
+      );
+      return localApp;
+    };
+
+    beforeEach(() => {
+      mockDurationLookupService = {
+        lookupDuration: jest.fn(),
+      } as unknown as jest.Mocked<DurationLookupService>;
+
+      mockLastFmService.scrobbleTrack.mockResolvedValue({
+        success: true,
+        accepted: 1,
+        ignored: 0,
+        message: 'Successfully scrobbled',
+      });
+    });
+
+    it('rejects requests missing artist or title', async () => {
+      const localApp = buildApp(true);
+
+      const missingTitle = await request(localApp)
+        .post('/api/v1/scrobble/recognized')
+        .send({ artist: 'Test Artist' })
+        .expect(400);
+      expect(missingTitle.body.success).toBe(false);
+
+      const missingArtist = await request(localApp)
+        .post('/api/v1/scrobble/recognized')
+        .send({ title: 'Test Track' })
+        .expect(400);
+      expect(missingArtist.body.success).toBe(false);
+    });
+
+    it('enriches the scrobble with a looked-up duration', async () => {
+      mockDurationLookupService.lookupDuration.mockResolvedValue({
+        artist: 'Test Artist',
+        track: 'Test Track',
+        duration: 213,
+        source: 'discogs_collection',
+      });
+
+      const localApp = buildApp(true);
+      const response = await request(localApp)
+        .post('/api/v1/scrobble/recognized')
+        .send({
+          artist: 'Test Artist',
+          title: 'Test Track',
+          album: 'Test Album',
+          source: 'vinyl-pi',
+        })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.durationSource).toBe('discogs_collection');
+      expect(mockLastFmService.scrobbleTrack).toHaveBeenCalledWith(
+        expect.objectContaining({
+          artist: 'Test Artist',
+          track: 'Test Track',
+          album: 'Test Album',
+          duration: 213,
+          timestamp: expect.any(Number),
+        })
+      );
+      expect(mockDurationLookupService.lookupDuration).toHaveBeenCalledWith(
+        'Test Artist',
+        'Test Track',
+        'Test Album'
+      );
+    });
+
+    it('scrobbles without a duration when lookup returns not_found', async () => {
+      mockDurationLookupService.lookupDuration.mockResolvedValue({
+        artist: 'Test Artist',
+        track: 'Test Track',
+        duration: null,
+        source: 'not_found',
+      });
+
+      const localApp = buildApp(true);
+      const response = await request(localApp)
+        .post('/api/v1/scrobble/recognized')
+        .send({ artist: 'Test Artist', title: 'Test Track' })
+        .expect(200);
+
+      expect(response.body.data.durationSource).toBe('not_found');
+      const scrobbled = mockLastFmService.scrobbleTrack.mock.calls[0][0];
+      expect(scrobbled.duration).toBeUndefined();
+    });
+
+    it('falls back gracefully when duration lookup throws', async () => {
+      mockDurationLookupService.lookupDuration.mockRejectedValue(
+        new Error('boom')
+      );
+
+      const localApp = buildApp(true);
+      const response = await request(localApp)
+        .post('/api/v1/scrobble/recognized')
+        .send({ artist: 'Test Artist', title: 'Test Track' })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      const scrobbled = mockLastFmService.scrobbleTrack.mock.calls[0][0];
+      expect(scrobbled.duration).toBeUndefined();
+    });
+
+    it('works when no DurationLookupService is provided', async () => {
+      const localApp = buildApp(false);
+      const response = await request(localApp)
+        .post('/api/v1/scrobble/recognized')
+        .send({ artist: 'Test Artist', title: 'Test Track' })
+        .expect(200);
+
+      expect(response.body.data.durationSource).toBe('not_looked_up');
+      expect(mockDurationLookupService.lookupDuration).not.toHaveBeenCalled();
+    });
+
+    it('honors a caller-supplied timestamp', async () => {
+      mockDurationLookupService.lookupDuration.mockResolvedValue({
+        artist: 'A',
+        track: 'T',
+        duration: null,
+        source: 'not_found',
+      });
+      const localApp = buildApp(true);
+
+      await request(localApp)
+        .post('/api/v1/scrobble/recognized')
+        .send({ artist: 'A', title: 'T', timestamp: 1700000000 })
+        .expect(200);
+
+      expect(mockLastFmService.scrobbleTrack).toHaveBeenCalledWith(
+        expect.objectContaining({ timestamp: 1700000000 })
+      );
+    });
+
+    it('returns 500 when the scrobble itself fails', async () => {
+      mockDurationLookupService.lookupDuration.mockResolvedValue({
+        artist: 'A',
+        track: 'T',
+        duration: null,
+        source: 'not_found',
+      });
+      mockLastFmService.scrobbleTrack.mockRejectedValue(
+        new Error('Last.fm down')
+      );
+
+      const localApp = buildApp(true);
+      const response = await request(localApp)
+        .post('/api/v1/scrobble/recognized')
+        .send({ artist: 'A', title: 'T' })
+        .expect(500);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Last.fm down');
     });
   });
 
