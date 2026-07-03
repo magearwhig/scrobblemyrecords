@@ -257,7 +257,19 @@
   position: relative;
 }
 
-.lastfm-history-search-input {
+.history-sessions-search {
+  position: relative;
+  margin-top: var(--space-3);
+}
+
+.history-sessions-search-count {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.lastfm-history-search-input,
+.history-sessions-search-input {
   width: 100%;
   padding: var(--space-2) 2rem var(--space-2) var(--space-3);
   border: 1px solid var(--border-default);
@@ -268,7 +280,8 @@
   transition: border-color 0.15s;
 }
 
-.lastfm-history-search-input:focus {
+.lastfm-history-search-input:focus,
+.history-sessions-search-input:focus {
   outline: none;
   border-color: var(--accent-color);
   box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.2);
@@ -280,7 +293,8 @@
   background: var(--surface-sunken);
 }
 
-.lastfm-history-search-clear {
+.lastfm-history-search-clear,
+.history-sessions-search-clear {
   position: absolute;
   right: 0.5rem;
   top: 50%;
@@ -294,7 +308,8 @@
   line-height: 1;
 }
 
-.lastfm-history-search-clear:hover {
+.lastfm-history-search-clear:hover,
+.history-sessions-search-clear:hover {
   color: var(--text-primary);
 }
 

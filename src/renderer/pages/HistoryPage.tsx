@@ -1,5 +1,5 @@
 import { Check, Circle, Clock, FileText, XCircle } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 import './HistoryPage.page.css';
 
@@ -52,6 +52,20 @@ const HistoryPage: React.FC = () => {
     useState<ScrobbleSession | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [backfillLoading, setBackfillLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredSessions = useMemo(() => {
+    if (!normalizedQuery) return sessions;
+    return sessions.filter(session =>
+      session.tracks.some(
+        track =>
+          track.artist.toLowerCase().includes(normalizedQuery) ||
+          track.track.toLowerCase().includes(normalizedQuery) ||
+          (track.album?.toLowerCase().includes(normalizedQuery) ?? false)
+      )
+    );
+  }, [sessions, normalizedQuery]);
 
   const api = getApiService(state.serverUrl);
 
@@ -327,6 +341,33 @@ const HistoryPage: React.FC = () => {
               </div>
             </div>
 
+            {sessions.length > 0 && (
+              <div className='history-sessions-search'>
+                <input
+                  type='text'
+                  placeholder='Search by artist, album, or track...'
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className='history-sessions-search-input'
+                  aria-label='Search scrobble sessions'
+                />
+                {searchQuery && (
+                  <button
+                    className='history-sessions-search-clear'
+                    onClick={() => setSearchQuery('')}
+                    aria-label='Clear search'
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            )}
+            {normalizedQuery && !loading && sessions.length > 0 && (
+              <div className='history-sessions-search-count'>
+                {filteredSessions.length} of {sessions.length} sessions match
+              </div>
+            )}
+
             {error && (
               <div className='error-message'>
                 {error}
@@ -366,9 +407,20 @@ const HistoryPage: React.FC = () => {
             </div>
           )}
 
-          {sessions.length > 0 && (
+          {!loading && sessions.length > 0 && filteredSessions.length === 0 && (
+            <div className='card'>
+              <EmptyState
+                icon={<FileText size={48} aria-hidden='true' />}
+                title='No Matching Sessions'
+                description={`No scrobble sessions contain "${searchQuery.trim()}".`}
+                suggestion='Try a different artist, album, or track name.'
+              />
+            </div>
+          )}
+
+          {filteredSessions.length > 0 && (
             <div className='history-sessions-grid'>
-              {sessions.map(session => (
+              {filteredSessions.map(session => (
                 <ScrobbleSessionCard
                   key={session.id}
                   session={session}
@@ -391,7 +443,7 @@ const HistoryPage: React.FC = () => {
             </div>
           )}
 
-          {sessions.length > 10 && (
+          {!normalizedQuery && sessions.length > 10 && (
             <div className='card history-footer'>
               <div className='history-footer-text'>
                 Showing recent sessions. Older sessions may be automatically

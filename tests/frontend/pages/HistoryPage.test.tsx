@@ -552,6 +552,172 @@ describe('HistoryPage', () => {
     });
   });
 
+  describe('Session Search', () => {
+    const authStatus: AuthStatus = {
+      discogs: { authenticated: true, username: 'discogs_user' },
+      lastfm: { authenticated: true, username: 'lastfm_user' },
+    };
+
+    const makeSession = (
+      id: string,
+      tracks: Array<{ artist: string; track: string; album?: string }>
+    ): ScrobbleSession => ({
+      id,
+      timestamp: Date.now(),
+      status: 'completed',
+      tracks,
+    });
+
+    const mockSessions = [
+      makeSession('s1', [
+        { artist: 'Radiohead', track: 'Airbag', album: 'OK Computer' },
+      ]),
+      makeSession('s2', [
+        { artist: 'Danny Brown', track: 'Side A (Old)', album: 'Old' },
+      ]),
+      makeSession('s3', [{ artist: 'Björk', track: 'Hyperballad' }]),
+    ];
+
+    beforeEach(() => {
+      mockApi.getScrobbleHistory.mockResolvedValue(mockSessions);
+    });
+
+    const renderAndWaitForSearch = async () => {
+      renderHistoryPageWithProviders(authStatus);
+      await waitFor(() => {
+        expect(
+          screen.getByLabelText('Search scrobble sessions')
+        ).toBeInTheDocument();
+      });
+      return screen.getByLabelText('Search scrobble sessions');
+    };
+
+    it('shows the search input once sessions load', async () => {
+      await renderAndWaitForSearch();
+      expect(screen.getAllByText('View Details').length).toBe(3);
+    });
+
+    it('hides the search input when there are no sessions', async () => {
+      mockApi.getScrobbleHistory.mockResolvedValue([]);
+
+      renderHistoryPageWithProviders(authStatus);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('No Scrobble Sessions Yet')
+        ).toBeInTheDocument();
+      });
+
+      expect(
+        screen.queryByLabelText('Search scrobble sessions')
+      ).not.toBeInTheDocument();
+    });
+
+    it('filters sessions by artist name, case-insensitively', async () => {
+      const user = userEvent.setup();
+      const input = await renderAndWaitForSearch();
+
+      await user.type(input, 'radiohead');
+
+      expect(screen.getAllByText('View Details').length).toBe(1);
+      expect(screen.getByText('1 of 3 sessions match')).toBeInTheDocument();
+    });
+
+    it('filters sessions by track name', async () => {
+      const user = userEvent.setup();
+      const input = await renderAndWaitForSearch();
+
+      await user.type(input, 'hyperballad');
+
+      expect(screen.getAllByText('View Details').length).toBe(1);
+      expect(screen.getByText('1 of 3 sessions match')).toBeInTheDocument();
+    });
+
+    it('filters sessions by album name, tolerating tracks without albums', async () => {
+      const user = userEvent.setup();
+      const input = await renderAndWaitForSearch();
+
+      await user.type(input, 'ok computer');
+
+      expect(screen.getAllByText('View Details').length).toBe(1);
+      expect(screen.getByText('1 of 3 sessions match')).toBeInTheDocument();
+    });
+
+    it('matches multiple sessions when the query spans them', async () => {
+      const user = userEvent.setup();
+      const input = await renderAndWaitForSearch();
+
+      // "old" appears in session s2's track and album only
+      await user.type(input, 'old');
+
+      expect(screen.getAllByText('View Details').length).toBe(1);
+      expect(screen.getByText('1 of 3 sessions match')).toBeInTheDocument();
+    });
+
+    it('shows a no-match empty state with the query text', async () => {
+      const user = userEvent.setup();
+      const input = await renderAndWaitForSearch();
+
+      await user.type(input, 'zeppelin');
+
+      expect(screen.getByText('No Matching Sessions')).toBeInTheDocument();
+      expect(
+        screen.getByText('No scrobble sessions contain "zeppelin".')
+      ).toBeInTheDocument();
+      expect(screen.queryByText('View Details')).not.toBeInTheDocument();
+    });
+
+    it('ignores whitespace-only queries', async () => {
+      const user = userEvent.setup();
+      const input = await renderAndWaitForSearch();
+
+      await user.type(input, '   ');
+
+      expect(screen.getAllByText('View Details').length).toBe(3);
+      expect(screen.queryByText(/sessions match/)).not.toBeInTheDocument();
+    });
+
+    it('clearing the search restores all sessions', async () => {
+      const user = userEvent.setup();
+      const input = await renderAndWaitForSearch();
+
+      await user.type(input, 'radiohead');
+      expect(screen.getAllByText('View Details').length).toBe(1);
+
+      await user.click(screen.getByLabelText('Clear search'));
+
+      expect(input).toHaveValue('');
+      expect(screen.getAllByText('View Details').length).toBe(3);
+      expect(screen.queryByText(/sessions match/)).not.toBeInTheDocument();
+    });
+
+    it('hides the cleanup notice while a search is active', async () => {
+      const manySessions = Array.from({ length: 12 }, (_, i) =>
+        makeSession(`bulk${i}`, [
+          { artist: 'Radiohead', track: `Song ${i}`, album: 'OK Computer' },
+        ])
+      );
+      mockApi.getScrobbleHistory.mockResolvedValue(manySessions);
+
+      const user = userEvent.setup();
+      const input = await renderAndWaitForSearch();
+
+      expect(
+        screen.getByText(
+          'Showing recent sessions. Older sessions may be automatically cleaned up.'
+        )
+      ).toBeInTheDocument();
+
+      await user.type(input, 'radiohead');
+
+      expect(
+        screen.queryByText(
+          'Showing recent sessions. Older sessions may be automatically cleaned up.'
+        )
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe('Tab Navigation', () => {
     const authStatus: AuthStatus = {
       discogs: { authenticated: true, username: 'discogs_user' },
@@ -629,6 +795,30 @@ describe('HistoryPage', () => {
       expect(
         screen.queryByTestId('lastfm-history-tab')
       ).not.toBeInTheDocument();
+    });
+
+    it('search state persists across tab switches', async () => {
+      const user = userEvent.setup();
+
+      renderHistoryPageWithProviders(authStatus);
+
+      await waitFor(() => {
+        expect(
+          screen.getByLabelText('Search scrobble sessions')
+        ).toBeInTheDocument();
+      });
+
+      await user.type(
+        screen.getByLabelText('Search scrobble sessions'),
+        'Artist 1'
+      );
+
+      await user.click(screen.getByText('Last.fm Listening History'));
+      await user.click(screen.getByText('App Scrobble Sessions'));
+
+      expect(screen.getByLabelText('Search scrobble sessions')).toHaveValue(
+        'Artist 1'
+      );
     });
 
     it('highlights active tab', async () => {
