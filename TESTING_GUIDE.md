@@ -2,20 +2,26 @@
 
 ## Overview
 
-This document provides comprehensive guidance for the testing infrastructure of the RecordScrobbles application. The project maintains a robust testing strategy with **81.16% overall code coverage** across unit, integration, and end-to-end tests.
+This document provides comprehensive guidance for the testing infrastructure of the RecordScrobbles application. The project maintains a robust testing strategy with **74.94% line coverage** across unit, integration, and end-to-end tests.
 
 ## Current Coverage Status
 
 ### Overall Coverage Metrics
-- **Statements**: 81.16% (1,875/2,310)
-- **Branches**: 72.85% (1,052/1,444)
-- **Functions**: 86.78% (335/386)
-- **Lines**: 81.34% (1,832/2,252)
+
+Measured with `npm test -- --coverage` (189 suites, 4,913 tests):
+
+- **Statements**: 74.26% (17,846/24,030)
+- **Branches**: 61.04% (8,308/13,609)
+- **Functions**: 69.03% (2,914/4,221)
+- **Lines**: 74.94% (17,183/22,927)
+
+Regenerate these numbers with `npm test -- --coverage` rather than editing them
+by hand; the figures above drift as soon as code is added.
 
 ### Coverage Targets
-- **Global Threshold**: 60% (configured in jest.config.js)
+- **Enforced Thresholds** (jest.config.js): 73% lines, 72% statements, 65% functions, 60% branches
 - **Target Coverage**: 90% (project goal)
-- **Current Status**: 81.16% (excellent progress toward 90% target)
+- **Current Status**: 74.94% lines — above the enforced floor, well short of the 90% goal
 
 ## Testing Architecture
 
@@ -590,7 +596,7 @@ jobs:
 
 ## Conclusion
 
-The RecordScrobbles testing infrastructure provides comprehensive coverage with a well-structured approach to unit, integration, and end-to-end testing. The current 81.16% coverage represents excellent progress toward the 90% target, with strong foundations in place for continued improvement.
+The RecordScrobbles testing infrastructure provides broad coverage with a well-structured approach to unit, integration, and end-to-end testing. Line coverage currently sits at 74.94%, above the thresholds enforced in CI but still short of the 90% goal.
 
 Key strengths:
 - **Multi-layered testing strategy** (unit, integration, e2e)

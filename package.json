@@ -36,7 +36,7 @@
   "license": "MIT",
   "description": "A web application that connects your Discogs collection with Last.fm scrobbling",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   },
   "homepage": "https://github.com/user/recordscrobbles",
   "dependencies": {
