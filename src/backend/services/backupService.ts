@@ -64,6 +64,7 @@ import {
   WebsiteMonitoringSettings,
   WishlistSettings,
 } from '../../shared/types';
+import { atomicWriteFile } from '../utils/atomicWrite';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -1485,7 +1486,9 @@ export class BackupService {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `auto-backup-${timestamp}.json`;
     const filePath = path.join(backupDir, filename);
-    await fs.writeFile(filePath, backupJson, 'utf8');
+    // Atomic: a truncated backup is worse than no backup, because it looks
+    // like one until the day you need it.
+    await atomicWriteFile(filePath, backupJson);
 
     // Update last backup time
     await this.saveSettings({ lastBackup: now });

@@ -1,6 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { atomicWriteFileSync } from '../utils/atomicWrite';
+import { resolveDataDir } from '../utils/dataDir';
 import { logger } from '../utils/logger';
 
 export interface ArtistMapping {
@@ -23,8 +25,7 @@ class ArtistMappingService {
 
   constructor() {
     // Store mappings in a separate file from cache
-    const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data');
-    const mappingsDir = path.join(dataDir, 'mappings');
+    const mappingsDir = path.join(resolveDataDir(), 'mappings');
     if (!fs.existsSync(mappingsDir)) {
       fs.mkdirSync(mappingsDir, { recursive: true });
     }
@@ -96,7 +97,7 @@ class ArtistMappingService {
         lastUpdated: Date.now(),
       };
 
-      fs.writeFileSync(
+      atomicWriteFileSync(
         this.mappingsFilePath,
         JSON.stringify(mappingData, null, 2)
       );
@@ -200,7 +201,7 @@ class ArtistMappingService {
 
         if (mapping) {
           mapping.lastUsed = Date.now();
-          fs.writeFileSync(
+          atomicWriteFileSync(
             this.mappingsFilePath,
             JSON.stringify(mappingData, null, 2)
           );

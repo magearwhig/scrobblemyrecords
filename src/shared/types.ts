@@ -77,6 +77,18 @@ export interface CollectionFilterPreset {
   createdAt: number; // milliseconds since epoch
 }
 
+/**
+ * A single in-flight OAuth browser redirect awaiting its callback.
+ *
+ * Stored as a list rather than one slot per provider so that starting a second
+ * sign-in does not silently break the first.
+ */
+export interface PendingOAuthTransaction {
+  /** The value the callback must present: a request token or a nonce. */
+  value: string;
+  expiresAt: number;
+}
+
 export interface UserSettings {
   discogs: {
     token?: string;
@@ -96,6 +108,16 @@ export interface UserSettings {
   };
   temp?: {
     oauthTokenSecret?: string;
+    /**
+     * One-use binding for in-flight OAuth browser redirects.
+     *
+     * The callback routes cannot carry an Authorization header, so they are
+     * exempt from API auth. These fields are what stops that exemption being a
+     * hole: a callback is only honoured if it matches a pending transaction
+     * that an authenticated request started, and each is consumed on use.
+     */
+    pendingDiscogsRequests?: PendingOAuthTransaction[];
+    pendingLastFmNonces?: PendingOAuthTransaction[];
   };
 }
 

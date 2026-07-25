@@ -1,6 +1,8 @@
 import * as fs from 'fs/promises';
+import * as path from 'path';
 
 import { CleanupService } from '../../src/backend/services/cleanupService';
+import { TEMP_FILE_PREFIX } from '../../src/backend/utils/atomicWrite';
 import { FileStorage } from '../../src/backend/utils/fileStorage';
 import { SellerMatchesStore, VersionsCache } from '../../src/shared/types';
 
@@ -510,6 +512,111 @@ describe('CleanupService', () => {
       expect(report.versionsCacheEntriesRemoved).toBe(0);
       expect(report.inventoryCacheFilesRemoved).toBe(0);
       expect(report.errors).toHaveLength(0);
+    });
+  });
+
+  describe('cleanupStaleTempFiles', () => {
+    const writeTempFile = async (
+      relativePath: string,
+      ageMs: number
+    ): Promise<string> => {
+      const fullPath = `${testDataDir}/${relativePath}`;
+      await fs.mkdir(path.dirname(fullPath), { recursive: true });
+      await fs.writeFile(fullPath, '{"partial"');
+      const when = new Date(Date.now() - ageMs);
+      await fs.utimes(fullPath, when, when);
+      return fullPath;
+    };
+
+    const exists = async (fullPath: string): Promise<boolean> => {
+      try {
+        await fs.access(fullPath);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    it('removes orphaned temp files older than the cutoff', async () => {
+      const stale = await writeTempFile(
+        `settings/${TEMP_FILE_PREFIX}orphan.json-123-abc`,
+        2 * 60 * 60 * 1000
+      );
+
+      expect(await cleanupService.cleanupStaleTempFiles()).toBe(1);
+      expect(await exists(stale)).toBe(false);
+    });
+
+    it('leaves recent temp files alone — a write may be in flight', async () => {
+      const fresh = await writeTempFile(
+        `settings/${TEMP_FILE_PREFIX}inflight.json-123-abc`,
+        5 * 1000
+      );
+
+      expect(await cleanupService.cleanupStaleTempFiles()).toBe(0);
+      expect(await exists(fresh)).toBe(true);
+    });
+
+    it('never touches real files, however old', async () => {
+      await fileStorage.writeJSON('settings/real.json', { keep: true });
+      const realPath = `${testDataDir}/settings/real.json`;
+      const ancient = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
+      await fs.utimes(realPath, ancient, ancient);
+
+      expect(await cleanupService.cleanupStaleTempFiles()).toBe(0);
+      expect(await fileStorage.readJSON('settings/real.json')).toEqual({
+        keep: true,
+      });
+    });
+
+    it('recurses into nested directories', async () => {
+      const nested = await writeTempFile(
+        `sellers/inventory-cache/${TEMP_FILE_PREFIX}deep.json-1-b`,
+        2 * 60 * 60 * 1000
+      );
+
+      expect(await cleanupService.cleanupStaleTempFiles()).toBe(1);
+      expect(await exists(nested)).toBe(false);
+    });
+
+    it('never unlinks a temp file belonging to an in-flight write', async () => {
+      // A writer blocked in fsync can outlive the age threshold. Deleting its
+      // temp would succeed on POSIX and make its rename fail with ENOENT,
+      // losing the write entirely.
+      const sweepResults: number[] = [];
+      let settled = false;
+
+      const write = fileStorage
+        .writeJSON('settings/inflight.json', {
+          pad: 'w'.repeat(400_000),
+        })
+        .finally(() => {
+          settled = true;
+        });
+
+      while (!settled) {
+        sweepResults.push(await cleanupService.cleanupStaleTempFiles());
+      }
+      await write;
+
+      expect(sweepResults.every(removed => removed === 0)).toBe(true);
+      expect(await fileStorage.readJSON('settings/inflight.json')).toEqual({
+        pad: 'w'.repeat(400_000),
+      });
+    });
+
+    it('sweeps the injected storage directory, not the global DATA_DIR', async () => {
+      // CleanupService gets its FileStorage injected; a sweep that resolved the
+      // global DATA_DIR instead would silently walk the wrong tree.
+      const stale = await writeTempFile(
+        `${TEMP_FILE_PREFIX}root-level.json-1-c`,
+        2 * 60 * 60 * 1000
+      );
+
+      const report = await cleanupService.runCleanup();
+
+      expect(report.staleTempFilesRemoved).toBe(1);
+      expect(await exists(stale)).toBe(false);
     });
   });
 });

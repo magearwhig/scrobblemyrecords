@@ -10,8 +10,9 @@ process.env.DISCOGS_CLIENT_ID = 'test-discogs-client-id';
 process.env.DISCOGS_CLIENT_SECRET = 'test-discogs-client-secret';
 process.env.LASTFM_API_KEY = 'test-lastfm-api-key';
 process.env.LASTFM_SECRET = 'test-lastfm-secret';
-// Use separate test data directory to avoid conflicts with development data
-process.env.DATA_DIR = './test-data-integration';
+// DATA_DIR is set by tests/setupEnv.ts to a per-file temp directory outside the
+// repository. Don't override it here — a repo-relative directory defeats the
+// central fixture and survives crashes as leftover working-tree clutter.
 
 // Mock external service calls to prevent real HTTP requests during integration tests
 jest.mock('../../src/backend/services/discogsService', () => {
@@ -24,16 +25,18 @@ jest.mock('../../src/backend/services/lastfmService', () => {
 import app, { serverStartup } from '../../src/server';
 
 describe('API Integration Tests', () => {
-  const testDataDir = './test-data-integration';
+  // Captured at module load so a test that reassigns DATA_DIR cannot redirect
+  // the recursive delete in afterEach.
+  const testDataDir = process.env.DATA_DIR as string;
 
   beforeAll(async () => {
     await serverStartup;
   }, 15000);
 
-  // Ensure proper test isolation with mock cleanup and data cleanup
-  // NOTE: We only clean up the test data directory (test-data-integration).
-  // We NEVER rename or move the real ./data directory — if tests crash or
-  // timeout before afterEach runs, the real data would be lost.
+  // Ensure proper test isolation with mock cleanup and data cleanup.
+  // NOTE: we only clean up the per-file temp directory from tests/setupEnv.ts.
+  // The real ./data directory is unreachable from tests — resolveDataDir()
+  // throws if DATA_DIR resolves there under NODE_ENV=test.
   beforeEach(async () => {
     jest.clearAllMocks();
   });

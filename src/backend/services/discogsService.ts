@@ -96,9 +96,14 @@ export class DiscogsService {
         throw new Error('Failed to get OAuth request token');
       }
 
-      // Store the token secret temporarily (needed for the callback)
-      await this.authService.storeOAuthTokenSecret(oauthTokenSecret);
-      this.logger.debug('OAuth token secret stored for callback');
+      // Store the token secret (needed to complete the exchange) together with
+      // the request token, which binds the unauthenticated callback route to
+      // this specific flow.
+      await this.authService.storePendingDiscogsRequest(
+        oauthToken,
+        oauthTokenSecret
+      );
+      this.logger.debug('Pending OAuth transaction stored for callback');
 
       // Return the authorization URL
       const backendPort =

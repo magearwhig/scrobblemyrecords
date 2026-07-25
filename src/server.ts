@@ -11,6 +11,7 @@ import morgan from 'morgan';
 // Load environment variables before any other imports
 dotenv.config();
 
+import { requireApiToken } from './backend/middleware/requireApiToken';
 import { createArtistMappingRouter } from './backend/routes/artistMapping';
 import { createAuthRouter } from './backend/routes/auth';
 import createBackupRouter from './backend/routes/backup';
@@ -81,6 +82,12 @@ import { WebsiteMonitoringService } from './backend/services/websiteMonitoringSe
 import { WishlistService } from './backend/services/wishlistService';
 import { WrappedService } from './backend/services/wrappedService';
 import { sendError } from './backend/utils/apiResponse';
+import {
+  AuthConfigurationError,
+  AuthPolicy,
+  resolveAuthPolicy,
+} from './backend/utils/authPolicy';
+import { resolveDataDir } from './backend/utils/dataDir';
 import { FileStorage } from './backend/utils/fileStorage';
 import { createLogger } from './backend/utils/logger';
 
@@ -125,7 +132,7 @@ function validateRequiredEnvVars(): void {
 validateRequiredEnvVars();
 
 // Server lock file to prevent multiple instances
-const LOCK_FILE = path.join(process.cwd(), 'data', '.server.lock');
+const LOCK_FILE = path.join(resolveDataDir(), '.server.lock');
 
 /**
  * Acquire a lock file to prevent multiple server instances.
@@ -199,7 +206,7 @@ const HOST = process.env.HOST || '127.0.0.1';
 
 // Ensure the data directory exists before any service or lock file touches it.
 // New users cloning the repo won't have it because it's gitignored.
-fs.mkdirSync(path.join(process.cwd(), 'data'), { recursive: true });
+fs.mkdirSync(resolveDataDir(), { recursive: true });
 
 // Initialize file storage
 const fileStorage = new FileStorage();
@@ -279,6 +286,35 @@ const apiLimiter = rateLimit({
   },
 });
 app.use('/api/', apiLimiter);
+
+// API authentication.
+//
+// Installed only when the server is actually exposed — see authPolicy.ts. It
+// sits after CORS and body parsing (so preflight and malformed-JSON handling
+// still work) but before every route, so no route can be added later that
+// accidentally sits outside the gate.
+let authPolicy: AuthPolicy;
+try {
+  authPolicy = resolveAuthPolicy(HOST);
+} catch (error) {
+  // Fail closed and legibly: this is the message a user hits when they first
+  // try to expose the app on their network, so print it plainly rather than
+  // as a stack trace.
+  if (error instanceof AuthConfigurationError) {
+    // eslint-disable-next-line no-console
+    console.error(`\n${error.message}\n`);
+    if (process.env.NODE_ENV !== 'test') process.exit(1);
+  }
+  throw error;
+}
+
+if (authPolicy.authRequired && authPolicy.token) {
+  app.use(requireApiToken(authPolicy.token));
+  log.info(
+    `API authentication enabled (${authPolicy.reason}). Clients must send an ` +
+      'Authorization: Bearer header.'
+  );
+}
 
 // HTTP request logging via morgan, piped through the secure logger.
 // Uses 'dev' format in development (colored, concise) and 'combined' in production.
@@ -360,7 +396,10 @@ const releaseTrackingService = new ReleaseTrackingService(
   wishlistService,
   hiddenReleasesService
 );
-const backupService = new BackupService(fileStorage, 'data');
+// Pass the resolved data dir explicitly: BackupService uses raw fs for the
+// backups subdirectory, so a relative 'data' would resolve against cwd and
+// bypass DATA_DIR entirely.
+const backupService = new BackupService(fileStorage, resolveDataDir());
 const discardPileService = new DiscardPileService(fileStorage);
 const savedCollectionService = new SavedCollectionService(fileStorage);
 const durationLookupService = new DurationLookupService(

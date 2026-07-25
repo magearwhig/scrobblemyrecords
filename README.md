@@ -115,6 +115,7 @@ turntable) and have your laptop browser point at it as the UI.
 npm ci
 npm run build:backend
 HOST=0.0.0.0 \
+API_TOKEN=$(openssl rand -hex 32) \
 FRONTEND_URL=http://your-laptop.local:8080 \
 ENCRYPTION_KEY=... \
 DISCOGS_CLIENT_ID=... \
@@ -128,6 +129,13 @@ Notes:
 
 - Set `HOST=0.0.0.0` so the backend listens on the LAN instead of just
   loopback.
+- **`API_TOKEN` is required whenever `HOST` is not loopback** — the server
+  refuses to start without it, because this app has no user accounts and
+  anything that can reach the port would otherwise have full access. Clients
+  send it as `Authorization: Bearer <token>`; in the web UI, paste it when
+  prompted. Note the token travels in plaintext over HTTP, so put TLS or an
+  authenticated reverse proxy in front of anything beyond a trusted LAN. See
+  [SECURITY.md](SECURITY.md).
 - If you load the React UI from a different origin (e.g. your laptop), set
   `FRONTEND_URL` so the CORS allowlist accepts it.
 - The `data/` directory is the authoritative store. If you want to migrate
@@ -141,6 +149,16 @@ Notes:
 Intended for external recognizers (like an audio-fingerprinting daemon) that
 produce `{artist, title}` and want recordscrobbles to handle duration lookup
 and scrobbling.
+
+If the server was started with `API_TOKEN` set (required for any non-loopback
+bind), the recognizer must send it:
+
+```bash
+curl -X POST http://your-pi.local:3001/api/v1/scrobble/recognized \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"artist":"The Beatles","title":"Hey Jude","source":"vinyl-pi"}'
+```
 
 Request body:
 
