@@ -21,6 +21,10 @@ module.exports = {
         '!src/**/*.test.ts',
         '!src/**/*.spec.ts'
       ],
+      // setupFiles runs before setupFilesAfterEnv and before any test module is
+      // imported — required so DATA_DIR is redirected away from the real data/
+      // directory before src/server.ts runs its import-time side effects.
+      setupFiles: ['<rootDir>/tests/setupEnv.ts'],
       setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
       testTimeout: 10000,
       clearMocks: true,

@@ -4,6 +4,19 @@ import { OllamaService } from '../services/ollamaService';
 import { WebsiteMonitoringService } from '../services/websiteMonitoringService';
 import { sendError, sendSuccess } from '../utils/apiResponse';
 import { createLogger } from '../utils/logger';
+import { BlockedAddressError } from '../utils/ssrfGuard';
+
+/**
+ * Distinguish "the caller gave us something bad" from "we broke".
+ *
+ * A refused SSRF target is the caller's fault, so it belongs in the 400 family
+ * — matching on the message alone would classify it as a 500.
+ */
+function isClientError(error: unknown, messageMatches: string[]): boolean {
+  if (error instanceof BlockedAddressError) return true;
+  const message = error instanceof Error ? error.message : '';
+  return messageMatches.some(match => message.includes(match));
+}
 
 export default function createWebsitesRouter(
   websiteMonitoringService: WebsiteMonitoringService,
@@ -45,13 +58,14 @@ export default function createWebsitesRouter(
       sendSuccess(res, website);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      const status =
-        message.includes('Already monitoring') ||
-        message.includes('required') ||
-        message.includes('Invalid URL') ||
-        message.includes('http or https')
-          ? 400
-          : 500;
+      const status = isClientError(error, [
+        'Already monitoring',
+        'required',
+        'Invalid URL',
+        'http or https',
+      ])
+        ? 400
+        : 500;
       logger.error('Error adding website', error);
       sendError(res, status, message);
     }
@@ -71,12 +85,13 @@ export default function createWebsitesRouter(
       sendSuccess(res, result);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      const status =
-        message.includes('Invalid URL') ||
-        message.includes('http or https') ||
-        message.includes('Failed to fetch')
-          ? 400
-          : 500;
+      const status = isClientError(error, [
+        'Invalid URL',
+        'http or https',
+        'Failed to fetch',
+      ])
+        ? 400
+        : 500;
       logger.error(`Error previewing website (url=${String(url)})`, error);
       sendError(res, status, message);
     }
@@ -326,10 +341,9 @@ export default function createWebsitesRouter(
       sendSuccess(res, updated);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      const status =
-        message.includes('Invalid URL') || message.includes('http or https')
-          ? 400
-          : 500;
+      const status = isClientError(error, ['Invalid URL', 'http or https'])
+        ? 400
+        : 500;
       logger.error('Error updating website', error);
       sendError(res, status, message);
     }

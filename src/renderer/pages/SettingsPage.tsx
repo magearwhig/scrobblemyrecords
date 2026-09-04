@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react';
 import './SettingsPage.page.css';
 
 import {
+  SettingsApiTokenSection,
   SettingsConnectionsSection,
   SettingsIntegrationsSection,
   SettingsMappingsSection,
@@ -174,7 +175,12 @@ const SettingsPage: React.FC = () => {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'connections':
-        return <SettingsConnectionsSection api={api} />;
+        return (
+          <>
+            <SettingsConnectionsSection api={api} />
+            <SettingsApiTokenSection />
+          </>
+        );
       case 'integrations':
         return <SettingsIntegrationsSection api={api} />;
       case 'mappings':

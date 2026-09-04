@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-import { UserSettings } from '../../shared/types';
+import { PendingOAuthTransaction, UserSettings } from '../../shared/types';
 import { EncryptionKeyValidator } from '../utils/encryptionValidator';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
@@ -433,6 +433,139 @@ export class AuthService {
       }
     }
     await this.saveUserSettings(settings);
+  }
+
+  // ============================================
+  // Pending OAuth transactions
+  //
+  // The OAuth callback routes are reachable without an API token, because the
+  // user's browser arrives there by redirect and cannot send an Authorization
+  // header. These bindings are what keeps that safe: a callback is only
+  // honoured when it matches a transaction that an authenticated request
+  // started, and each transaction is single-use and short-lived.
+  // ============================================
+
+  /** How long a started OAuth flow stays completable. */
+  private readonly PENDING_OAUTH_TTL_MS = 10 * 60 * 1000;
+
+  /** Upper bound on stored transactions, so the callbacks cannot grow the file. */
+  private readonly MAX_PENDING_OAUTH = 10;
+
+  private prunePending(
+    pending: PendingOAuthTransaction[] | undefined
+  ): PendingOAuthTransaction[] {
+    const now = Date.now();
+    return (pending ?? [])
+      .filter(entry => entry.expiresAt > now)
+      .slice(-this.MAX_PENDING_OAUTH);
+  }
+
+  /**
+   * Match a presented value against pending transactions and remove it.
+   *
+   * Removal happens ONLY on a match. A wrong value must not destroy a
+   * legitimate pending flow: the callbacks are reachable without an API token,
+   * so consuming on mismatch would let anyone cancel a sign-in in progress by
+   * sending one junk request. The values are high-entropy, so guessing is not
+   * a realistic path in the first place.
+   */
+  private matchAndRemove(
+    pending: PendingOAuthTransaction[],
+    presented: string
+  ): { matched: boolean; remaining: PendingOAuthTransaction[] } {
+    if (!presented) return { matched: false, remaining: pending };
+
+    const index = pending.findIndex(entry => entry.value === presented);
+    if (index === -1) return { matched: false, remaining: pending };
+
+    const remaining = [...pending];
+    remaining.splice(index, 1);
+    return { matched: true, remaining };
+  }
+
+  /**
+   * Record that an authenticated caller started a Discogs OAuth flow.
+   *
+   * Stores the token secret needed to complete the exchange alongside the
+   * request token the callback must present.
+   *
+   * Note the token secret remains a single slot (pre-existing behaviour), so
+   * two Discogs sign-ins started simultaneously will still collide on it; the
+   * request-token list only ensures the second does not invalidate the first's
+   * binding.
+   */
+  async storePendingDiscogsRequest(
+    requestToken: string,
+    tokenSecret: string
+  ): Promise<void> {
+    const settings = await this.getUserSettings();
+    settings.temp = settings.temp || {};
+    settings.temp.oauthTokenSecret = tokenSecret;
+    settings.temp.pendingDiscogsRequests = [
+      ...this.prunePending(settings.temp.pendingDiscogsRequests),
+      {
+        value: requestToken,
+        expiresAt: Date.now() + this.PENDING_OAUTH_TTL_MS,
+      },
+    ].slice(-this.MAX_PENDING_OAUTH);
+    await this.saveUserSettings(settings);
+  }
+
+  /**
+   * Verify and consume a pending Discogs transaction.
+   *
+   * @returns true only if this exact request token is pending and unexpired.
+   *          A successful match is consumed, so a replay cannot succeed.
+   */
+  async consumePendingDiscogsRequest(requestToken: string): Promise<boolean> {
+    const settings = await this.getUserSettings();
+    const pending = this.prunePending(settings.temp?.pendingDiscogsRequests);
+    const { matched, remaining } = this.matchAndRemove(pending, requestToken);
+
+    // Only write on a match. Rejected attempts must not cost a disk write, or
+    // an unauthenticated caller could drive writes by replaying junk.
+    if (matched && settings.temp) {
+      settings.temp.pendingDiscogsRequests = remaining;
+      await this.saveUserSettings(settings);
+    }
+
+    return matched;
+  }
+
+  /**
+   * Record that an authenticated caller started a Last.fm OAuth flow.
+   *
+   * @returns the nonce to embed in the callback URL.
+   */
+  async storePendingLastFmNonce(): Promise<string> {
+    const nonce = this.generateNonce();
+    const settings = await this.getUserSettings();
+    settings.temp = settings.temp || {};
+    settings.temp.pendingLastFmNonces = [
+      ...this.prunePending(settings.temp.pendingLastFmNonces),
+      { value: nonce, expiresAt: Date.now() + this.PENDING_OAUTH_TTL_MS },
+    ].slice(-this.MAX_PENDING_OAUTH);
+    await this.saveUserSettings(settings);
+    return nonce;
+  }
+
+  /**
+   * Verify and consume a pending Last.fm transaction.
+   *
+   * Without this, anyone who can reach the callback could supply their own
+   * Last.fm token and bind their account to this instance.
+   */
+  async consumePendingLastFmNonce(nonce: string): Promise<boolean> {
+    const settings = await this.getUserSettings();
+    const pending = this.prunePending(settings.temp?.pendingLastFmNonces);
+    const { matched, remaining } = this.matchAndRemove(pending, nonce);
+
+    if (matched && settings.temp) {
+      settings.temp.pendingLastFmNonces = remaining;
+      await this.saveUserSettings(settings);
+    }
+
+    return matched;
   }
 
   generateTimestamp(): string {

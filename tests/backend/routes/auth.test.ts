@@ -11,6 +11,10 @@ const mockAuthService = {
   setLastFmCredentials: jest.fn(),
   clearTokens: jest.fn(),
   saveUserSettings: jest.fn(),
+  // Default to "a flow was started", so existing happy-path tests describe the
+  // normal case. The binding itself is exercised in its own describe block.
+  consumePendingDiscogsRequest: jest.fn().mockResolvedValue(true),
+  consumePendingLastFmNonce: jest.fn().mockResolvedValue(true),
 };
 
 const mockDiscogsService = {
@@ -59,6 +63,11 @@ describe('Auth Routes', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // clearAllMocks wipes the default implementations above; restore the
+    // "pending flow exists" baseline so unrelated tests exercise the happy path.
+    mockAuthService.consumePendingDiscogsRequest.mockResolvedValue(true);
+    mockAuthService.consumePendingLastFmNonce.mockResolvedValue(true);
 
     // Create Express app
     app = express();
@@ -259,10 +268,12 @@ describe('Auth Routes', () => {
       );
     });
 
-    it('should handle Discogs callback errors', async () => {
+    it('should handle Discogs callback errors without leaking detail', async () => {
+      // This page is rendered for an unauthenticated browser and upstream error
+      // text is attacker-influenced, so it must not be reflected into the HTML.
       mockDiscogsService.handleCallback = jest
         .fn()
-        .mockRejectedValue(new Error('Invalid OAuth token'));
+        .mockRejectedValue(new Error('Invalid OAuth token <img src=x>'));
 
       const response = await request(app)
         .get('/api/v1/auth/discogs/callback')
@@ -270,7 +281,103 @@ describe('Auth Routes', () => {
         .expect(500);
 
       expect(response.text).toContain('Authentication Error');
-      expect(response.text).toContain('Invalid OAuth token');
+      expect(response.text).not.toContain('Invalid OAuth token');
+      expect(response.text).not.toContain('<img src=x>');
+    });
+  });
+
+  describe('OAuth callback transaction binding', () => {
+    // The callback routes are exempt from API authentication, because the
+    // browser arrives there by redirect from Discogs/Last.fm and cannot send an
+    // Authorization header. These tests cover what makes that exemption safe.
+
+    describe('Discogs', () => {
+      it('refuses a callback with no pending flow', async () => {
+        mockAuthService.consumePendingDiscogsRequest.mockResolvedValue(false);
+        mockDiscogsService.handleCallback = jest.fn();
+
+        const response = await request(app)
+          .get('/api/v1/auth/discogs/callback')
+          .query({ oauth_token: 'attacker', oauth_verifier: 'v' })
+          .expect(400);
+
+        expect(response.text).toContain('not valid or has expired');
+        expect(mockDiscogsService.handleCallback).not.toHaveBeenCalled();
+      });
+
+      it('checks the presented token against the pending one', async () => {
+        await request(app)
+          .get('/api/v1/auth/discogs/callback')
+          .query({ oauth_token: 'presented_token', oauth_verifier: 'v' });
+
+        expect(
+          mockAuthService.consumePendingDiscogsRequest
+        ).toHaveBeenCalledWith('presented_token');
+      });
+
+      it('consumes the transaction before exchanging it', async () => {
+        mockDiscogsService.handleCallback = jest
+          .fn()
+          .mockResolvedValue({ username: 'u' });
+
+        await request(app)
+          .get('/api/v1/auth/discogs/callback')
+          .query({ oauth_token: 't', oauth_verifier: 'v' })
+          .expect(200);
+
+        expect(
+          mockAuthService.consumePendingDiscogsRequest
+        ).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('Last.fm', () => {
+      it('refuses a callback with no pending flow', async () => {
+        // Without this, anyone able to reach the callback could supply their
+        // own Last.fm token and bind their account to this instance.
+        mockAuthService.consumePendingLastFmNonce.mockResolvedValue(false);
+        mockLastFmService.getSession = jest.fn();
+
+        const response = await request(app)
+          .get('/api/v1/auth/lastfm/callback')
+          .query({ token: 'attacker_token', nonce: 'guessed' })
+          .expect(400);
+
+        expect(response.text).toContain('not valid or has expired');
+        expect(mockLastFmService.getSession).not.toHaveBeenCalled();
+      });
+
+      it('refuses a callback carrying no nonce at all', async () => {
+        mockAuthService.consumePendingLastFmNonce.mockResolvedValue(false);
+        mockLastFmService.getSession = jest.fn();
+
+        await request(app)
+          .get('/api/v1/auth/lastfm/callback')
+          .query({ token: 'attacker_token' })
+          .expect(400);
+
+        expect(mockAuthService.consumePendingLastFmNonce).toHaveBeenCalledWith(
+          ''
+        );
+        expect(mockLastFmService.getSession).not.toHaveBeenCalled();
+      });
+
+      it('passes the presented nonce through for checking', async () => {
+        mockAuthService.getUserSettings = jest
+          .fn()
+          .mockResolvedValue({ lastfm: { apiKey: 'k' } });
+        mockLastFmService.getSession = jest
+          .fn()
+          .mockResolvedValue({ sessionKey: 's', username: 'u' });
+
+        await request(app)
+          .get('/api/v1/auth/lastfm/callback')
+          .query({ token: 't', nonce: 'the_nonce' });
+
+        expect(mockAuthService.consumePendingLastFmNonce).toHaveBeenCalledWith(
+          'the_nonce'
+        );
+      });
     });
   });
 
@@ -490,18 +597,22 @@ describe('Auth Routes', () => {
       );
     });
 
-    it('should handle Last.fm callback errors', async () => {
+    it('should handle Last.fm callback errors without leaking detail', async () => {
+      // Last.fm can propagate provider-supplied text into this error path.
       mockLastFmService.getSession = jest
         .fn()
-        .mockRejectedValue(new Error('Invalid token'));
+        .mockRejectedValue(
+          new Error('Invalid token <script>alert(1)</script>')
+        );
 
       const response = await request(app)
         .get('/api/v1/auth/lastfm/callback')
-        .query({ token: 'invalid_token' })
+        .query({ token: 'invalid_token', nonce: 'n' })
         .expect(500);
 
       expect(response.text).toContain('Last.fm Authentication Error');
-      expect(response.text).toContain('Invalid token');
+      expect(response.text).not.toContain('Invalid token');
+      expect(response.text).not.toContain('alert(1)');
     });
   });
 

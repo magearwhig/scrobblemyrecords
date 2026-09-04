@@ -13,7 +13,12 @@
  * - Collection artists cache (releases): 24 hours max age (uses fetchedAt timestamp)
  * - Artist tags cache (genre analysis): 30 days max age per entry (uses fetchedAt timestamp)
  * - Collection value cache: 7 days max age (based on lastUpdated timestamp)
+ * - Orphaned atomic-write temp files: 1 hour max age
  */
+
+import type { Dirent } from 'fs';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 import {
   ArtistTagsCacheStore,
@@ -22,6 +27,7 @@ import {
   SellerMatchesStore,
   VersionsCache,
 } from '../../shared/types';
+import { isTempFileName, isTempPathActive } from '../utils/atomicWrite';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 import { nowUnixMs } from '../utils/timestamps';
@@ -52,6 +58,7 @@ export interface CleanupReport {
   collectionArtistsCacheCleared: boolean;
   artistTagsEntriesRemoved: number;
   collectionValueCacheCleared: boolean;
+  staleTempFilesRemoved: number;
   errors: string[];
   durationMs: number;
 }
@@ -67,6 +74,7 @@ export class CleanupService {
   private readonly COLLECTION_ARTISTS_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
   private readonly ARTIST_TAGS_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
   private readonly COLLECTION_VALUE_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+  private readonly STALE_TEMP_FILE_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 
   constructor(storage: FileStorage) {
     this.storage = storage;
@@ -87,6 +95,7 @@ export class CleanupService {
       collectionArtistsCacheCleared: false,
       artistTagsEntriesRemoved: 0,
       collectionValueCacheCleared: false,
+      staleTempFilesRemoved: 0,
       errors: [],
       durationMs: 0,
     };
@@ -159,6 +168,15 @@ export class CleanupService {
         await this.cleanupCollectionValueCache();
     } catch (e) {
       const msg = `Collection value cache cleanup failed: ${e instanceof Error ? e.message : String(e)}`;
+      report.errors.push(msg);
+      log.error(msg);
+    }
+
+    // Orphaned atomic-write temp files (left behind by a hard kill)
+    try {
+      report.staleTempFilesRemoved = await this.cleanupStaleTempFiles();
+    } catch (e) {
+      const msg = `Stale temp file cleanup failed: ${e instanceof Error ? e.message : String(e)}`;
       report.errors.push(msg);
       log.error(msg);
     }
@@ -392,6 +410,65 @@ export class CleanupService {
     }
 
     return false;
+  }
+
+  /**
+   * Remove orphaned atomic-write temp files.
+   *
+   * atomicWriteFile() unlinks its temp file on any failure, so these only
+   * appear when the process was killed hard mid-write. They are invisible to
+   * listFiles(), so without this sweep they would accumulate silently forever.
+   *
+   * The age cutoff matters: a temp file belonging to a write happening right
+   * now must not be deleted out from under it.
+   */
+  async cleanupStaleTempFiles(): Promise<number> {
+    const cutoff = nowUnixMs() - this.STALE_TEMP_FILE_MAX_AGE_MS;
+    const dataDir = this.storage.getDataDir();
+    let removed = 0;
+
+    const walk = async (dir: string): Promise<void> => {
+      let entries: Dirent[];
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true });
+      } catch {
+        return; // Directory vanished or is unreadable; nothing to sweep.
+      }
+
+      for (const entry of entries) {
+        const entryPath = path.join(dir, entry.name);
+
+        if (entry.isDirectory()) {
+          await walk(entryPath);
+          continue;
+        }
+
+        if (!isTempFileName(entry.name)) continue;
+
+        // A write in this process may be blocked in fsync for longer than the
+        // age threshold. Unlinking its temp would succeed on POSIX and make its
+        // rename fail with ENOENT, losing the write.
+        if (isTempPathActive(entryPath)) continue;
+
+        try {
+          const stats = await fs.stat(entryPath);
+          if (stats.mtimeMs < cutoff) {
+            await fs.unlink(entryPath);
+            removed++;
+          }
+        } catch {
+          // Already gone, or being renamed right now. Either way, skip it.
+        }
+      }
+    };
+
+    await walk(dataDir);
+
+    if (removed > 0) {
+      log.info(`Removed ${removed} orphaned temp files`);
+    }
+
+    return removed;
   }
 
   /**

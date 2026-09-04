@@ -17,7 +17,9 @@ import {
   normalizeArtistName,
 } from '../../shared/utils/trackNormalization';
 import { FileStorage } from '../utils/fileStorage';
+import { guardedFetchText } from '../utils/guardedFetch';
 import { createLogger } from '../utils/logger';
+import { defaultSsrfGuard, SsrfGuard } from '../utils/ssrfGuard';
 
 import { OllamaService } from './ollamaService';
 import { WishlistService } from './wishlistService';
@@ -72,15 +74,20 @@ export class WebsiteMonitoringService {
   private initialized = false;
 
   private wishlistService: WishlistService;
+  private ssrfGuard: SsrfGuard;
 
   constructor(
     fileStorage: FileStorage,
     ollamaService: OllamaService,
-    wishlistService: WishlistService
+    wishlistService: WishlistService,
+    // Injected so transport behaviour can be tested against a local server on
+    // 127.0.0.1, which the real guard necessarily blocks.
+    ssrfGuard: SsrfGuard = defaultSsrfGuard
   ) {
     this.fileStorage = fileStorage;
     this.ollamaService = ollamaService;
     this.wishlistService = wishlistService;
+    this.ssrfGuard = ssrfGuard;
     this.initialize();
   }
 
@@ -189,17 +196,14 @@ export class WebsiteMonitoringService {
     return [];
   }
 
+  /**
+   * Reject a URL at entry so add/update fail fast with a clear message.
+   *
+   * This is a convenience, not the security boundary — fetchPage revalidates,
+   * because DNS can change between adding a website and scanning it.
+   */
   private validateUrl(url: string): URL {
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      throw new Error('Invalid URL');
-    }
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      throw new Error('URL must use http or https');
-    }
-    return parsed;
+    return this.ssrfGuard.assertPublicUrl(url);
   }
 
   async addWebsite(input: {
@@ -382,89 +386,27 @@ export class WebsiteMonitoringService {
   // ============================================
 
   /**
-   * Fetch a URL with timeout and a hard byte cap.
+   * Fetch a URL with SSRF protection, a timeout and a hard byte cap.
+   *
+   * Validation lives here rather than only at the route boundary on purpose:
+   * this is the single choke point both callers go through, including the
+   * background scanner, which re-fetches stored URLs and previously validated
+   * nothing at all. Checking here also re-validates on every scan, which
+   * matters because a hostname's DNS can change after the URL was added.
    */
   private async fetchPage(
     url: string,
     timeoutMs: number,
     maxBytes: number
   ): Promise<string> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'User-Agent': USER_AGENT,
-          Accept: 'text/html,application/xhtml+xml',
-        },
-        signal: controller.signal,
-        redirect: 'follow',
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Fetch failed: HTTP ${response.status} ${response.statusText}`
-        );
-      }
-
-      const contentType = response.headers.get('content-type') || '';
-      if (
-        contentType &&
-        !/text\/html|application\/xhtml/i.test(contentType) &&
-        !/text\/plain/i.test(contentType)
-      ) {
-        // Non-HTML; reject before parsing
-        throw new Error(`Unsupported content-type: ${contentType}`);
-      }
-
-      // Stream-style read with cap. We always cap, even when no reader is
-      // available (some non-Node runtimes), to ensure we never load an
-      // unbounded body into memory.
-      const reader = response.body?.getReader();
-      if (!reader) {
-        const text = await response.text();
-        if (text.length > maxBytes) {
-          this.logger.warn(
-            `Body exceeded ${maxBytes} bytes for ${url}; truncating (no reader available)`
-          );
-        }
-        return text.length > maxBytes ? text.slice(0, maxBytes) : text;
-      }
-
-      const chunks: Uint8Array[] = [];
-      let total = 0;
-      let truncated = false;
-      while (total < maxBytes) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (!value) continue;
-        const remaining = maxBytes - total;
-        if (value.byteLength > remaining) {
-          chunks.push(value.slice(0, remaining));
-          total = maxBytes;
-          truncated = true;
-          break;
-        }
-        chunks.push(value);
-        total += value.byteLength;
-      }
-      if (truncated) {
-        this.logger.debug(
-          `Body capped at ${maxBytes} bytes for ${url} (truncated mid-stream)`
-        );
-      }
-      try {
-        await reader.cancel();
-      } catch {
-        // ignore — cancelling an already-completed stream throws
-      }
-
-      const buffer = Buffer.concat(chunks.map(c => Buffer.from(c)));
-      return buffer.toString('utf-8');
-    } finally {
-      clearTimeout(timer);
-    }
+    return guardedFetchText(url, {
+      timeoutMs,
+      maxBytes,
+      userAgent: USER_AGENT,
+      accept: 'text/html,application/xhtml+xml',
+      allowedContentType: /text\/html|application\/xhtml|text\/plain/i,
+      guard: this.ssrfGuard,
+    });
   }
 
   /**

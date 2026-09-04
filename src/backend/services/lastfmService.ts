@@ -92,9 +92,16 @@ export class LastFmService {
     }
 
     const backendPort = process.env.BACKEND_PORT || process.env.PORT || '3001';
-    const callbackUrl =
+    const baseCallbackUrl =
       process.env.LASTFM_CALLBACK_URL ||
       `http://localhost:${backendPort}/api/v1/auth/lastfm/callback`;
+
+    // Bind the callback to this flow. The callback route is reachable without
+    // an API token (Last.fm redirects the browser there), so without a nonce
+    // anyone could POST their own Last.fm token and attach their account.
+    const nonce = await this.authService.storePendingLastFmNonce();
+    const separator = baseCallbackUrl.includes('?') ? '&' : '?';
+    const callbackUrl = `${baseCallbackUrl}${separator}nonce=${nonce}`;
 
     return `http://www.last.fm/api/auth/?api_key=${credentials.apiKey}&cb=${encodeURIComponent(callbackUrl)}`;
   }

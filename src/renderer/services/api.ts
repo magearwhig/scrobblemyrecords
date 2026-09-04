@@ -84,6 +84,8 @@ import {
 } from '../../shared/types';
 import { createLogger } from '../utils/logger';
 
+import { getApiToken } from './apiToken';
+
 const log = createLogger('ApiService');
 
 class ApiService {
@@ -102,9 +104,15 @@ class ApiService {
       },
     });
 
-    // Request interceptor for logging
+    // Request interceptor: attach the API token (when the backend requires one)
+    // and log. Read per-request rather than captured at construction, so a
+    // token entered after startup takes effect without a reload.
     this.api.interceptors.request.use(
       config => {
+        const token = getApiToken();
+        if (token) {
+          config.headers.set('Authorization', `Bearer ${token}`);
+        }
         log.debug(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
         return config;
       },

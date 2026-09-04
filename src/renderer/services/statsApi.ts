@@ -37,7 +37,33 @@ import {
   ValueScanStatus,
 } from '../../shared/types';
 
+import { authHeader } from './apiToken';
+
 const API_BASE = `http://localhost:${process.env.REACT_APP_BACKEND_PORT || '3001'}/api/v1`;
+
+/**
+ * fetch with the API token attached when the backend requires one.
+ *
+ * The backend only demands a token when bound to a non-loopback address; on the
+ * usual localhost setup authHeader() is empty and this behaves as plain fetch.
+ */
+async function authedFetch(
+  input: string,
+  init?: Parameters<typeof fetch>[1]
+): ReturnType<typeof fetch> {
+  const auth = authHeader();
+
+  // With no token and no options, call fetch exactly as before rather than
+  // synthesizing an empty options object.
+  if (!init && Object.keys(auth).length === 0) {
+    return fetch(input);
+  }
+
+  return fetch(input, {
+    ...init,
+    headers: { ...(init?.headers || {}), ...auth },
+  });
+}
 
 /**
  * Stats API service for the frontend
@@ -47,7 +73,7 @@ export const statsApi = {
    * Get full stats overview
    */
   async getOverview(): Promise<ApiResponse<StatsOverview>> {
-    const response = await fetch(`${API_BASE}/stats/overview`);
+    const response = await authedFetch(`${API_BASE}/stats/overview`);
     return response.json();
   },
 
@@ -55,7 +81,7 @@ export const statsApi = {
    * Get streak information
    */
   async getStreaks(): Promise<ApiResponse<StreakInfo>> {
-    const response = await fetch(`${API_BASE}/stats/streaks`);
+    const response = await authedFetch(`${API_BASE}/stats/streaks`);
     return response.json();
   },
 
@@ -63,7 +89,7 @@ export const statsApi = {
    * Get scrobble counts
    */
   async getCounts(): Promise<ApiResponse<ScrobbleCounts>> {
-    const response = await fetch(`${API_BASE}/stats/counts`);
+    const response = await authedFetch(`${API_BASE}/stats/counts`);
     return response.json();
   },
 
@@ -71,7 +97,7 @@ export const statsApi = {
    * Get listening hours
    */
   async getListeningHours(): Promise<ApiResponse<ListeningHours>> {
-    const response = await fetch(`${API_BASE}/stats/listening-hours`);
+    const response = await authedFetch(`${API_BASE}/stats/listening-hours`);
     return response.json();
   },
 
@@ -79,7 +105,7 @@ export const statsApi = {
    * Get new artists count this month
    */
   async getNewArtists(): Promise<ApiResponse<{ count: number }>> {
-    const response = await fetch(`${API_BASE}/stats/new-artists`);
+    const response = await authedFetch(`${API_BASE}/stats/new-artists`);
     return response.json();
   },
 
@@ -87,7 +113,7 @@ export const statsApi = {
    * Get detailed list of new artists discovered this month
    */
   async getNewArtistsDetails(): Promise<ApiResponse<NewArtistDetail[]>> {
-    const response = await fetch(`${API_BASE}/stats/new-artists/details`);
+    const response = await authedFetch(`${API_BASE}/stats/new-artists/details`);
     return response.json();
   },
 
@@ -116,7 +142,7 @@ export const statsApi = {
       url += `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;
     }
 
-    const response = await fetch(url);
+    const response = await authedFetch(url);
     return response.json();
   },
 
@@ -145,7 +171,7 @@ export const statsApi = {
       url += `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;
     }
 
-    const response = await fetch(url);
+    const response = await authedFetch(url);
     return response.json();
   },
 
@@ -174,7 +200,7 @@ export const statsApi = {
       url += `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;
     }
 
-    const response = await fetch(url);
+    const response = await authedFetch(url);
     return response.json();
   },
 
@@ -182,7 +208,7 @@ export const statsApi = {
    * Get collection coverage stats
    */
   async getCollectionCoverage(): Promise<ApiResponse<CollectionCoverage>> {
-    const response = await fetch(`${API_BASE}/stats/collection/coverage`);
+    const response = await authedFetch(`${API_BASE}/stats/collection/coverage`);
     return response.json();
   },
 
@@ -192,7 +218,7 @@ export const statsApi = {
   async getDustyCorners(
     limit: number = 20
   ): Promise<ApiResponse<DustyCornerAlbum[]>> {
-    const response = await fetch(
+    const response = await authedFetch(
       `${API_BASE}/stats/dusty-corners?limit=${limit}`
     );
     return response.json();
@@ -204,7 +230,7 @@ export const statsApi = {
   async getHeavyRotation(
     limit: number = 10
   ): Promise<ApiResponse<AlbumPlayCount[]>> {
-    const response = await fetch(
+    const response = await authedFetch(
       `${API_BASE}/stats/heavy-rotation?limit=${limit}`
     );
     return response.json();
@@ -215,7 +241,7 @@ export const statsApi = {
    */
   async getHeatmap(year?: number): Promise<ApiResponse<CalendarHeatmapData[]>> {
     const params = year ? `?year=${year}` : '';
-    const response = await fetch(`${API_BASE}/stats/heatmap${params}`);
+    const response = await authedFetch(`${API_BASE}/stats/heatmap${params}`);
     return response.json();
   },
 
@@ -224,7 +250,7 @@ export const statsApi = {
    * @param date - Date string in YYYY-MM-DD format
    */
   async getHeatmapDate(date: string): Promise<ApiResponse<DateAlbumsResult>> {
-    const response = await fetch(`${API_BASE}/stats/heatmap/${date}`);
+    const response = await authedFetch(`${API_BASE}/stats/heatmap/${date}`);
     return response.json();
   },
 
@@ -232,7 +258,7 @@ export const statsApi = {
    * Get milestone progress
    */
   async getMilestones(): Promise<ApiResponse<MilestoneInfo>> {
-    const response = await fetch(`${API_BASE}/stats/milestones`);
+    const response = await authedFetch(`${API_BASE}/stats/milestones`);
     return response.json();
   },
 
@@ -240,7 +266,7 @@ export const statsApi = {
    * Get source breakdown (RecordScrobbles vs Other)
    */
   async getSourceBreakdown(): Promise<ApiResponse<SourceBreakdownItem[]>> {
-    const response = await fetch(`${API_BASE}/stats/sources`);
+    const response = await authedFetch(`${API_BASE}/stats/sources`);
     return response.json();
   },
 
@@ -268,7 +294,7 @@ export const statsApi = {
       url += `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;
     }
 
-    const response = await fetch(url);
+    const response = await authedFetch(url);
     return response.json();
   },
 
@@ -278,7 +304,7 @@ export const statsApi = {
   async getHourlyDistribution(): Promise<
     ApiResponse<HourlyDistributionResult>
   > {
-    const response = await fetch(`${API_BASE}/stats/hourly-distribution`);
+    const response = await authedFetch(`${API_BASE}/stats/hourly-distribution`);
     return response.json();
   },
 
@@ -288,7 +314,9 @@ export const statsApi = {
   async getDayOfWeekDistribution(): Promise<
     ApiResponse<DayOfWeekDistributionResult>
   > {
-    const response = await fetch(`${API_BASE}/stats/day-of-week-distribution`);
+    const response = await authedFetch(
+      `${API_BASE}/stats/day-of-week-distribution`
+    );
     return response.json();
   },
 
@@ -314,7 +342,7 @@ export const statsApi = {
       url += `&endDate=${endDate}`;
     }
 
-    const response = await fetch(url);
+    const response = await authedFetch(url);
     return response.json();
   },
 
@@ -327,7 +355,7 @@ export const statsApi = {
     album: string
   ): Promise<ApiResponse<AlbumTracksPlayedResponse>> {
     const params = new URLSearchParams({ artist, album });
-    const response = await fetch(
+    const response = await authedFetch(
       `${API_BASE}/stats/album-tracks-played?${params}`
     );
     return response.json();
@@ -343,7 +371,7 @@ export const statsApi = {
     trendPeriod: 'month' | 'week' = 'month'
   ): Promise<ApiResponse<ArtistDetailResponse>> {
     const params = new URLSearchParams({ trendPeriod });
-    const response = await fetch(
+    const response = await authedFetch(
       `${API_BASE}/stats/artist/${encodeURIComponent(artistName)}?${params}`
     );
     return response.json();
@@ -366,7 +394,7 @@ export const statsApi = {
     if (album) {
       params.set('album', album);
     }
-    const response = await fetch(`${API_BASE}/stats/track?${params}`);
+    const response = await authedFetch(`${API_BASE}/stats/track?${params}`);
     return response.json();
   },
 
@@ -380,7 +408,9 @@ export const statsApi = {
     album: string
   ): Promise<ApiResponse<AlbumDetailResponse>> {
     const params = new URLSearchParams({ artist, album });
-    const response = await fetch(`${API_BASE}/stats/album-detail?${params}`);
+    const response = await authedFetch(
+      `${API_BASE}/stats/album-detail?${params}`
+    );
     return response.json();
   },
 
@@ -397,7 +427,7 @@ export const statsApi = {
     if (month !== undefined) params.set('month', String(month));
     if (day !== undefined) params.set('day', String(day));
     const qs = params.toString();
-    const response = await fetch(
+    const response = await authedFetch(
       `${API_BASE}/stats/on-this-day${qs ? `?${qs}` : ''}`
     );
     return response.json();
@@ -412,7 +442,7 @@ export const statsApi = {
     limit: number = 50,
     maxTags: number = 10
   ): Promise<ApiResponse<GenreDistributionResult>> {
-    const response = await fetch(
+    const response = await authedFetch(
       `${API_BASE}/stats/genres?limit=${limit}&maxTags=${maxTags}`
     );
     return response.json();
@@ -424,7 +454,9 @@ export const statsApi = {
    */
   async getCollectionROI(limit?: number): Promise<ApiResponse<RoiScoreItem[]>> {
     const params = limit ? `?limit=${limit}` : '';
-    const response = await fetch(`${API_BASE}/stats/collection-roi${params}`);
+    const response = await authedFetch(
+      `${API_BASE}/stats/collection-roi${params}`
+    );
     return response.json();
   },
 
@@ -437,7 +469,7 @@ export const statsApi = {
     artist: string,
     album: string
   ): Promise<ApiResponse<AlbumArcBucket[]>> {
-    const response = await fetch(
+    const response = await authedFetch(
       `${API_BASE}/stats/album-arc?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}`
     );
     return response.json();
@@ -449,7 +481,9 @@ export const statsApi = {
    */
   async getTasteDrift(months?: number): Promise<ApiResponse<TasteDriftResult>> {
     const params = months ? `?months=${months}` : '';
-    const response = await fetch(`${API_BASE}/stats/taste-drift${params}`);
+    const response = await authedFetch(
+      `${API_BASE}/stats/taste-drift${params}`
+    );
     return response.json();
   },
 };
@@ -466,7 +500,7 @@ export const imagesApi = {
     album: string
   ): Promise<ApiResponse<{ url: string | null; source: string | null }>> {
     const params = new URLSearchParams({ artist, album });
-    const response = await fetch(`${API_BASE}/images/album?${params}`);
+    const response = await authedFetch(`${API_BASE}/images/album?${params}`);
     return response.json();
   },
 
@@ -477,7 +511,7 @@ export const imagesApi = {
     name: string
   ): Promise<ApiResponse<{ url: string | null; source: string | null }>> {
     const params = new URLSearchParams({ name });
-    const response = await fetch(`${API_BASE}/images/artist?${params}`);
+    const response = await authedFetch(`${API_BASE}/images/artist?${params}`);
     return response.json();
   },
 
@@ -487,7 +521,7 @@ export const imagesApi = {
   async batchGetAlbumCovers(
     albums: Array<{ artist: string; album: string }>
   ): Promise<ApiResponse<Record<string, string | null>>> {
-    const response = await fetch(`${API_BASE}/images/batch/albums`, {
+    const response = await authedFetch(`${API_BASE}/images/batch/albums`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ albums }),
@@ -501,7 +535,7 @@ export const imagesApi = {
   async batchGetArtistImages(
     artists: string[]
   ): Promise<ApiResponse<Record<string, string | null>>> {
-    const response = await fetch(`${API_BASE}/images/batch/artists`, {
+    const response = await authedFetch(`${API_BASE}/images/batch/artists`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ artists }),
@@ -515,7 +549,9 @@ export const imagesApi = {
  */
 export const collectionAnalyticsApi = {
   async getOverview(): Promise<ApiResponse<CollectionAnalyticsOverview>> {
-    const response = await fetch(`${API_BASE}/collection-analytics/overview`);
+    const response = await authedFetch(
+      `${API_BASE}/collection-analytics/overview`
+    );
     return response.json();
   },
 
@@ -527,7 +563,9 @@ export const collectionAnalyticsApi = {
       cacheAge: number;
     }>
   > {
-    const response = await fetch(`${API_BASE}/collection-analytics/value`);
+    const response = await authedFetch(
+      `${API_BASE}/collection-analytics/value`
+    );
     return response.json();
   },
 
@@ -535,7 +573,7 @@ export const collectionAnalyticsApi = {
     batchSize?: number,
     force?: boolean
   ): Promise<ApiResponse<{ message: string }>> {
-    const response = await fetch(
+    const response = await authedFetch(
       `${API_BASE}/collection-analytics/value/scan`,
       {
         method: 'POST',
@@ -547,31 +585,37 @@ export const collectionAnalyticsApi = {
   },
 
   async getValueScanStatus(): Promise<ApiResponse<ValueScanStatus>> {
-    const response = await fetch(
+    const response = await authedFetch(
       `${API_BASE}/collection-analytics/value/scan/status`
     );
     return response.json();
   },
 
   async getFormats(): Promise<ApiResponse<FormatBreakdown>> {
-    const response = await fetch(`${API_BASE}/collection-analytics/formats`);
+    const response = await authedFetch(
+      `${API_BASE}/collection-analytics/formats`
+    );
     return response.json();
   },
 
   async getLabels(): Promise<ApiResponse<LabelDistribution>> {
-    const response = await fetch(`${API_BASE}/collection-analytics/labels`);
+    const response = await authedFetch(
+      `${API_BASE}/collection-analytics/labels`
+    );
     return response.json();
   },
 
   async getDecades(): Promise<ApiResponse<DecadeHistogram>> {
-    const response = await fetch(`${API_BASE}/collection-analytics/decades`);
+    const response = await authedFetch(
+      `${API_BASE}/collection-analytics/decades`
+    );
     return response.json();
   },
 
   async getGrowth(
     granularity: 'month' | 'year' = 'month'
   ): Promise<ApiResponse<GrowthTimeline>> {
-    const response = await fetch(
+    const response = await authedFetch(
       `${API_BASE}/collection-analytics/growth?granularity=${granularity}`
     );
     return response.json();

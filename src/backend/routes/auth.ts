@@ -87,6 +87,23 @@ export function createAuthRouter(
       `);
       }
 
+      // This route is exempt from API authentication because Discogs redirects
+      // the browser here. The exemption is only safe because the callback must
+      // match a pending flow that an authenticated request started.
+      const bound = await authService.consumePendingDiscogsRequest(
+        oauth_token as string
+      );
+      if (!bound) {
+        logger.warn('Discogs callback did not match a pending OAuth flow');
+        return res.status(400).send(`
+        <html><body>
+          <h2>Authentication Error</h2>
+          <p>This authentication link is not valid or has expired. Please start the sign-in again from the app.</p>
+          <script>window.close();</script>
+        </body></html>
+      `);
+      }
+
       logger.debug('Processing OAuth callback');
       const result = await discogsService.handleCallback(
         oauth_token as string,
@@ -107,11 +124,13 @@ export function createAuthRouter(
       </body></html>
     `);
     } catch (error) {
+      // Detail stays in the log. This page is rendered for an unauthenticated
+      // browser, and upstream error text is attacker-influenced and unescaped.
       logger.error('Discogs OAuth callback error', error);
       res.status(500).send(`
       <html><body>
         <h2>Authentication Error</h2>
-        <p>${error instanceof Error ? error.message : 'Unknown error'}</p>
+        <p>Authentication could not be completed. Please try signing in again from the app.</p>
         <script>window.close();</script>
       </body></html>
     `);
@@ -211,13 +230,31 @@ export function createAuthRouter(
   // Last.fm authentication - Handle callback (GET from Last.fm redirect)
   router.get('/lastfm/callback', async (req: Request, res: Response) => {
     try {
-      const { token } = req.query;
+      const { token, nonce } = req.query;
 
       if (!token) {
         return res.status(400).send(`
         <html><body>
           <h2>Last.fm Authentication Error</h2>
           <p>Missing required token parameter for authentication.</p>
+          <script>window.close();</script>
+        </body></html>
+      `);
+      }
+
+      // Exempt from API authentication (Last.fm redirects the browser here), so
+      // the nonce is what proves this callback belongs to a flow that an
+      // authenticated request started. Without it, anyone reaching this route
+      // could bind their own Last.fm account to this instance.
+      const bound = await authService.consumePendingLastFmNonce(
+        typeof nonce === 'string' ? nonce : ''
+      );
+      if (!bound) {
+        logger.warn('Last.fm callback did not match a pending OAuth flow');
+        return res.status(400).send(`
+        <html><body>
+          <h2>Last.fm Authentication Error</h2>
+          <p>This authentication link is not valid or has expired. Please start the sign-in again from the app.</p>
           <script>window.close();</script>
         </body></html>
       `);
@@ -247,11 +284,13 @@ export function createAuthRouter(
       </body></html>
     `);
     } catch (error) {
+      // See the Discogs callback: Last.fm can propagate provider error text
+      // into this response, so keep the page static and log the detail.
       logger.error('Last.fm OAuth callback error', error);
       res.status(500).send(`
       <html><body>
         <h2>Last.fm Authentication Error</h2>
-        <p>${error instanceof Error ? error.message : 'Unknown error'}</p>
+        <p>Authentication could not be completed. Please try signing in again from the app.</p>
         <script>window.close();</script>
       </body></html>
     `);

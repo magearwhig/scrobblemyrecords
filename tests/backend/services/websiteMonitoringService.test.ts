@@ -1,7 +1,11 @@
+import * as http from 'http';
+import type { AddressInfo } from 'net';
+
 import { OllamaService } from '../../../src/backend/services/ollamaService';
 import { WebsiteMonitoringService } from '../../../src/backend/services/websiteMonitoringService';
 import { WishlistService } from '../../../src/backend/services/wishlistService';
 import { FileStorage } from '../../../src/backend/utils/fileStorage';
+import { createPermissiveSsrfGuard } from '../../../src/backend/utils/ssrfGuard';
 
 jest.mock('../../../src/backend/utils/fileStorage');
 jest.mock('../../../src/backend/services/ollamaService');
@@ -20,7 +24,51 @@ describe('WebsiteMonitoringService', () => {
   let mockFileStorage: jest.Mocked<FileStorage>;
   let mockOllama: jest.Mocked<OllamaService>;
   let mockWishlist: jest.Mocked<WishlistService>;
-  let originalFetch: typeof globalThis.fetch;
+
+  // A real HTTP server stands in for the remote site. The service no longer
+  // uses global fetch, so stubbing globalThis.fetch would have no effect.
+  let server: http.Server;
+  let serverUrl: string;
+  let handler: (req: http.IncomingMessage, res: http.ServerResponse) => void;
+
+  // Relaxes only the address blocklist — scheme and credential validation
+  // still apply, so those tests keep testing something real.
+  const permissiveGuard = createPermissiveSsrfGuard();
+
+  /** Respond with an HTML body. */
+  const serveHtml = (html: string) => {
+    handler = (_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/html' });
+      res.end(html);
+    };
+  };
+
+  /** Respond with an arbitrary status and content type. */
+  const serve = (status: number, contentType: string, body = '') => {
+    handler = (_req, res) => {
+      res.writeHead(status, { 'content-type': contentType });
+      res.end(body);
+    };
+  };
+
+  /** Drop the connection, standing in for a socket-level failure. */
+  const serveConnectionFailure = () => {
+    handler = (_req, res) => {
+      res.socket?.destroy();
+    };
+  };
+
+  beforeAll(done => {
+    server = http.createServer((req, res) => handler(req, res));
+    server.listen(0, '127.0.0.1', () => {
+      serverUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+      done();
+    });
+  });
+
+  afterAll(done => {
+    server.close(() => done());
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -45,17 +93,15 @@ describe('WebsiteMonitoringService', () => {
       getLocalWantList: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<WishlistService>;
 
-    originalFetch = globalThis.fetch;
-
     service = new WebsiteMonitoringService(
       mockFileStorage,
       mockOllama,
-      mockWishlist
+      mockWishlist,
+      // Fetches now go through node:http with SSRF checks. The test server
+      // lives on 127.0.0.1, which the real guard blocks by design, so inject a
+      // permissive one — the real guard has its own unit tests.
+      permissiveGuard
     );
-  });
-
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
   });
 
   describe('CRUD: getWebsites', () => {
@@ -302,14 +348,7 @@ describe('WebsiteMonitoringService', () => {
         </div>
         </body></html>
       `;
-      globalThis.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        headers: new Map([['content-type', 'text/html']]) as never,
-        text: async () => html,
-        body: null,
-      }) as never;
+      serveHtml(html);
 
       mockOllama.checkConnection.mockResolvedValue({ connected: true });
       mockOllama.chat.mockResolvedValue(
@@ -328,7 +367,7 @@ describe('WebsiteMonitoringService', () => {
         })
       );
 
-      const result = await service.previewWebsite('https://example.com');
+      const result = await service.previewWebsite(serverUrl);
       expect(result.ollamaAvailable).toBe(true);
       expect(result.items).toHaveLength(1);
       expect(result.items[0].title).toBe('Album One');
@@ -345,19 +384,12 @@ describe('WebsiteMonitoringService', () => {
         <div>Artist B - Album Two £15</div>
         </body></html>
       `;
-      globalThis.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        headers: new Map([['content-type', 'text/html']]) as never,
-        text: async () => html,
-        body: null,
-      }) as never;
+      serveHtml(html);
 
       mockOllama.checkConnection.mockResolvedValue({ connected: true });
       mockOllama.chat.mockResolvedValue('this is not JSON at all!!!');
 
-      const result = await service.previewWebsite('https://example.com');
+      const result = await service.previewWebsite(serverUrl);
       expect(result.ollamaAvailable).toBe(true);
       expect(result.items.length).toBeGreaterThanOrEqual(1);
       expect(result.warning).toMatch(/Ollama returned unusable/);
@@ -367,21 +399,14 @@ describe('WebsiteMonitoringService', () => {
 
     it('uses fallback when Ollama unavailable', async () => {
       const html = `<html><body>Artist X - Title Y $20</body></html>`;
-      globalThis.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        headers: new Map([['content-type', 'text/html']]) as never,
-        text: async () => html,
-        body: null,
-      }) as never;
+      serveHtml(html);
 
       mockOllama.checkConnection.mockResolvedValue({
         connected: false,
         error: 'down',
       });
 
-      const result = await service.previewWebsite('https://example.com');
+      const result = await service.previewWebsite(serverUrl);
       expect(result.ollamaAvailable).toBe(false);
       expect(result.warning).toMatch(/Ollama unavailable/);
       // Should not have called chat at all
@@ -389,43 +414,27 @@ describe('WebsiteMonitoringService', () => {
     });
 
     it('handles fetch failure', async () => {
-      globalThis.fetch = jest
-        .fn()
-        .mockRejectedValue(new Error('socket reset')) as never;
+      serveConnectionFailure();
 
-      await expect(
-        service.previewWebsite('https://example.com')
-      ).rejects.toThrow('Failed to fetch URL');
+      await expect(service.previewWebsite(serverUrl)).rejects.toThrow(
+        'Failed to fetch URL'
+      );
     });
 
     it('rejects non-HTML content-type', async () => {
-      globalThis.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        headers: new Map([['content-type', 'application/pdf']]) as never,
-        text: async () => 'binary',
-        body: null,
-      }) as never;
+      serve(200, 'application/pdf', 'binary');
 
-      await expect(
-        service.previewWebsite('https://example.com')
-      ).rejects.toThrow(/content-type/);
+      await expect(service.previewWebsite(serverUrl)).rejects.toThrow(
+        /content-type/
+      );
     });
 
     it('rejects HTTP error response', async () => {
-      globalThis.fetch = jest.fn().mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-        headers: new Map([['content-type', 'text/html']]) as never,
-        text: async () => '',
-        body: null,
-      }) as never;
+      serve(500, 'text/html');
 
-      await expect(
-        service.previewWebsite('https://example.com')
-      ).rejects.toThrow(/HTTP 500/);
+      await expect(service.previewWebsite(serverUrl)).rejects.toThrow(
+        /HTTP 500/
+      );
     });
 
     it('uses CSS selector to scope extraction', async () => {
@@ -435,21 +444,11 @@ describe('WebsiteMonitoringService', () => {
         <div class="products">Visible - Real Album $25</div>
         </body></html>
       `;
-      globalThis.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        headers: new Map([['content-type', 'text/html']]) as never,
-        text: async () => html,
-        body: null,
-      }) as never;
+      serveHtml(html);
 
       mockOllama.checkConnection.mockResolvedValue({ connected: false });
 
-      const result = await service.previewWebsite(
-        'https://example.com',
-        '.products'
-      );
+      const result = await service.previewWebsite(serverUrl, '.products');
       // The selector text should not include "Hidden Title"
       expect(result.rawTextPreview).toContain('Real Album');
       expect(result.rawTextPreview).not.toContain('Hidden Title');
@@ -459,18 +458,11 @@ describe('WebsiteMonitoringService', () => {
       // 600KB body — should be truncated to 500KB cap
       const huge = 'a'.repeat(600 * 1024);
       const html = `<html><body>${huge}</body></html>`;
-      globalThis.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        headers: new Map([['content-type', 'text/html']]) as never,
-        text: async () => html,
-        body: null,
-      }) as never;
+      serveHtml(html);
 
       mockOllama.checkConnection.mockResolvedValue({ connected: false });
 
-      const result = await service.previewWebsite('https://example.com');
+      const result = await service.previewWebsite(serverUrl);
       // rawTextPreview is sliced to 1000 chars after extraction
       expect(result.rawTextPreview!.length).toBeLessThanOrEqual(1000);
       expect(result.ollamaAvailable).toBe(false);
@@ -529,7 +521,7 @@ describe('WebsiteMonitoringService', () => {
         {
           id: 'w2',
           name: 'B',
-          url: 'https://b.example.com',
+          url: serverUrl, // scanned website points at the local test server
           useOllama: false,
           enabled: true,
           addedAt: 1,
@@ -561,14 +553,7 @@ describe('WebsiteMonitoringService', () => {
       });
 
       // Stub fetch to return empty body (no items)
-      globalThis.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        headers: new Map([['content-type', 'text/html']]) as never,
-        text: async () => '<html></html>',
-        body: null,
-      }) as never;
+      serveHtml('<html></html>');
 
       mockOllama.checkConnection.mockResolvedValue({ connected: false });
 

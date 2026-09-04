@@ -328,13 +328,11 @@ describe('GenreAnalysisService.getTasteDrift', () => {
       ]);
       mockHistoryStorage.getIndex = jest.fn().mockResolvedValue(index);
       mockLastFmService.getArtistTopTags = jest.fn();
-      mockFileStorage.readJSON = jest
-        .fn()
-        .mockResolvedValue(
-          createTagCache({
-            radiohead: [{ name: 'alternative rock', count: 80 }],
-          })
-        );
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(
+        createTagCache({
+          radiohead: [{ name: 'alternative rock', count: 80 }],
+        })
+      );
 
       // Act
       await service.getTasteDrift(24);

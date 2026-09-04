@@ -40,6 +40,7 @@ describe('DiscogsService', () => {
       mockFileStorage
     ) as jest.Mocked<AuthService>;
     mockAuthService.getDiscogsToken = jest.fn();
+    mockAuthService.storePendingDiscogsRequest = jest.fn();
 
     // Mock axios instance
     mockAxiosInstance = {
@@ -457,13 +458,16 @@ describe('DiscogsService', () => {
       mockAxiosInstance.get.mockResolvedValue({
         data: 'oauth_token=test-token&oauth_token_secret=test-secret',
       });
-      mockAuthService.storeOAuthTokenSecret.mockResolvedValue();
+      mockAuthService.storePendingDiscogsRequest.mockResolvedValue();
 
       const result = await discogsService.getAuthUrl();
 
       expect(result).toContain('https://discogs.com/oauth/authorize');
       expect(result).toContain('oauth_token=test-token');
-      expect(mockAuthService.storeOAuthTokenSecret).toHaveBeenCalledWith(
+      // The request token is stored alongside the secret so the callback route,
+      // which is exempt from API auth, can be bound to this specific flow.
+      expect(mockAuthService.storePendingDiscogsRequest).toHaveBeenCalledWith(
+        'test-token',
         'test-secret'
       );
     });
