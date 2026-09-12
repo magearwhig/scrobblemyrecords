@@ -1,5 +1,12 @@
 import { AlertTriangle, Bookmark, X } from 'lucide-react';
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from 'react';
 import './CollectionPage.page.css';
 
 import {
@@ -27,6 +34,11 @@ import { useToast } from '../context/ToastContext';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
 import { navigate } from '../routes';
 import { getApiService } from '../services/api';
+import {
+  clearCollectionViewSnapshot,
+  readCollectionViewSnapshotForReturn,
+  saveCollectionViewSnapshot,
+} from '../utils/collectionViewSnapshot';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('CollectionPage');
@@ -35,20 +47,31 @@ const CollectionPage: React.FC = () => {
   const { authStatus, setAuthStatus } = useAuth();
   const { state } = useApp();
   const { showToast } = useToast();
+  // View state saved when opening an album; only present when returning
+  // directly from the album details page.
+  const [restoredView] = useState(readCollectionViewSnapshotForReturn);
+  // Cleared once the grid has applied it, so a later grid remount doesn't jump
+  const [gridRestoreScrollTop, setGridRestoreScrollTop] = useState(
+    restoredView?.gridScrollTop
+  );
   const [entireCollection, setEntireCollection] = useState<CollectionItem[]>(
     []
   );
   const [loading, setLoading] = useState(false);
   const [preloading, setPreloading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(
+    restoredView?.searchQuery ?? ''
+  );
   const [filteredCollection, setFilteredCollection] = useState<
     CollectionItem[]
   >([]);
   // Pagination for search mode only
-  const [searchPage, setSearchPage] = useState(1);
+  const [searchPage, setSearchPage] = useState(restoredView?.searchPage ?? 1);
   const [searchTotalPages, setSearchTotalPages] = useState(1);
   const [searchTotal, setSearchTotal] = useState(0);
-  const [isSearchMode, setIsSearchMode] = useState(false);
+  const [isSearchMode, setIsSearchMode] = useState(
+    () => !!restoredView?.searchQuery.trim()
+  );
   const [selectedAlbums, setSelectedAlbums] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string>('');
   const [cacheProgress, setCacheProgress] = useState<{
@@ -56,16 +79,32 @@ const CollectionPage: React.FC = () => {
     currentPage?: number;
     totalPages?: number;
   } | null>(null);
-  const [sortBy, setSortBy] = useState<CollectionSortBy>('artist');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [viewMode, setViewMode] = useState<'grid' | 'single'>('grid');
-  const [currentRecordIndex, setCurrentRecordIndex] = useState(0);
+  const [sortBy, setSortBy] = useState<CollectionSortBy>(
+    restoredView?.sortBy ?? 'artist'
+  );
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(
+    restoredView?.sortOrder ?? 'asc'
+  );
+  const [viewMode, setViewMode] = useState<'grid' | 'single'>(
+    restoredView?.viewMode ?? 'grid'
+  );
+  const [currentRecordIndex, setCurrentRecordIndex] = useState(
+    restoredView?.currentRecordIndex ?? 0
+  );
 
   // Filter state
-  const [filterFormat, setFilterFormat] = useState<string>('');
-  const [filterYearFrom, setFilterYearFrom] = useState<string>('');
-  const [filterYearTo, setFilterYearTo] = useState<string>('');
-  const [filterDateAdded, setFilterDateAdded] = useState<string>('');
+  const [filterFormat, setFilterFormat] = useState<string>(
+    restoredView?.filterFormat ?? ''
+  );
+  const [filterYearFrom, setFilterYearFrom] = useState<string>(
+    restoredView?.filterYearFrom ?? ''
+  );
+  const [filterYearTo, setFilterYearTo] = useState<string>(
+    restoredView?.filterYearTo ?? ''
+  );
+  const [filterDateAdded, setFilterDateAdded] = useState<string>(
+    restoredView?.filterDateAdded ?? ''
+  );
   const [usingCache, setUsingCache] = useState<boolean>(false);
   const [authChecked, setAuthChecked] = useState<boolean>(false);
   const [cacheStatus, setCacheStatus] = useState<
@@ -151,8 +190,49 @@ const CollectionPage: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [viewMode, filteredCollection.length]);
 
-  // Reset current index when switching views or changing filters
+  // The snapshot is single-use: consume it on mount so a later visit starts fresh
   useEffect(() => {
+    clearCollectionViewSnapshot();
+  }, []);
+
+  // Restore the page scroll position once the restored results have rendered
+  const pageRootRef = useRef<HTMLDivElement>(null);
+  const pendingPageScrollRef = useRef<number | null>(
+    restoredView?.pageScrollTop || null
+  );
+  useLayoutEffect(() => {
+    if (
+      pendingPageScrollRef.current === null ||
+      loading ||
+      filteredCollection.length === 0
+    ) {
+      return;
+    }
+    const scrollContainer = pageRootRef.current?.closest('.content');
+    if (scrollContainer) {
+      scrollContainer.scrollTop = pendingPageScrollRef.current;
+    }
+    pendingPageScrollRef.current = null;
+  }, [loading, filteredCollection.length]);
+
+  // Keep the single-view index in range if the restored results are shorter
+  useEffect(() => {
+    if (
+      filteredCollection.length > 0 &&
+      currentRecordIndex >= filteredCollection.length
+    ) {
+      setCurrentRecordIndex(0);
+    }
+  }, [filteredCollection.length, currentRecordIndex]);
+
+  // Reset current index when switching views or changing filters
+  // (skipped on mount so a restored index survives)
+  const skipIndexResetRef = useRef(true);
+  useEffect(() => {
+    if (skipIndexResetRef.current) {
+      skipIndexResetRef.current = false;
+      return;
+    }
     setCurrentRecordIndex(0);
   }, [
     viewMode,
@@ -367,7 +447,14 @@ const CollectionPage: React.FC = () => {
       });
       performSearch(searchQuery, searchPage);
     }
-  }, [isSearchMode, searchQuery, searchPage, sortBy, sortOrder]);
+  }, [
+    isSearchMode,
+    searchQuery,
+    searchPage,
+    sortBy,
+    sortOrder,
+    authStatus.discogs.username,
+  ]);
 
   useEffect(() => {
     logger.info('Search mode changed', {
@@ -431,6 +518,15 @@ const CollectionPage: React.FC = () => {
     filterDateAdded,
     playCounts,
   ]);
+
+  // Search results are sorted when they arrive; if play counts load afterwards
+  // (e.g. a restored search sorted by scrobbles), re-sort them in place
+  useEffect(() => {
+    if (isSearchMode && sortBy === 'scrobbles') {
+      setFilteredCollection(prev => sortCollection(prev));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playCounts]);
 
   const loadCollection = async (forceReload: boolean = false) => {
     if (!authStatus.discogs.username) {
@@ -587,6 +683,9 @@ const CollectionPage: React.FC = () => {
 
   const handleSearch = async (query: string) => {
     if (!authStatus.discogs.username) return;
+    // SearchBar re-emits its initial value on mount; ignore it so a restored
+    // search keeps its page
+    if (query === searchQuery) return;
 
     setSearchQuery(query);
 
@@ -800,8 +899,42 @@ const CollectionPage: React.FC = () => {
     []
   );
 
+  // Latest view state for handleViewDetails, which is memoized with no deps
+  const latestViewRef = useRef({
+    searchQuery,
+    searchPage,
+    sortBy,
+    sortOrder,
+    viewMode,
+    filterFormat,
+    filterYearFrom,
+    filterYearTo,
+    filterDateAdded,
+    currentRecordIndex,
+  });
+  latestViewRef.current = {
+    searchQuery,
+    searchPage,
+    sortBy,
+    sortOrder,
+    viewMode,
+    filterFormat,
+    filterYearFrom,
+    filterYearTo,
+    filterDateAdded,
+    currentRecordIndex,
+  };
+
   const handleViewDetails = useCallback(
     (release: DiscogsRelease, item: CollectionItem) => {
+      const { current: view } = latestViewRef;
+      saveCollectionViewSnapshot({
+        ...view,
+        pageScrollTop: pageRootRef.current?.closest('.content')?.scrollTop ?? 0,
+        gridScrollTop:
+          pageRootRef.current?.querySelector('.virtualized-collection-grid')
+            ?.scrollTop ?? 0,
+      });
       localStorage.setItem('selectedRelease', JSON.stringify(release));
       localStorage.setItem('selectedCollectionItemId', item.id.toString());
       // Use pushState + manual hashchange to avoid browser hash-anchor
@@ -1116,7 +1249,7 @@ const CollectionPage: React.FC = () => {
   }
 
   return (
-    <div>
+    <div ref={pageRootRef}>
       <div className='card'>
         {/* Header */}
         <div className='collection-header'>
@@ -1188,6 +1321,7 @@ const CollectionPage: React.FC = () => {
 
         <SearchBar
           onSearch={handleSearch}
+          defaultValue={restoredView?.searchQuery}
           placeholder='Search your collection...'
           disabled={loading}
         />
@@ -1401,6 +1535,8 @@ const CollectionPage: React.FC = () => {
             onAddToDiscardPile={handleOpenDiscardModal}
             playCounts={playCounts}
             getPlayCountKey={getPlayCountKey}
+            initialScrollTop={gridRestoreScrollTop}
+            onInitialScrollApplied={() => setGridRestoreScrollTop(undefined)}
           />
         ))}
 
@@ -1441,7 +1577,8 @@ const CollectionPage: React.FC = () => {
           {/* Single Album Card */}
           <div className='collection-single-card'>
             {(() => {
-              const currentItem = filteredCollection[currentRecordIndex];
+              const currentItem =
+                filteredCollection[currentRecordIndex] ?? filteredCollection[0];
               const pcKey = getPlayCountKey(
                 currentItem.release.artist,
                 currentItem.release.title

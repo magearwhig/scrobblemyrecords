@@ -16,6 +16,7 @@ import { ToastProvider } from './context/ToastContext';
 import { useJobPoller } from './hooks/useJobPoller';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { DEFAULT_ROUTE, ROUTE_REDIRECTS, ROUTES, navigate } from './routes';
+import { recordRouteVisit } from './utils/collectionViewSnapshot';
 
 const JobPollerSetup: React.FC = () => {
   useJobPoller();
@@ -71,6 +72,12 @@ const App: React.FC = () => {
     setSidebarCollapsed(collapsed);
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
   };
+
+  // Runs after child effects, so a newly mounted page can still see the
+  // previous route when it initializes.
+  useEffect(() => {
+    recordRouteVisit(currentPage);
+  }, [currentPage]);
 
   useEffect(() => {
     // Handle hash-based routing

@@ -19,6 +19,7 @@ import React, { useEffect } from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import { ROUTES, navigate } from '../routes';
+import { clearCollectionViewSnapshot } from '../utils/collectionViewSnapshot';
 
 interface SidebarProps {
   currentPage: string;
@@ -206,6 +207,9 @@ const Sidebar: React.FC<SidebarProps> = ({
             className={`nav-link ${currentPage === item.id ? 'active' : ''} ${!item.enabled ? 'disabled' : ''}`}
             onClick={() => {
               if (item.enabled) {
+                // Nav clicks always open a page fresh, even straight from an
+                // album; only Back returns to a saved collection view
+                clearCollectionViewSnapshot();
                 onPageChange(item.id);
                 navigate(item.id);
               }
