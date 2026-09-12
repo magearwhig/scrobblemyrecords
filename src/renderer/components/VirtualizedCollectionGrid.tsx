@@ -1,5 +1,11 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 
 import {
   AlbumPlayCountResult,
@@ -18,11 +24,17 @@ interface VirtualizedCollectionGridProps {
   onAddToDiscardPile: (item: CollectionItem) => void;
   playCounts?: Map<string, AlbumPlayCountResult>;
   getPlayCountKey?: (artist: string, title: string) => string;
+  /** Scroll offset to restore once the column count has been measured */
+  initialScrollTop?: number;
+  onInitialScrollApplied?: () => void;
 }
 
 const CARD_MIN_WIDTH = 280;
 const CARD_GAP = 24; // 1.5rem
 const ROW_HEIGHT = 400; // Slightly above min-height: 380px + gap
+
+const getColumnCount = (width: number): number =>
+  Math.max(1, Math.floor((width + CARD_GAP) / (CARD_MIN_WIDTH + CARD_GAP)));
 
 const VirtualizedCollectionGrid: React.FC<VirtualizedCollectionGridProps> = ({
   items,
@@ -33,17 +45,15 @@ const VirtualizedCollectionGrid: React.FC<VirtualizedCollectionGridProps> = ({
   onAddToDiscardPile,
   playCounts,
   getPlayCountKey,
+  initialScrollTop,
+  onInitialScrollApplied,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(4);
 
   const updateColumns = useCallback(() => {
     if (!scrollRef.current) return;
-    const width = scrollRef.current.clientWidth;
-    const cols = Math.max(
-      1,
-      Math.floor((width + CARD_GAP) / (CARD_MIN_WIDTH + CARD_GAP))
-    );
+    const cols = getColumnCount(scrollRef.current.clientWidth);
     setColumns(prev => (prev === cols ? prev : cols));
   }, []);
 
@@ -57,6 +67,19 @@ const VirtualizedCollectionGrid: React.FC<VirtualizedCollectionGridProps> = ({
   }, [updateColumns]);
 
   const rowCount = Math.ceil(items.length / columns);
+
+  // Restore scroll only after columns match the container width; otherwise the
+  // content height (and therefore the offset) would be wrong.
+  const pendingScrollTopRef = useRef<number | null>(initialScrollTop || null);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (pendingScrollTopRef.current === null || !el) return;
+    if (getColumnCount(el.clientWidth) !== columns) return;
+    el.scrollTop = pendingScrollTopRef.current;
+    pendingScrollTopRef.current = null;
+    onInitialScrollApplied?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [columns]);
 
   const virtualizer = useVirtualizer({
     count: rowCount,

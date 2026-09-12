@@ -5,6 +5,13 @@ import React from 'react';
 
 import Sidebar from '../../../src/renderer/components/Sidebar';
 import { AuthProvider } from '../../../src/renderer/context/AuthContext';
+import { ROUTES } from '../../../src/renderer/routes';
+import {
+  readCollectionViewSnapshotForReturn,
+  recordRouteVisit,
+  resetRouteTrackingForTests,
+  saveCollectionViewSnapshot,
+} from '../../../src/renderer/utils/collectionViewSnapshot';
 import { AuthStatus } from '../../../src/shared/types';
 
 const createMockAuthContext = (authStatus: AuthStatus) => ({
@@ -314,6 +321,41 @@ describe('Sidebar', () => {
       await user.click(settingsButton!);
 
       expect(onPageChange).toHaveBeenCalledWith('settings');
+    });
+
+    it('opens Browse Collection fresh even when coming straight from an album', async () => {
+      const user = userEvent.setup();
+      const onPageChange = jest.fn();
+      const authStatus: AuthStatus = {
+        discogs: { authenticated: true, username: 'discogs_user' },
+        lastfm: { authenticated: true, username: 'lastfm_user' },
+      };
+      resetRouteTrackingForTests();
+      recordRouteVisit(ROUTES.COLLECTION);
+      saveCollectionViewSnapshot({
+        searchQuery: 'radiohead',
+        searchPage: 2,
+        sortBy: 'artist',
+        sortOrder: 'asc',
+        viewMode: 'grid',
+        filterFormat: '',
+        filterYearFrom: '',
+        filterYearTo: '',
+        filterDateAdded: '',
+        currentRecordIndex: 0,
+        pageScrollTop: 0,
+        gridScrollTop: 0,
+      });
+      recordRouteVisit(ROUTES.RELEASE_DETAILS);
+      expect(readCollectionViewSnapshotForReturn()).not.toBeNull();
+
+      renderSidebarWithAuth(authStatus, ROUTES.RELEASE_DETAILS, onPageChange);
+      await user.click(
+        screen.getByText('Browse Collection').closest('button')!
+      );
+
+      expect(onPageChange).toHaveBeenCalledWith(ROUTES.COLLECTION);
+      expect(readCollectionViewSnapshotForReturn()).toBeNull();
     });
 
     it('does not call onPageChange when disabled button is clicked', async () => {

@@ -6,7 +6,13 @@ import React from 'react';
 import { AuthProvider } from '../../../src/renderer/context/AuthContext';
 import { ToastProvider } from '../../../src/renderer/context/ToastContext';
 import CollectionPage from '../../../src/renderer/pages/CollectionPage';
+import { ROUTES } from '../../../src/renderer/routes';
 import * as apiService from '../../../src/renderer/services/api';
+import {
+  readCollectionViewSnapshotForReturn,
+  recordRouteVisit,
+  resetRouteTrackingForTests,
+} from '../../../src/renderer/utils/collectionViewSnapshot';
 import { AuthStatus, CollectionItem } from '../../../src/shared/types';
 
 // Mock the API service
@@ -66,8 +72,13 @@ jest.mock('../../../src/renderer/components/AlbumCard', () => {
 });
 
 jest.mock('../../../src/renderer/components/SearchBar', () => {
-  return function MockSearchBar({ onSearch, placeholder, disabled }: any) {
-    const [query, setQuery] = React.useState('');
+  return function MockSearchBar({
+    onSearch,
+    placeholder,
+    disabled,
+    defaultValue = '',
+  }: any) {
+    const [query, setQuery] = React.useState(defaultValue);
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
@@ -736,6 +747,85 @@ describe('CollectionPage', () => {
       });
 
       expect(window.location.hash).toBe('#release-details');
+    });
+  });
+
+  describe('Restoring view after returning from album details', () => {
+    beforeEach(() => {
+      sessionStorage.clear();
+      resetRouteTrackingForTests();
+    });
+
+    const searchAndOpenAlbum = async () => {
+      mockApiServiceInstance.searchCollectionPaginated.mockResolvedValue({
+        items: mockCollectionItems,
+        total: 150,
+        totalPages: 3,
+        page: 1,
+        perPage: 50,
+      });
+      recordRouteVisit(ROUTES.COLLECTION);
+      const { unmount } = renderWithProviders(<CollectionPage />);
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      await userEvent.type(screen.getByTestId('search-input'), 'Artist B');
+      await userEvent.click(screen.getByText('Search'));
+      await waitFor(() => {
+        expect(
+          mockApiServiceInstance.searchCollectionPaginated
+        ).toHaveBeenCalledWith('testuser', 'Artist B', 1, 50);
+      });
+      await userEvent.click(screen.getByRole('button', { name: /Next/ }));
+      await waitFor(() => {
+        expect(
+          mockApiServiceInstance.searchCollectionPaginated
+        ).toHaveBeenCalledWith('testuser', 'Artist B', 2, 50);
+      });
+
+      await userEvent.click(screen.getAllByText('View Details')[0]);
+      unmount();
+      recordRouteVisit(ROUTES.RELEASE_DETAILS);
+    };
+
+    it('restores the search and results page when coming straight back from the album', async () => {
+      await searchAndOpenAlbum();
+      mockApiServiceInstance.searchCollectionPaginated.mockClear();
+
+      renderWithProviders(<CollectionPage />);
+      recordRouteVisit(ROUTES.COLLECTION);
+
+      expect(screen.getByTestId('search-input')).toHaveValue('Artist B');
+      await waitFor(() => {
+        expect(
+          mockApiServiceInstance.searchCollectionPaginated
+        ).toHaveBeenCalledWith('testuser', 'Artist B', 2, 50);
+      });
+      // Re-submitting the unchanged query must not reset to page 1
+      await userEvent.click(screen.getByText('Search'));
+      expect(
+        mockApiServiceInstance.searchCollectionPaginated
+      ).not.toHaveBeenCalledWith('testuser', 'Artist B', 1, 50);
+      // Snapshot is single-use
+      expect(readCollectionViewSnapshotForReturn()).toBeNull();
+    });
+
+    it('starts fresh when arriving from another page', async () => {
+      await searchAndOpenAlbum();
+      recordRouteVisit(ROUTES.HOME);
+      mockApiServiceInstance.searchCollectionPaginated.mockClear();
+
+      renderWithProviders(<CollectionPage />);
+      recordRouteVisit(ROUTES.COLLECTION);
+
+      expect(screen.getByTestId('search-input')).toHaveValue('');
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+      expect(
+        mockApiServiceInstance.searchCollectionPaginated
+      ).not.toHaveBeenCalled();
     });
   });
 
