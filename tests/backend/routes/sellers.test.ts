@@ -10,6 +10,7 @@ import { WishlistService } from '../../../src/backend/services/wishlistService';
 import { FileStorage } from '../../../src/backend/utils/fileStorage';
 import {
   MonitoredSeller,
+  ReleaseCacheRefreshStatus,
   SellerMatch,
   SellerMonitoringSettings,
   SellerScanStatus,
@@ -61,6 +62,17 @@ function createSeller(partial: Partial<MonitoredSeller>): MonitoredSeller {
     ...partial,
   };
 }
+
+const runningRefreshStatus: ReleaseCacheRefreshStatus = {
+  status: 'running',
+  mastersTotal: 193,
+  mastersProcessed: 68,
+  mastersSkipped: 7,
+  mastersFailed: 0,
+  staleRefreshed: 60,
+  releasesAdded: 120,
+  startedAt: Date.now(),
+};
 
 describe('Sellers Routes', () => {
   let app: express.Application;
@@ -166,6 +178,28 @@ describe('Sellers Routes', () => {
         notifyOnNewMatch: settings.notifyOnNewMatch ?? true,
         vinylFormatsOnly: settings.vinylFormatsOnly ?? true,
       }));
+
+    mockSellerMonitoringService.isScanInProgress = jest
+      .fn()
+      .mockReturnValue(false);
+    mockSellerMonitoringService.isReleaseCacheRefreshing = jest
+      .fn()
+      .mockReturnValue(false);
+    mockSellerMonitoringService.startReleaseCacheRefresh = jest
+      .fn()
+      .mockReturnValue(runningRefreshStatus);
+    mockSellerMonitoringService.getReleaseCacheRefreshStatus = jest
+      .fn()
+      .mockReturnValue(runningRefreshStatus);
+    mockSellerMonitoringService.startSingleSellerScan = jest
+      .fn()
+      .mockResolvedValue({
+        status: 'scanning',
+        sellersScanned: 0,
+        totalSellers: 1,
+        progress: 0,
+        newMatches: 0,
+      } as SellerScanStatus);
 
     mockSellerMonitoringService.markMatchAsSeen = jest
       .fn()
@@ -457,6 +491,84 @@ describe('Sellers Routes', () => {
 
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('POST /api/v1/sellers/cache/refresh', () => {
+    it('starts a background refresh and returns its status immediately', async () => {
+      const response = await request(app).post('/api/v1/sellers/cache/refresh');
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toEqual(runningRefreshStatus);
+      expect(
+        mockSellerMonitoringService.startReleaseCacheRefresh
+      ).toHaveBeenCalled();
+    });
+
+    it('returns 409 while a seller scan is running', async () => {
+      mockSellerMonitoringService.isScanInProgress.mockReturnValue(true);
+
+      const response = await request(app).post('/api/v1/sellers/cache/refresh');
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toBe(
+        'Cannot refresh the release cache while a seller scan is running'
+      );
+      expect(
+        mockSellerMonitoringService.startReleaseCacheRefresh
+      ).not.toHaveBeenCalled();
+    });
+
+    it('handles errors gracefully', async () => {
+      mockSellerMonitoringService.startReleaseCacheRefresh.mockImplementation(
+        () => {
+          throw new Error('boom');
+        }
+      );
+
+      const response = await request(app).post('/api/v1/sellers/cache/refresh');
+
+      expect(response.status).toBe(500);
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('GET /api/v1/sellers/cache/refresh/status', () => {
+    it('returns the refresh status', async () => {
+      const response = await request(app).get(
+        '/api/v1/sellers/cache/refresh/status'
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toEqual(runningRefreshStatus);
+    });
+  });
+
+  describe('scans while the release cache is refreshing', () => {
+    beforeEach(() => {
+      mockSellerMonitoringService.isReleaseCacheRefreshing.mockReturnValue(
+        true
+      );
+    });
+
+    it('rejects a full scan with 409', async () => {
+      const response = await request(app).post('/api/v1/sellers/scan');
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toBe(
+        'Cannot start a scan while the release cache is refreshing'
+      );
+      expect(mockSellerMonitoringService.startScan).not.toHaveBeenCalled();
+    });
+
+    it('rejects a single seller scan with 409', async () => {
+      const response = await request(app).post('/api/v1/sellers/testshop/scan');
+
+      expect(response.status).toBe(409);
+      expect(
+        mockSellerMonitoringService.startSingleSellerScan
+      ).not.toHaveBeenCalled();
     });
   });
 

@@ -1,9 +1,13 @@
 import { AlertTriangle } from 'lucide-react';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 import './MarketplacePage.page.css';
 
-import { MonitoredSeller, SellerScanStatus } from '../../shared/types';
+import {
+  MonitoredSeller,
+  ReleaseCacheRefreshStatus,
+  SellerScanStatus,
+} from '../../shared/types';
 import SellerCard from '../components/SellerCard';
 import { Modal, ModalFooter } from '../components/ui';
 import { Button } from '../components/ui/Button';
@@ -23,6 +27,61 @@ import { getApiService } from '../services/api';
 interface SellersPageProps {
   embedded?: boolean;
 }
+
+/** A scan requested while the release cache was empty */
+type PendingScan =
+  | { kind: 'all'; forceFresh: boolean }
+  | { kind: 'seller'; username: string };
+
+/** Prefer the server's error message over axios' generic status text */
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  const apiError = (err as { response?: { data?: { error?: unknown } } })
+    ?.response?.data?.error;
+  if (typeof apiError === 'string') return apiError;
+  return err instanceof Error ? err.message : fallback;
+};
+
+/**
+ * Status responses can resolve out of order (initial load vs polling). Keep
+ * whichever describes the newer run, and never move a run backwards.
+ */
+const newerRefreshStatus = (
+  prev: ReleaseCacheRefreshStatus | null,
+  next: ReleaseCacheRefreshStatus
+): ReleaseCacheRefreshStatus => {
+  if (!prev) return next;
+  const prevStart = prev.startedAt ?? 0;
+  const nextStart = next.startedAt ?? 0;
+  if (nextStart !== prevStart) return nextStart > prevStart ? next : prev;
+  if (prev.status !== 'running' && next.status === 'running') return prev;
+  if (
+    prev.status === 'running' &&
+    next.status === 'running' &&
+    next.mastersProcessed < prev.mastersProcessed
+  ) {
+    return prev;
+  }
+  return next;
+};
+
+const describeCacheRefresh = (status: ReleaseCacheRefreshStatus): string => {
+  if (status.status === 'error') {
+    return `Cache refresh failed: ${status.error || 'Unknown error'}`;
+  }
+  if (status.status === 'idle') {
+    return 'Cache refresh was interrupted (server restarted)';
+  }
+  if (status.mastersTotal === 0) {
+    return 'Cache is already up to date';
+  }
+  const failed =
+    status.mastersFailed > 0 ? `, ${status.mastersFailed} failed` : '';
+  const skipped =
+    status.mastersSkipped > 0
+      ? ` (${status.mastersSkipped} already cached)`
+      : '';
+  return `Processed ${status.mastersProcessed} masters, added ${status.releasesAdded} releases${failed}${skipped}`;
+};
 
 const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
   const { state } = useApp();
@@ -55,22 +114,35 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
     lastUpdated: number;
     staleMasters: number;
   } | null>(null);
-  const [refreshingCache, setRefreshingCache] = useState(false);
+  const [cacheRefreshStatus, setCacheRefreshStatus] =
+    useState<ReleaseCacheRefreshStatus | null>(null);
+  const refreshingCache = cacheRefreshStatus?.status === 'running';
   const [cacheMessage, setCacheMessage] = useState<string | null>(null);
+  // Scan to start once the cache refresh finishes. The ref is read by the
+  // polling callback; the state drives the "scan will start" hint.
+  const pendingScanRef = useRef<PendingScan | null>(null);
+  const [hasPendingScan, setHasPendingScan] = useState(false);
+  const setPendingScan = (scan: PendingScan | null) => {
+    pendingScanRef.current = scan;
+    setHasPendingScan(scan !== null);
+  };
 
   // Load sellers
   const loadSellers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const [sellersData, statusData, cacheStatsData] = await Promise.all([
-        api.getSellers(),
-        api.getSellerScanStatus(),
-        api.getReleaseCacheStats(),
-      ]);
+      const [sellersData, statusData, cacheStatsData, cacheRefreshData] =
+        await Promise.all([
+          api.getSellers(),
+          api.getSellerScanStatus(),
+          api.getReleaseCacheStats(),
+          api.getReleaseCacheRefreshStatus(),
+        ]);
       setSellers(sellersData);
       setScanStatus(statusData);
       setCacheStats(cacheStatsData);
+      setCacheRefreshStatus(prev => newerRefreshStatus(prev, cacheRefreshData));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load sellers');
     } finally {
@@ -234,56 +306,97 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
     }
   };
 
-  // Handle trigger scan (all sellers)
-  const handleTriggerScan = async (forceFresh = false) => {
-    try {
-      // If cache is empty, auto-refresh it first
-      if (cacheStats && cacheStats.totalMasters === 0) {
-        setRefreshingCache(true);
-        try {
-          await api.refreshReleaseCache();
-          // Reload cache stats after refresh
-          const newStats = await api.getReleaseCacheStats();
-          setCacheStats(newStats);
-        } finally {
-          setRefreshingCache(false);
-        }
+  const startScan = useCallback(
+    async (scan: PendingScan) => {
+      try {
+        const status =
+          scan.kind === 'all'
+            ? await api.triggerSellerScan(scan.forceFresh)
+            : await api.triggerSingleSellerScan(scan.username);
+        setScanStatus(status);
+      } catch (err) {
+        showToast('error', getErrorMessage(err, 'Failed to start scan'));
       }
+    },
+    [api, showToast]
+  );
 
-      const status = await api.triggerSellerScan(forceFresh);
-      setScanStatus(status);
+  // Handle refresh cache - starts a background refresh on the server
+  const handleRefreshCache = async () => {
+    try {
+      setCacheMessage(null);
+      const status = await api.refreshReleaseCache();
+      setCacheRefreshStatus(prev => newerRefreshStatus(prev, status));
     } catch (err) {
-      showToast(
-        'error',
-        err instanceof Error ? err.message : 'Failed to start scan'
-      );
+      setPendingScan(null);
+      setCacheMessage(getErrorMessage(err, 'Failed to refresh cache'));
     }
   };
+
+  // Scans need the release cache; if it's empty, build it first and start the
+  // scan automatically once the refresh completes
+  const requestScan = async (scan: PendingScan) => {
+    if (cacheStats && cacheStats.totalMasters === 0) {
+      setPendingScan(scan);
+      await handleRefreshCache();
+      return;
+    }
+    await startScan(scan);
+  };
+
+  // Handle trigger scan (all sellers)
+  const handleTriggerScan = (forceFresh = false) =>
+    requestScan({ kind: 'all', forceFresh });
 
   // Handle scan single seller
-  const handleScanSeller = async (username: string) => {
-    try {
-      // If cache is empty, auto-refresh it first
-      if (cacheStats && cacheStats.totalMasters === 0) {
-        setRefreshingCache(true);
-        try {
-          await api.refreshReleaseCache();
-          const newStats = await api.getReleaseCacheStats();
-          setCacheStats(newStats);
-        } finally {
-          setRefreshingCache(false);
-        }
+  const handleScanSeller = (username: string) =>
+    requestScan({ kind: 'seller', username });
+
+  const finishCacheRefresh = useCallback(
+    async (status: ReleaseCacheRefreshStatus) => {
+      setCacheMessage(describeCacheRefresh(status));
+      try {
+        setCacheStats(await api.getReleaseCacheStats());
+      } catch {
+        // Stats will refresh on next load
       }
 
-      const status = await api.triggerSingleSellerScan(username);
-      setScanStatus(status);
-    } catch (err) {
-      showToast(
-        'error',
-        err instanceof Error ? err.message : 'Failed to start scan'
-      );
-    }
-  };
+      const pending = pendingScanRef.current;
+      pendingScanRef.current = null;
+      setHasPendingScan(false);
+      if (!pending) return;
+      if (status.status === 'completed') {
+        await startScan(pending);
+      } else {
+        showToast('error', 'Scan not started: release cache refresh failed');
+      }
+    },
+    [api, showToast, startScan]
+  );
+
+  // Poll release cache refresh progress while it runs
+  useEffect(() => {
+    if (cacheRefreshStatus?.status !== 'running') return;
+
+    const interval = setInterval(async () => {
+      try {
+        const status = await api.getReleaseCacheRefreshStatus();
+        if (status.status === 'idle') {
+          // Server restarted mid-refresh - that run is gone
+          setCacheRefreshStatus(status);
+        } else {
+          setCacheRefreshStatus(prev => newerRefreshStatus(prev, status));
+        }
+        if (status.status !== 'running') {
+          await finishCacheRefresh(status);
+        }
+      } catch {
+        // Ignore polling errors
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [cacheRefreshStatus?.status, api, finishCacheRefresh]);
 
   // Handle cancel scan
   const handleCancelScan = async () => {
@@ -300,35 +413,6 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
       );
     } finally {
       setCancelling(false);
-    }
-  };
-
-  // Handle refresh cache
-  const handleRefreshCache = async () => {
-    try {
-      setRefreshingCache(true);
-      setCacheMessage(null);
-      const result = await api.refreshReleaseCache();
-      if (result.mastersProcessed === 0 && result.mastersSkipped > 0) {
-        setCacheMessage('Cache is already up to date');
-      } else {
-        setCacheMessage(
-          `Processed ${result.mastersProcessed} masters, added ${result.releasesAdded} releases${
-            result.mastersSkipped > 0
-              ? ` (${result.mastersSkipped} already cached)`
-              : ''
-          }`
-        );
-      }
-      // Reload cache stats
-      const newStats = await api.getReleaseCacheStats();
-      setCacheStats(newStats);
-    } catch (err) {
-      setCacheMessage(
-        err instanceof Error ? err.message : 'Failed to refresh cache'
-      );
-    } finally {
-      setRefreshingCache(false);
     }
   };
 
@@ -511,12 +595,30 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
               <span className='sellers-cache-updated'>{cacheMessage}</span>
             )}
           </div>
-          {refreshingCache && (
+          {refreshingCache && cacheRefreshStatus && (
             <div className='sellers-scan-progress'>
               <div className='sellers-scan-progress-text'>
-                Building release cache... This may take several minutes.
+                {cacheRefreshStatus.mastersTotal > 0
+                  ? `Building release cache... ${cacheRefreshStatus.mastersProcessed} of ${cacheRefreshStatus.mastersTotal} masters`
+                  : 'Building release cache...'}
+                {cacheRefreshStatus.mastersFailed > 0 &&
+                  ` (${cacheRefreshStatus.mastersFailed} failed)`}
+                {hasPendingScan && ' Scan will start when the cache is ready.'}
               </div>
-              <ProgressBar value={0} indeterminate size='small' animated />
+              <ProgressBar
+                value={
+                  cacheRefreshStatus.mastersTotal > 0
+                    ? Math.round(
+                        (cacheRefreshStatus.mastersProcessed /
+                          cacheRefreshStatus.mastersTotal) *
+                          100
+                      )
+                    : 0
+                }
+                indeterminate={cacheRefreshStatus.mastersTotal === 0}
+                size='small'
+                animated
+              />
             </div>
           )}
           {cacheStats.totalMasters === 0 && (

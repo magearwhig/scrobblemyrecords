@@ -6,7 +6,11 @@ import '@testing-library/jest-dom';
 import { AppProvider } from '../../../src/renderer/context/AppContext';
 import { ToastProvider } from '../../../src/renderer/context/ToastContext';
 import SellersPage from '../../../src/renderer/pages/SellersPage';
-import { MonitoredSeller, SellerScanStatus } from '../../../src/shared/types';
+import {
+  MonitoredSeller,
+  ReleaseCacheRefreshStatus,
+  SellerScanStatus,
+} from '../../../src/shared/types';
 
 // Mock API service
 const mockGetSellers = jest.fn();
@@ -18,12 +22,17 @@ const mockAddSeller = jest.fn();
 const mockRemoveSeller = jest.fn();
 const mockTriggerSellerScan = jest.fn();
 const mockRefreshReleaseCache = jest.fn();
+const mockGetReleaseCacheRefreshStatus = jest.fn();
+const mockTriggerSingleSellerScan = jest.fn();
 const mockGetSellerSettings = jest.fn();
 const mockGetSellerMatches = jest.fn();
 const mockMarkMatchAsNotified = jest.fn();
 
-jest.mock('../../../src/renderer/services/api', () => ({
-  getApiService: () => ({
+// Stable instance, like the real singleton - a new object per call would
+// change `api` identity on every render and re-trigger the page's load effect
+jest.mock('../../../src/renderer/services/api', () => {
+  let instance: Record<string, jest.Mock> | undefined;
+  const createInstance = () => ({
     getSellers: mockGetSellers,
     getSellerScanStatus: mockGetSellerScanStatus,
     getReleaseCacheStats: mockGetReleaseCacheStats,
@@ -33,11 +42,19 @@ jest.mock('../../../src/renderer/services/api', () => ({
     removeSeller: mockRemoveSeller,
     triggerSellerScan: mockTriggerSellerScan,
     refreshReleaseCache: mockRefreshReleaseCache,
+    getReleaseCacheRefreshStatus: mockGetReleaseCacheRefreshStatus,
+    triggerSingleSellerScan: mockTriggerSingleSellerScan,
     getSellerSettings: mockGetSellerSettings,
     getSellerMatches: mockGetSellerMatches,
     markMatchAsNotified: mockMarkMatchAsNotified,
-  }),
-}));
+  });
+  return {
+    getApiService: () => {
+      instance ??= createInstance();
+      return instance;
+    },
+  };
+});
 
 // Mock SellerCard component
 jest.mock('../../../src/renderer/components/SellerCard', () => {
@@ -175,6 +192,37 @@ const mockCacheStats = {
   staleMasters: 10,
 };
 
+const idleCacheRefreshStatus: ReleaseCacheRefreshStatus = {
+  status: 'idle',
+  mastersTotal: 0,
+  mastersProcessed: 0,
+  mastersSkipped: 0,
+  mastersFailed: 0,
+  staleRefreshed: 0,
+  releasesAdded: 0,
+};
+
+const runningCacheRefreshStatus: ReleaseCacheRefreshStatus = {
+  ...idleCacheRefreshStatus,
+  status: 'running',
+  mastersTotal: 193,
+  mastersProcessed: 68,
+  mastersSkipped: 7,
+  startedAt: Date.now(),
+};
+
+const completedCacheRefreshStatus: ReleaseCacheRefreshStatus = {
+  ...runningCacheRefreshStatus,
+  status: 'completed',
+  mastersProcessed: 193,
+  mastersFailed: 2,
+  releasesAdded: 450,
+  completedAt: Date.now(),
+};
+
+// Polling runs every 2s, so allow longer than waitFor's 1s default
+const POLL_WAIT = { timeout: 4000 };
+
 const renderSellersPage = () => {
   return render(
     <AppProvider>
@@ -195,6 +243,7 @@ describe('SellersPage', () => {
     mockGetSellers.mockResolvedValue(mockSellers);
     mockGetSellerScanStatus.mockResolvedValue(idleScanStatus);
     mockGetReleaseCacheStats.mockResolvedValue(mockCacheStats);
+    mockGetReleaseCacheRefreshStatus.mockResolvedValue(idleCacheRefreshStatus);
     mockGetWishlist.mockResolvedValue([{ id: 1 }]); // Non-empty wishlist
     mockGetLocalWantList.mockResolvedValue([]);
   });
@@ -440,5 +489,200 @@ describe('SellersPage', () => {
     await user.click(screen.getByText('Check for New'));
 
     expect(mockTriggerSellerScan).toHaveBeenCalledWith(false);
+  });
+
+  describe('release cache refresh', () => {
+    it('ignores an older run status returned by a later page reload', async () => {
+      mockRefreshReleaseCache.mockResolvedValue(runningCacheRefreshStatus);
+      mockAddSeller.mockResolvedValue(undefined);
+      renderSellersPage();
+
+      await waitFor(() => {
+        expect(screen.getByText('Build/Refresh Cache')).toBeInTheDocument();
+      });
+      await user.click(screen.getByText('Build/Refresh Cache'));
+      expect(await screen.findByText(/68 of 193 masters/)).toBeInTheDocument();
+
+      // Adding a seller reloads the page data; that reload's refresh status
+      // is from an older, finished run
+      mockGetReleaseCacheRefreshStatus.mockResolvedValueOnce({
+        ...completedCacheRefreshStatus,
+        startedAt: runningCacheRefreshStatus.startedAt! - 60_000,
+      });
+      mockGetReleaseCacheRefreshStatus.mockResolvedValue(
+        runningCacheRefreshStatus
+      );
+      await user.click(screen.getByText('+ Add Seller'));
+      await user.type(screen.getByPlaceholderText('localvinylshop'), 'newshop');
+      await user.click(screen.getByRole('button', { name: 'Add Seller' }));
+
+      await waitFor(() => {
+        expect(mockGetSellers).toHaveBeenCalledTimes(2);
+        expect(screen.queryByTestId('skeleton-loader')).not.toBeInTheDocument();
+      });
+      expect(screen.getByText(/68 of 193 masters/)).toBeInTheDocument();
+    });
+
+    it('stops showing progress if the server restarted mid-refresh', async () => {
+      mockGetReleaseCacheRefreshStatus.mockResolvedValueOnce(
+        runningCacheRefreshStatus
+      );
+      mockGetReleaseCacheRefreshStatus.mockResolvedValue(
+        idleCacheRefreshStatus
+      );
+
+      renderSellersPage();
+
+      expect(await screen.findByText(/68 of 193 masters/)).toBeInTheDocument();
+      await waitFor(
+        () =>
+          expect(
+            screen.getByText('Cache refresh was interrupted (server restarted)')
+          ).toBeInTheDocument(),
+        POLL_WAIT
+      );
+      expect(screen.getByText('Build/Refresh Cache')).toBeInTheDocument();
+    });
+
+    it('shows progress of a refresh already running when the page loads', async () => {
+      mockGetReleaseCacheRefreshStatus.mockResolvedValue(
+        runningCacheRefreshStatus
+      );
+
+      renderSellersPage();
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Building release cache\.\.\. 68 of 193 masters/)
+        ).toBeInTheDocument();
+      });
+      expect(screen.getByRole('progressbar')).toHaveAttribute(
+        'aria-valuenow',
+        '35'
+      );
+      expect(
+        screen.getByRole('button', { name: 'Building Cache...' })
+      ).toBeDisabled();
+      expect(
+        screen.getByRole('button', { name: 'Preparing Cache...' })
+      ).toBeDisabled();
+    });
+
+    it('starts a background refresh, polls progress and reports the result', async () => {
+      mockRefreshReleaseCache.mockResolvedValue(runningCacheRefreshStatus);
+      renderSellersPage();
+
+      await waitFor(() => {
+        expect(screen.getByText('Build/Refresh Cache')).toBeInTheDocument();
+      });
+
+      mockGetReleaseCacheRefreshStatus.mockResolvedValue(
+        completedCacheRefreshStatus
+      );
+      mockGetReleaseCacheStats.mockClear();
+      await user.click(screen.getByText('Build/Refresh Cache'));
+
+      expect(mockRefreshReleaseCache).toHaveBeenCalled();
+      expect(await screen.findByText(/68 of 193 masters/)).toBeInTheDocument();
+
+      await waitFor(
+        () =>
+          expect(
+            screen.getByText(
+              'Processed 193 masters, added 450 releases, 2 failed (7 already cached)'
+            )
+          ).toBeInTheDocument(),
+        POLL_WAIT
+      );
+      expect(mockGetReleaseCacheStats).toHaveBeenCalled();
+      expect(screen.getByText('Build/Refresh Cache')).toBeInTheDocument();
+    });
+
+    it('shows the server error when a refresh cannot start', async () => {
+      mockRefreshReleaseCache.mockRejectedValue({
+        message: 'Request failed with status code 409',
+        response: {
+          data: {
+            error:
+              'Cannot refresh the release cache while a seller scan is running',
+          },
+        },
+      });
+      renderSellersPage();
+
+      await waitFor(() => {
+        expect(screen.getByText('Build/Refresh Cache')).toBeInTheDocument();
+      });
+      await user.click(screen.getByText('Build/Refresh Cache'));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(
+            'Cannot refresh the release cache while a seller scan is running'
+          )
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('builds an empty cache first, then starts the requested scan', async () => {
+      mockGetReleaseCacheStats.mockResolvedValue({
+        ...mockCacheStats,
+        totalMasters: 0,
+        totalReleases: 0,
+      });
+      mockRefreshReleaseCache.mockResolvedValue(runningCacheRefreshStatus);
+      mockTriggerSellerScan.mockResolvedValue(idleScanStatus);
+      renderSellersPage();
+
+      await waitFor(() => {
+        expect(screen.getByText('Check for New')).toBeInTheDocument();
+      });
+
+      mockGetReleaseCacheRefreshStatus.mockResolvedValue(
+        completedCacheRefreshStatus
+      );
+      await user.click(screen.getByText('Check for New'));
+
+      expect(mockRefreshReleaseCache).toHaveBeenCalled();
+      expect(mockTriggerSellerScan).not.toHaveBeenCalled();
+      expect(
+        await screen.findByText(/Scan will start when the cache is ready/)
+      ).toBeInTheDocument();
+
+      await waitFor(
+        () => expect(mockTriggerSellerScan).toHaveBeenCalledWith(false),
+        POLL_WAIT
+      );
+    });
+
+    it('does not start the pending scan if the refresh fails', async () => {
+      mockGetReleaseCacheStats.mockResolvedValue({
+        ...mockCacheStats,
+        totalMasters: 0,
+        totalReleases: 0,
+      });
+      mockRefreshReleaseCache.mockResolvedValue(runningCacheRefreshStatus);
+      renderSellersPage();
+
+      await waitFor(() => {
+        expect(screen.getByText('Check for New')).toBeInTheDocument();
+      });
+
+      mockGetReleaseCacheRefreshStatus.mockResolvedValue({
+        ...runningCacheRefreshStatus,
+        status: 'error',
+        error: 'Discogs unavailable',
+      });
+      await user.click(screen.getByText('Check for New'));
+
+      await waitFor(
+        () =>
+          expect(
+            screen.getByText('Cache refresh failed: Discogs unavailable')
+          ).toBeInTheDocument(),
+        POLL_WAIT
+      );
+      expect(mockTriggerSellerScan).not.toHaveBeenCalled();
+    });
   });
 });

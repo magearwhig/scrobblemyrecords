@@ -1341,6 +1341,26 @@ export interface SellerScanStatus {
 }
 
 /**
+ * Progress of a background release matching cache refresh.
+ * Held in memory on the server - a restart ends any running refresh.
+ */
+export interface ReleaseCacheRefreshStatus {
+  status: 'idle' | 'running' | 'completed' | 'error';
+  /** Wishlist masters that need fetching in this run (missing or stale) */
+  mastersTotal: number;
+  mastersProcessed: number;
+  /** Wishlist masters already fresh, not fetched */
+  mastersSkipped: number;
+  /** Masters whose versions could not be fetched */
+  mastersFailed: number;
+  staleRefreshed: number;
+  releasesAdded: number;
+  startedAt?: number;
+  completedAt?: number;
+  error?: string;
+}
+
+/**
  * Settings for seller monitoring
  */
 export interface SellerMonitoringSettings {

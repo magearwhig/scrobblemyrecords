@@ -105,6 +105,12 @@ export default function createSellersRouter(
   // Body: { forceFresh?: boolean } - If true, re-fetch inventory from API even if cached
   router.post('/scan', async (req, res) => {
     try {
+      if (sellerMonitoringService.isReleaseCacheRefreshing()) {
+        return res.status(409).json({
+          success: false,
+          error: 'Cannot start a scan while the release cache is refreshing',
+        });
+      }
       const { forceFresh } = req.body || {};
       const status = await sellerMonitoringService.startScan(
         forceFresh === true
@@ -209,16 +215,38 @@ export default function createSellersRouter(
     }
   });
 
-  // POST /api/v1/sellers/cache/refresh - Pre-populate release cache from wishlist
-  // This fetches all release versions for each wishlist master_id
-  // to make future scans faster (no API calls needed for known releases)
+  // POST /api/v1/sellers/cache/refresh - Start pre-populating the release cache
+  // from the wishlist in the background. Fetches all release versions for each
+  // wishlist master_id so future scans need no API calls for known releases.
+  // Returns the refresh status immediately; poll /cache/refresh/status.
   router.post('/cache/refresh', async (_req, res) => {
     try {
+      if (sellerMonitoringService.isScanInProgress()) {
+        return res.status(409).json({
+          success: false,
+          error:
+            'Cannot refresh the release cache while a seller scan is running',
+        });
+      }
       logger.info('Starting release cache refresh...');
-      const result = await sellerMonitoringService.refreshReleaseCache();
-      res.json({ success: true, data: result });
+      const status = sellerMonitoringService.startReleaseCacheRefresh();
+      res.json({ success: true, data: status });
     } catch (error) {
       logger.error('Error refreshing cache', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  // GET /api/v1/sellers/cache/refresh/status - Release cache refresh progress
+  router.get('/cache/refresh/status', (_req, res) => {
+    try {
+      const status = sellerMonitoringService.getReleaseCacheRefreshStatus();
+      res.json({ success: true, data: status });
+    } catch (error) {
+      logger.error('Error getting cache refresh status', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -239,6 +267,13 @@ export default function createSellersRouter(
         return res.status(400).json({
           success: false,
           error: 'Invalid username format',
+        });
+      }
+
+      if (sellerMonitoringService.isReleaseCacheRefreshing()) {
+        return res.status(409).json({
+          success: false,
+          error: 'Cannot start a scan while the release cache is refreshing',
         });
       }
 

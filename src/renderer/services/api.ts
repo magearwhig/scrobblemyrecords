@@ -54,6 +54,7 @@ import {
   NewReleaseSyncStatus,
   RecommendationResult,
   RecommendationSettings,
+  ReleaseCacheRefreshStatus,
   ReleaseTrackingSyncStatus,
   ReleaseVersion,
   SavedCollection,
@@ -1502,21 +1503,14 @@ class ApiService {
     return response.data.data;
   }
 
-  async refreshReleaseCache(): Promise<{
-    mastersProcessed: number;
-    releasesAdded: number;
-    staleRefreshed: number;
-    mastersSkipped: number;
-    totalReleases: number;
-  }> {
-    // This can take a long time - increase timeout
-    const response = await this.api.post(
-      '/sellers/cache/refresh',
-      {},
-      {
-        timeout: 600000, // 10 minutes
-      }
-    );
+  /** Start a background refresh; poll getReleaseCacheRefreshStatus for progress */
+  async refreshReleaseCache(): Promise<ReleaseCacheRefreshStatus> {
+    const response = await this.api.post('/sellers/cache/refresh');
+    return response.data.data;
+  }
+
+  async getReleaseCacheRefreshStatus(): Promise<ReleaseCacheRefreshStatus> {
+    const response = await this.api.get('/sellers/cache/refresh/status');
     return response.data.data;
   }
 
