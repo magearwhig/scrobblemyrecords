@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 import { AuthService } from '../../src/backend/services/authService';
+import { jobStatusService } from '../../src/backend/services/jobStatusService';
 import { SellerMonitoringService } from '../../src/backend/services/sellerMonitoringService';
 import { WishlistService } from '../../src/backend/services/wishlistService';
 import { getDiscogsAxios } from '../../src/backend/utils/discogsAxios';
@@ -41,6 +42,7 @@ jest.mock('../../src/backend/utils/discogsAxios');
 jest.mock('../../src/backend/utils/fileStorage');
 jest.mock('../../src/backend/services/authService');
 jest.mock('../../src/backend/services/wishlistService');
+jest.mock('../../src/backend/services/jobStatusService');
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 const mockedGetDiscogsAxios = getDiscogsAxios as jest.MockedFunction<
@@ -710,6 +712,200 @@ describe('SellerMonitoringService', () => {
           sellersScanned: 0,
           totalSellers: 0,
         })
+      );
+    });
+  });
+
+  describe('release cache refresh', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+
+    beforeEach(() => {
+      (jobStatusService.startJob as jest.Mock).mockReturnValue('job-1');
+      mockWishlistService.getWishlistItems = jest
+        .fn()
+        .mockResolvedValue([{ masterId: 1 }, { masterId: 2 }, { masterId: 3 }]);
+      mockWishlistService.getLocalWantList = jest
+        .fn()
+        .mockResolvedValue([{ masterId: 4 }]);
+
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'sellers/release-master-cache.json') {
+          return {
+            schemaVersion: 2,
+            lastUpdated: Date.now(),
+            releaseToMaster: { 30: 3, 40: 4 },
+            masterToReleases: {
+              // Fresh - skipped
+              3: { releases: [30], fetchedAt: Date.now() - DAY },
+              // Stale - refreshed
+              4: { releases: [40], fetchedAt: Date.now() - 45 * DAY },
+            },
+          };
+        }
+        return null;
+      });
+
+      mockAxiosInstance.get.mockImplementation(async (url: string) => {
+        if (url === '/masters/1/versions') {
+          return {
+            data: {
+              versions: [{ id: 10 }, { id: 11 }],
+              pagination: { pages: 1 },
+            },
+          };
+        }
+        if (url === '/masters/4/versions') {
+          return {
+            data: {
+              versions: [{ id: 40 }, { id: 41 }],
+              pagination: { pages: 1 },
+            },
+          };
+        }
+        throw new Error('Discogs unavailable');
+      });
+    });
+
+    it('returns a running status immediately and completes in the background', async () => {
+      const initial = sellerMonitoringService.startReleaseCacheRefresh();
+
+      expect(initial.status).toBe('running');
+      expect(sellerMonitoringService.isReleaseCacheRefreshing()).toBe(true);
+
+      await jest.advanceTimersByTimeAsync(100);
+
+      const status = sellerMonitoringService.getReleaseCacheRefreshStatus();
+      expect(status).toEqual(
+        expect.objectContaining({
+          status: 'completed',
+          mastersTotal: 3, // 1 missing, 2 missing (fails), 4 stale
+          mastersProcessed: 3,
+          mastersSkipped: 1,
+          mastersFailed: 1,
+          staleRefreshed: 1,
+          releasesAdded: 3, // 10, 11, 41
+        })
+      );
+      expect(status.completedAt).toBeDefined();
+      expect(sellerMonitoringService.isReleaseCacheRefreshing()).toBe(false);
+      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+        'sellers/release-master-cache.json',
+        expect.anything()
+      );
+      expect(jobStatusService.completeJob).toHaveBeenCalledWith(
+        'job-1',
+        'Release matching cache refreshed: 3 masters, 3 new releases, 1 failed'
+      );
+    });
+
+    it('does not start a second refresh while one is running', async () => {
+      sellerMonitoringService.startReleaseCacheRefresh();
+      const second = sellerMonitoringService.startReleaseCacheRefresh();
+
+      expect(second.status).toBe('running');
+      expect(jobStatusService.startJob).toHaveBeenCalledTimes(1);
+
+      await jest.advanceTimersByTimeAsync(100);
+      expect(mockWishlistService.getWishlistItems).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports an error status when the refresh throws', async () => {
+      mockWishlistService.getWishlistItems = jest
+        .fn()
+        .mockRejectedValue(new Error('Wishlist unreadable'));
+
+      sellerMonitoringService.startReleaseCacheRefresh();
+      await jest.advanceTimersByTimeAsync(100);
+
+      const status = sellerMonitoringService.getReleaseCacheRefreshStatus();
+      expect(status.status).toBe('error');
+      expect(status.error).toBe('Wishlist unreadable');
+      expect(sellerMonitoringService.isReleaseCacheRefreshing()).toBe(false);
+      expect(jobStatusService.failJob).toHaveBeenCalledWith(
+        'job-1',
+        'Release matching cache refresh failed: Wishlist unreadable'
+      );
+    });
+
+    it('refuses to start while a seller scan is running', () => {
+      (sellerMonitoringService as any).scanInProgress = true;
+
+      expect(() => sellerMonitoringService.startReleaseCacheRefresh()).toThrow(
+        'Cannot refresh the release cache while a seller scan is running'
+      );
+      expect(sellerMonitoringService.isReleaseCacheRefreshing()).toBe(false);
+    });
+
+    it('keeps a partially fetched master stale so it is retried', async () => {
+      const staleFetchedAt = Date.now() - 45 * DAY;
+      mockAxiosInstance.get.mockImplementation(
+        async (url: string, config: { params: { page: number } }) => {
+          if (url === '/masters/4/versions' && config.params.page === 1) {
+            return {
+              data: { versions: [{ id: 41 }], pagination: { pages: 2 } },
+            };
+          }
+          throw new Error('Discogs unavailable');
+        }
+      );
+
+      sellerMonitoringService.startReleaseCacheRefresh();
+      await jest.advanceTimersByTimeAsync(100);
+
+      const cache = (sellerMonitoringService as any).releaseCache;
+      // Page 1 was cached but the master's timestamp was not advanced
+      expect(cache.releaseToMaster[41]).toBe(4);
+      expect(cache.masterToReleases[4].fetchedAt).toBeLessThanOrEqual(
+        staleFetchedAt
+      );
+      // A master that failed on its first page is left retryable too
+      expect(cache.masterToReleases[1]).toBeUndefined();
+    });
+
+    it('does not let a refresh start while a single seller scan is starting', async () => {
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'sellers/monitored-sellers.json') {
+          return {
+            schemaVersion: 1,
+            sellers: [{ username: 'someseller', displayName: 'Some Seller' }],
+          };
+        }
+        return null;
+      });
+
+      const scanStarting =
+        sellerMonitoringService.startSingleSellerScan('someseller');
+
+      expect(() => sellerMonitoringService.startReleaseCacheRefresh()).toThrow(
+        'Cannot refresh the release cache while a seller scan is running'
+      );
+      await scanStarting;
+    });
+
+    it('releases the scan reservation when the seller is not found', async () => {
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'sellers/monitored-sellers.json') {
+          return { schemaVersion: 1, sellers: [] };
+        }
+        return null;
+      });
+
+      await expect(
+        sellerMonitoringService.startSingleSellerScan('missing')
+      ).rejects.toThrow('Seller missing not found');
+      expect(sellerMonitoringService.isScanInProgress()).toBe(false);
+    });
+
+    it('prevents scans from starting while the cache refreshes', async () => {
+      sellerMonitoringService.startReleaseCacheRefresh();
+
+      await expect(sellerMonitoringService.startScan()).rejects.toThrow(
+        'Cannot start a scan while the release cache is refreshing'
+      );
+      await expect(
+        sellerMonitoringService.startSingleSellerScan('someseller')
+      ).rejects.toThrow(
+        'Cannot start a scan while the release cache is refreshing'
       );
     });
   });
