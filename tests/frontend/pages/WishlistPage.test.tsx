@@ -26,19 +26,23 @@ const mockCheckLocalWantListForVinyl = jest.fn();
 const mockRemoveFromLocalWantList = jest.fn();
 const mockGetAlbumPlayCounts = jest.fn();
 
-jest.mock('../../../src/renderer/services/api', () => ({
-  getApiService: () => ({
-    getWishlist: mockGetWishlist,
-    getWishlistSyncStatus: mockGetWishlistSyncStatus,
-    getWishlistSettings: mockGetWishlistSettings,
-    getLocalWantList: mockGetLocalWantList,
-    startWishlistSync: mockStartWishlistSync,
-    getMasterVersions: mockGetMasterVersions,
-    checkLocalWantListForVinyl: mockCheckLocalWantListForVinyl,
-    removeFromLocalWantList: mockRemoveFromLocalWantList,
-    getAlbumPlayCounts: mockGetAlbumPlayCounts,
-  }),
-}));
+// Return a stable instance, matching the real singleton ApiService
+jest.mock('../../../src/renderer/services/api', () => {
+  let mockApi: Record<string, jest.Mock> | undefined;
+  const getMockApi = () =>
+    (mockApi ??= {
+      getWishlist: mockGetWishlist,
+      getWishlistSyncStatus: mockGetWishlistSyncStatus,
+      getWishlistSettings: mockGetWishlistSettings,
+      getLocalWantList: mockGetLocalWantList,
+      startWishlistSync: mockStartWishlistSync,
+      getMasterVersions: mockGetMasterVersions,
+      checkLocalWantListForVinyl: mockCheckLocalWantListForVinyl,
+      removeFromLocalWantList: mockRemoveFromLocalWantList,
+      getAlbumPlayCounts: mockGetAlbumPlayCounts,
+    });
+  return { getApiService: getMockApi };
+});
 
 // Mock useNotifications hook
 jest.mock('../../../src/renderer/hooks/useNotifications', () => ({
@@ -559,6 +563,66 @@ describe('WishlistPage', () => {
         expect(cards[0]).toHaveTextContent('Artist Newer');
         expect(cards[1]).toHaveTextContent('Artist Older');
       });
+    });
+  });
+
+  describe('Search', () => {
+    it('filters wishlist items by artist', async () => {
+      renderWishlistPage();
+      await waitFor(() => {
+        expect(screen.getByText('Radiohead')).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByLabelText('Search wishlist'), 'beatles');
+
+      expect(screen.getByText('The Beatles')).toBeInTheDocument();
+      expect(screen.queryByText('Radiohead')).not.toBeInTheDocument();
+    });
+
+    it('filters wishlist items by album title, case-insensitively', async () => {
+      renderWishlistPage();
+      await waitFor(() => {
+        expect(screen.getByText('Radiohead')).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByLabelText('Search wishlist'), 'ok comp');
+
+      expect(screen.getByText('Radiohead')).toBeInTheDocument();
+      expect(screen.queryByText('The Beatles')).not.toBeInTheDocument();
+    });
+
+    it('shows a search-specific empty state and clears the search', async () => {
+      renderWishlistPage();
+      await waitFor(() => {
+        expect(screen.getByText('Radiohead')).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByLabelText('Search wishlist'), 'zzzz');
+      expect(
+        screen.getByText('No items match your search.')
+      ).toBeInTheDocument();
+
+      await user.click(screen.getByLabelText('Clear search'));
+      expect(screen.getByText('Radiohead')).toBeInTheDocument();
+      expect(screen.getByText('The Beatles')).toBeInTheDocument();
+    });
+
+    it('filters the Monitoring tab', async () => {
+      renderWishlistPage();
+      await waitFor(() => {
+        expect(screen.getByText('Radiohead')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText(/Monitoring \(/));
+      await waitFor(() => {
+        expect(screen.getByText('Bon Iver')).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByLabelText('Search wishlist'), 'radiohead');
+      expect(
+        await screen.findByText('No monitored albums match your search.')
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Bon Iver')).not.toBeInTheDocument();
     });
   });
 

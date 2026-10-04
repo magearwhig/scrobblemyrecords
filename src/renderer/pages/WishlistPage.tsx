@@ -1,3 +1,4 @@
+import { Search, X } from 'lucide-react';
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import './WishlistPage.page.css';
 
@@ -66,6 +67,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
   // Tab and sorting state
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [sortBy, setSortBy] = useState<SortOption>('date');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Include monitored albums toggle (Phase 2)
   const [includeMonitored, setIncludeMonitored] = useState(false);
@@ -261,6 +263,19 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
     [monitoredAlbumKeys, normalizeForComparison]
   );
 
+  // Case-insensitive artist/album match for the search box
+  const matchesSearch = useCallback(
+    (artist: string, album: string): boolean => {
+      const query = normalizeForComparison(searchQuery);
+      if (!query) return true;
+      return (
+        artist.toLowerCase().includes(query) ||
+        album.toLowerCase().includes(query)
+      );
+    },
+    [searchQuery, normalizeForComparison]
+  );
+
   // Filter items based on active tab
   const filteredItems = useMemo(() => {
     // Start with Discogs wishlist items
@@ -324,6 +339,8 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
         break;
     }
 
+    filtered = filtered.filter(item => matchesSearch(item.artist, item.title));
+
     // Sort items
     switch (sortBy) {
       case 'date':
@@ -376,7 +393,13 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
     getPlayCountKey,
     includeMonitored,
     normalizeForComparison,
+    matchesSearch,
   ]);
+
+  const filteredLocalWantItems = useMemo(
+    () => localWantItems.filter(item => matchesSearch(item.artist, item.album)),
+    [localWantItems, matchesSearch]
+  );
 
   // Tab counts
   const tabCounts = useMemo(() => {
@@ -706,6 +729,35 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
         ))}
       </div>
 
+      {/* Search - applies to all tabs except New Releases */}
+      {activeTab !== 'new_releases' && (
+        <div className='wishlist-search search-input-wrapper'>
+          <Search
+            size={16}
+            className='wishlist-search-icon'
+            aria-hidden='true'
+          />
+          <input
+            type='search'
+            className='search-input wishlist-search-input'
+            placeholder='Search artist or album...'
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            aria-label='Search wishlist'
+          />
+          {searchQuery && (
+            <button
+              type='button'
+              className='wishlist-search-clear'
+              onClick={() => setSearchQuery('')}
+              aria-label='Clear search'
+            >
+              <X size={16} aria-hidden='true' />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Sort Options - hide for Monitoring and New Releases tabs */}
       {activeTab !== 'monitoring' && activeTab !== 'new_releases' && (
         <div className='wishlist-sort'>
@@ -776,9 +828,13 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
                 monitor for vinyl availability.
               </p>
             </div>
+          ) : filteredLocalWantItems.length === 0 ? (
+            <div className='empty-state'>
+              <p>No monitored albums match your search.</p>
+            </div>
           ) : (
             <div className='wishlist-grid'>
-              {localWantItems.map(item => (
+              {filteredLocalWantItems.map(item => (
                 <div
                   key={item.id}
                   className={`wishlist-card ${item.vinylStatus === 'has_vinyl' ? 'wishlist-card-highlight' : ''}`}
@@ -848,7 +904,9 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
               <p>
                 {items.length === 0
                   ? 'Your wishlist is empty. Sync to load items from Discogs.'
-                  : 'No items match the current filter.'}
+                  : searchQuery.trim()
+                    ? 'No items match your search.'
+                    : 'No items match the current filter.'}
               </p>
             </div>
           ) : (
