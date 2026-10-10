@@ -1094,4 +1094,68 @@ describe('Suggestions Routes', () => {
       expect(response.body.success).toBe(true);
     });
   });
+
+  describe('POST /api/v1/suggestions/mappings/albums/batch', () => {
+    const mapping = {
+      historyArtist: 'the go-betweens',
+      historyAlbum: ' that striped sunlight sound (live) ',
+      collectionId: 0,
+      collectionArtist: 'the go-betweens',
+      collectionAlbum: 'that striped sunlight sound',
+    };
+
+    it('should add all mappings in one call with trimmed names', async () => {
+      mockMappingService.addAlbumMappings = jest.fn().mockResolvedValue(1);
+
+      const response = await request(app)
+        .post('/api/v1/suggestions/mappings/albums/batch')
+        .send({ mappings: [mapping] });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ success: true, data: { added: 1 } });
+      expect(mockMappingService.addAlbumMappings).toHaveBeenCalledWith([
+        { ...mapping, historyAlbum: 'that striped sunlight sound (live)' },
+      ]);
+    });
+
+    it('should refresh cached stats after mappings change', async () => {
+      mockMappingService.addAlbumMappings = jest.fn().mockResolvedValue(1);
+      mockStatsService.invalidateStatsCache = jest
+        .fn()
+        .mockResolvedValue(undefined);
+      mockStatsService.warmCache = jest.fn().mockResolvedValue(undefined);
+
+      await request(app)
+        .post('/api/v1/suggestions/mappings/albums/batch')
+        .send({ mappings: [mapping] });
+
+      // The refresh runs in the background after the response
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(mockStatsService.invalidateStatsCache).toHaveBeenCalled();
+      expect(mockStatsService.warmCache).toHaveBeenCalled();
+    });
+
+    it('should reject an empty batch', async () => {
+      mockMappingService.addAlbumMappings = jest.fn();
+
+      const response = await request(app)
+        .post('/api/v1/suggestions/mappings/albums/batch')
+        .send({ mappings: [] });
+
+      expect(response.status).toBe(400);
+      expect(mockMappingService.addAlbumMappings).not.toHaveBeenCalled();
+    });
+
+    it('should reject a negative or missing collectionId', async () => {
+      mockMappingService.addAlbumMappings = jest.fn();
+
+      for (const collectionId of [-1, undefined, '5']) {
+        const response = await request(app)
+          .post('/api/v1/suggestions/mappings/albums/batch')
+          .send({ mappings: [{ ...mapping, collectionId }] });
+        expect(response.status).toBe(400);
+      }
+      expect(mockMappingService.addAlbumMappings).not.toHaveBeenCalled();
+    });
+  });
 });

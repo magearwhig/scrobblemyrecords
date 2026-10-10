@@ -48,6 +48,25 @@ jest.mock('../../../src/renderer/utils/spotifyUtils', () => ({
 const mockStatsApi = statsApi as jest.Mocked<typeof statsApi>;
 const mockImagesApi = imagesApi as jest.Mocked<typeof imagesApi>;
 
+const mockCreateAlbumMappingsBatch = jest.fn();
+const mockRemoveDiscoveryAlbumMapping = jest.fn();
+const mockAddNotification = jest.fn();
+
+jest.mock('../../../src/renderer/context/AppContext', () => ({
+  useApp: () => ({ state: { serverUrl: 'http://localhost:3001' } }),
+}));
+
+jest.mock('../../../src/renderer/hooks/useNotifications', () => ({
+  useNotifications: () => ({ addNotification: mockAddNotification }),
+}));
+
+jest.mock('../../../src/renderer/services/api', () => ({
+  getApiService: () => ({
+    createAlbumMappingsBatch: mockCreateAlbumMappingsBatch,
+    removeDiscoveryAlbumMapping: mockRemoveDiscoveryAlbumMapping,
+  }),
+}));
+
 describe('ArtistDetailPage', () => {
   const mockArtistData: ArtistDetailResponse = {
     artist: 'Radiohead',
@@ -230,6 +249,165 @@ describe('ArtistDetailPage', () => {
       expect(screen.getByText('Kid A')).toBeInTheDocument();
       expect(screen.getByText('OK Computer')).toBeInTheDocument();
     });
+  });
+
+  it('should merge an album into another version that is not owned', async () => {
+    // Arrange
+    const user = userEvent.setup();
+    mockCreateAlbumMappingsBatch.mockResolvedValue({ added: 1 });
+    mockStatsApi.getArtistDetail.mockResolvedValue({
+      success: true,
+      data: {
+        ...mockArtistData,
+        albums: [
+          {
+            album: 'Amnesiac',
+            playCount: 90,
+            lastPlayed: 1706745600,
+            inCollection: false,
+            historyEntries: [{ artist: 'radiohead', album: 'amnesiac' }],
+          },
+          {
+            album: 'Amnesiac (live)',
+            playCount: 10,
+            lastPlayed: 1706745600,
+            inCollection: false,
+            historyEntries: [{ artist: 'radiohead', album: 'amnesiac (live)' }],
+          },
+        ],
+      },
+    });
+    render(<ArtistDetailPage />);
+
+    // Act
+    await user.click(
+      await screen.findByLabelText('Merge Amnesiac (live) into another album')
+    );
+    await user.click(await screen.findByRole('button', { name: /90 plays/ }));
+
+    // Assert
+    expect(mockCreateAlbumMappingsBatch).toHaveBeenCalledWith([
+      {
+        historyArtist: 'radiohead',
+        historyAlbum: 'amnesiac (live)',
+        collectionId: 0,
+        collectionArtist: 'radiohead',
+        collectionAlbum: 'amnesiac',
+      },
+    ]);
+    await waitFor(() =>
+      expect(mockStatsApi.getArtistDetail).toHaveBeenCalledTimes(2)
+    );
+  });
+
+  it('should link both versions to the owned copy when merging into an owned album', async () => {
+    // Arrange
+    const user = userEvent.setup();
+    mockCreateAlbumMappingsBatch.mockResolvedValue({ added: 2 });
+    mockStatsApi.getArtistDetail.mockResolvedValue({
+      success: true,
+      data: {
+        ...mockArtistData,
+        albums: [
+          {
+            ...mockArtistData.albums[0],
+            collectionItemId: 456,
+            collectionArtist: 'Radiohead',
+            collectionAlbum: 'Kid A',
+            historyEntries: [{ artist: 'radiohead', album: 'kid a' }],
+          },
+          {
+            ...mockArtistData.albums[1],
+            album: 'Kid A (live)',
+            historyEntries: [{ artist: 'radiohead', album: 'kid a (live)' }],
+          },
+        ],
+      },
+    });
+    render(<ArtistDetailPage />);
+
+    // Act
+    await user.click(
+      await screen.findByLabelText('Merge Kid A (live) into another album')
+    );
+    await user.click(await screen.findByRole('button', { name: /150 plays/ }));
+
+    // Assert
+    const owned = {
+      collectionId: 456,
+      collectionArtist: 'Radiohead',
+      collectionAlbum: 'Kid A',
+    };
+    expect(mockCreateAlbumMappingsBatch).toHaveBeenCalledWith([
+      { historyArtist: 'radiohead', historyAlbum: 'kid a (live)', ...owned },
+      { historyArtist: 'radiohead', historyAlbum: 'kid a', ...owned },
+    ]);
+  });
+
+  it('should keep ownership when merging an owned album into an unowned one', async () => {
+    // Arrange
+    const user = userEvent.setup();
+    mockCreateAlbumMappingsBatch.mockResolvedValue({ added: 2 });
+    mockStatsApi.getArtistDetail.mockResolvedValue({
+      success: true,
+      data: {
+        ...mockArtistData,
+        albums: [
+          {
+            album: 'Amnesiac (deluxe)',
+            playCount: 90,
+            lastPlayed: 1706745600,
+            inCollection: false,
+            historyEntries: [
+              { artist: 'radiohead', album: 'amnesiac (deluxe)' },
+            ],
+          },
+          {
+            album: 'Amnesiac',
+            playCount: 10,
+            lastPlayed: 1706745600,
+            inCollection: true,
+            collectionItemId: 789,
+            collectionArtist: 'Radiohead',
+            collectionAlbum: 'Amnesiac',
+            historyEntries: [{ artist: 'radiohead', album: 'amnesiac' }],
+          },
+        ],
+      },
+    });
+    render(<ArtistDetailPage />);
+
+    // Act - merge the owned album into the unowned one
+    await user.click(
+      await screen.findByLabelText('Merge Amnesiac into another album')
+    );
+    await user.click(await screen.findByRole('button', { name: /90 plays/ }));
+
+    // Assert - both versions link to the owned copy
+    const owned = {
+      collectionId: 789,
+      collectionArtist: 'Radiohead',
+      collectionAlbum: 'Amnesiac',
+    };
+    expect(mockCreateAlbumMappingsBatch).toHaveBeenCalledWith([
+      { historyArtist: 'radiohead', historyAlbum: 'amnesiac', ...owned },
+      {
+        historyArtist: 'radiohead',
+        historyAlbum: 'amnesiac (deluxe)',
+        ...owned,
+      },
+    ]);
+  });
+
+  it('should hide the merge action when history entries are absent', async () => {
+    // Arrange & Act
+    render(<ArtistDetailPage />);
+    await screen.findByText('Kid A');
+
+    // Assert
+    expect(
+      screen.queryByLabelText('Merge Kid A into another album')
+    ).not.toBeInTheDocument();
   });
 
   it('should show "In Collection" badge for collected albums', async () => {

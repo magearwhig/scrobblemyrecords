@@ -1,12 +1,19 @@
 import {
+  AlbumHistoryEntry,
   CollectionItem,
   MissingAlbum,
   MissingArtist,
 } from '../../shared/types';
+import {
+  createAlbumCanonicalizer,
+  createCollectionNameResolver,
+  isCollectionLinked,
+} from '../../shared/utils/albumMapping';
 import { createLogger } from '../utils/logger';
 
 import { LastFmService, LastFmTopArtist } from './lastfmService';
 import { MappingService } from './mappingService';
+import { loadAlbumMappings } from './mergedAlbumHistory';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 
 /**
@@ -165,28 +172,26 @@ export class AnalyticsService {
       return 0.5; // Neutral if no track info
     }
 
-    // Check if there's an album mapping for this collection item
-    let searchArtist = artist;
-    let searchAlbum = album;
-
-    if (this.mappingService) {
-      const albumMapping =
-        await this.mappingService.getAlbumMappingForCollection(artist, album);
-
-      if (albumMapping) {
-        searchArtist = albumMapping.historyArtist;
-        searchAlbum = albumMapping.historyAlbum;
-        this.logger.debug(
-          `Album Completeness: using album mapping "${artist}|${album}" -> "${searchArtist}|${searchAlbum}"`
-        );
+    // Plays across the collection item's own name and every history album
+    // mapped to it
+    const namesFor = createCollectionNameResolver(
+      await loadAlbumMappings(this.mappingService)
+    );
+    const history: Pick<AlbumHistoryEntry, 'plays' | 'playCount'> = {
+      plays: [],
+      playCount: 0,
+    };
+    for (const name of namesFor(artist, album)) {
+      const entry = await this.historyStorage.getAlbumHistory(
+        name.artist,
+        name.album
+      );
+      if (entry) {
+        history.plays.push(...entry.plays);
+        history.playCount += entry.playCount;
       }
     }
-
-    const history = await this.historyStorage.getAlbumHistory(
-      searchArtist,
-      searchAlbum
-    );
-    if (!history || history.playCount === 0) {
+    if (history.playCount === 0) {
       return 0.5; // Neutral if never played
     }
 
@@ -310,32 +315,49 @@ export class AnalyticsService {
       return [];
     }
 
-    // Find albums in history but not in collection
-    const missing: MissingAlbum[] = [];
+    // Merge history albums by album mapping first, so thresholds and ranking
+    // apply to the whole album. A mapping linked to a collection item means the
+    // album is owned; an unlinked one merges it into another history album.
+    const canonicalize = createAlbumCanonicalizer(
+      await loadAlbumMappings(this.mappingService)
+    );
+
+    const merged = new Map<string, MissingAlbum>();
     for (const { artist, album, history } of historyAlbums) {
-      // Skip albums with too few plays
-      if (history.playCount < 3) {
+      const canonical = canonicalize(artist, album);
+      if (canonical.mapping && isCollectionLinked(canonical.mapping)) {
+        // Manual mapping to a collection item, skip this album (it's in collection)
         continue;
       }
 
-      // First, check if there's a manual mapping for this album
-      if (this.mappingService) {
-        const mapping = await this.mappingService.getAlbumMapping(
-          artist,
-          album
-        );
-        if (mapping) {
-          // Manual mapping exists, skip this album (it's in collection)
-          continue;
-        }
+      const existing = merged.get(canonical.key);
+      if (existing) {
+        existing.playCount += history.playCount;
+        existing.lastPlayed = Math.max(existing.lastPlayed, history.lastPlayed);
+      } else {
+        merged.set(canonical.key, {
+          artist: canonical.artist,
+          album: canonical.album,
+          playCount: history.playCount,
+          lastPlayed: history.lastPlayed,
+        });
+      }
+    }
+
+    // Find albums in history but not in collection
+    const missing: MissingAlbum[] = [];
+    for (const candidate of merged.values()) {
+      // Skip albums with too few plays
+      if (candidate.playCount < 3) {
+        continue;
       }
 
       // Check if this album matches any collection item
       let foundMatch = false;
       for (const item of collection) {
         if (
-          this.artistsMatch(item.release.artist, artist) &&
-          this.albumsMatch(item.release.title, album)
+          this.artistsMatch(item.release.artist, candidate.artist) &&
+          this.albumsMatch(item.release.title, candidate.album)
         ) {
           foundMatch = true;
           break;
@@ -343,12 +365,7 @@ export class AnalyticsService {
       }
 
       if (!foundMatch) {
-        missing.push({
-          artist,
-          album,
-          playCount: history.playCount,
-          lastPlayed: history.lastPlayed,
-        });
+        missing.push(candidate);
       }
     }
 

@@ -117,6 +117,55 @@ describe('SuggestionService', () => {
   });
 
   describe('calculateFactors', () => {
+    it('should use the most recent play across mapped versions of the album', async () => {
+      // Arrange - the owned title was played long ago; a linked version recently
+      const album = createMockCollectionItem({
+        artist: 'The Go-Betweens',
+        title: 'Tallulah',
+      });
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockImplementation(
+        async (_artist: string, title: string) =>
+          title === 'Tallulah'
+            ? {
+                entry: {
+                  lastPlayed: nowSeconds - 400 * 86400,
+                  playCount: 3,
+                  plays: [],
+                },
+                matchType: 'exact' as const,
+                matchedKeys: ['the go-betweens|tallulah'],
+              }
+            : {
+                entry: {
+                  lastPlayed: nowSeconds - 2 * 86400,
+                  playCount: 1,
+                  plays: [],
+                },
+                matchType: 'exact' as const,
+                matchedKeys: ['the go-betweens|tallulah (remastered)'],
+              }
+      );
+      suggestionService.setMappingService({
+        getAllAlbumMappings: jest.fn().mockResolvedValue([
+          {
+            historyArtist: 'the go-betweens',
+            historyAlbum: 'tallulah (remastered)',
+            collectionId: 123,
+            collectionArtist: 'The Go-Betweens',
+            collectionAlbum: 'Tallulah',
+            createdAt: 0,
+          },
+        ]),
+      } as never);
+
+      // Act
+      const factors = await suggestionService.calculateFactors(album);
+
+      // Assert
+      expect(factors.recencyGap).toBe(2);
+    });
+
     it('should mark album as never played when no history', async () => {
       // Arrange
       const album = createMockCollectionItem();

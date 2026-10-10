@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Merge } from 'lucide-react';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 import './ArtistDetailPage.page.css';
@@ -9,10 +9,14 @@ import PlayTrendChart from '../components/PlayTrendChart';
 import { AlbumListeningArc } from '../components/stats/AlbumListeningArc';
 import TrackLink from '../components/TrackLink';
 import { Badge } from '../components/ui/Badge';
-import { IconButton } from '../components/ui/Button';
+import { Button, IconButton } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
+import { Modal, ModalFooter } from '../components/ui/Modal';
 import { Skeleton } from '../components/ui/Skeleton';
+import { useApp } from '../context/AppContext';
+import { useNotifications } from '../hooks/useNotifications';
 import { ROUTES, navigate } from '../routes';
+import { getApiService } from '../services/api';
 import { statsApi, imagesApi } from '../services/statsApi';
 import { formatLocalDateOnly, formatRelativeTime } from '../utils/dateUtils';
 import { createLogger } from '../utils/logger';
@@ -40,12 +44,60 @@ const PAGE_NAMES: Record<string, string> = {
 const stripDisambiguation = (name: string): string =>
   name.replace(/\s+\(\d+\)$/, '');
 
+type ArtistAlbum = ArtistDetailResponse['albums'][number];
+
+/**
+ * Album mappings that merge `source` into `target`. When either side is owned,
+ * every version of both is linked to the owned collection item (the owned copy's
+ * name wins, so ownership isn't lost); otherwise the target's matching history
+ * name becomes the canonical album. Returns the canonical display name too.
+ */
+const buildMergeMappings = (source: ArtistAlbum, target: ArtistAlbum) => {
+  const targetEntries = target.historyEntries ?? [];
+  const allEntries = [...(source.historyEntries ?? []), ...targetEntries];
+  const owned = [target, source].find(
+    a => a.collectionItemId && a.collectionArtist && a.collectionAlbum
+  );
+  if (owned) {
+    return {
+      canonicalName: owned.album,
+      mappings: allEntries.map(e => ({
+        historyArtist: e.artist,
+        historyAlbum: e.album,
+        collectionId: owned.collectionItemId as number,
+        collectionArtist: owned.collectionArtist as string,
+        collectionAlbum: owned.collectionAlbum as string,
+      })),
+    };
+  }
+
+  const lcAlbum = target.album.toLowerCase();
+  const canonical =
+    targetEntries.find(e => e.album.toLowerCase() === lcAlbum) ??
+    targetEntries[0];
+  return {
+    canonicalName: target.album,
+    mappings: canonical
+      ? (source.historyEntries ?? []).map(e => ({
+          historyArtist: e.artist,
+          historyAlbum: e.album,
+          collectionId: 0,
+          collectionArtist: canonical.artist,
+          collectionAlbum: canonical.album,
+        }))
+      : [],
+  };
+};
+
 /**
  * Artist detail page showing play stats, top tracks, albums, and trend chart.
  * Reads the selected artist name from localStorage ('selectedArtist'),
  * set by ArtistLink navigation.
  */
 const ArtistDetailPage: React.FC = () => {
+  const { state } = useApp();
+  const api = getApiService(state.serverUrl);
+  const { addNotification } = useNotifications();
   const [artistName, setArtistName] = useState<string>('');
   const [data, setData] = useState<ArtistDetailResponse | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -53,6 +105,9 @@ const ArtistDetailPage: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [trendPeriod, setTrendPeriod] = useState<'month' | 'week'>('month');
   const [expandedArcAlbum, setExpandedArcAlbum] = useState<string | null>(null);
+  /** Album being merged into another album version (merge modal open when set) */
+  const [mergeSource, setMergeSource] = useState<ArtistAlbum | null>(null);
+  const [merging, setMerging] = useState(false);
   /** The page to navigate back to — derived from `?from=` URL param. */
   const previousPage = useMemo<string>(() => {
     const hash = window.location.hash.replace('#', '');
@@ -146,6 +201,47 @@ const ArtistDetailPage: React.FC = () => {
   const handleBackClick = useCallback(() => {
     navigate(previousPage);
   }, [previousPage]);
+
+  /** Alias every history name in the merge source to the target album. */
+  const handleMergeInto = useCallback(
+    async (target: ArtistAlbum) => {
+      if (!mergeSource) return;
+      const { mappings, canonicalName } = buildMergeMappings(
+        mergeSource,
+        target
+      );
+      if (mappings.length === 0) return;
+      try {
+        setMerging(true);
+        await api.createAlbumMappingsBatch(mappings);
+        addNotification({
+          type: 'success',
+          title: 'Albums merged',
+          message: `"${mergeSource.album}" and "${target.album}" are now counted as "${canonicalName}".`,
+        });
+        setMergeSource(null);
+        const controller = new AbortController();
+        await fetchArtistData(artistName, trendPeriod, controller.signal);
+      } catch (err) {
+        addNotification({
+          type: 'alert',
+          title: 'Merge failed',
+          message:
+            err instanceof Error ? err.message : 'Failed to merge albums',
+        });
+      } finally {
+        setMerging(false);
+      }
+    },
+    [
+      api,
+      addNotification,
+      artistName,
+      fetchArtistData,
+      mergeSource,
+      trendPeriod,
+    ]
+  );
 
   const backLabel = useMemo(() => {
     const pageName = PAGE_NAMES[previousPage] || 'Stats';
@@ -427,6 +523,17 @@ const ArtistDetailPage: React.FC = () => {
                       }
                       title='Toggle listening arc'
                     />
+                    {data.albums.length > 1 &&
+                      (album.historyEntries?.length ?? 0) > 0 && (
+                        <IconButton
+                          icon={<Merge size={16} aria-hidden='true' />}
+                          size='small'
+                          variant='ghost'
+                          onClick={() => setMergeSource(album)}
+                          aria-label={`Merge ${album.album} into another album`}
+                          title='Merge into another album version'
+                        />
+                      )}
                     <IconButton
                       icon={<>&#9654;</>}
                       size='small'
@@ -482,6 +589,53 @@ const ArtistDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <Modal
+        isOpen={mergeSource !== null}
+        onClose={() => setMergeSource(null)}
+        title='Merge album versions'
+        size='medium'
+        loading={merging}
+      >
+        {mergeSource && (
+          <>
+            <p className='artist-merge-intro'>
+              Count plays of <strong>{mergeSource.album}</strong> as another
+              version of the same album:
+            </p>
+            <ul className='artist-merge-target-list'>
+              {data.albums
+                .filter(a => a.album !== mergeSource.album)
+                .map(target => (
+                  <li key={target.album}>
+                    <button
+                      type='button'
+                      className='artist-merge-target'
+                      onClick={() => handleMergeInto(target)}
+                      disabled={merging}
+                    >
+                      <span className='artist-merge-target-name'>
+                        {target.album}
+                      </span>
+                      <span className='artist-merge-target-meta'>
+                        {target.playCount.toLocaleString()} plays
+                      </span>
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          </>
+        )}
+        <ModalFooter>
+          <Button
+            variant='secondary'
+            onClick={() => setMergeSource(null)}
+            disabled={merging}
+          >
+            Cancel
+          </Button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 };

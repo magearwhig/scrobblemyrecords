@@ -64,6 +64,7 @@ describe('AnalyticsService', () => {
 
     mockMappingService = {
       getAlbumMapping: jest.fn().mockResolvedValue(null),
+      getAllAlbumMappings: jest.fn().mockResolvedValue([]),
       getArtistMapping: jest.fn().mockResolvedValue(null),
     } as unknown as jest.Mocked<MappingService>;
 
@@ -481,14 +482,16 @@ describe('AnalyticsService', () => {
     it('should skip albums with manual mappings', async () => {
       // Arrange
       analyticsService.setMappingService(mockMappingService);
-      mockMappingService.getAlbumMapping.mockResolvedValue({
-        historyArtist: 'radiohead',
-        historyAlbum: 'kid a',
-        collectionId: 123,
-        collectionArtist: 'Radiohead',
-        collectionAlbum: 'Kid A',
-        createdAt: Date.now(),
-      });
+      mockMappingService.getAllAlbumMappings.mockResolvedValue([
+        {
+          historyArtist: 'radiohead',
+          historyAlbum: 'kid a',
+          collectionId: 123,
+          collectionArtist: 'Radiohead',
+          collectionAlbum: 'Kid A',
+          createdAt: Date.now(),
+        },
+      ]);
       mockHistoryStorage.getAllAlbums.mockResolvedValue([
         {
           key: 'radiohead|kid a',
@@ -503,6 +506,48 @@ describe('AnalyticsService', () => {
 
       // Assert - should be skipped due to mapping
       expect(missing).toEqual([]);
+    });
+
+    it('should merge unlinked mapped versions into their album before thresholds', async () => {
+      // Arrange - a 100-play live version merged into a 1-play album name
+      analyticsService.setMappingService(mockMappingService);
+      mockMappingService.getAllAlbumMappings.mockResolvedValue([
+        {
+          historyArtist: 'the go-betweens',
+          historyAlbum: 'that striped sunlight sound (live)',
+          collectionId: 0,
+          collectionArtist: 'the go-betweens',
+          collectionAlbum: 'that striped sunlight sound',
+          createdAt: Date.now(),
+        },
+      ]);
+      mockHistoryStorage.getAllAlbums.mockResolvedValue([
+        {
+          key: 'the go-betweens|that striped sunlight sound (live)',
+          artist: 'the go-betweens',
+          album: 'that striped sunlight sound (live)',
+          history: { lastPlayed: 2000, playCount: 100, plays: [] },
+        },
+        {
+          key: 'the go-betweens|that striped sunlight sound',
+          artist: 'the go-betweens',
+          album: 'that striped sunlight sound',
+          history: { lastPlayed: 1000, playCount: 1, plays: [] },
+        },
+      ]);
+
+      // Act
+      const missing = await analyticsService.getMissingAlbums([]);
+
+      // Assert
+      expect(missing).toEqual([
+        {
+          artist: 'the go-betweens',
+          album: 'that striped sunlight sound',
+          playCount: 101,
+          lastPlayed: 2000,
+        },
+      ]);
     });
   });
 

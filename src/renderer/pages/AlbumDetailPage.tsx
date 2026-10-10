@@ -1,4 +1,4 @@
-import { ExternalLink, Disc3, Play, Library } from 'lucide-react';
+import { ExternalLink, Disc3, Play, Library, Unlink } from 'lucide-react';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 import './AlbumDetailPage.page.css';
@@ -7,10 +7,13 @@ import { AlbumDetailResponse } from '../../shared/types';
 import ArtistLink from '../components/ArtistLink';
 import { AlbumListeningArc } from '../components/stats/AlbumListeningArc';
 import TrackLink from '../components/TrackLink';
-import { Button } from '../components/ui/Button';
+import { Button, IconButton } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton } from '../components/ui/Skeleton';
+import { useApp } from '../context/AppContext';
+import { useNotifications } from '../hooks/useNotifications';
 import { ROUTES, navigate } from '../routes';
+import { getApiService } from '../services/api';
 import { statsApi } from '../services/statsApi';
 import { formatLocalDateOnly, formatRelativeTime } from '../utils/dateUtils';
 import { createLogger } from '../utils/logger';
@@ -53,6 +56,9 @@ interface SelectedAlbumInfo {
  * param, falling back to `#stats`.
  */
 const AlbumDetailPage: React.FC = () => {
+  const { state } = useApp();
+  const api = getApiService(state.serverUrl);
+  const { addNotification } = useNotifications();
   const [data, setData] = useState<AlbumDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -145,6 +151,26 @@ const AlbumDetailPage: React.FC = () => {
     return () => controller.abort();
   }, [albumInfo, fetchAlbumDetail]);
 
+  /** Unmerge a history album version from this album by removing its mapping. */
+  const handleUnmerge = useCallback(
+    async (historyArtist: string, historyAlbum: string) => {
+      if (!albumInfo) return;
+      try {
+        await api.removeDiscoveryAlbumMapping(historyArtist, historyAlbum);
+        const controller = new AbortController();
+        await fetchAlbumDetail(albumInfo, controller.signal);
+      } catch (err) {
+        addNotification({
+          type: 'alert',
+          title: 'Unmerge failed',
+          message:
+            err instanceof Error ? err.message : 'Failed to unmerge album',
+        });
+      }
+    },
+    [albumInfo, api, addNotification, fetchAlbumDetail]
+  );
+
   const firstPlayedDisplay = useMemo(() => {
     if (!data?.firstPlayed) return null;
     return formatLocalDateOnly(data.firstPlayed * 1000);
@@ -185,6 +211,11 @@ const AlbumDetailPage: React.FC = () => {
         artist: data.collectionArtist ?? data.artist,
         title: data.collectionAlbum ?? data.album,
       })
+    );
+    // Only shown for owned albums; CollectionItem.id is the Discogs release id
+    localStorage.setItem(
+      'selectedCollectionItemId',
+      data.collectionReleaseId.toString()
     );
     navigate(ROUTES.RELEASE_DETAILS, { from: 'album' });
   }, [data]);
@@ -277,7 +308,8 @@ const AlbumDetailPage: React.FC = () => {
     Boolean(mappings.albumMapping) ||
     Boolean(mappings.artistMapping) ||
     Boolean(mappings.compoundArtist) ||
-    (Array.isArray(mappings.albumAliases) && mappings.albumAliases.length > 0);
+    (Array.isArray(mappings.mergedVersions) &&
+      mappings.mergedVersions.length > 0);
 
   return (
     <div className='detail-page'>
@@ -441,8 +473,9 @@ const AlbumDetailPage: React.FC = () => {
             <div className='detail-page-section album-detail-mapping-card'>
               <h3>Album Mapping</h3>
               <p className='detail-page-meta'>
-                This Last.fm album maps to a different name in your Discogs
-                collection.
+                {mappings.albumMapping.collectionLinked === false
+                  ? 'This Last.fm album is counted as another album in your history.'
+                  : 'This Last.fm album maps to a different name in your Discogs collection.'}
               </p>
               <dl className='album-detail-mapping-grid'>
                 <dt>Last.fm</dt>
@@ -450,7 +483,11 @@ const AlbumDetailPage: React.FC = () => {
                   {mappings.albumMapping.historyArtist} &mdash;{' '}
                   {mappings.albumMapping.historyAlbum}
                 </dd>
-                <dt>Discogs</dt>
+                <dt>
+                  {mappings.albumMapping.collectionLinked === false
+                    ? 'Merged into'
+                    : 'Discogs'}
+                </dt>
                 <dd>
                   {mappings.albumMapping.collectionArtist} &mdash;{' '}
                   {mappings.albumMapping.collectionAlbum}
@@ -491,17 +528,35 @@ const AlbumDetailPage: React.FC = () => {
             </div>
           )}
 
-          {Array.isArray(mappings.albumAliases) &&
-            mappings.albumAliases.length > 0 && (
+          {Array.isArray(mappings.mergedVersions) &&
+            mappings.mergedVersions.length > 0 && (
               <div className='detail-page-section album-detail-mapping-card'>
-                <h3>Album Aliases</h3>
+                <h3>Merged Versions</h3>
                 <p className='detail-page-meta'>
-                  Other album names treated as the same album.
+                  Other album names counted as this album.
                 </p>
                 <ul className='album-detail-alias-list'>
-                  {mappings.albumAliases.map((alias, idx) => (
-                    <li key={`${alias.aliasArtist}-${alias.aliasAlbum}-${idx}`}>
-                      {alias.aliasArtist} &mdash; {alias.aliasAlbum}
+                  {mappings.mergedVersions.map(version => (
+                    <li
+                      key={`${version.historyArtist}|${version.historyAlbum}`}
+                      className='album-detail-alias-item'
+                    >
+                      <span>
+                        {version.historyArtist} &mdash; {version.historyAlbum}
+                      </span>
+                      <IconButton
+                        icon={<Unlink size={16} aria-hidden='true' />}
+                        size='small'
+                        variant='ghost'
+                        onClick={() =>
+                          handleUnmerge(
+                            version.historyArtist,
+                            version.historyAlbum
+                          )
+                        }
+                        aria-label={`Unmerge ${version.historyAlbum}`}
+                        title='Unmerge this album version'
+                      />
                     </li>
                   ))}
                 </ul>

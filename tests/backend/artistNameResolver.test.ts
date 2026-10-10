@@ -103,6 +103,23 @@ describe('ArtistNameResolver', () => {
       expect(resolver.areSameArtist('Radiohead', 'Radiohead (UK)')).toBe(true);
     });
 
+    it('should ignore unlinked album mappings (album merges only)', async () => {
+      // Arrange
+      mockMappingService.getAllAlbumMappings.mockResolvedValue([
+        createAlbumMapping({
+          historyArtist: 'Radiohead',
+          collectionArtist: 'Thom Yorke',
+          collectionId: 0,
+        }),
+      ]);
+
+      // Act
+      await resolver.rebuild();
+
+      // Assert
+      expect(resolver.areSameArtist('Radiohead', 'Thom Yorke')).toBe(false);
+    });
+
     it('should build from history artist mappings', async () => {
       // Arrange
       mockMappingService.getAllArtistMappings.mockResolvedValue([
@@ -448,6 +465,25 @@ describe('ArtistNameResolver', () => {
       expect(missing).toHaveLength(1);
       expect(missing[0].discogsName).toBe('Radiohead (UK)');
       expect(missing[0].lastfmName).toBe('Radiohead');
+    });
+
+    it('should not suggest artist mappings from unlinked album mappings', async () => {
+      // Arrange
+      mockMappingService.getAllAlbumMappings.mockResolvedValue([
+        createAlbumMapping({
+          historyArtist: 'Radiohead',
+          collectionArtist: 'Thom Yorke',
+          collectionId: 0,
+        }),
+      ]);
+      (mockArtistMappingService.hasMapping as jest.Mock).mockReturnValue(false);
+      await resolver.rebuild();
+
+      // Act
+      const missing = await resolver.detectMissingScrobbleMappings();
+
+      // Assert
+      expect(missing).toEqual([]);
     });
 
     it('should return empty when all album mapping artists already have artist mappings', async () => {

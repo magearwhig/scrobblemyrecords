@@ -327,8 +327,10 @@ export interface AlbumMapping {
   // The Last.fm naming (from scrobble history)
   historyArtist: string;
   historyAlbum: string;
-  // The Discogs collection item to map to
-  collectionId: number; // CollectionItem.id
+  // The canonical album this history name is merged into. When collectionId is
+  // set (> 0) this is a Discogs collection item and the mapping records
+  // ownership; when 0 it is another history album name ("same album, not owned").
+  collectionId: number; // CollectionItem.id, or 0 when not linked to the collection
   collectionArtist: string;
   collectionAlbum: string;
   // Metadata
@@ -756,6 +758,12 @@ export interface ArtistDetailResponse {
     coverUrl?: string;
     inCollection: boolean;
     collectionReleaseId?: number;
+    /** Owned copy (CollectionItem.id and Discogs names), used as a merge target */
+    collectionItemId?: number;
+    collectionArtist?: string;
+    collectionAlbum?: string;
+    /** Raw scrobble history artist/album names merged into this entry */
+    historyEntries?: Array<{ artist: string; album: string }>;
   }>;
   imageUrl?: string;
 }
@@ -804,6 +812,8 @@ export interface AlbumDetailAlbumMapping {
   historyAlbum: string;
   collectionArtist: string;
   collectionAlbum: string;
+  /** True when the target is a collection item; false when it's another history album */
+  collectionLinked?: boolean;
 }
 
 /**
@@ -833,11 +843,8 @@ export interface AlbumDetailMappings {
   albumMapping?: AlbumDetailAlbumMapping;
   artistMapping?: AlbumDetailArtistMapping;
   compoundArtist?: AlbumDetailCompoundArtist;
-  /**
-   * Forward-compat per .plan/album-name-aliasing-plan.md.
-   * Undefined until the album alias mapping service is wired up.
-   */
-  albumAliases?: AlbumAliasMapping[];
+  /** Other history album names merged into this album via album mappings */
+  mergedVersions?: AlbumDetailAlbumMapping[];
 }
 
 /**
@@ -862,25 +869,6 @@ export interface AlbumDetailResponse {
   coverUrl?: string;
 
   mappings: AlbumDetailMappings;
-}
-
-/**
- * Forward-compat placeholder for album alias mappings.
- * Mirrors the canonical shape proposed in .plan/album-name-aliasing-plan.md
- * (lines 58-69). When that plan lands, the canonical declaration should
- * subsume this one; the album detail surface already exposes the field
- * as optional so no callers will need to change.
- */
-export interface AlbumAliasMapping {
-  /** The canonical album key (artist|album, lowercased) to merge into */
-  canonicalArtist: string;
-  canonicalAlbum: string;
-  /** The alias album key that should be treated as the same album */
-  aliasArtist: string;
-  aliasAlbum: string;
-  /** Whether this was auto-detected or manually created */
-  autoDetected: boolean;
-  createdAt: number;
 }
 
 // ============================================

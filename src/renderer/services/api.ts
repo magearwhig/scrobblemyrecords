@@ -988,19 +988,22 @@ class ApiService {
   }
 
   /**
-   * Create an album mapping (convenience method for Release Details page).
-   * Note: collectionId will be set to 0 as it's not available in Release Details context.
+   * Create several album mappings in one save (e.g. merging album versions).
+   * collectionId 0 merges into another history album without a collection link.
    */
-  async createAlbumMapping(mapping: {
-    historyArtist: string;
-    historyAlbum: string;
-    collectionArtist: string;
-    collectionAlbum: string;
-  }): Promise<void> {
-    await this.api.post('/suggestions/mappings/albums', {
-      ...mapping,
-      collectionId: 0, // Not available in Release Details context
+  async createAlbumMappingsBatch(
+    mappings: Array<{
+      historyArtist: string;
+      historyAlbum: string;
+      collectionId: number;
+      collectionArtist: string;
+      collectionAlbum: string;
+    }>
+  ): Promise<{ added: number }> {
+    const response = await this.api.post('/suggestions/mappings/albums/batch', {
+      mappings,
     });
+    return response.data.data;
   }
 
   async removeDiscoveryAlbumMapping(

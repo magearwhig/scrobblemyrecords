@@ -1,4 +1,5 @@
 import { AlbumMapping } from '../../shared/types';
+import { isCollectionLinked } from '../../shared/utils/albumMapping';
 import { createLogger } from '../utils/logger';
 
 import { ArtistMapping as DiscogsArtistMapping } from './artistMappingService';
@@ -212,6 +213,9 @@ export class ArtistNameResolver {
     let albumArtistUnions = 0;
     for (const mapping of albumMappings) {
       if (!mapping.historyArtist || !mapping.collectionArtist) continue;
+      // Unlinked mappings only merge album names; they don't assert that the
+      // two artists are the same.
+      if (!isCollectionLinked(mapping)) continue;
       if (
         GENERIC_COLLECTION_ARTISTS.has(mapping.collectionArtist.toLowerCase())
       )
@@ -571,6 +575,8 @@ export class ArtistNameResolver {
 
     for (const mapping of albumMappings) {
       if (!mapping.historyArtist || !mapping.collectionArtist) continue;
+      // Unlinked mappings have no Discogs artist to map from
+      if (!isCollectionLinked(mapping)) continue;
 
       // Only consider cases where artists actually differ
       if (

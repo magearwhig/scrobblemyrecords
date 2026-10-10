@@ -2,6 +2,8 @@ import {
   AlbumArcBucket,
   AlbumDetailResponse,
   AlbumDetailTrack,
+  AlbumHistoryEntry,
+  AlbumMapping,
   AlbumPlayCount,
   ArtistDetailResponse,
   ArtistPlayCount,
@@ -30,6 +32,11 @@ import {
   TrackPlayCount,
 } from '../../shared/types';
 import {
+  createAlbumCanonicalizer,
+  createCollectionNameResolver,
+  isCollectionLinked,
+} from '../../shared/utils/albumMapping';
+import {
   createNormalizedTrackKey,
   normalizeForMatching,
 } from '../../shared/utils/trackNormalization';
@@ -40,6 +47,7 @@ import { artistMappingService } from './artistMappingService';
 import { ArtistNameResolver } from './artistNameResolver';
 import { CompoundArtistMappingServiceLike } from './compoundArtistMappingService';
 import { MappingService } from './mappingService';
+import { loadAlbumMappings, lookupMergedHistory } from './mergedAlbumHistory';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 import { TrackMappingService } from './trackMappingService';
 
@@ -116,6 +124,122 @@ export class StatsService {
     service: CompoundArtistMappingServiceLike
   ): void {
     this.compoundArtistMappingService = service;
+  }
+
+  /**
+   * Album mappings that merge another history album into the given album
+   * (linked to the collection or not), excluding a mapping of the album itself.
+   */
+  private async getMappingsMergedInto(
+    artist: string,
+    album: string
+  ): Promise<AlbumMapping[]> {
+    const albumKey = album.toLowerCase().trim();
+    return (await loadAlbumMappings(this.mappingService)).filter(
+      m =>
+        m.collectionAlbum.toLowerCase().trim() === albumKey &&
+        this.historyStorage.normalizeKey(m.historyArtist, m.historyAlbum) !==
+          this.historyStorage.normalizeKey(
+            m.collectionArtist,
+            m.collectionAlbum
+          ) &&
+        (this.isArtistMatch(m.collectionArtist, artist) ||
+          this.isArtistMatch(m.historyArtist, artist))
+    );
+  }
+
+  /**
+   * Scrobble history for each collection item (same order), combining the
+   * item's own name with every history album linked to it by a mapping.
+   */
+  private async lookupCollectionHistory(
+    collection: CollectionItem[],
+    options?: { countsOnly?: boolean }
+  ) {
+    const namesFor = createCollectionNameResolver(
+      await loadAlbumMappings(this.mappingService)
+    );
+    return lookupMergedHistory(
+      this.historyStorage,
+      collection.map(item => namesFor(item.release.artist, item.release.title)),
+      options
+    );
+  }
+
+  /**
+   * Resolve an album name to the album it is merged into (album mapping), or
+   * itself. Returns the album's own mapping, if any, for display.
+   */
+  private async resolveMergedAlbum(
+    artist: string,
+    album: string
+  ): Promise<{ artist: string; album: string; mapping: AlbumMapping | null }> {
+    const mapping =
+      (this.mappingService &&
+        (await this.mappingService.getAlbumMapping(artist, album))) ||
+      null;
+    if (
+      mapping &&
+      this.historyStorage.normalizeKey(
+        mapping.collectionArtist,
+        mapping.collectionAlbum
+      ) !== this.historyStorage.normalizeKey(artist, album)
+    ) {
+      return {
+        artist: mapping.collectionArtist,
+        album: mapping.collectionAlbum,
+        mapping,
+      };
+    }
+    return { artist, album, mapping };
+  }
+
+  /**
+   * All plays of an album: the fuzzy match for its name plus every history
+   * album merged into it by an album mapping, each history entry counted once.
+   */
+  private async collectMergedAlbumHistory(
+    artist: string,
+    album: string
+  ): Promise<{
+    plays: AlbumHistoryEntry['plays'];
+    totalPlayCount: number;
+    mergedMappings: AlbumMapping[];
+  }> {
+    // Fuzzy match handles "(Deluxe)" / "(2)" variants
+    const historyResult = await this.historyStorage.getAlbumHistoryFuzzy(
+      artist,
+      album
+    );
+
+    const mergedMappings = await this.getMappingsMergedInto(artist, album);
+    const matchedKeys = new Set(historyResult.matchedKeys ?? []);
+    const mergedEntries: AlbumHistoryEntry[] = [];
+    if (mergedMappings.length > 0) {
+      const index = await this.historyStorage.getIndex();
+      for (const mapping of mergedMappings) {
+        const mergedKey = this.historyStorage.normalizeKey(
+          mapping.historyArtist,
+          mapping.historyAlbum
+        );
+        const mergedEntry = index?.albums[mergedKey];
+        if (mergedEntry && !matchedKeys.has(mergedKey)) {
+          matchedKeys.add(mergedKey);
+          mergedEntries.push(mergedEntry);
+        }
+      }
+    }
+
+    return {
+      plays: [
+        ...(historyResult.entry?.plays ?? []),
+        ...mergedEntries.flatMap(e => e.plays),
+      ],
+      totalPlayCount:
+        (historyResult.entry?.playCount ?? 0) +
+        mergedEntries.reduce((sum, e) => sum + e.playCount, 0),
+      mergedMappings,
+    };
   }
 
   private resolveArtistName(name: string): string {
@@ -723,8 +847,21 @@ export class StatsService {
       cutoffTimestamp = this.getPeriodCutoff(period);
     }
 
-    // Count plays per album in the period
-    const albumCounts: AlbumPlayCount[] = [];
+    // Count plays per album in the period. Versions merged by album mappings
+    // count as one album, shown under the artist with the most plays.
+    const canonicalize = createAlbumCanonicalizer(
+      await loadAlbumMappings(this.mappingService)
+    );
+    const albumCounts = new Map<
+      string,
+      {
+        album: string;
+        playCount: number;
+        lastPlayed: number;
+        artistPlays: Map<string, number>;
+        collectionId?: number;
+      }
+    >();
 
     for (const [key, albumHistory] of Object.entries(index.albums)) {
       const [artist, album] = key.split('|');
@@ -743,32 +880,65 @@ export class StatsService {
         }
       }
 
-      if (periodPlays > 0) {
-        albumCounts.push({
-          artist: this.capitalizeArtist(artist),
-          album: this.capitalizeTitle(album),
+      if (periodPlays === 0) continue;
+
+      const canonical = canonicalize(artist, album);
+      const linkedId =
+        canonical.mapping && isCollectionLinked(canonical.mapping)
+          ? canonical.mapping.collectionId
+          : undefined;
+      const existing = albumCounts.get(canonical.key);
+      if (existing) {
+        existing.playCount += periodPlays;
+        existing.lastPlayed = Math.max(existing.lastPlayed, periodLastPlayed);
+        existing.artistPlays.set(
+          artist,
+          (existing.artistPlays.get(artist) ?? 0) + periodPlays
+        );
+        existing.collectionId ??= linkedId;
+      } else {
+        albumCounts.set(canonical.key, {
+          album: canonical.album,
           playCount: periodPlays,
           lastPlayed: periodLastPlayed,
+          artistPlays: new Map([[artist, periodPlays]]),
+          collectionId: linkedId,
         });
       }
     }
 
     // Sort by play count and take top results
-    const result = albumCounts
+    const topEntries = Array.from(albumCounts.values())
       .sort((a, b) => b.playCount - a.playCount)
       .slice(0, limit);
+    const result: AlbumPlayCount[] = topEntries.map(entry => {
+      const [topArtist] = Array.from(entry.artistPlays.entries()).sort(
+        (a, b) => b[1] - a[1]
+      )[0];
+      return {
+        artist: this.capitalizeArtist(topArtist),
+        album: this.capitalizeTitle(entry.album),
+        playCount: entry.playCount,
+        lastPlayed: entry.lastPlayed,
+      };
+    });
 
     // Enrich with collection info if collection is provided
     if (collection && collection.length > 0) {
       const collectionByFuzzyKey =
         await this.buildFuzzyCollectionMap(collection);
 
-      for (const album of result) {
-        const collectionItem = this.lookupCollectionItem(
-          collectionByFuzzyKey,
-          album.artist,
-          album.album
-        );
+      for (const [i, album] of result.entries()) {
+        const linkedId = topEntries[i].collectionId;
+        const collectionItem =
+          (linkedId !== undefined
+            ? collection.find(item => item.id === linkedId)
+            : undefined) ??
+          this.lookupCollectionItem(
+            collectionByFuzzyKey,
+            album.artist,
+            album.album
+          );
         if (collectionItem) {
           album.inCollection = true;
           album.collectionReleaseId = collectionItem.release.id;
@@ -927,42 +1097,10 @@ export class StatsService {
     let albumsPlayedDays90 = 0;
     let albumsPlayedDays365 = 0;
 
-    // Step 1: resolve album mappings for all collection items
-    const batchKeys: Array<{ artist: string; album: string }> = [];
-    const resolvedItems: Array<{ artist: string; album: string }> = [];
+    // Every collection item's plays, across all names mapped to it
+    const collectionHistory = await this.lookupCollectionHistory(collection);
 
-    for (const item of collection) {
-      let searchArtist = item.release.artist;
-      let searchAlbum = item.release.title;
-
-      if (this.mappingService) {
-        const albumMapping =
-          await this.mappingService.getAlbumMappingForCollection(
-            item.release.artist,
-            item.release.title
-          );
-
-        if (albumMapping) {
-          searchArtist = albumMapping.historyArtist;
-          searchAlbum = albumMapping.historyAlbum;
-          this.logger.debug(
-            `Collection Coverage: using album mapping "${item.release.artist}|${item.release.title}" -> "${searchArtist}|${searchAlbum}"`
-          );
-        }
-      }
-
-      resolvedItems.push({ artist: searchArtist, album: searchAlbum });
-      batchKeys.push({ artist: searchArtist, album: searchAlbum });
-    }
-
-    // Step 2: batch lookup — single index read for all collection items
-    const batchResults = await this.historyStorage.batchLookup(batchKeys);
-
-    // Step 3: process results from the batch map
-    for (const { artist, album } of resolvedItems) {
-      const lookupKey = this.historyStorage.normalizeKey(artist, album);
-      const result = batchResults.get(lookupKey);
-
+    for (const result of collectionHistory) {
       if (result?.entry && result.entry.playCount > 0) {
         // Album has been played at least once
         albumsPlayedAllTime++;
@@ -1037,50 +1175,13 @@ export class StatsService {
 
     const dustyAlbums: DustyCornerAlbum[] = [];
 
-    // Step 1: resolve album mappings for all collection items
-    const batchKeys: Array<{ artist: string; album: string }> = [];
-    const resolvedDustyItems: Array<{
-      item: CollectionItem;
-      searchArtist: string;
-      searchAlbum: string;
-    }> = [];
-
-    for (const item of collection) {
-      let searchArtist = item.release.artist;
-      let searchAlbum = item.release.title;
-
-      if (this.mappingService) {
-        const albumMapping =
-          await this.mappingService.getAlbumMappingForCollection(
-            item.release.artist,
-            item.release.title
-          );
-
-        if (albumMapping) {
-          searchArtist = albumMapping.historyArtist;
-          searchAlbum = albumMapping.historyAlbum;
-          this.logger.debug(
-            `Dusty Corners: using album mapping "${item.release.artist}|${item.release.title}" -> "${searchArtist}|${searchAlbum}"`
-          );
-        }
-      }
-
-      resolvedDustyItems.push({ item, searchArtist, searchAlbum });
-      batchKeys.push({ artist: searchArtist, album: searchAlbum });
-    }
-
-    // Step 2: batch lookup — countsOnly since we only need lastPlayed/playCount
-    const batchResults = await this.historyStorage.batchLookup(batchKeys, {
+    // countsOnly since we only need lastPlayed/playCount
+    const collectionHistory = await this.lookupCollectionHistory(collection, {
       countsOnly: true,
     });
 
-    // Step 3: filter and collect dusty albums from batch results
-    for (const { item, searchArtist, searchAlbum } of resolvedDustyItems) {
-      const lookupKey = this.historyStorage.normalizeKey(
-        searchArtist,
-        searchAlbum
-      );
-      const result = batchResults.get(lookupKey);
+    for (const [i, item] of collection.entries()) {
+      const result = collectionHistory[i];
 
       // Album never played or last played more than 6 months ago
       if (!result?.entry || result.entry.lastPlayed < sixMonthsAgoSeconds) {
@@ -1122,51 +1223,13 @@ export class StatsService {
   ): Promise<AlbumPlayCount[]> {
     const albumsWithPlays: AlbumPlayCount[] = [];
 
-    // Step 1: resolve album mappings for all collection items
-    const heavyBatchKeys: Array<{ artist: string; album: string }> = [];
-    const resolvedHeavyItems: Array<{
-      item: CollectionItem;
-      searchArtist: string;
-      searchAlbum: string;
-    }> = [];
+    // countsOnly since we only need playCount/lastPlayed
+    const collectionHistory = await this.lookupCollectionHistory(collection, {
+      countsOnly: true,
+    });
 
-    for (const item of collection) {
-      let searchArtist = item.release.artist;
-      let searchAlbum = item.release.title;
-
-      if (this.mappingService) {
-        const albumMapping =
-          await this.mappingService.getAlbumMappingForCollection(
-            item.release.artist,
-            item.release.title
-          );
-
-        if (albumMapping) {
-          searchArtist = albumMapping.historyArtist;
-          searchAlbum = albumMapping.historyAlbum;
-          this.logger.debug(
-            `Heavy Rotation: using album mapping "${item.release.artist}|${item.release.title}" -> "${searchArtist}|${searchAlbum}"`
-          );
-        }
-      }
-
-      resolvedHeavyItems.push({ item, searchArtist, searchAlbum });
-      heavyBatchKeys.push({ artist: searchArtist, album: searchAlbum });
-    }
-
-    // Step 2: batch lookup — countsOnly since we only need playCount/lastPlayed
-    const heavyBatchResults = await this.historyStorage.batchLookup(
-      heavyBatchKeys,
-      { countsOnly: true }
-    );
-
-    // Step 3: collect albums with plays from batch results
-    for (const { item, searchArtist, searchAlbum } of resolvedHeavyItems) {
-      const lookupKey = this.historyStorage.normalizeKey(
-        searchArtist,
-        searchAlbum
-      );
-      const result = heavyBatchResults.get(lookupKey);
+    for (const [i, item] of collection.entries()) {
+      const result = collectionHistory[i];
 
       if (result?.entry && result.entry.playCount > 0) {
         albumsWithPlays.push({
@@ -1796,13 +1859,15 @@ export class StatsService {
    * @returns Array of unique track names that have been scrobbled
    */
   async getAlbumTracksPlayed(artist: string, album: string): Promise<string[]> {
-    const result = await this.historyStorage.getAlbumHistoryFuzzy(
-      artist,
-      album
+    // Includes versions merged into this album by album mappings, whichever
+    // version's name was requested
+    const resolved = await this.resolveMergedAlbum(artist, album);
+    const { plays } = await this.collectMergedAlbumHistory(
+      resolved.artist,
+      resolved.album
     );
-    if (!result.entry) return [];
     const tracks = new Set<string>();
-    for (const play of result.entry.plays) {
+    for (const play of plays) {
       if (play.track) {
         tracks.add(play.track);
       }
@@ -1862,27 +1927,53 @@ export class StatsService {
       { track: string; album: string; count: number; lastPlayed: number }
     >();
 
-    // Album data: key = normalized album name, value = { artist, album, playCount, lastPlayed }
+    // Album data: key = normalized album name, value = { artist, album, playCount, lastPlayed }.
+    // historyEntries holds every raw history artist/album merged into the entry so the
+    // collection lookup can match on any of them.
     const albumCounts = new Map<
       string,
-      { artist: string; album: string; playCount: number; lastPlayed: number }
+      {
+        artist: string;
+        album: string;
+        playCount: number;
+        lastPlayed: number;
+        historyEntries: Array<{ artist: string; album: string }>;
+        collectionId?: number;
+      }
     >();
+
+    // Manual album mappings (history name -> canonical album). Versions of the same
+    // album that the user mapped together (e.g. "Tallulah (Remastered)" -> "Tallulah")
+    // are merged into a single entry.
+    const canonicalize = createAlbumCanonicalizer(
+      await loadAlbumMappings(this.mappingService)
+    );
 
     // Play trend data: key = period string (YYYY-MM or YYYY-Www), value = count
     const trendCounts = new Map<string, number>();
 
     for (const [key, albumHistory] of Object.entries(index.albums)) {
-      const [artist, album] = key.split('|');
+      const [artist, historyAlbum] = key.split('|');
       if (!this.isArtistMatch(artist, artistName)) {
         continue;
       }
 
-      const normalizedAlbum = album.toLowerCase();
+      // Mappings are one hop deep, so the target is the canonical album
+      const { album, mapping: albumMapping } = canonicalize(
+        artist,
+        historyAlbum
+      );
+
+      const normalizedAlbum = album.toLowerCase().trim();
       const existingAlbum = albumCounts.get(normalizedAlbum);
       if (existingAlbum) {
         existingAlbum.playCount += albumHistory.playCount;
         if (albumHistory.lastPlayed > existingAlbum.lastPlayed) {
           existingAlbum.lastPlayed = albumHistory.lastPlayed;
+        }
+        existingAlbum.historyEntries.push({ artist, album: historyAlbum });
+        if (!existingAlbum.collectionId && albumMapping?.collectionId) {
+          existingAlbum.collectionId = albumMapping.collectionId;
         }
       } else {
         albumCounts.set(normalizedAlbum, {
@@ -1890,6 +1981,8 @@ export class StatsService {
           album,
           playCount: albumHistory.playCount,
           lastPlayed: albumHistory.lastPlayed,
+          historyEntries: [{ artist, album: historyAlbum }],
+          collectionId: albumMapping?.collectionId || undefined,
         });
       }
 
@@ -1968,11 +2061,19 @@ export class StatsService {
     const albums = Array.from(albumCounts.values())
       .sort((a, b) => b.playCount - a.playCount)
       .map(a => {
-        const collectionItem = this.lookupCollectionItem(
-          collectionByFuzzyKey,
-          a.artist,
-          a.album
-        );
+        const collectionItem =
+          (a.collectionId
+            ? collection.find(item => item.id === a.collectionId)
+            : undefined) ??
+          [{ artist: a.artist, album: a.album }, ...a.historyEntries]
+            .map(entry =>
+              this.lookupCollectionItem(
+                collectionByFuzzyKey,
+                entry.artist,
+                entry.album
+              )
+            )
+            .find(item => item !== undefined);
         return {
           album: this.capitalizeTitle(a.album),
           playCount: a.playCount,
@@ -1980,6 +2081,10 @@ export class StatsService {
           coverUrl: collectionItem?.release.cover_image,
           inCollection: !!collectionItem,
           collectionReleaseId: collectionItem?.release.id,
+          collectionItemId: collectionItem?.id,
+          collectionArtist: collectionItem?.release.artist,
+          collectionAlbum: collectionItem?.release.title,
+          historyEntries: a.historyEntries,
         };
       });
 
@@ -2048,11 +2153,18 @@ export class StatsService {
     // Play trend data
     const trendCounts = new Map<string, number>();
 
-    // Albums this track appears on: key = normalized album, value = { album, artist, playCount, lastPlayed }
+    // Albums this track appears on: key = normalized album, value = { album, artist, playCount, lastPlayed }.
+    // Versions merged by album mappings count as one album.
     const albumAppearances = new Map<
       string,
       { album: string; artist: string; playCount: number; lastPlayed: number }
     >();
+    const canonicalize = createAlbumCanonicalizer(
+      await loadAlbumMappings(this.mappingService)
+    );
+    const canonicalAlbumFilter = album
+      ? canonicalize(artist, album).album.toLowerCase()
+      : undefined;
 
     for (const [key, albumHistory] of Object.entries(index.albums)) {
       const [entryArtist, entryAlbum] = key.split('|');
@@ -2062,10 +2174,12 @@ export class StatsService {
         continue;
       }
 
-      // If album filter is provided, only look at that album
+      // If album filter is provided, only look at that album (any of its versions)
+      const canonicalAlbum = canonicalize(entryArtist, entryAlbum).album;
       if (
         normalizedAlbumFilter &&
-        entryAlbum.toLowerCase() !== normalizedAlbumFilter
+        entryAlbum.toLowerCase() !== normalizedAlbumFilter &&
+        canonicalAlbum.toLowerCase() !== canonicalAlbumFilter
       ) {
         continue;
       }
@@ -2087,7 +2201,7 @@ export class StatsService {
         }
 
         // Album appearances
-        const normalizedEntryAlbum = entryAlbum.toLowerCase();
+        const normalizedEntryAlbum = canonicalAlbum.toLowerCase();
         const existing = albumAppearances.get(normalizedEntryAlbum);
         if (existing) {
           existing.playCount++;
@@ -2096,7 +2210,7 @@ export class StatsService {
           }
         } else {
           albumAppearances.set(normalizedEntryAlbum, {
-            album: entryAlbum,
+            album: canonicalAlbum,
             artist: entryArtist,
             playCount: 1,
             lastPlayed: play.timestamp,
@@ -2467,27 +2581,18 @@ export class StatsService {
   ): Promise<Map<string, CollectionItem>> {
     const collectionByFuzzyKey = new Map<string, CollectionItem>();
 
+    // Index the collection's own name plus every history name mapped to it,
+    // so one mapped version can't displace the others.
+    const namesFor = createCollectionNameResolver(
+      await loadAlbumMappings(this.mappingService)
+    );
     for (const item of collection) {
-      let searchArtist = item.release.artist;
-      let searchAlbum = item.release.title;
-
-      if (this.mappingService) {
-        const albumMapping =
-          await this.mappingService.getAlbumMappingForCollection(
-            item.release.artist,
-            item.release.title
-          );
-        if (albumMapping) {
-          searchArtist = albumMapping.historyArtist;
-          searchAlbum = albumMapping.historyAlbum;
-        }
+      for (const name of namesFor(item.release.artist, item.release.title)) {
+        collectionByFuzzyKey.set(
+          this.historyStorage.fuzzyNormalizeKey(name.artist, name.album),
+          item
+        );
       }
-
-      const fuzzyKey = this.historyStorage.fuzzyNormalizeKey(
-        searchArtist,
-        searchAlbum
-      );
-      collectionByFuzzyKey.set(fuzzyKey, item);
     }
 
     return collectionByFuzzyKey;
@@ -2616,23 +2721,47 @@ export class StatsService {
 
     // Build fuzzy collection map using the canonical pattern
     const collectionByFuzzyKey = await this.buildFuzzyCollectionMap(collection);
+    const canonicalize = createAlbumCanonicalizer(
+      await loadAlbumMappings(this.mappingService)
+    );
 
-    const results: RoiScoreItem[] = [];
-
+    // Sum plays per collection item, so versions mapped to one item give one row
+    const playsByItem = new Map<
+      number,
+      { item: CollectionItem; plays: number }
+    >();
     for (const [key, albumHistory] of Object.entries(index.albums)) {
       const [artist, album] = key.split('|');
       const playCount = albumHistory.playCount;
 
       if (playCount === 0) continue;
 
-      // Find collection item via fuzzy map
-      const collectionItem = this.lookupCollectionItem(
-        collectionByFuzzyKey,
-        artist,
-        album
-      );
+      // Prefer a mapping's collection link, then the fuzzy map
+      const { mapping } = canonicalize(artist, album);
+      const collectionItem =
+        (mapping && isCollectionLinked(mapping)
+          ? collection.find(item => item.id === mapping.collectionId)
+          : undefined) ??
+        this.lookupCollectionItem(collectionByFuzzyKey, artist, album);
       if (!collectionItem) continue;
 
+      const existing = playsByItem.get(collectionItem.id);
+      if (existing) {
+        existing.plays += playCount;
+      } else {
+        playsByItem.set(collectionItem.id, {
+          item: collectionItem,
+          plays: playCount,
+        });
+      }
+    }
+
+    const results: RoiScoreItem[] = [];
+
+    for (const {
+      item: collectionItem,
+      plays: playCount,
+    } of playsByItem.values()) {
       const releaseId = collectionItem.release.id;
       const cachedValue = valueCache.items[releaseId];
       if (
@@ -2646,8 +2775,8 @@ export class StatsService {
       const roiScore = playCount / cachedValue.medianPrice;
 
       results.push({
-        artist: this.capitalizeArtist(artist),
-        album: this.capitalizeTitle(album),
+        artist: collectionItem.release.artist,
+        album: collectionItem.release.title,
         playCount,
         medianPrice: cachedValue.medianPrice,
         currency: cachedValue.currency,
@@ -2692,6 +2821,17 @@ export class StatsService {
       );
       if (entryFuzzyKey === fuzzyKey) {
         matchingKeys.push(exactKey);
+      }
+    }
+
+    // Include history albums merged into this one via album mappings
+    for (const mapping of await this.getMappingsMergedInto(artist, album)) {
+      const mergedKey = this.historyStorage.normalizeKey(
+        mapping.historyArtist,
+        mapping.historyAlbum
+      );
+      if (index.albums[mergedKey] && !matchingKeys.includes(mergedKey)) {
+        matchingKeys.push(mergedKey);
       }
     }
 
@@ -2749,18 +2889,20 @@ export class StatsService {
     albumName: string,
     collection?: CollectionItem[]
   ): Promise<AlbumDetailResponse> {
-    // Fetch the album's plays via fuzzy match (handles "(Deluxe)" / "(2)" variants)
-    const historyResult = await this.historyStorage.getAlbumHistoryFuzzy(
-      artistName,
-      albumName
-    );
+    // A history album merged into another (album mapping) shows the canonical
+    // album, so it reports the same totals whichever version name was opened.
+    const {
+      artist: resolvedArtist,
+      album: resolvedAlbum,
+      mapping: albumMapping,
+    } = await this.resolveMergedAlbum(artistName, albumName);
 
-    if (!historyResult.entry || historyResult.entry.playCount === 0) {
+    const { plays, totalPlayCount, mergedMappings } =
+      await this.collectMergedAlbumHistory(resolvedArtist, resolvedAlbum);
+
+    if (totalPlayCount === 0) {
       throw new Error('ALBUM_NOT_FOUND');
     }
-
-    const { entry } = historyResult;
-    const plays = entry.plays;
 
     // Per-track aggregation: dedupe variants via normalizeForMatching
     const trackAgg = new Map<
@@ -2807,27 +2949,25 @@ export class StatsService {
       });
 
     // Listening arc (monthly buckets)
-    const arc = await this.getAlbumListeningArc(artistName, albumName);
+    const arc = await this.getAlbumListeningArc(resolvedArtist, resolvedAlbum);
 
     // Collection lookup. Prefer the explicit albumMapping (yields collectionId
     // directly) and reconcile against any provided collection items for cover URL.
-    const albumMapping = this.mappingService
-      ? await this.mappingService.getAlbumMapping(artistName, albumName)
-      : null;
-
+    // A link on any merged version counts for the whole album.
     let collectionItem: CollectionItem | undefined;
     if (collection && collection.length > 0) {
-      if (albumMapping?.collectionId !== undefined) {
-        collectionItem = collection.find(
-          item => item.id === albumMapping.collectionId
-        );
+      const linkedId = [albumMapping, ...mergedMappings].find(
+        m => m && isCollectionLinked(m)
+      )?.collectionId;
+      if (linkedId !== undefined) {
+        collectionItem = collection.find(item => item.id === linkedId);
       }
       if (!collectionItem) {
         const fuzzyMap = await this.buildFuzzyCollectionMap(collection);
         collectionItem = this.lookupCollectionItem(
           fuzzyMap,
-          artistName,
-          albumName
+          resolvedArtist,
+          resolvedAlbum
         );
       }
     }
@@ -2873,8 +3013,8 @@ export class StatsService {
 
     const response: AlbumDetailResponse = {
       artist: displayArtist,
-      album: this.capitalizeTitle(albumName),
-      playCount: entry.playCount,
+      album: this.capitalizeTitle(resolvedAlbum),
+      playCount: totalPlayCount,
       firstPlayed,
       lastPlayed,
       tracks,
@@ -2887,11 +3027,21 @@ export class StatsService {
               historyAlbum: albumMapping.historyAlbum,
               collectionArtist: albumMapping.collectionArtist,
               collectionAlbum: albumMapping.collectionAlbum,
+              collectionLinked: isCollectionLinked(albumMapping),
             }
           : undefined,
         artistMapping: artistMappingProjection,
         compoundArtist: compoundProjection,
-        // albumAliases stays undefined (forward-compat per .plan/album-name-aliasing-plan.md)
+        mergedVersions:
+          mergedMappings.length > 0
+            ? mergedMappings.map(m => ({
+                historyArtist: m.historyArtist,
+                historyAlbum: m.historyAlbum,
+                collectionArtist: m.collectionArtist,
+                collectionAlbum: m.collectionAlbum,
+                collectionLinked: isCollectionLinked(m),
+              }))
+            : undefined,
       },
     };
 

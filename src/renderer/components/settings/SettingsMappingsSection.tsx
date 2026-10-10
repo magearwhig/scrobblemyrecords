@@ -8,6 +8,7 @@ import {
   ArtistMbidMapping,
   TrackMapping,
 } from '../../../shared/types';
+import { isCollectionLinked } from '../../../shared/utils/albumMapping';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirmModal } from '../../hooks/useConfirmModal';
 import ApiService from '../../services/api';
@@ -1043,7 +1044,8 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                 <h4>Album Mappings ({discoveryAlbumMappings.length})</h4>
                 {discoveryAlbumMappings.length === 0 ? (
                   <div className='settings-empty-text'>
-                    No album mappings. Create them from the Discovery page.
+                    No album mappings. Create them from the Discovery page or
+                    merge album versions on an artist page.
                   </div>
                 ) : (
                   <div className='settings-discovery-list'>
@@ -1061,7 +1063,9 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                           </div>
                           <div className='settings-discovery-target'>
                             <span className='settings-discovery-label target'>
-                              Discogs:
+                              {isCollectionLinked(mapping)
+                                ? 'Discogs:'
+                                : 'Merged into:'}
                             </span>
                             {mapping.collectionArtist} —{' '}
                             {mapping.collectionAlbum}
