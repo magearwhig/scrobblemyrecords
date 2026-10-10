@@ -259,6 +259,31 @@ describe('WrappedService', () => {
       expect(result.listening.uniqueAlbums).toBe(3);
     });
 
+    it('should count album versions merged by album mappings once', async () => {
+      // Arrange: Dark Side is merged into OK Computer (contrived, but distinct keys)
+      wrappedService.setMappingService({
+        getAllAlbumMappings: jest.fn().mockResolvedValue([
+          {
+            historyArtist: 'pink floyd',
+            historyAlbum: 'dark side of the moon',
+            collectionId: 0,
+            collectionArtist: 'radiohead',
+            collectionAlbum: 'ok computer',
+            createdAt: 0,
+          },
+        ]),
+      });
+
+      // Act
+      const result = await wrappedService.generateWrapped(
+        startDateMs,
+        endDateMs
+      );
+
+      // Assert
+      expect(result.listening.uniqueAlbums).toBe(2);
+    });
+
     it('should detect new artists discovered in range', async () => {
       // Act
       const result = await wrappedService.generateWrapped(

@@ -2317,16 +2317,18 @@ describe('Stats Routes', () => {
         });
 
       // Mapping service maps Discogs -> Last.fm names
-      dashboardMappingService.getAlbumMappingForCollection = jest
+      dashboardMappingService.getAllAlbumMappings = jest
         .fn()
-        .mockResolvedValue({
-          historyArtist: 'hail mary mallon',
-          historyAlbum: 'bestiary (bonus track version)',
-          collectionId: 999,
-          collectionArtist: 'Hail Mary Mallon',
-          collectionAlbum: 'Bestiary',
-          createdAt: Date.now(),
-        });
+        .mockResolvedValue([
+          {
+            historyArtist: 'hail mary mallon',
+            historyAlbum: 'bestiary (bonus track version)',
+            collectionId: 999,
+            collectionArtist: 'Hail Mary Mallon',
+            collectionAlbum: 'Bestiary',
+            createdAt: Date.now(),
+          },
+        ]);
 
       dashboardApp = createDashboardApp(true);
 
@@ -2337,9 +2339,7 @@ describe('Stats Routes', () => {
 
       // Assert
       expect(response.status).toBe(200);
-      expect(
-        dashboardMappingService.getAlbumMappingForCollection
-      ).toHaveBeenCalledWith('Hail Mary Mallon', 'Bestiary');
+      expect(dashboardMappingService.getAllAlbumMappings).toHaveBeenCalled();
 
       const recentAlbums = response.body.data.recentAlbums;
       expect(recentAlbums).toHaveLength(1);

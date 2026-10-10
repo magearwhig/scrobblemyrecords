@@ -1,10 +1,12 @@
 import express, { Request, Response } from 'express';
 
 import {
+  AlbumMapping,
   CollectionItem,
   SuggestionSettings,
   SyncSettings,
 } from '../../shared/types';
+import { createCollectionNameResolver } from '../../shared/utils/albumMapping';
 import { AIPromptBuilder, AIPromptContext } from '../services/aiPromptBuilder';
 import { AnalyticsService } from '../services/analyticsService';
 import { artistMappingService } from '../services/artistMappingService';
@@ -14,6 +16,7 @@ import { DiscogsService } from '../services/discogsService';
 import { HiddenItemService } from '../services/hiddenItemService';
 import { jobStatusService } from '../services/jobStatusService';
 import { MappingService } from '../services/mappingService';
+import { loadAlbumMappings } from '../services/mergedAlbumHistory';
 import {
   DEFAULT_OLLAMA_SETTINGS,
   OllamaService,
@@ -52,6 +55,21 @@ export default function createSuggestionsRouter(
   artistNameResolver?: ArtistNameResolver
 ) {
   const router = express.Router();
+
+  /**
+   * Album mappings change how albums are merged in cached stats (e.g. top
+   * albums), so rebuild the warm cache in the background.
+   */
+  const refreshStatsAfterAlbumMappingChange = (): void => {
+    void (async () => {
+      try {
+        await statsService.invalidateStatsCache();
+        await statsService.warmCache();
+      } catch (err) {
+        logger.error('Failed to refresh stats after album mapping change', err);
+      }
+    })();
+  };
   const logger = createLogger('SuggestionsRoutes');
 
   // ============================================
@@ -1343,25 +1361,16 @@ export default function createSuggestionsRouter(
       // Build avoid ID set (recently played + recent AI suggestions)
       // Use mapping service + fuzzy matching to handle Discogs↔Last.fm name differences
       const collectionByFuzzyKey = new Map<string, CollectionItem>();
+      const namesFor = createCollectionNameResolver(
+        await loadAlbumMappings(mappingService)
+      );
       for (const item of allItems) {
-        let searchArtist = item.release.artist;
-        let searchAlbum = item.release.title;
-        if (mappingService) {
-          const albumMapping =
-            await mappingService.getAlbumMappingForCollection(
-              item.release.artist,
-              item.release.title
-            );
-          if (albumMapping) {
-            searchArtist = albumMapping.historyArtist;
-            searchAlbum = albumMapping.historyAlbum;
-          }
+        for (const name of namesFor(item.release.artist, item.release.title)) {
+          collectionByFuzzyKey.set(
+            historyStorage.fuzzyNormalizeKey(name.artist, name.album),
+            item
+          );
         }
-        const fuzzyKey = historyStorage.fuzzyNormalizeKey(
-          searchArtist,
-          searchAlbum
-        );
-        collectionByFuzzyKey.set(fuzzyKey, item);
       }
 
       const avoidIds = new Set<number>();
@@ -1565,12 +1574,91 @@ export default function createSuggestionsRouter(
         }
       }
 
+      refreshStatsAfterAlbumMappingChange();
+
       res.json({
         success: true,
         message: 'Album mapping created',
       });
     } catch (error) {
       logger.error('Error creating album mapping', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * POST /api/v1/suggestions/mappings/albums/batch
+   * Merge several history albums into one target album in a single save.
+   * Body: { mappings: Array<{ historyArtist, historyAlbum, collectionId,
+   *   collectionArtist, collectionAlbum }> } — collectionId 0 means the target
+   *   is another history album, not a collection item.
+   */
+  router.post('/mappings/albums/batch', async (req: Request, res: Response) => {
+    try {
+      const { mappings } = req.body;
+      const isNonEmptyString = (value: unknown): value is string =>
+        typeof value === 'string' && value.trim().length > 0;
+
+      if (
+        !Array.isArray(mappings) ||
+        mappings.length === 0 ||
+        !mappings.every(
+          (m: Record<string, unknown>) =>
+            m !== null &&
+            typeof m === 'object' &&
+            isNonEmptyString(m.historyArtist) &&
+            isNonEmptyString(m.historyAlbum) &&
+            isNonEmptyString(m.collectionArtist) &&
+            isNonEmptyString(m.collectionAlbum) &&
+            Number.isInteger(m.collectionId) &&
+            (m.collectionId as number) >= 0
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          error:
+            'mappings must be a non-empty array of { historyArtist, historyAlbum, collectionId, collectionArtist, collectionAlbum }',
+        });
+      }
+
+      const added = await mappingService.addAlbumMappings(
+        (mappings as AlbumMapping[]).map(m => ({
+          historyArtist: m.historyArtist.trim(),
+          historyAlbum: m.historyAlbum.trim(),
+          collectionId: m.collectionId,
+          collectionArtist: m.collectionArtist.trim(),
+          collectionAlbum: m.collectionAlbum.trim(),
+        }))
+      );
+
+      // Linked mappings can change artist equivalences; same rebuild as above
+      if (artistNameResolver && added > 0) {
+        try {
+          await artistNameResolver.rebuild();
+          const missing =
+            await artistNameResolver.detectMissingScrobbleMappings();
+          for (const m of missing) {
+            artistMappingService.setMapping(m.discogsName, m.lastfmName);
+          }
+          if (missing.length > 0) {
+            await artistNameResolver.rebuild();
+          }
+        } catch (rebuildError) {
+          logger.error(
+            'Failed to rebuild resolver after adding album mappings',
+            rebuildError
+          );
+        }
+      }
+
+      if (added > 0) refreshStatsAfterAlbumMappingChange();
+
+      res.json({ success: true, data: { added } });
+    } catch (error) {
+      logger.error('Error creating album mappings', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -1618,6 +1706,8 @@ export default function createSuggestionsRouter(
           );
         }
       }
+
+      if (removed) refreshStatsAfterAlbumMappingChange();
 
       res.json({
         success: true,

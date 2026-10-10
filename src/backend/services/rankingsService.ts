@@ -1,5 +1,8 @@
+import { AlbumMapping } from '../../shared/types';
+import { createAlbumCanonicalizer } from '../../shared/utils/albumMapping';
 import { createLogger } from '../utils/logger';
 
+import { loadAlbumMappings } from './mergedAlbumHistory';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 
 export type RankingType = 'tracks' | 'artists' | 'albums';
@@ -29,10 +32,20 @@ export interface RankingsOverTimeResponse {
  */
 export class RankingsService {
   private historyStorage: ScrobbleHistoryStorage;
+  private mappingService: {
+    getAllAlbumMappings(): Promise<AlbumMapping[]>;
+  } | null = null;
   private logger = createLogger('RankingsService');
 
   constructor(historyStorage: ScrobbleHistoryStorage) {
     this.historyStorage = historyStorage;
+  }
+
+  /** Optional: album rankings count versions merged by album mappings as one album. */
+  setMappingService(service: {
+    getAllAlbumMappings(): Promise<AlbumMapping[]>;
+  }): void {
+    this.mappingService = service;
   }
 
   /**
@@ -62,11 +75,25 @@ export class RankingsService {
       timestamp: number;
       artist: string;
       album: string;
+      albumArtist: string;
       track?: string;
     }> = [];
 
+    const canonicalize = createAlbumCanonicalizer(
+      await loadAlbumMappings(this.mappingService)
+    );
+
     for (const [albumKey, albumEntry] of Object.entries(index.albums)) {
-      const [artist, album] = albumKey.split('|');
+      const [artist, historyAlbum] = albumKey.split('|');
+      // Merged versions share the canonical album and its artist (index keys
+      // are lowercase); artist rankings still use the scrobble's own artist
+      const canonical = canonicalize(artist, historyAlbum);
+      const album = canonical.mapping
+        ? canonical.album.toLowerCase()
+        : historyAlbum;
+      const albumArtist = canonical.mapping
+        ? canonical.artist.toLowerCase()
+        : artist;
       for (const play of albumEntry.plays) {
         // Convert timestamp from seconds to milliseconds
         const timestampMs = play.timestamp * 1000;
@@ -77,6 +104,7 @@ export class RankingsService {
             timestamp: timestampMs,
             artist,
             album,
+            albumArtist,
             track: play.track,
           });
         }
@@ -153,6 +181,7 @@ export class RankingsService {
       timestamp: number;
       artist: string;
       album: string;
+      albumArtist: string;
       track?: string;
     }>,
     type: RankingType,
@@ -174,8 +203,8 @@ export class RankingsService {
           key = scrobble.artist;
           break;
         case 'albums':
-          key = `${scrobble.artist}|${scrobble.album}`;
-          artist = scrobble.artist;
+          key = `${scrobble.albumArtist}|${scrobble.album}`;
+          artist = scrobble.albumArtist;
           break;
       }
 

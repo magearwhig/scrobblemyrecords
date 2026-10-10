@@ -3714,14 +3714,16 @@ describe('StatsService', () => {
 
       // Mapping service maps Discogs -> Last.fm names
       const mockMappingService = {
-        getAlbumMappingForCollection: jest.fn().mockResolvedValue({
-          historyArtist: 'hail mary mallon',
-          historyAlbum: 'bestiary (bonus track version)',
-          collectionId: 999,
-          collectionArtist: 'Hail Mary Mallon',
-          collectionAlbum: 'Bestiary',
-          createdAt: Date.now(),
-        }),
+        getAllAlbumMappings: jest.fn().mockResolvedValue([
+          {
+            historyArtist: 'hail mary mallon',
+            historyAlbum: 'bestiary (bonus track version)',
+            collectionId: 999,
+            collectionArtist: 'Hail Mary Mallon',
+            collectionAlbum: 'Bestiary',
+            createdAt: Date.now(),
+          },
+        ]),
       } as unknown as MappingService;
 
       statsService.setMappingService(mockMappingService);
@@ -3734,9 +3736,7 @@ describe('StatsService', () => {
       );
 
       // Assert
-      expect(
-        mockMappingService.getAlbumMappingForCollection
-      ).toHaveBeenCalledWith('Hail Mary Mallon', 'Bestiary');
+      expect(mockMappingService.getAllAlbumMappings).toHaveBeenCalled();
       expect(result.albums).toHaveLength(1);
       expect(result.albums[0].inCollection).toBe(true);
       expect(result.albums[0].collectionReleaseId).toBe(999);
@@ -3772,7 +3772,7 @@ describe('StatsService', () => {
 
       // Mapping service returns null (no mapping needed, names match)
       const mockMappingService = {
-        getAlbumMappingForCollection: jest.fn().mockResolvedValue(null),
+        getAllAlbumMappings: jest.fn().mockResolvedValue([]),
       } as unknown as MappingService;
 
       statsService.setMappingService(mockMappingService);
@@ -3785,9 +3785,7 @@ describe('StatsService', () => {
       );
 
       // Assert
-      expect(
-        mockMappingService.getAlbumMappingForCollection
-      ).toHaveBeenCalled();
+      expect(mockMappingService.getAllAlbumMappings).toHaveBeenCalled();
       expect(result.albums).toHaveLength(1);
       // Should still match via fuzzy normalization since names are identical
       expect(result.albums[0].inCollection).toBe(true);
@@ -3861,7 +3859,7 @@ describe('StatsService', () => {
 
       // No mapping needed - fuzzyNormalizeKey strips "(3)" suffix
       const mockMappingService = {
-        getAlbumMappingForCollection: jest.fn().mockResolvedValue(null),
+        getAllAlbumMappings: jest.fn().mockResolvedValue([]),
       } as unknown as MappingService;
 
       statsService.setMappingService(mockMappingService);
@@ -3906,14 +3904,16 @@ describe('StatsService', () => {
 
       // Mapping service provides the Last.fm name
       const mockMappingService = {
-        getAlbumMappingForCollection: jest.fn().mockResolvedValue({
-          historyArtist: 'hail mary mallon',
-          historyAlbum: 'bestiary (bonus track version)',
-          collectionId: 777,
-          collectionArtist: 'Hail Mary Mallon',
-          collectionAlbum: 'Bestiary',
-          createdAt: Date.now(),
-        }),
+        getAllAlbumMappings: jest.fn().mockResolvedValue([
+          {
+            historyArtist: 'hail mary mallon',
+            historyAlbum: 'bestiary (bonus track version)',
+            collectionId: 777,
+            collectionArtist: 'Hail Mary Mallon',
+            collectionAlbum: 'Bestiary',
+            createdAt: Date.now(),
+          },
+        ]),
       } as unknown as MappingService;
 
       statsService.setMappingService(mockMappingService);
@@ -3929,6 +3929,328 @@ describe('StatsService', () => {
       expect(result.albums).toHaveLength(1);
       expect(result.albums[0].inCollection).toBe(true);
       expect(result.albums[0].collectionReleaseId).toBe(777);
+    });
+
+    it('should merge history album versions that are mapped to the same album', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'the go-betweens|before hollywood': {
+            lastPlayed: now - 100,
+            playCount: 41,
+            plays: Array.from({ length: 41 }, () => ({
+              timestamp: now - 100,
+              track: 'Cattle and Cane',
+            })),
+          },
+          'the go-betweens|before hollywood (2 of 2)': {
+            lastPlayed: now,
+            playCount: 2,
+            plays: Array.from({ length: 2 }, () => ({
+              timestamp: now,
+              track: 'Cattle and Cane',
+            })),
+          },
+          'the go-betweens|before hollywood (1 of 2)': {
+            lastPlayed: now - 50,
+            playCount: 2,
+            plays: Array.from({ length: 2 }, () => ({
+              timestamp: now - 50,
+              track: 'A Bad Debt Follows You',
+            })),
+          },
+          'the go-betweens|spring hill fair': {
+            lastPlayed: now,
+            playCount: 3,
+            plays: Array.from({ length: 3 }, () => ({ timestamp: now })),
+          },
+        })
+      );
+
+      const collection = [
+        createMockCollectionItem({
+          id: 555,
+          artist: 'The Go-Betweens',
+          title: 'Before Hollywood',
+        }),
+      ];
+
+      const mappings = [
+        {
+          historyArtist: 'the go-betweens',
+          historyAlbum: 'before hollywood (2 of 2)',
+          collectionId: 0,
+          collectionArtist: 'The Go-Betweens',
+          collectionAlbum: 'Before Hollywood',
+          createdAt: Date.now(),
+        },
+        {
+          historyArtist: 'the go-betweens',
+          historyAlbum: 'before hollywood (1 of 2)',
+          collectionId: 0,
+          collectionArtist: 'The Go-Betweens',
+          collectionAlbum: 'Before Hollywood',
+          createdAt: Date.now(),
+        },
+      ];
+      const mockMappingService = {
+        getAllAlbumMappings: jest.fn().mockResolvedValue(mappings),
+      } as unknown as MappingService;
+
+      statsService.setMappingService(mockMappingService);
+
+      // Act
+      const result = await statsService.getArtistDetail(
+        'The Go-Betweens',
+        'month',
+        collection
+      );
+
+      // Assert
+      expect(result.albums).toHaveLength(2);
+      expect(result.albums[0].album).toBe('Before Hollywood');
+      expect(result.albums[0].playCount).toBe(45);
+      expect(result.albums[0].lastPlayed).toBe(now);
+      expect(result.albums[0].inCollection).toBe(true);
+      expect(result.albums[0].collectionReleaseId).toBe(555);
+      expect(result.topTracks[0]).toMatchObject({
+        track: 'Cattle And Cane',
+        album: 'Before Hollywood',
+        playCount: 43,
+      });
+    });
+
+    it('should merge history albums mapped to another history album (unlinked)', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const liveAlbum =
+        'that striped sunlight sound (live at the tivoli, brisbane)';
+
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndexWithTracks({
+          'the go-betweens|that striped sunlight sound': {
+            lastPlayed: now - 100,
+            playCount: 7,
+            plays: Array.from({ length: 7 }, () => ({
+              timestamp: now - 100,
+            })),
+          },
+          [`the go-betweens|${liveAlbum}`]: {
+            lastPlayed: now,
+            playCount: 11,
+            plays: Array.from({ length: 11 }, () => ({ timestamp: now })),
+          },
+        })
+      );
+
+      statsService.setMappingService({
+        getAllAlbumMappings: jest.fn().mockResolvedValue([
+          {
+            historyArtist: 'the go-betweens',
+            historyAlbum: liveAlbum,
+            collectionId: 0,
+            collectionArtist: 'the go-betweens',
+            collectionAlbum: 'that striped sunlight sound',
+            createdAt: Date.now(),
+          },
+        ]),
+      } as unknown as MappingService);
+
+      // Act
+      const result = await statsService.getArtistDetail(
+        'The Go-Betweens',
+        'month',
+        []
+      );
+
+      // Assert
+      expect(result.albums).toHaveLength(1);
+      expect(result.albums[0]).toMatchObject({
+        album: 'That Striped Sunlight Sound',
+        playCount: 18,
+        lastPlayed: now,
+        inCollection: false,
+      });
+      expect(result.albums[0].historyEntries).toEqual(
+        expect.arrayContaining([
+          { artist: 'the go-betweens', album: 'that striped sunlight sound' },
+          { artist: 'the go-betweens', album: liveAlbum },
+        ])
+      );
+    });
+  });
+
+  describe('getAlbumDetail merged versions', () => {
+    it('should include plays from history albums mapped into it and list them', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const studioEntry = {
+        lastPlayed: now - 100,
+        playCount: 2,
+        plays: [
+          { timestamp: now - 200, track: 'Cattle and Cane' },
+          { timestamp: now - 100, track: 'Cattle and Cane' },
+        ],
+      };
+      const liveEntry = {
+        lastPlayed: now,
+        playCount: 1,
+        plays: [{ timestamp: now, track: 'Cattle and Cane' }],
+      };
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+        entry: studioEntry,
+        matchType: 'exact',
+        matchedKeys: ['the go-betweens|that striped sunlight sound'],
+      });
+      mockHistoryStorage.getIndex.mockResolvedValue({
+        albums: {
+          'the go-betweens|that striped sunlight sound': studioEntry,
+          'the go-betweens|that striped sunlight sound (live)': liveEntry,
+        },
+        totalScrobbles: 3,
+        lastSyncTimestamp: now,
+        oldestScrobbleDate: 0,
+      });
+      const merged = {
+        historyArtist: 'the go-betweens',
+        historyAlbum: 'that striped sunlight sound (live)',
+        collectionArtist: 'the go-betweens',
+        collectionAlbum: 'that striped sunlight sound',
+      };
+      statsService.setMappingService({
+        getAllAlbumMappings: jest
+          .fn()
+          .mockResolvedValue([
+            { ...merged, collectionId: 0, createdAt: Date.now() },
+          ]),
+        getAlbumMapping: jest.fn().mockResolvedValue(null),
+      } as unknown as MappingService);
+
+      // Act
+      const result = await statsService.getAlbumDetail(
+        'The Go-Betweens',
+        'That Striped Sunlight Sound'
+      );
+
+      // Assert
+      expect(result.playCount).toBe(3);
+      expect(result.lastPlayed).toBe(now);
+      expect(result.tracks[0]).toMatchObject({
+        track: 'Cattle And Cane',
+        playCount: 3,
+      });
+      expect(result.arc.reduce((sum, b) => sum + b.playCount, 0)).toBe(3);
+      expect(result.mappings.mergedVersions).toEqual([
+        { ...merged, collectionLinked: false },
+      ]);
+    });
+
+    it('should show the canonical album when opened through a merged version', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const studio = {
+        lastPlayed: now - 100,
+        playCount: 2,
+        plays: [
+          { timestamp: now - 200, track: 'One' },
+          { timestamp: now - 100, track: 'One' },
+        ],
+      };
+      const live = {
+        lastPlayed: now,
+        playCount: 3,
+        plays: [
+          { timestamp: now, track: 'One' },
+          { timestamp: now, track: 'Two' },
+          { timestamp: now, track: 'Two' },
+        ],
+      };
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+        entry: studio,
+        matchType: 'exact',
+        matchedKeys: ['artist|studio'],
+      });
+      mockHistoryStorage.getIndex.mockResolvedValue({
+        albums: { 'artist|studio': studio, 'artist|studio (live)': live },
+        totalScrobbles: 5,
+        lastSyncTimestamp: now,
+        oldestScrobbleDate: 0,
+      });
+      const mapping = {
+        historyArtist: 'artist',
+        historyAlbum: 'studio (live)',
+        collectionId: 0,
+        collectionArtist: 'artist',
+        collectionAlbum: 'studio',
+        createdAt: Date.now(),
+      };
+      statsService.setMappingService({
+        getAllAlbumMappings: jest.fn().mockResolvedValue([mapping]),
+        getAlbumMapping: jest.fn().mockResolvedValue(mapping),
+      } as unknown as MappingService);
+
+      // Act
+      const result = await statsService.getAlbumDetail(
+        'Artist',
+        'Studio (Live)'
+      );
+
+      // Assert
+      expect(mockHistoryStorage.getAlbumHistoryFuzzy).toHaveBeenCalledWith(
+        'artist',
+        'studio'
+      );
+      expect(result.album).toBe('Studio');
+      expect(result.playCount).toBe(5);
+      expect(result.mappings.albumMapping?.collectionLinked).toBe(false);
+    });
+
+    it('should include a same-title version mapped from another artist spelling', async () => {
+      // Arrange
+      const now = Math.floor(Date.now() / 1000);
+      const target = {
+        lastPlayed: now,
+        playCount: 2,
+        plays: [{ timestamp: now }, { timestamp: now }],
+      };
+      const aliasEntry = {
+        lastPlayed: now,
+        playCount: 3,
+        plays: [{ timestamp: now }, { timestamp: now }, { timestamp: now }],
+      };
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+        entry: target,
+        matchType: 'exact',
+        matchedKeys: ['artist|x'],
+      });
+      mockHistoryStorage.getIndex.mockResolvedValue({
+        albums: { 'artist|x': target, 'artistalias|x': aliasEntry },
+        totalScrobbles: 5,
+        lastSyncTimestamp: now,
+        oldestScrobbleDate: 0,
+      });
+      statsService.setMappingService({
+        getAllAlbumMappings: jest.fn().mockResolvedValue([
+          {
+            historyArtist: 'artistalias',
+            historyAlbum: 'x',
+            collectionId: 0,
+            collectionArtist: 'artist',
+            collectionAlbum: 'x',
+            createdAt: Date.now(),
+          },
+        ]),
+        getAlbumMapping: jest.fn().mockResolvedValue(null),
+      } as unknown as MappingService);
+
+      // Act
+      const result = await statsService.getAlbumDetail('artist', 'x');
+
+      // Assert
+      expect(result.playCount).toBe(5);
+      expect(result.mappings.mergedVersions).toHaveLength(1);
     });
   });
 
@@ -3980,14 +4302,16 @@ describe('StatsService', () => {
       ];
 
       const mockMappingService = {
-        getAlbumMappingForCollection: jest.fn().mockResolvedValue({
-          historyArtist: 'hail mary mallon',
-          historyAlbum: 'bestiary (bonus track version)',
-          collectionId: 888,
-          collectionArtist: 'Hail Mary Mallon',
-          collectionAlbum: 'Bestiary',
-          createdAt: Date.now(),
-        }),
+        getAllAlbumMappings: jest.fn().mockResolvedValue([
+          {
+            historyArtist: 'hail mary mallon',
+            historyAlbum: 'bestiary (bonus track version)',
+            collectionId: 888,
+            collectionArtist: 'Hail Mary Mallon',
+            collectionAlbum: 'Bestiary',
+            createdAt: Date.now(),
+          },
+        ]),
       } as unknown as MappingService;
 
       statsService.setMappingService(mockMappingService);
@@ -4002,9 +4326,7 @@ describe('StatsService', () => {
       );
 
       // Assert
-      expect(
-        mockMappingService.getAlbumMappingForCollection
-      ).toHaveBeenCalledWith('Hail Mary Mallon', 'Bestiary');
+      expect(mockMappingService.getAllAlbumMappings).toHaveBeenCalled();
       expect(result.appearsOn).toHaveLength(1);
       expect(result.appearsOn[0].inCollection).toBe(true);
       expect(result.appearsOn[0].collectionReleaseId).toBe(888);
@@ -4039,7 +4361,7 @@ describe('StatsService', () => {
       ];
 
       const mockMappingService = {
-        getAlbumMappingForCollection: jest.fn().mockResolvedValue(null),
+        getAllAlbumMappings: jest.fn().mockResolvedValue([]),
       } as unknown as MappingService;
 
       statsService.setMappingService(mockMappingService);
@@ -4054,9 +4376,7 @@ describe('StatsService', () => {
       );
 
       // Assert
-      expect(
-        mockMappingService.getAlbumMappingForCollection
-      ).toHaveBeenCalled();
+      expect(mockMappingService.getAllAlbumMappings).toHaveBeenCalled();
       expect(result.appearsOn).toHaveLength(1);
       expect(result.appearsOn[0].inCollection).toBe(true);
     });
@@ -4137,7 +4457,7 @@ describe('StatsService', () => {
       ];
 
       const mockMappingService = {
-        getAlbumMappingForCollection: jest.fn().mockResolvedValue(null),
+        getAllAlbumMappings: jest.fn().mockResolvedValue([]),
       } as unknown as MappingService;
 
       statsService.setMappingService(mockMappingService);
@@ -4159,6 +4479,289 @@ describe('StatsService', () => {
       );
       expect(okComputer?.inCollection).toBe(true);
       expect(live?.inCollection).toBe(false);
+    });
+  });
+
+  describe('merged album versions (album mappings)', () => {
+    const now = Math.floor(Date.now() / 1000);
+    const plays = (count: number, track?: string) =>
+      Array.from({ length: count }, () => ({ timestamp: now, track }));
+    const unlinked = {
+      historyArtist: 'the go-betweens',
+      historyAlbum: 'tallulah (live)',
+      collectionId: 0,
+      collectionArtist: 'the go-betweens',
+      collectionAlbum: 'tallulah',
+      createdAt: 0,
+    };
+    const linked = {
+      historyArtist: 'the go-betweens',
+      historyAlbum: 'tallulah (remastered)',
+      collectionId: 55,
+      collectionArtist: 'The Go-Betweens',
+      collectionAlbum: 'Tallulah',
+      createdAt: 0,
+    };
+    const useMappings = (mappings: unknown[]) =>
+      statsService.setMappingService({
+        getAllAlbumMappings: jest.fn().mockResolvedValue(mappings),
+        getAlbumMapping: jest.fn().mockResolvedValue(null),
+      } as unknown as MappingService);
+
+    it('getTopAlbums counts mapped versions as one album', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'the go-betweens|tallulah': {
+            lastPlayed: now,
+            playCount: 3,
+            plays: plays(3),
+          },
+          'the go-betweens|tallulah (live)': {
+            lastPlayed: now,
+            playCount: 4,
+            plays: plays(4),
+          },
+          'radiohead|kid a': { lastPlayed: now, playCount: 5, plays: plays(5) },
+        })
+      );
+      useMappings([unlinked]);
+
+      // Act
+      const topAlbums = await statsService.getTopAlbums('days30', 10);
+
+      // Assert
+      expect(topAlbums).toHaveLength(2);
+      expect(topAlbums[0]).toMatchObject({
+        album: 'Tallulah',
+        playCount: 7,
+      });
+    });
+
+    it('getTopAlbums uses a linked mapping to mark the album as owned', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'the go-betweens|tallulah (remastered)': {
+            lastPlayed: now,
+            playCount: 2,
+            plays: plays(2),
+          },
+        })
+      );
+      useMappings([linked]);
+      const collection = [
+        createMockCollectionItem({
+          id: 55,
+          artist: 'The Go-Betweens',
+          title: 'Tallulah',
+          coverImage: 'https://example.com/tallulah.jpg',
+        }),
+      ];
+
+      // Act
+      const topAlbums = await statsService.getTopAlbums(
+        'days30',
+        10,
+        undefined,
+        undefined,
+        collection
+      );
+
+      // Assert
+      expect(topAlbums[0]).toMatchObject({
+        album: 'Tallulah',
+        inCollection: true,
+        collectionReleaseId: 55,
+        coverUrl: 'https://example.com/tallulah.jpg',
+      });
+    });
+
+    it('getHeavyRotation sums the collection title and its linked versions', async () => {
+      // Arrange
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockImplementation(
+        async (_artist: string, album: string) => {
+          const counts: Record<string, number> = {
+            tallulah: 3,
+            'tallulah (remastered)': 2,
+          };
+          const count = counts[album.toLowerCase()];
+          return count
+            ? {
+                entry: { playCount: count, lastPlayed: now, plays: [] },
+                matchType: 'exact' as const,
+                matchedKeys: [`the go-betweens|${album.toLowerCase()}`],
+              }
+            : { entry: null, matchType: 'none' as const };
+        }
+      );
+      useMappings([linked]);
+      const collection = [
+        createMockCollectionItem({
+          id: 55,
+          artist: 'The Go-Betweens',
+          title: 'Tallulah',
+        }),
+      ];
+
+      // Act
+      const heavy = await statsService.getHeavyRotation(collection);
+
+      // Assert
+      expect(heavy).toHaveLength(1);
+      expect(heavy[0].playCount).toBe(5);
+    });
+
+    it('getTrackDetail lists mapped versions as one appearance', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex.mockResolvedValue({
+        albums: {
+          'the go-betweens|tallulah': {
+            lastPlayed: now,
+            playCount: 2,
+            plays: plays(2, 'Right Here'),
+          },
+          'the go-betweens|tallulah (live)': {
+            lastPlayed: now,
+            playCount: 1,
+            plays: plays(1, 'Right Here'),
+          },
+        },
+        totalScrobbles: 3,
+        lastSyncTimestamp: now,
+        oldestScrobbleDate: 0,
+      });
+      useMappings([unlinked]);
+
+      // Act
+      const all = await statsService.getTrackDetail(
+        'The Go-Betweens',
+        'Right Here'
+      );
+      const filteredByVersion = await statsService.getTrackDetail(
+        'The Go-Betweens',
+        'Right Here',
+        'Tallulah (Live)'
+      );
+
+      // Assert
+      expect(all.appearsOn).toHaveLength(1);
+      expect(all.appearsOn[0]).toMatchObject({
+        album: 'Tallulah',
+        playCount: 3,
+      });
+      expect(filteredByVersion.totalPlayCount).toBe(3);
+    });
+
+    it('getAlbumDetail opened via a version mapped to another artist shows the target', async () => {
+      // Arrange - unlinked "a|old" merged into "b|new"
+      const oldEntry = { lastPlayed: now, playCount: 2, plays: plays(2) };
+      const newEntry = { lastPlayed: now, playCount: 3, plays: plays(3) };
+      const mapping = {
+        historyArtist: 'a',
+        historyAlbum: 'old',
+        collectionId: 0,
+        collectionArtist: 'b',
+        collectionAlbum: 'new',
+        createdAt: 0,
+      };
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockImplementation(
+        async (artist: string, album: string) =>
+          artist === 'b' && album === 'new'
+            ? { entry: newEntry, matchType: 'exact', matchedKeys: ['b|new'] }
+            : { entry: null, matchType: 'none' }
+      );
+      mockHistoryStorage.getIndex.mockResolvedValue({
+        albums: { 'a|old': oldEntry, 'b|new': newEntry },
+        totalScrobbles: 5,
+        lastSyncTimestamp: now,
+        oldestScrobbleDate: 0,
+      });
+      statsService.setMappingService({
+        getAllAlbumMappings: jest.fn().mockResolvedValue([mapping]),
+        getAlbumMapping: jest.fn().mockResolvedValue(mapping),
+      } as unknown as MappingService);
+
+      // Act
+      const result = await statsService.getAlbumDetail('a', 'old');
+
+      // Assert
+      expect(result.album).toBe('New');
+      expect(result.playCount).toBe(5);
+    });
+
+    it('getAlbumTracksPlayed resolves a requested version to its merged album', async () => {
+      // Arrange - "tallulah (live)" merged into "tallulah"
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockImplementation(
+        async (_artist: string, album: string) =>
+          album === 'tallulah'
+            ? {
+                entry: {
+                  playCount: 1,
+                  lastPlayed: now,
+                  plays: plays(1, 'Bye Bye'),
+                },
+                matchType: 'exact',
+                matchedKeys: ['the go-betweens|tallulah'],
+              }
+            : { entry: null, matchType: 'none' }
+      );
+      mockHistoryStorage.getIndex.mockResolvedValue({
+        albums: {
+          'the go-betweens|tallulah (live)': {
+            lastPlayed: now,
+            playCount: 1,
+            plays: plays(1, 'Live Track'),
+          },
+        },
+        totalScrobbles: 2,
+        lastSyncTimestamp: now,
+        oldestScrobbleDate: 0,
+      });
+      statsService.setMappingService({
+        getAllAlbumMappings: jest.fn().mockResolvedValue([unlinked]),
+        getAlbumMapping: jest.fn().mockResolvedValue(unlinked),
+      } as unknown as MappingService);
+
+      // Act
+      const tracks = await statsService.getAlbumTracksPlayed(
+        'the go-betweens',
+        'tallulah (live)'
+      );
+
+      // Assert
+      expect(tracks.sort()).toEqual(['Bye Bye', 'Live Track']);
+    });
+
+    it('getAlbumTracksPlayed includes tracks from mapped versions', async () => {
+      // Arrange
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+        entry: { playCount: 1, lastPlayed: now, plays: plays(1, 'Bye Bye') },
+        matchType: 'exact',
+        matchedKeys: ['the go-betweens|tallulah'],
+      });
+      mockHistoryStorage.getIndex.mockResolvedValue({
+        albums: {
+          'the go-betweens|tallulah (remastered)': {
+            lastPlayed: now,
+            playCount: 1,
+            plays: plays(1, 'Cut It Out'),
+          },
+        },
+        totalScrobbles: 2,
+        lastSyncTimestamp: now,
+        oldestScrobbleDate: 0,
+      });
+      useMappings([linked]);
+
+      // Act
+      const tracks = await statsService.getAlbumTracksPlayed(
+        'The Go-Betweens',
+        'Tallulah'
+      );
+
+      // Assert
+      expect(tracks.sort()).toEqual(['Bye Bye', 'Cut It Out']);
     });
   });
 });

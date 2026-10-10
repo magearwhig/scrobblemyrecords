@@ -6,6 +6,7 @@ import {
   ScrobbleSession,
   Track,
 } from '../../shared/types';
+import { isCollectionLinked } from '../../shared/utils/albumMapping';
 import { artistMappingService } from '../services/artistMappingService';
 import { AuthService } from '../services/authService';
 import { DurationLookupService } from '../services/durationLookupService';
@@ -295,7 +296,24 @@ export default function createScrobbleRouter(
                   collectionRelease.album
                 );
 
-                if (!existingMapping) {
+                // Attach the collection link to an unlinked mapping only when
+                // it already points at this album
+                const sameName = (a: string, b: string) =>
+                  a.toLowerCase().trim() === b.toLowerCase().trim();
+                const isUnlinkedSameAlbum =
+                  existingMapping &&
+                  !isCollectionLinked(existingMapping) &&
+                  sameName(
+                    existingMapping.collectionAlbum,
+                    collectionRelease.album
+                  ) &&
+                  (sameName(
+                    existingMapping.collectionArtist,
+                    collectionRelease.artist
+                  ) ||
+                    sameName(existingMapping.collectionArtist, trackArtist));
+
+                if (!existingMapping || isUnlinkedSameAlbum) {
                   await mappingService.addAlbumMapping({
                     historyArtist: trackArtist,
                     historyAlbum: collectionRelease.album,

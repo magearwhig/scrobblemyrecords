@@ -360,4 +360,51 @@ describe('StatsService.getCollectionROI', () => {
       expect(result[0].coverUrl).toBe('https://example.com/cover.jpg');
     });
   });
+
+  describe('with album mappings', () => {
+    it('should give one row per collection item, summing its mapped versions', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex = jest.fn().mockResolvedValue(
+        createMockIndex({
+          'the go-betweens|tallulah': 6,
+          'the go-betweens|tallulah (live)': 4,
+        })
+      );
+      mockFileStorage.readJSON = jest.fn().mockImplementation((path: string) =>
+        Promise.resolve(
+          path === 'collection/releases.json'
+            ? createMockCollection([
+                { id: 55, artist: 'The Go-Betweens', title: 'Tallulah' },
+              ])
+            : createMockValueCache({
+                55: { medianPrice: 20, currency: 'USD' },
+              })
+        )
+      );
+      service.setMappingService({
+        getAllAlbumMappings: jest.fn().mockResolvedValue([
+          {
+            historyArtist: 'the go-betweens',
+            historyAlbum: 'tallulah (live)',
+            collectionId: 55,
+            collectionArtist: 'The Go-Betweens',
+            collectionAlbum: 'Tallulah',
+            createdAt: 0,
+          },
+        ]),
+      } as never);
+
+      // Act
+      const result = await service.getCollectionROI();
+
+      // Assert
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        artist: 'The Go-Betweens',
+        album: 'Tallulah',
+        playCount: 10,
+        roiScore: 0.5,
+      });
+    });
+  });
 });

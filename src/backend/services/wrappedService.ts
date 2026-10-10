@@ -1,4 +1,5 @@
 import {
+  AlbumMapping,
   CollectionItem,
   ScrobbleSession,
   WrappedCollectionItem,
@@ -9,6 +10,10 @@ import {
   WrappedNewArtist,
   WrappedTopItem,
 } from '../../shared/types';
+import {
+  createAlbumCanonicalizer,
+  createCollectionNameResolver,
+} from '../../shared/utils/albumMapping';
 import { getAllCachedCollectionItems } from '../utils/collectionCache';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
@@ -16,6 +21,7 @@ import { createLogger } from '../utils/logger';
 import { ArtistNameResolver } from './artistNameResolver';
 import { DiscogsService } from './discogsService';
 import { ImageService } from './imageService';
+import { loadAlbumMappings, lookupMergedHistory } from './mergedAlbumHistory';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 import { StatsService } from './statsService';
 
@@ -41,6 +47,28 @@ export class WrappedService {
 
   setArtistNameResolver(resolver: ArtistNameResolver): void {
     this.artistNameResolver = resolver;
+  }
+
+  private mappingService: {
+    getAllAlbumMappings(): Promise<AlbumMapping[]>;
+  } | null = null;
+
+  /** Optional: counts versions merged by album mappings as one album. */
+  setMappingService(service: {
+    getAllAlbumMappings(): Promise<AlbumMapping[]>;
+  }): void {
+    this.mappingService = service;
+  }
+
+  /** History for each collection item, across every name mapped to it. */
+  private async lookupCollectionHistory(collection: CollectionItem[]) {
+    const namesFor = createCollectionNameResolver(
+      await loadAlbumMappings(this.mappingService)
+    );
+    return lookupMergedHistory(
+      this.historyStorage,
+      collection.map(item => namesFor(item.release.artist, item.release.title))
+    );
   }
 
   /**
@@ -125,9 +153,15 @@ export class WrappedService {
     // Track plays in range per artist
     const artistRangePlays = new Map<string, number>();
 
+    const canonicalize = createAlbumCanonicalizer(
+      await loadAlbumMappings(this.mappingService)
+    );
+
     for (const [key, albumHistory] of Object.entries(index.albums)) {
-      const [artist] = key.split('|');
+      const [artist, album] = key.split('|');
       const normalizedArtist = this.resolveArtistName(artist);
+      // Merged versions count as one unique album
+      const albumKey = canonicalize(artist, album).key;
 
       for (const play of albumHistory.plays) {
         // Track first-ever play for each artist (across all history)
@@ -147,7 +181,7 @@ export class WrappedService {
           );
 
           // Unique albums
-          albumSet.add(key);
+          albumSet.add(albumKey);
 
           // Artist range plays
           artistRangePlays.set(
@@ -340,19 +374,10 @@ export class WrappedService {
       let bestItem: CollectionItem | null = null;
 
       // Batch lookup — single index read for all new additions
-      const addedBatchKeys = addedInRange.map(item => ({
-        artist: item.release.artist,
-        album: item.release.title,
-      }));
-      const addedBatchResults =
-        await this.historyStorage.batchLookup(addedBatchKeys);
+      const addedResults = await this.lookupCollectionHistory(addedInRange);
 
-      for (const item of addedInRange) {
-        const lookupKey = this.historyStorage.normalizeKey(
-          item.release.artist,
-          item.release.title
-        );
-        const result = addedBatchResults.get(lookupKey);
+      for (const [i, item] of addedInRange.entries()) {
+        const result = addedResults[i];
 
         if (result?.entry) {
           // Count plays that occurred after the item was added and within the range
@@ -403,20 +428,9 @@ export class WrappedService {
 
     if (collection && collection.length > 0 && index) {
       // Batch lookup — single index read for entire collection
-      const crossBatchKeys = collection.map(item => ({
-        artist: item.release.artist,
-        album: item.release.title,
-      }));
-      const crossBatchResults =
-        await this.historyStorage.batchLookup(crossBatchKeys);
+      const crossResults = await this.lookupCollectionHistory(collection);
 
-      for (const item of collection) {
-        const lookupKey = this.historyStorage.normalizeKey(
-          item.release.artist,
-          item.release.title
-        );
-        const result = crossBatchResults.get(lookupKey);
-
+      for (const result of crossResults) {
         if (result?.entry) {
           const hasRangePlays = result.entry.plays.some(
             p => p.timestamp >= startSec && p.timestamp <= endSec

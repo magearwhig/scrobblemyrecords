@@ -369,6 +369,7 @@ statsService.setMappingService(mappingService);
 // expensive stats and persists them so dashboard reads are instant.
 syncService.setStatsWarmer(statsService);
 const rankingsService = new RankingsService(historyStorage);
+rankingsService.setMappingService(mappingService);
 const imageService = new ImageService(fileStorage, lastfmService);
 imageService.setMappingService(mappingService);
 const wishlistService = new WishlistService(fileStorage, authService);
@@ -419,6 +420,7 @@ const wrappedService = new WrappedService(
   imageService,
   fileStorage
 );
+wrappedService.setMappingService(mappingService);
 
 // API routes
 app.use(

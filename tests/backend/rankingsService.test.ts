@@ -116,6 +116,86 @@ describe('RankingsService', () => {
       expect(result.snapshots[0].rankings[0].artist).toBe('Artist 1');
     });
 
+    it('should rank album versions merged by album mappings as one album', async () => {
+      mockHistoryStorage.getIndex = jest.fn().mockResolvedValue({
+        albums: {
+          'artist 1|album 1': {
+            playCount: 2,
+            plays: [{ timestamp: 1705320000 }, { timestamp: 1705320000 }],
+          },
+          'artist 1|album 1 (live)': {
+            playCount: 2,
+            plays: [{ timestamp: 1705320000 }, { timestamp: 1705320000 }],
+          },
+          'artist 1|album 2': {
+            playCount: 3,
+            plays: [
+              { timestamp: 1705320000 },
+              { timestamp: 1705320000 },
+              { timestamp: 1705320000 },
+            ],
+          },
+        },
+      });
+      service.setMappingService({
+        getAllAlbumMappings: jest.fn().mockResolvedValue([
+          {
+            historyArtist: 'artist 1',
+            historyAlbum: 'album 1 (live)',
+            collectionId: 0,
+            collectionArtist: 'artist 1',
+            collectionAlbum: 'Album 1',
+            createdAt: 0,
+          },
+        ]),
+      });
+
+      const result = await service.getRankingsOverTime('albums', 10);
+
+      const rankings = result.snapshots[0].rankings;
+      expect(rankings).toHaveLength(2);
+      expect(rankings[0]).toMatchObject({ name: 'album 1', count: 4 });
+    });
+
+    it('should rank an album merged across artists as one album without changing artist rankings', async () => {
+      mockHistoryStorage.getIndex = jest.fn().mockResolvedValue({
+        albums: {
+          'a|old': {
+            playCount: 2,
+            plays: [{ timestamp: 1705320000 }, { timestamp: 1705320000 }],
+          },
+          'b|new': {
+            playCount: 3,
+            plays: [
+              { timestamp: 1705320000 },
+              { timestamp: 1705320000 },
+              { timestamp: 1705320000 },
+            ],
+          },
+        },
+      });
+      service.setMappingService({
+        getAllAlbumMappings: jest.fn().mockResolvedValue([
+          {
+            historyArtist: 'a',
+            historyAlbum: 'old',
+            collectionId: 0,
+            collectionArtist: 'b',
+            collectionAlbum: 'new',
+            createdAt: 0,
+          },
+        ]),
+      });
+
+      const albums = await service.getRankingsOverTime('albums', 10);
+      const artists = await service.getRankingsOverTime('artists', 10);
+
+      expect(albums.snapshots[0].rankings).toEqual([
+        expect.objectContaining({ name: 'new', artist: 'b', count: 5 }),
+      ]);
+      expect(artists.snapshots[0].rankings).toHaveLength(2);
+    });
+
     it('should filter by date range when provided', async () => {
       const mockIndex = {
         albums: {
