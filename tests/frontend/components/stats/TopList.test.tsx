@@ -193,6 +193,29 @@ describe('TopList', () => {
     });
   });
 
+  describe('View all link', () => {
+    it.each([
+      ['artists', 'View All Artists'],
+      ['albums', 'View All Albums'],
+      ['tracks', 'View All Tracks'],
+    ] as const)('links %s to the matching History view', (type, label) => {
+      render(
+        <TopList
+          title='Top'
+          type={type}
+          data={type === 'artists' ? mockArtists : mockAlbums}
+          currentPeriod='month'
+          onPeriodChange={mockOnPeriodChange}
+        />
+      );
+
+      expect(screen.getByText(label)).toHaveAttribute(
+        'href',
+        `#history?view=${type}`
+      );
+    });
+  });
+
   describe('Period selector', () => {
     it('should render period buttons', () => {
       render(
