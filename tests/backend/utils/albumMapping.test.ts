@@ -117,6 +117,17 @@ describe('albumMapping utils', () => {
       expect(albumGroupKey('artist', '春 1')).not.toBe(
         albumGroupKey('artist', '夏 1')
       );
+      // Devanagari vowel signs are combining marks that change the word
+      const devanagari = ['क', 'का', 'कि', 'कु'].map(t =>
+        albumGroupKey('artist', t)
+      );
+      expect(new Set(devanagari).size).toBe(4);
+    });
+
+    it('keeps emoji-only names with variation selectors distinct', () => {
+      expect(albumGroupKey('artist', '♥️')).not.toBe(
+        albumGroupKey('artist', '☀️')
+      );
     });
 
     it('keeps punctuation-only names distinct', () => {

@@ -39,7 +39,12 @@ export function albumGroupKey(artist: string, album: string): string {
     const simplified = lower
       .normalize('NFKD')
       .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^\p{L}\p{N}]/gu, '');
+      // Variation selectors only pick a glyph style (e.g. emoji); left
+      // behind without their base symbol, they would make "♥️" equal "☀️"
+      .replace(/[\u{FE00}-\u{FE0F}\u{E0100}-\u{E01EF}]/gu, '')
+      // Keep combining marks: Latin accents are already gone, and in other
+      // scripts (e.g. Devanagari vowel signs) marks distinguish words
+      .replace(/[^\p{L}\p{N}\p{M}]/gu, '');
     // Names made only of punctuation keep their own spelling rather than
     // all simplifying to ""
     return simplified || lower;
