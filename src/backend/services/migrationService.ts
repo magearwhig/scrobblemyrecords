@@ -105,6 +105,14 @@ export class MigrationService {
       arrayWrapperKey: 'mappings',
     });
 
+    this.register('dismissed-album-merges', {
+      path: 'mappings/dismissed-album-merges.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+      arrayWrapperKey: 'items',
+    });
+
     // ============================================
     // Discovery Files
     // NOTE: These files originally stored raw arrays.

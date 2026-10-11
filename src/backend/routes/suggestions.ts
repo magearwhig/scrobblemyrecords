@@ -3,11 +3,13 @@ import express, { Request, Response } from 'express';
 import {
   AlbumMapping,
   CollectionItem,
+  DismissedAlbumMergesStore,
   SuggestionSettings,
   SyncSettings,
 } from '../../shared/types';
 import { createCollectionNameResolver } from '../../shared/utils/albumMapping';
 import { AIPromptBuilder, AIPromptContext } from '../services/aiPromptBuilder';
+import { findAlbumMergeSuggestions } from '../services/albumMergeSuggestions';
 import { AnalyticsService } from '../services/analyticsService';
 import { artistMappingService } from '../services/artistMappingService';
 import { ArtistNameResolver } from '../services/artistNameResolver';
@@ -36,6 +38,7 @@ import { createLogger } from '../utils/logger';
 
 const SUGGESTION_SETTINGS_FILE = 'settings/suggestion-settings.json';
 const AI_SETTINGS_FILE = 'settings/ai-settings.json';
+const DISMISSED_ALBUM_MERGES_FILE = 'mappings/dismissed-album-merges.json';
 
 /**
  * Create suggestion routes with dependency injection
@@ -1722,6 +1725,86 @@ export default function createSuggestionsRouter(
       });
     }
   });
+
+  /** Suggestion ids the user dismissed from Suggested Album Merges */
+  const loadDismissedMergeIds = async (): Promise<Set<string>> => {
+    const store = await fileStorage.readJSON<DismissedAlbumMergesStore>(
+      DISMISSED_ALBUM_MERGES_FILE
+    );
+    return new Set((store?.items ?? []).map(item => item.id));
+  };
+
+  /**
+   * GET /api/v1/suggestions/album-merge-suggestions
+   * Versions of the same album still counted separately (edition tags or
+   * artist spellings), with the mappings that would merge each group.
+   */
+  router.get(
+    '/album-merge-suggestions',
+    async (_req: Request, res: Response) => {
+      try {
+        const index = await historyStorage.getIndex();
+        const settings = await authService.getUserSettings();
+        const username = settings.discogs.username;
+        const collection = username
+          ? await getAllCachedCollectionItems(username, fileStorage)
+          : [];
+        const suggestions = findAlbumMergeSuggestions({
+          albums: index?.albums ?? {},
+          mappings: await loadAlbumMappings(mappingService),
+          resolveArtist: artistNameResolver
+            ? name => artistNameResolver.resolveArtist(name)
+            : undefined,
+          collection,
+          dismissedIds: await loadDismissedMergeIds(),
+        });
+        res.json({ success: true, data: suggestions });
+      } catch (error) {
+        logger.error('Error finding album merge suggestions', error);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+  );
+
+  /**
+   * POST /api/v1/suggestions/album-merge-suggestions/dismiss
+   * Stop suggesting a merge. Body: { id }
+   */
+  router.post(
+    '/album-merge-suggestions/dismiss',
+    async (req: Request, res: Response) => {
+      try {
+        const { id } = req.body ?? {};
+        if (typeof id !== 'string' || id.trim().length === 0) {
+          return res.status(400).json({
+            success: false,
+            error: 'id is required',
+          });
+        }
+        const store = await fileStorage.readJSON<DismissedAlbumMergesStore>(
+          DISMISSED_ALBUM_MERGES_FILE
+        );
+        const items = store?.items ?? [];
+        if (!items.some(item => item.id === id)) {
+          items.push({ id, dismissedAt: Date.now() });
+          await fileStorage.writeJSONWithBackup(DISMISSED_ALBUM_MERGES_FILE, {
+            schemaVersion: 1,
+            items,
+          });
+        }
+        res.json({ success: true });
+      } catch (error) {
+        logger.error('Error dismissing album merge suggestion', error);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+  );
 
   /**
    * GET /api/v1/suggestions/mappings/artists

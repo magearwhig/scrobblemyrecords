@@ -354,6 +354,45 @@ export interface AlbumMappingsStore {
   mappings: AlbumMapping[];
 }
 
+/** A mapping to create when an album merge suggestion is accepted. */
+export type AlbumMergeMapping = Pick<
+  AlbumMapping,
+  | 'historyArtist'
+  | 'historyAlbum'
+  | 'collectionId'
+  | 'collectionArtist'
+  | 'collectionAlbum'
+>;
+
+/** One album as it shows up today: a row in Top Albums. */
+export interface AlbumMergeSuggestionVersion {
+  artist: string;
+  album: string;
+  playCount: number;
+  /** Already linked to a collection item by an album mapping */
+  linked: boolean;
+  /** The version the others would be merged into */
+  isTarget: boolean;
+}
+
+/** Versions of one album that are still counted separately. */
+export interface AlbumMergeSuggestion {
+  /** Stable id for dismissing the suggestion */
+  id: string;
+  totalPlays: number;
+  /** Album the versions merge into; collectionId 0 means a history album */
+  target: { artist: string; album: string; collectionId: number };
+  versions: AlbumMergeSuggestionVersion[];
+  /** Mappings that merge every version into the target */
+  mappings: AlbumMergeMapping[];
+}
+
+/** Album merge suggestions the user dismissed. */
+export interface DismissedAlbumMergesStore extends VersionedStore {
+  schemaVersion: 1;
+  items: Array<{ id: string; dismissedAt: number }>;
+}
+
 /**
  * Versioned store for artist mappings (History->Collection)
  */

@@ -4,6 +4,7 @@ import {
   AddDiscardPileItemRequest,
   AlbumIdentifier,
   AlbumMapping,
+  AlbumMergeSuggestion,
   AlbumPlayCountResponse,
   ApiResponse,
   ArtistDisambiguationStatus,
@@ -1004,6 +1005,17 @@ class ApiService {
       mappings,
     });
     return response.data.data;
+  }
+
+  /** Versions of the same album still counted separately, with fixes. */
+  async getAlbumMergeSuggestions(): Promise<AlbumMergeSuggestion[]> {
+    const response = await this.api.get('/suggestions/album-merge-suggestions');
+    return response.data.data;
+  }
+
+  /** Stop suggesting the merge with this id. */
+  async dismissAlbumMergeSuggestion(id: string): Promise<void> {
+    await this.api.post('/suggestions/album-merge-suggestions/dismiss', { id });
   }
 
   async removeDiscoveryAlbumMapping(

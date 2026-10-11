@@ -599,6 +599,44 @@
   gap: 0.5rem;
 }
 
+/* Suggested Album Merges */
+.album-merge-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.album-merge-versions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.album-merge-version {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.album-merge-version-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.album-merge-version-plays {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .settings-discovery-row {
   display: flex;
   align-items: center;

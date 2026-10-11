@@ -1120,6 +1120,91 @@ describe('Suggestions Routes', () => {
     });
   });
 
+  describe('album merge suggestions', () => {
+    const noDiscogsUser = {
+      discogs: { username: '' },
+      lastfm: {},
+      preferences: {
+        defaultTimestamp: 'now' as const,
+        batchSize: 50,
+        autoScrobble: false,
+      },
+    };
+
+    beforeEach(() => {
+      mockAuthService.getUserSettings.mockResolvedValue(noDiscogsUser);
+      mockMappingService.getAllAlbumMappings = jest.fn().mockResolvedValue([]);
+      mockHistoryStorage.getIndex = jest.fn().mockResolvedValue({
+        albums: {
+          'chromatics|kill for love': { playCount: 53, plays: [] },
+          'chromatics|kill for love (deluxe)': { playCount: 11, plays: [] },
+        },
+      });
+      mockFileStorage.writeJSONWithBackup = jest
+        .fn()
+        .mockResolvedValue(undefined);
+    });
+
+    it('GET lists versions still counted separately, minus dismissed ones', async () => {
+      mockFileStorage.readJSON.mockResolvedValue(null);
+
+      const response = await request(app).get(
+        '/api/v1/suggestions/album-merge-suggestions'
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0]).toMatchObject({
+        totalPlays: 64,
+        target: { album: 'kill for love', collectionId: 0 },
+      });
+
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        items: [{ id: response.body.data[0].id, dismissedAt: 0 }],
+      });
+      const afterDismiss = await request(app).get(
+        '/api/v1/suggestions/album-merge-suggestions'
+      );
+      expect(afterDismiss.body.data).toEqual([]);
+    });
+
+    it('POST dismiss saves the id once', async () => {
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        items: [{ id: 'existing', dismissedAt: 0 }],
+      });
+
+      const response = await request(app)
+        .post('/api/v1/suggestions/album-merge-suggestions/dismiss')
+        .send({ id: 'chromatics|killforlove' });
+      await request(app)
+        .post('/api/v1/suggestions/album-merge-suggestions/dismiss')
+        .send({ id: 'existing' });
+
+      expect(response.status).toBe(200);
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledTimes(1);
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
+        'mappings/dismissed-album-merges.json',
+        {
+          schemaVersion: 1,
+          items: [
+            { id: 'existing', dismissedAt: 0 },
+            { id: 'chromatics|killforlove', dismissedAt: expect.any(Number) },
+          ],
+        }
+      );
+    });
+
+    it('POST dismiss requires an id', async () => {
+      const response = await request(app)
+        .post('/api/v1/suggestions/album-merge-suggestions/dismiss')
+        .send({});
+
+      expect(response.status).toBe(400);
+    });
+  });
+
   describe('POST /api/v1/suggestions/mappings/albums/batch', () => {
     const mapping = {
       historyArtist: 'the go-betweens',

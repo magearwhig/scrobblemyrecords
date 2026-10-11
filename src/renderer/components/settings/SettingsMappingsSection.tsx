@@ -15,6 +15,8 @@ import ApiService from '../../services/api';
 import { createLogger } from '../../utils/logger';
 import { Button } from '../ui/Button';
 
+import AlbumMergeSuggestionsCard from './AlbumMergeSuggestionsCard';
+
 const logger = createLogger('SettingsMappingsSection');
 
 interface SettingsMappingsSectionProps {
@@ -1137,6 +1139,9 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
           )}
         </div>
       </div>
+
+      {/* Suggested Album Merges */}
+      <AlbumMergeSuggestionsCard api={api} onMerged={loadDiscoveryMappings} />
 
       {/* Track Mappings (for Forgotten Favorites) */}
       <div className='settings-section-card'>

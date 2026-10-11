@@ -21,6 +21,7 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | done/wishlist-new-release-tracking-plan.md | Complete -- Feature 5.5 |
 | done/artist-track-deep-dives-plan.md | Complete -- Feature 15, all 4 phases implemented |
 | done/album-detail-page-plan.md | Complete -- shipped 2026-05-09, Feature 17 backend endpoint, AlbumDetailPage, AlbumLink integrations across Stats/History/Collection |
+| done/album-name-aliasing-plan.md | Complete -- via album mappings (merge into history album or collection item) plus Suggested Album Merges in Settings; history-index rewrite intentionally skipped |
 | done/traded-in-archive-plan.md | Complete -- Feature 7 extension, all 3 phases implemented |
 | missing-albums-page-plan.md | Backlog -- not started |
 | context-tags-plan.md | Backlog -- Effort F from backlog shark tank |
