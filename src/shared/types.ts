@@ -327,8 +327,10 @@ export interface AlbumMapping {
   // The Last.fm naming (from scrobble history)
   historyArtist: string;
   historyAlbum: string;
-  // The Discogs collection item to map to
-  collectionId: number; // CollectionItem.id
+  // The canonical album this history name is merged into. When collectionId is
+  // set (> 0) this is a Discogs collection item and the mapping records
+  // ownership; when 0 it is another history album name ("same album, not owned").
+  collectionId: number; // CollectionItem.id, or 0 when not linked to the collection
   collectionArtist: string;
   collectionAlbum: string;
   // Metadata
@@ -350,6 +352,45 @@ export interface ArtistMapping {
 export interface AlbumMappingsStore {
   schemaVersion: 1;
   mappings: AlbumMapping[];
+}
+
+/** A mapping to create when an album merge suggestion is accepted. */
+export type AlbumMergeMapping = Pick<
+  AlbumMapping,
+  | 'historyArtist'
+  | 'historyAlbum'
+  | 'collectionId'
+  | 'collectionArtist'
+  | 'collectionAlbum'
+>;
+
+/** One album as it shows up today: a row in Top Albums. */
+export interface AlbumMergeSuggestionVersion {
+  artist: string;
+  album: string;
+  playCount: number;
+  /** Already linked to a collection item by an album mapping */
+  linked: boolean;
+  /** The version the others would be merged into */
+  isTarget: boolean;
+}
+
+/** Versions of one album that are still counted separately. */
+export interface AlbumMergeSuggestion {
+  /** Stable id for dismissing the suggestion */
+  id: string;
+  totalPlays: number;
+  /** Album the versions merge into; collectionId 0 means a history album */
+  target: { artist: string; album: string; collectionId: number };
+  versions: AlbumMergeSuggestionVersion[];
+  /** Mappings that merge every version into the target */
+  mappings: AlbumMergeMapping[];
+}
+
+/** Album merge suggestions the user dismissed. */
+export interface DismissedAlbumMergesStore extends VersionedStore {
+  schemaVersion: 1;
+  items: Array<{ id: string; dismissedAt: number }>;
 }
 
 /**
@@ -756,6 +797,12 @@ export interface ArtistDetailResponse {
     coverUrl?: string;
     inCollection: boolean;
     collectionReleaseId?: number;
+    /** Owned copy (CollectionItem.id and Discogs names), used as a merge target */
+    collectionItemId?: number;
+    collectionArtist?: string;
+    collectionAlbum?: string;
+    /** Raw scrobble history artist/album names merged into this entry */
+    historyEntries?: Array<{ artist: string; album: string }>;
   }>;
   imageUrl?: string;
 }
@@ -804,6 +851,8 @@ export interface AlbumDetailAlbumMapping {
   historyAlbum: string;
   collectionArtist: string;
   collectionAlbum: string;
+  /** True when the target is a collection item; false when it's another history album */
+  collectionLinked?: boolean;
 }
 
 /**
@@ -833,11 +882,8 @@ export interface AlbumDetailMappings {
   albumMapping?: AlbumDetailAlbumMapping;
   artistMapping?: AlbumDetailArtistMapping;
   compoundArtist?: AlbumDetailCompoundArtist;
-  /**
-   * Forward-compat per .plan/album-name-aliasing-plan.md.
-   * Undefined until the album alias mapping service is wired up.
-   */
-  albumAliases?: AlbumAliasMapping[];
+  /** Other history album names merged into this album via album mappings */
+  mergedVersions?: AlbumDetailAlbumMapping[];
 }
 
 /**
@@ -862,25 +908,6 @@ export interface AlbumDetailResponse {
   coverUrl?: string;
 
   mappings: AlbumDetailMappings;
-}
-
-/**
- * Forward-compat placeholder for album alias mappings.
- * Mirrors the canonical shape proposed in .plan/album-name-aliasing-plan.md
- * (lines 58-69). When that plan lands, the canonical declaration should
- * subsume this one; the album detail surface already exposes the field
- * as optional so no callers will need to change.
- */
-export interface AlbumAliasMapping {
-  /** The canonical album key (artist|album, lowercased) to merge into */
-  canonicalArtist: string;
-  canonicalAlbum: string;
-  /** The alias album key that should be treated as the same album */
-  aliasArtist: string;
-  aliasAlbum: string;
-  /** Whether this was auto-detected or manually created */
-  autoDetected: boolean;
-  createdAt: number;
 }
 
 // ============================================
@@ -923,6 +950,10 @@ export interface StatsCache {
   warm?: {
     warmedAt: number; // Unix timestamp seconds when cache was built
     syncTimestamp: number; // historyStorage.lastSyncTimestamp at warm time (ms)
+    /** Stats grouping logic version; older caches are recomputed */
+    version?: number;
+    /** ArtistNameResolver fingerprint at warm time; artist alias changes invalidate */
+    artistAliasFingerprint?: string;
     streaks: StreakInfo;
     counts: ScrobbleCounts;
     listeningHours: ListeningHours;

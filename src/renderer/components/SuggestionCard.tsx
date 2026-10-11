@@ -74,6 +74,7 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
 
   const handleViewInCollection = () => {
     localStorage.setItem('selectedRelease', JSON.stringify(release));
+    localStorage.setItem('selectedCollectionItemId', album.id.toString());
     navigate('release-details');
   };
 
@@ -87,6 +88,7 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
       artist: release?.artist,
     });
     localStorage.setItem('selectedRelease', JSON.stringify(release));
+    localStorage.setItem('selectedCollectionItemId', album.id.toString());
     const stored = localStorage.getItem('selectedRelease');
     logger.info('localStorage set, verifying', {
       title: stored ? JSON.parse(stored).title : 'null',

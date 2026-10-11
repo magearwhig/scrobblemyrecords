@@ -1,10 +1,12 @@
 import { CollectionItem } from '../../shared/types';
+import { createCollectionNameResolver } from '../../shared/utils/albumMapping';
 import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
 import { LastFmService } from './lastfmService';
 import { MappingService } from './mappingService';
+import { loadAlbumMappings } from './mergedAlbumHistory';
 
 const ALBUM_COVERS_CACHE = 'images/album-covers.json';
 const ARTIST_IMAGES_CACHE = 'images/artist-images.json';
@@ -123,26 +125,17 @@ export class ImageService {
     const normalizedSearchArtist = normalizeForMatching(artist);
     const normalizedSearchAlbum = normalizeForMatching(album);
 
+    // Match the collection item's own name or any history album mapped to it
+    const namesFor = createCollectionNameResolver(
+      await loadAlbumMappings(this.mappingService)
+    );
     for (const item of collection) {
-      let matchArtist = item.release.artist;
-      let matchAlbum = item.release.title;
-
-      if (this.mappingService) {
-        const albumMapping =
-          await this.mappingService.getAlbumMappingForCollection(
-            item.release.artist,
-            item.release.title
-          );
-        if (albumMapping) {
-          matchArtist = albumMapping.historyArtist;
-          matchAlbum = albumMapping.historyAlbum;
-        }
-      }
-
-      if (
-        normalizeForMatching(matchArtist) === normalizedSearchArtist &&
-        normalizeForMatching(matchAlbum) === normalizedSearchAlbum
-      ) {
+      const matches = namesFor(item.release.artist, item.release.title).some(
+        name =>
+          normalizeForMatching(name.artist) === normalizedSearchArtist &&
+          normalizeForMatching(name.album) === normalizedSearchAlbum
+      );
+      if (matches) {
         return item.release.cover_image || null;
       }
     }

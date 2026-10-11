@@ -242,6 +242,42 @@ describe('HistoryIndexMergeService', () => {
       );
     });
 
+    it('should keep different tracks that share a timestamp', async () => {
+      // Arrange
+      const index = createHistoryIndex({
+        'artist|album': {
+          lastPlayed: 1700000000,
+          playCount: 1,
+          plays: [{ timestamp: 1700000000, track: 'Track 1' }],
+        },
+        'artist (2)|album': {
+          lastPlayed: 1700000000,
+          playCount: 2,
+          plays: [
+            { timestamp: 1700000000, track: 'Track 1' }, // duplicate
+            { timestamp: 1700000000, track: 'Track 2' }, // same time, new track
+          ],
+        },
+      });
+      mockFileStorage.readJSON.mockResolvedValue(index);
+
+      // Act
+      await service.executeMerge([
+        {
+          sourceKey: 'artist (2)|album',
+          targetKey: 'artist|album',
+          sourcePlayCount: 2,
+          targetPlayCount: 1,
+          mergedPlayCount: 2,
+        },
+      ]);
+
+      // Assert
+      const writtenIndex = mockFileStorage.writeJSON.mock
+        .calls[0][1] as ScrobbleHistoryIndex;
+      expect(writtenIndex.albums['artist|album'].plays).toHaveLength(2);
+    });
+
     it('should update playCount to merged count', async () => {
       // Arrange
       const index = createHistoryIndex({

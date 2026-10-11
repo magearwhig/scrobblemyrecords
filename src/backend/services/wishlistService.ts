@@ -815,8 +815,10 @@ export class WishlistService {
   // ============================================
 
   /**
-   * Search Discogs for a release by artist and album
-   * Returns master releases that match the search
+   * Search Discogs for an album by artist and title.
+   * Returns matching masters. A master groups all pressings of an album; its
+   * ID is not a release ID, so use getMasterMainReleaseId() to get a release
+   * (e.g. to add to the Discogs wantlist).
    */
   async searchForRelease(
     artist: string,
@@ -824,7 +826,6 @@ export class WishlistService {
   ): Promise<
     {
       masterId: number;
-      releaseId: number;
       title: string;
       artist: string;
       year?: number;
@@ -872,8 +873,8 @@ export class WishlistService {
           }
 
           return {
+            // type=master search results are masters: `id` is the master ID
             masterId: result.master_id || result.id,
-            releaseId: result.id,
             title: resultTitle,
             artist: resultArtist,
             year: result.year ? parseInt(result.year, 10) : undefined,
@@ -885,6 +886,29 @@ export class WishlistService {
     } catch (error) {
       this.logger.error('Error searching Discogs', error);
       throw error;
+    }
+  }
+
+  /**
+   * Get the main release (the pressing Discogs shows for the master) of a
+   * master. Returns null when the master has none or the lookup fails.
+   */
+  async getMasterMainReleaseId(masterId: number): Promise<number | null> {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await this.axios.get(`/masters/${masterId}`, {
+        headers,
+      });
+      const mainRelease = response.data?.main_release;
+      return typeof mainRelease === 'number' && mainRelease > 0
+        ? mainRelease
+        : null;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to get main release for master ${masterId}`,
+        error
+      );
+      return null;
     }
   }
 
@@ -980,7 +1004,13 @@ export class WishlistService {
       );
 
       if (store && store.schemaVersion === 1) {
-        return store.items;
+        // Older versions saved the search's master ID as releaseId; it is
+        // not a release ID, so drop it (the file is corrected on next save)
+        return store.items.map(item =>
+          item.releaseId !== undefined && item.releaseId === item.masterId
+            ? { ...item, releaseId: undefined }
+            : item
+        );
       }
     } catch {
       // No local want list exists
@@ -1012,7 +1042,6 @@ export class WishlistService {
 
     // Search Discogs to get masterId and cover image
     let masterId: number | undefined;
-    let releaseId: number | undefined;
     let coverImage: string | undefined;
 
     try {
@@ -1022,7 +1051,6 @@ export class WishlistService {
       );
       if (searchResults.length > 0) {
         masterId = searchResults[0].masterId;
-        releaseId = searchResults[0].releaseId;
         coverImage = searchResults[0].coverImage;
       }
     } catch (error) {
@@ -1041,7 +1069,6 @@ export class WishlistService {
       addedAt: Date.now(),
       source: 'discovery',
       masterId,
-      releaseId,
       coverImage,
       vinylStatus: 'unknown',
       notified: false,
@@ -1111,7 +1138,6 @@ export class WishlistService {
           );
           if (searchResults.length > 0) {
             item.masterId = searchResults[0].masterId;
-            item.releaseId = searchResults[0].releaseId;
             item.coverImage = searchResults[0].coverImage;
           }
         } catch {

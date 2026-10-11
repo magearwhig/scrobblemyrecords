@@ -196,6 +196,175 @@ describe('MappingService', () => {
     });
   });
 
+  describe('addAlbumMappings (merging album versions)', () => {
+    const A = 'the go-betweens';
+    const unlinked = (historyAlbum: string, collectionAlbum: string) => ({
+      historyArtist: A,
+      historyAlbum,
+      collectionId: 0,
+      collectionArtist: A,
+      collectionAlbum,
+    });
+
+    it('should store several mappings with a single save', async () => {
+      const saveSpy = jest.spyOn(fileStorage, 'writeJSONWithBackup');
+
+      const added = await service.addAlbumMappings([
+        unlinked('live', 'studio'),
+        unlinked('demo', 'studio'),
+      ]);
+
+      expect(added).toBe(2);
+      expect(await service.getAllAlbumMappings()).toHaveLength(2);
+      // One write per store (album + artist)
+      expect(saveSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('should resolve a target that is itself mapped (one hop)', async () => {
+      await service.addAlbumMapping(unlinked('b', 'a'));
+      await service.addAlbumMapping(unlinked('c', 'b'));
+
+      expect((await service.getAlbumMapping(A, 'c'))?.collectionAlbum).toBe(
+        'a'
+      );
+    });
+
+    it('should re-point mappings whose target becomes mapped', async () => {
+      await service.addAlbumMapping(unlinked('c', 'b'));
+      await service.addAlbumMapping(unlinked('b', 'a'));
+
+      expect((await service.getAlbumMapping(A, 'b'))?.collectionAlbum).toBe(
+        'a'
+      );
+      expect((await service.getAlbumMapping(A, 'c'))?.collectionAlbum).toBe(
+        'a'
+      );
+    });
+
+    it('should reverse an earlier merge when merging back the other way', async () => {
+      await service.addAlbumMapping(unlinked('b', 'a'));
+      await service.addAlbumMapping(unlinked('a', 'b'));
+
+      expect(await service.getAlbumMapping(A, 'b')).toBeNull();
+      expect((await service.getAlbumMapping(A, 'a'))?.collectionAlbum).toBe(
+        'b'
+      );
+    });
+
+    it('should resolve a chained batch to the final target', async () => {
+      await service.addAlbumMappings([
+        unlinked('a', 'b'),
+        unlinked('b', 'c'),
+        unlinked('c', 'd'),
+      ]);
+
+      for (const album of ['a', 'b', 'c']) {
+        expect((await service.getAlbumMapping(A, album))?.collectionAlbum).toBe(
+          'd'
+        );
+      }
+    });
+
+    it('should never redirect an explicit collection link', async () => {
+      await service.addAlbumMapping(unlinked('a', 'b'));
+      await service.addAlbumMapping({
+        historyArtist: A,
+        historyAlbum: 'b',
+        collectionId: 7,
+        collectionArtist: A,
+        collectionAlbum: 'a',
+      });
+
+      for (const album of ['a', 'b']) {
+        expect(await service.getAlbumMapping(A, album)).toMatchObject({
+          collectionId: 7,
+          collectionAlbum: 'a',
+        });
+      }
+      expect(
+        await service.getAllAlbumMappingsForCollection(A, 'a')
+      ).toHaveLength(2);
+    });
+
+    it('should flatten chains when loading imported data', async () => {
+      await fileStorage.writeJSON('mappings/album-mappings.json', {
+        schemaVersion: 1,
+        mappings: [
+          { ...unlinked('a', 'b'), createdAt: 1 },
+          { ...unlinked('b', 'c'), createdAt: 1 },
+        ],
+      });
+
+      const fresh = new MappingService(fileStorage);
+      expect((await fresh.getAlbumMapping(A, 'a'))?.collectionAlbum).toBe('c');
+    });
+
+    it('should keep a linked self-mapping because it records ownership', async () => {
+      await service.addAlbumMapping({
+        historyArtist: A,
+        historyAlbum: 'tallulah',
+        collectionId: 42,
+        collectionArtist: 'The Go-Betweens',
+        collectionAlbum: 'Tallulah',
+      });
+
+      expect((await service.getAlbumMapping(A, 'tallulah'))?.collectionId).toBe(
+        42
+      );
+    });
+
+    it('should propagate ownership to merged versions when the album becomes owned', async () => {
+      await service.addAlbumMapping(unlinked('studio (live)', 'studio'));
+      await service.addAlbumMapping({
+        historyArtist: A,
+        historyAlbum: 'studio',
+        collectionId: 7,
+        collectionArtist: 'The Go-Betweens',
+        collectionAlbum: 'Studio',
+      });
+
+      expect(await service.getAlbumMapping(A, 'studio (live)')).toMatchObject({
+        collectionId: 7,
+        collectionAlbum: 'Studio',
+      });
+    });
+
+    it('should copy the collection link when merging into an owned album', async () => {
+      await service.addAlbumMapping({
+        historyArtist: A,
+        historyAlbum: 'studio',
+        collectionId: 7,
+        collectionArtist: 'The Go-Betweens',
+        collectionAlbum: 'Studio',
+      });
+      await service.addAlbumMapping(unlinked('studio (live)', 'studio'));
+
+      expect(await service.getAlbumMapping(A, 'studio (live)')).toMatchObject({
+        collectionId: 7,
+        collectionAlbum: 'Studio',
+      });
+    });
+  });
+
+  describe('collection reverse lookups', () => {
+    it('should ignore unlinked mappings', async () => {
+      await service.addAlbumMapping({
+        historyArtist: 'artist',
+        historyAlbum: 'album (live)',
+        collectionId: 0,
+        collectionArtist: 'Artist',
+        collectionAlbum: 'Album',
+      });
+
+      expect(
+        await service.getAlbumMappingForCollection('Artist', 'Album')
+      ).toBeNull();
+      expect(
+        await service.getAllAlbumMappingsForCollection('Artist', 'Album')
+      ).toEqual([]);
+    });
+  });
+
   describe('addArtistMapping', () => {
     it('should add a new artist mapping', async () => {
       // Arrange

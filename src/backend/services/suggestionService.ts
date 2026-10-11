@@ -6,10 +6,12 @@ import {
   SuggestionResult,
   SuggestionSettings,
 } from '../../shared/types';
+import { createCollectionNameResolver } from '../../shared/utils/albumMapping';
 import { createLogger } from '../utils/logger';
 
 import { AnalyticsService } from './analyticsService';
 import { MappingService } from './mappingService';
+import { loadAlbumMappings, lookupMergedHistory } from './mergedAlbumHistory';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 
 /**
@@ -87,29 +89,15 @@ export class SuggestionService {
     if (prefetchedHistory !== undefined) {
       historyResult = prefetchedHistory;
     } else {
-      // Check if there's an album mapping for this collection item
-      let searchArtist = artist;
-      let searchAlbum = title;
-
-      if (this.mappingService) {
-        const albumMapping =
-          await this.mappingService.getAlbumMappingForCollection(artist, title);
-
-        if (albumMapping) {
-          searchArtist = albumMapping.historyArtist;
-          searchAlbum = albumMapping.historyAlbum;
-          this.logger.debug(
-            `Suggestion Factors: using album mapping "${artist}|${title}" -> "${searchArtist}|${searchAlbum}"`
-          );
-        }
-      }
-
-      // Get album history from local index with fuzzy matching
-      // This allows "Shame Shame" to match "Shame Shame (Deluxe Edition)"
-      historyResult = await this.historyStorage.getAlbumHistoryFuzzy(
-        searchArtist,
-        searchAlbum
+      // Every name this collection item's plays may be recorded under
+      // (its own title plus mapped history albums). Fuzzy matching lets
+      // "Shame Shame" match "Shame Shame (Deluxe Edition)".
+      const namesFor = createCollectionNameResolver(
+        await loadAlbumMappings(this.mappingService)
       );
+      [historyResult] = await lookupMergedHistory(this.historyStorage, [
+        namesFor(artist, title),
+      ]);
     }
 
     // Calculate recency gap (days since last played)
@@ -314,50 +302,24 @@ export class SuggestionService {
 
     const precomputed = { timeOfDayScore };
 
-    // Pre-fetch history for all collection items in a single batch lookup
-    const suggestionBatchKeys: Array<{ artist: string; album: string }> = [];
-    const suggestionResolvedKeys: Array<{ artist: string; album: string }> = [];
-
-    for (const album of collection) {
-      let searchArtist = album.release.artist;
-      let searchAlbum = album.release.title;
-
-      if (this.mappingService) {
-        const albumMapping =
-          await this.mappingService.getAlbumMappingForCollection(
-            album.release.artist,
-            album.release.title
-          );
-        if (albumMapping) {
-          searchArtist = albumMapping.historyArtist;
-          searchAlbum = albumMapping.historyAlbum;
-          this.logger.debug(
-            `Suggestions batch: using album mapping "${album.release.artist}|${album.release.title}" -> "${searchArtist}|${searchAlbum}"`
-          );
-        }
-      }
-
-      suggestionResolvedKeys.push({ artist: searchArtist, album: searchAlbum });
-      suggestionBatchKeys.push({ artist: searchArtist, album: searchAlbum });
-    }
-
-    const suggestionBatchResults =
-      await this.historyStorage.batchLookup(suggestionBatchKeys);
+    // Pre-fetch history for all collection items in a single batch lookup,
+    // across every name mapped to each item
+    const namesFor = createCollectionNameResolver(
+      await loadAlbumMappings(this.mappingService)
+    );
+    const prefetched = await lookupMergedHistory(
+      this.historyStorage,
+      collection.map(album =>
+        namesFor(album.release.artist, album.release.title)
+      )
+    );
 
     // Score all albums
     const scoredAlbums: SuggestionResult[] = [];
 
     for (let i = 0; i < collection.length; i++) {
       const album = collection[i];
-      const resolved = suggestionResolvedKeys[i];
-      const lookupKey = this.historyStorage.normalizeKey(
-        resolved.artist,
-        resolved.album
-      );
-      const prefetchedHistory = suggestionBatchResults.get(lookupKey) ?? {
-        entry: null,
-        matchType: 'none' as const,
-      };
+      const prefetchedHistory = prefetched[i];
 
       try {
         const factors = await this.calculateFactors(

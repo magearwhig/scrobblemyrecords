@@ -386,6 +386,23 @@ describe('WishlistService', () => {
       expect(items[0].artist).toBe('Boards of Canada');
     });
 
+    it('should drop a releaseId that is really the master ID', async () => {
+      const store: LocalWantStore = {
+        schemaVersion: 1,
+        items: [
+          createLocalWantItem({ id: 'a', masterId: 400, releaseId: 400 }),
+          createLocalWantItem({ id: 'b', masterId: 400, releaseId: 500 }),
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValueOnce(store);
+
+      const items = await service.getLocalWantList();
+
+      expect(items[0].releaseId).toBeUndefined();
+      expect(items[0].masterId).toBe(400);
+      expect(items[1].releaseId).toBe(500);
+    });
+
     it('should return empty array when no store exists', async () => {
       mockFileStorage.readJSON.mockResolvedValueOnce(null);
 
@@ -433,6 +450,8 @@ describe('WishlistService', () => {
       expect(item.source).toBe('discovery');
       expect(item.vinylStatus).toBe('unknown');
       expect(item.masterId).toBe(400);
+      // The search returns masters, so no release ID is stored
+      expect(item.releaseId).toBeUndefined();
       expect(item.coverImage).toBe('https://example.com/cover.jpg');
       expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
         'wishlist/local-want-list.json',
@@ -1096,6 +1115,28 @@ describe('WishlistService', () => {
   // Search for Release
   // ============================================
 
+  describe('getMasterMainReleaseId', () => {
+    it("should return the master's main release", async () => {
+      mockAxiosInstance.get.mockResolvedValueOnce({
+        data: { id: 400, main_release: 7001 },
+      });
+
+      await expect(service.getMasterMainReleaseId(400)).resolves.toBe(7001);
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+        '/masters/400',
+        expect.anything()
+      );
+    });
+
+    it('should return null when there is no main release or the call fails', async () => {
+      mockAxiosInstance.get.mockResolvedValueOnce({ data: { id: 400 } });
+      await expect(service.getMasterMainReleaseId(400)).resolves.toBeNull();
+
+      mockAxiosInstance.get.mockRejectedValueOnce(new Error('404'));
+      await expect(service.getMasterMainReleaseId(400)).resolves.toBeNull();
+    });
+  });
+
   describe('searchForRelease', () => {
     it('should search Discogs and parse results', async () => {
       mockAxiosInstance.get.mockResolvedValueOnce({
@@ -1120,6 +1161,8 @@ describe('WishlistService', () => {
 
       expect(results).toHaveLength(1);
       expect(results[0].masterId).toBe(400);
+      // A master search result has no release ID to offer
+      expect(results[0]).not.toHaveProperty('releaseId');
       expect(results[0].artist).toBe('Radiohead');
       expect(results[0].title).toBe('OK Computer');
       expect(results[0].year).toBe(1997);

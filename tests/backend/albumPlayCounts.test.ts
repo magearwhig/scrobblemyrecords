@@ -83,7 +83,7 @@ function makeExactResult(playCount: number, lastPlayed: number): FuzzyResult {
   return {
     entry: { playCount, lastPlayed, plays: [] },
     matchType: 'exact',
-    matchedKeys: ['key'],
+    matchedKeys: [`exact-${playCount}-${lastPlayed}`],
   };
 }
 
@@ -91,14 +91,14 @@ function makeFuzzyResult(playCount: number, lastPlayed: number): FuzzyResult {
   return {
     entry: { playCount, lastPlayed, plays: [] },
     matchType: 'fuzzy',
-    matchedKeys: ['key'],
+    matchedKeys: [`fuzzy-${playCount}-${lastPlayed}`],
   };
 }
 
 describe('POST /api/v1/stats/album-play-counts', () => {
   let mockHistoryStorage: { getAlbumHistoryFuzzy: jest.Mock };
   let mockMappingService: {
-    getAllAlbumMappingsForCollection: jest.Mock;
+    getAllAlbumMappings: jest.Mock;
   };
 
   beforeEach(() => {
@@ -109,7 +109,7 @@ describe('POST /api/v1/stats/album-play-counts', () => {
     };
 
     mockMappingService = {
-      getAllAlbumMappingsForCollection: jest.fn().mockResolvedValue([]),
+      getAllAlbumMappings: jest.fn().mockResolvedValue([]),
     };
 
     // Default: no artist name remapping
@@ -342,13 +342,14 @@ describe('POST /api/v1/stats/album-play-counts', () => {
           createdAt: Date.now(),
         },
       ];
-      mockMappingService.getAllAlbumMappingsForCollection.mockResolvedValue(
-        mappings
-      );
+      mockMappingService.getAllAlbumMappings.mockResolvedValue(mappings);
 
-      // The mapped lookup finds a match
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue(
-        makeExactResult(8, 1700000000)
+      // The mapped lookup finds a match; the Discogs name itself doesn't
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockImplementation(
+        async (artist: string) =>
+          artist === 'Various Artists'
+            ? makeExactResult(8, 1700000000)
+            : makeNoneResult()
       );
 
       const app = createTestApp(mockHistoryStorage, mockMappingService);
@@ -360,9 +361,7 @@ describe('POST /api/v1/stats/album-play-counts', () => {
         })
         .expect(200);
 
-      expect(
-        mockMappingService.getAllAlbumMappingsForCollection
-      ).toHaveBeenCalledWith('VA', 'Compilation Vol 1');
+      expect(mockMappingService.getAllAlbumMappings).toHaveBeenCalled();
       expect(mockHistoryStorage.getAlbumHistoryFuzzy).toHaveBeenCalledWith(
         'Various Artists',
         'Compilation Vol 1',
@@ -385,9 +384,7 @@ describe('POST /api/v1/stats/album-play-counts', () => {
           createdAt: Date.now(),
         },
       ];
-      mockMappingService.getAllAlbumMappingsForCollection.mockResolvedValue(
-        mappings
-      );
+      mockMappingService.getAllAlbumMappings.mockResolvedValue(mappings);
 
       // First call via mapping: no match
       // Second call with artist remap: exact match
@@ -429,7 +426,7 @@ describe('POST /api/v1/stats/album-play-counts', () => {
     });
 
     it('should fall back to direct fuzzy match when no mappings exist', async () => {
-      mockMappingService.getAllAlbumMappingsForCollection.mockResolvedValue([]);
+      mockMappingService.getAllAlbumMappings.mockResolvedValue([]);
       mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue(
         makeFuzzyResult(7, 1698000000)
       );
@@ -449,7 +446,7 @@ describe('POST /api/v1/stats/album-play-counts', () => {
     });
 
     it('should try artist name mapping as last resort for direct lookup', async () => {
-      mockMappingService.getAllAlbumMappingsForCollection.mockResolvedValue([]);
+      mockMappingService.getAllAlbumMappings.mockResolvedValue([]);
 
       // Direct lookup fails, then artist mapping lookup succeeds
       mockHistoryStorage.getAlbumHistoryFuzzy
@@ -503,9 +500,7 @@ describe('POST /api/v1/stats/album-play-counts', () => {
           createdAt: Date.now(),
         },
       ];
-      mockMappingService.getAllAlbumMappingsForCollection.mockResolvedValue(
-        mappings
-      );
+      mockMappingService.getAllAlbumMappings.mockResolvedValue(mappings);
 
       mockHistoryStorage.getAlbumHistoryFuzzy
         .mockResolvedValueOnce(makeExactResult(10, 1700000000))
@@ -601,7 +596,7 @@ describe('POST /api/v1/stats/album-play-counts', () => {
     });
 
     it('should preserve original artist/title in results regardless of matching', async () => {
-      mockMappingService.getAllAlbumMappingsForCollection.mockResolvedValue([]);
+      mockMappingService.getAllAlbumMappings.mockResolvedValue([]);
       mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue(
         makeFuzzyResult(5, 1700000000)
       );

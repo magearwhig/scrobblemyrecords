@@ -690,10 +690,16 @@ describe('ImageService', () => {
     it('should match via mapping service when Discogs and Last.fm names differ', async () => {
       // Arrange - Discogs has "Tobacco (3)" but Last.fm uses "Tobacco"
       const mockMappingService = {
-        getAlbumMappingForCollection: jest.fn().mockResolvedValue({
-          historyArtist: 'Tobacco',
-          historyAlbum: 'Fucked Up Friends',
-        }),
+        getAllAlbumMappings: jest.fn().mockResolvedValue([
+          {
+            historyArtist: 'Tobacco',
+            historyAlbum: 'Fucked Up Friends',
+            collectionId: 1,
+            collectionArtist: 'Tobacco (3)',
+            collectionAlbum: 'Fucked Up Friends',
+            createdAt: 0,
+          },
+        ]),
       };
       imageService.setMappingService(mockMappingService as never);
 
@@ -714,9 +720,7 @@ describe('ImageService', () => {
 
       // Assert
       expect(url).toBe('https://discogs-tobacco.jpg');
-      expect(
-        mockMappingService.getAlbumMappingForCollection
-      ).toHaveBeenCalledWith('Tobacco (3)', 'Fucked Up Friends');
+      expect(mockMappingService.getAllAlbumMappings).toHaveBeenCalled();
     });
 
     it('should strip edition suffixes via normalizeForMatching', async () => {
@@ -743,7 +747,7 @@ describe('ImageService', () => {
     it('should fall through gracefully when mapping returns null', async () => {
       // Arrange
       const mockMappingService = {
-        getAlbumMappingForCollection: jest.fn().mockResolvedValue(null),
+        getAllAlbumMappings: jest.fn().mockResolvedValue([]),
       };
       imageService.setMappingService(mockMappingService as never);
 

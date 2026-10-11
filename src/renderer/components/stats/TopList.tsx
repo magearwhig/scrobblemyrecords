@@ -32,6 +32,12 @@ type Period =
   | 'days365'
   | 'custom';
 
+const VIEW_ALL_LABELS: Record<TopListProps['type'], string> = {
+  artists: 'Artists',
+  albums: 'Albums',
+  tracks: 'Tracks',
+};
+
 interface TopListProps {
   title: string;
   type: 'artists' | 'albums' | 'tracks';
@@ -353,16 +359,14 @@ export const TopList: React.FC<TopListProps> = ({
                 </li>
               ))}
             </ol>
-            {type === 'artists' && (
-              <div className='top-list-view-all'>
-                <a
-                  href='#history?view=artists'
-                  className='top-list-view-all-link'
-                >
-                  View All Artists
-                </a>
-              </div>
-            )}
+            <div className='top-list-view-all'>
+              <a
+                href={`#history?view=${type}`}
+                className='top-list-view-all-link'
+              >
+                View All {VIEW_ALL_LABELS[type]}
+              </a>
+            </div>
           </>
         )}
       </div>

@@ -1,4 +1,7 @@
+import { createHash } from 'crypto';
+
 import { AlbumMapping } from '../../shared/types';
+import { isCollectionLinked } from '../../shared/utils/albumMapping';
 import { createLogger } from '../utils/logger';
 
 import { ArtistMapping as DiscogsArtistMapping } from './artistMappingService';
@@ -55,6 +58,9 @@ export class ArtistNameResolver {
   private artistMappingService: ArtistMappingServiceLike;
   private mappingService: MappingService;
   private compoundMappingService?: CompoundArtistMappingServiceLike;
+
+  /** Changes whenever a rebuild changes which names are the same artist */
+  private fingerprint = '';
 
   /** Optional callback to supply play counts for display name weighting */
   private playCountProvider?: () => Promise<Map<string, number>>;
@@ -212,6 +218,9 @@ export class ArtistNameResolver {
     let albumArtistUnions = 0;
     for (const mapping of albumMappings) {
       if (!mapping.historyArtist || !mapping.collectionArtist) continue;
+      // Unlinked mappings only merge album names; they don't assert that the
+      // two artists are the same.
+      if (!isCollectionLinked(mapping)) continue;
       if (
         GENERIC_COLLECTION_ARTISTS.has(mapping.collectionArtist.toLowerCase())
       )
@@ -287,6 +296,16 @@ export class ArtistNameResolver {
     if (playCounts) {
       this.assignPlayCountWeightedDisplayNames(playCounts);
     }
+
+    this.fingerprint = createHash('sha1')
+      .update(
+        JSON.stringify([
+          [...this.aliasToCanonical].sort(),
+          [...this.compoundToComponents].sort(),
+          [...this.displayNames].sort(),
+        ])
+      )
+      .digest('hex');
 
     log.info(
       `Alias graph built: ${this.canonicalToAliases.size} canonical artists, ` +
@@ -478,6 +497,14 @@ export class ArtistNameResolver {
    * Returns the canonical lowercase name for an artist.
    * If the artist is unknown, returns the input lowercased.
    */
+  /**
+   * Identifies the current alias graph. Cached results that depend on artist
+   * grouping should be discarded when this changes.
+   */
+  getFingerprint(): string {
+    return this.fingerprint;
+  }
+
   resolveArtist(name: string): string {
     if (!name) return '';
     const key = name.toLowerCase();
@@ -571,6 +598,8 @@ export class ArtistNameResolver {
 
     for (const mapping of albumMappings) {
       if (!mapping.historyArtist || !mapping.collectionArtist) continue;
+      // Unlinked mappings have no Discogs artist to map from
+      if (!isCollectionLinked(mapping)) continue;
 
       // Only consider cases where artists actually differ
       if (

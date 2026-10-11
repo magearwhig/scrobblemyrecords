@@ -357,17 +357,20 @@ const specs: EndpointSpec[] = [
     expected: undefined,
   },
   {
-    name: 'createAlbumMapping',
+    name: 'createAlbumMappingsBatch',
     verb: 'post',
-    url: '/suggestions/mappings/albums',
+    url: '/suggestions/mappings/albums/batch',
     call: api =>
-      api.createAlbumMapping({
-        historyArtist: 'a',
-        historyAlbum: 'b',
-        collectionArtist: 'c',
-        collectionAlbum: 'd',
-      }),
-    expected: undefined,
+      api.createAlbumMappingsBatch([
+        {
+          historyArtist: 'a',
+          historyAlbum: 'b',
+          collectionId: 0,
+          collectionArtist: 'c',
+          collectionAlbum: 'd',
+        },
+      ]),
+    expected: DATA,
   },
   {
     name: 'removeDiscoveryAlbumMapping',

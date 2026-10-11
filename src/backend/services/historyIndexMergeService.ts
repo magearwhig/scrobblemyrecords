@@ -183,18 +183,19 @@ export class HistoryIndexMergeService {
   }
 
   /**
-   * Deduplicate plays by timestamp. If two plays share the same timestamp,
-   * keep only one.
+   * Deduplicate plays by timestamp and track. Consecutive tracks can share a
+   * scrobble timestamp, so a shared timestamp alone is not a duplicate.
    */
   private deduplicatePlays(
     plays: ScrobbleHistoryEntry[]
   ): ScrobbleHistoryEntry[] {
-    const seen = new Set<number>();
+    const seen = new Set<string>();
     const result: ScrobbleHistoryEntry[] = [];
 
     for (const play of plays) {
-      if (!seen.has(play.timestamp)) {
-        seen.add(play.timestamp);
+      const key = `${play.timestamp}|${play.track ?? ''}`;
+      if (!seen.has(key)) {
+        seen.add(key);
         result.push(play);
       }
     }

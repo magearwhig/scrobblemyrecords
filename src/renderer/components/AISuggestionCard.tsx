@@ -28,6 +28,9 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
   const handleViewInCollection = () => {
     if (release) {
       localStorage.setItem('selectedRelease', JSON.stringify(release));
+      if (album) {
+        localStorage.setItem('selectedCollectionItemId', album.id.toString());
+      }
       navigate('release-details');
     }
   };
@@ -42,6 +45,9 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
         artist: release.artist,
       });
       localStorage.setItem('selectedRelease', JSON.stringify(release));
+      if (album) {
+        localStorage.setItem('selectedCollectionItemId', album.id.toString());
+      }
       const stored = localStorage.getItem('selectedRelease');
       logger.info('localStorage set, verifying', {
         title: stored ? JSON.parse(stored).title : 'null',

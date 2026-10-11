@@ -356,3 +356,61 @@
   outline: 2px solid var(--accent-color);
   outline-offset: 2px;
 }
+
+/* ==========================================================================
+   Merge album versions modal
+   ========================================================================== */
+
+.artist-merge-intro {
+  margin: 0 0 var(--space-3) 0;
+  color: var(--text-default);
+  font-size: var(--text-sm);
+}
+
+.artist-merge-target-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.artist-merge-target {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-raised);
+  color: var(--text-default);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.artist-merge-target:hover:not(:disabled) {
+  border-color: var(--border-accent);
+  background-color: var(--surface-sunken);
+}
+
+.artist-merge-target:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.artist-merge-target:disabled {
+  cursor: default;
+  color: var(--text-disabled);
+}
+
+.artist-merge-target-meta {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}

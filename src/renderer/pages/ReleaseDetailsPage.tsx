@@ -212,10 +212,17 @@ const ReleaseDetailsPage: React.FC = () => {
         artist: releaseInfo.artist,
       });
 
-      // Store collection item ID if available
-      if (storedCollectionItemId) {
-        setCollectionItemId(parseInt(storedCollectionItemId, 10));
-      }
+      // Store collection item ID if available. Navigation paths that don't set
+      // it leave the previous release's ID behind, so only accept an ID that
+      // belongs to this release (CollectionItem.id is the Discogs release id).
+      const parsedCollectionItemId = storedCollectionItemId
+        ? parseInt(storedCollectionItemId, 10)
+        : NaN;
+      setCollectionItemId(
+        parsedCollectionItemId === releaseInfo.id
+          ? parsedCollectionItemId
+          : null
+      );
 
       // Fetch full release details from API
       const fullRelease = await api.getReleaseDetails(releaseInfo.id);
@@ -1031,7 +1038,11 @@ const ReleaseDetailsPage: React.FC = () => {
         )}
 
         {/* Scrobble History Section */}
-        <AlbumScrobbleHistory artist={release.artist} album={release.title} />
+        <AlbumScrobbleHistory
+          artist={release.artist}
+          album={release.title}
+          collectionId={collectionItemId}
+        />
 
         {scrobbleProgress && (
           <div className='message info release-details-message-margin'>

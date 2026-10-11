@@ -20,11 +20,14 @@ interface AlbumHistoryData {
 interface AlbumScrobbleHistoryProps {
   artist: string;
   album: string;
+  /** CollectionItem.id of the release being viewed, when opened from the collection */
+  collectionId?: number | null;
 }
 
 const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
   artist,
   album,
+  collectionId,
 }) => {
   const { state } = useApp();
   const { addNotification } = useNotifications();
@@ -145,7 +148,8 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
       await api.createDiscoveryAlbumMapping({
         historyArtist: historyItem.artist,
         historyAlbum: historyItem.album,
-        collectionId: 0, // Not available in this context
+        // 0 when the page wasn't opened from a collection item
+        collectionId: collectionId ?? 0,
         collectionArtist: artist,
         collectionAlbum: album,
       });

@@ -67,6 +67,10 @@ describe('ReleaseTrackingService', () => {
       searchForRelease: jest.fn().mockResolvedValue([]),
       addToDiscogsWantlist: jest.fn().mockResolvedValue(true),
       getMasterVersions: jest.fn().mockResolvedValue([]),
+      // Main release of master N is 10 × N in these tests
+      getMasterMainReleaseId: jest
+        .fn()
+        .mockImplementation(async (masterId: number) => masterId * 10),
     } as unknown as jest.Mocked<WishlistService>;
 
     service = new ReleaseTrackingService(
@@ -1519,7 +1523,6 @@ describe('ReleaseTrackingService', () => {
       mockWishlistService.searchForRelease.mockResolvedValue([
         {
           masterId: 100,
-          releaseId: 200,
           title: 'OK Computer',
           artist: 'Radiohead',
           year: 1997,
@@ -1533,11 +1536,54 @@ describe('ReleaseTrackingService', () => {
 
       // Assert
       expect(result).toBe(true);
+      // Adds the master's main release, never the master ID itself
+      expect(mockWishlistService.getMasterMainReleaseId).toHaveBeenCalledWith(
+        100
+      );
       expect(mockWishlistService.addToDiscogsWantlist).toHaveBeenCalledWith(
-        200,
+        1000,
         'Added from New Releases tracking'
       );
       expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
+    });
+
+    it('should not add anything when the master has no main release', async () => {
+      // Arrange
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          {
+            mbid: 'rg-1',
+            title: 'OK Computer',
+            artistName: 'Radiohead',
+            artistMbid: 'artist-mbid',
+            releaseDate: '1997-05-21',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: false,
+            inWishlist: false,
+          },
+        ],
+      });
+      mockWishlistService.searchForRelease.mockResolvedValue([
+        {
+          masterId: 100,
+          title: 'OK Computer',
+          artist: 'Radiohead',
+          formats: [],
+        },
+      ]);
+      mockWishlistService.getMasterMainReleaseId.mockResolvedValue(null);
+
+      // Act
+      const result = await service.addToWishlist('rg-1');
+
+      // Assert
+      expect(result).toBe(false);
+      expect(mockWishlistService.addToDiscogsWantlist).not.toHaveBeenCalled();
+      expect(mockFileStorage.writeJSONWithBackup).not.toHaveBeenCalled();
     });
 
     it('should prefer exact artist and title match', async () => {
@@ -1565,14 +1611,12 @@ describe('ReleaseTrackingService', () => {
       mockWishlistService.searchForRelease.mockResolvedValue([
         {
           masterId: 999,
-          releaseId: 1000,
           title: 'Wrong Album',
           artist: 'Wrong Artist',
           formats: [],
         },
         {
           masterId: 555,
-          releaseId: 600,
           title: 'In Rainbows',
           artist: 'Radiohead',
           year: 2007,
@@ -1586,9 +1630,9 @@ describe('ReleaseTrackingService', () => {
 
       // Assert
       expect(result).toBe(true);
-      // Should use the exact-match result (releaseId 600), not the first result
+      // Should use the exact-match result (master 555), not the first result
       expect(mockWishlistService.addToDiscogsWantlist).toHaveBeenCalledWith(
-        600,
+        5550,
         'Added from New Releases tracking'
       );
     });
@@ -1618,14 +1662,12 @@ describe('ReleaseTrackingService', () => {
       mockWishlistService.searchForRelease.mockResolvedValue([
         {
           masterId: 111,
-          releaseId: 222,
           title: 'Different Title',
           artist: 'Different Artist',
           formats: [],
         },
         {
           masterId: 333,
-          releaseId: 444,
           title: 'Also Different Title',
           artist: 'Radiohead',
           formats: [],
@@ -1636,9 +1678,9 @@ describe('ReleaseTrackingService', () => {
       // Act
       await service.addToWishlist('rg-1');
 
-      // Assert - should pick the artist match (releaseId 444) over the first result
+      // Assert - should pick the artist match (master 333) over the first result
       expect(mockWishlistService.addToDiscogsWantlist).toHaveBeenCalledWith(
-        444,
+        3330,
         'Added from New Releases tracking'
       );
     });
@@ -1668,7 +1710,6 @@ describe('ReleaseTrackingService', () => {
       mockWishlistService.searchForRelease.mockResolvedValue([
         {
           masterId: 42,
-          releaseId: 100,
           title: 'Album',
           artist: 'Artist',
           formats: [],
@@ -1714,7 +1755,6 @@ describe('ReleaseTrackingService', () => {
       mockWishlistService.searchForRelease.mockResolvedValue([
         {
           masterId: 1,
-          releaseId: 2,
           title: 'Album',
           artist: 'Artist',
           formats: [],
@@ -2164,7 +2204,6 @@ describe('ReleaseTrackingService', () => {
       mockWishlistService.searchForRelease.mockResolvedValue([
         {
           masterId: 100,
-          releaseId: 200,
           title: 'OK Computer',
           artist: 'Radiohead',
           year: 1997,
@@ -2258,7 +2297,6 @@ describe('ReleaseTrackingService', () => {
       mockWishlistService.searchForRelease.mockResolvedValue([
         {
           masterId: 100,
-          releaseId: 200,
           title: 'Album',
           artist: 'Artist',
           formats: ['CD'],
@@ -2310,7 +2348,6 @@ describe('ReleaseTrackingService', () => {
       mockWishlistService.searchForRelease.mockResolvedValue([
         {
           masterId: 100,
-          releaseId: 200,
           title: 'Album',
           artist: 'Artist',
           formats: ['Vinyl'],
@@ -2440,7 +2477,6 @@ describe('ReleaseTrackingService', () => {
       mockWishlistService.searchForRelease.mockResolvedValue([
         {
           masterId: 42,
-          releaseId: 100,
           title: 'In Rainbows',
           artist: 'Radiohead',
           year: 2007,
@@ -2533,14 +2569,12 @@ describe('ReleaseTrackingService', () => {
       mockWishlistService.searchForRelease.mockResolvedValue([
         {
           masterId: 1,
-          releaseId: 10,
           title: 'Wrong Album',
           artist: 'Wrong Artist',
           formats: [],
         },
         {
           masterId: 2,
-          releaseId: 20,
           title: 'Discovery',
           artist: 'Daft Punk',
           year: 2001,
@@ -2592,7 +2626,6 @@ describe('ReleaseTrackingService', () => {
       mockWishlistService.searchForRelease.mockResolvedValue([
         {
           masterId: 1,
-          releaseId: 10,
           title: 'Album',
           artist: 'Wrong Artist',
           formats: [],

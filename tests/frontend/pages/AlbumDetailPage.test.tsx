@@ -73,6 +73,25 @@ const setSelectedAlbum = (
   });
 };
 
+const mockCreateAlbumMappingsBatch = jest.fn();
+const mockRemoveDiscoveryAlbumMapping = jest.fn();
+const mockAddNotification = jest.fn();
+
+jest.mock('../../../src/renderer/context/AppContext', () => ({
+  useApp: () => ({ state: { serverUrl: 'http://localhost:3001' } }),
+}));
+
+jest.mock('../../../src/renderer/hooks/useNotifications', () => ({
+  useNotifications: () => ({ addNotification: mockAddNotification }),
+}));
+
+jest.mock('../../../src/renderer/services/api', () => ({
+  getApiService: () => ({
+    createAlbumMappingsBatch: mockCreateAlbumMappingsBatch,
+    removeDiscoveryAlbumMapping: mockRemoveDiscoveryAlbumMapping,
+  }),
+}));
+
 describe('AlbumDetailPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -364,7 +383,7 @@ describe('AlbumDetailPage', () => {
     expect(screen.queryByText('Album Mapping')).not.toBeInTheDocument();
     expect(screen.queryByText('Artist Mapping')).not.toBeInTheDocument();
     expect(screen.queryByText('Compound Artist')).not.toBeInTheDocument();
-    expect(screen.queryByText('Album Aliases')).not.toBeInTheDocument();
+    expect(screen.queryByText('Merged Versions')).not.toBeInTheDocument();
     // With no mappings + not in collection, we render a friendly fallback card
     expect(
       screen.getByText(/no special mappings or collection link/i)
@@ -482,31 +501,31 @@ describe('AlbumDetailPage', () => {
 
   // -------------------------------------------------------------- forward-compat
 
-  it('renders no album-aliases card when albumAliases is undefined (forward-compat)', async () => {
-    // baseAlbumData.mappings has no albumAliases key — guard against rendering
+  it('renders no merged-versions card when mergedVersions is undefined', async () => {
+    // baseAlbumData.mappings has no mergedVersions key — guard against rendering
     render(<AlbumDetailPage />);
     await waitFor(() => {
       expect(
         screen.getByRole('heading', { level: 1, name: 'Kid A' })
       ).toBeInTheDocument();
     });
-    expect(screen.queryByText('Album Aliases')).not.toBeInTheDocument();
+    expect(screen.queryByText('Merged Versions')).not.toBeInTheDocument();
   });
 
-  it('renders an album-aliases card when albumAliases has entries', async () => {
+  it('renders a merged-versions card and unmerges a version', async () => {
+    const user = userEvent.setup();
+    mockRemoveDiscoveryAlbumMapping.mockResolvedValue(undefined);
     mockStatsApi.getAlbumDetail.mockResolvedValue({
       success: true,
       data: {
         ...baseAlbumData,
         mappings: {
-          albumAliases: [
+          mergedVersions: [
             {
-              canonicalArtist: 'radiohead',
-              canonicalAlbum: 'kid a',
-              aliasArtist: 'Radiohead',
-              aliasAlbum: 'Kid A (Deluxe)',
-              autoDetected: false,
-              createdAt: 0,
+              historyArtist: 'radiohead',
+              historyAlbum: 'kid a (deluxe)',
+              collectionArtist: 'Radiohead',
+              collectionAlbum: 'Kid A',
             },
           ],
         },
@@ -514,9 +533,19 @@ describe('AlbumDetailPage', () => {
     });
     render(<AlbumDetailPage />);
     await waitFor(() => {
-      expect(screen.getByText('Album Aliases')).toBeInTheDocument();
+      expect(screen.getByText('Merged Versions')).toBeInTheDocument();
     });
-    expect(screen.getByText(/Kid A \(Deluxe\)/)).toBeInTheDocument();
+    expect(screen.getByText(/kid a \(deluxe\)/)).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('Unmerge kid a (deluxe)'));
+
+    expect(mockRemoveDiscoveryAlbumMapping).toHaveBeenCalledWith(
+      'radiohead',
+      'kid a (deluxe)'
+    );
+    await waitFor(() =>
+      expect(mockStatsApi.getAlbumDetail).toHaveBeenCalledTimes(2)
+    );
   });
 
   // -------------------------------------------------------------- scale

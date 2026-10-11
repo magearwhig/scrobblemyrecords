@@ -914,6 +914,31 @@ describe('Suggestions Routes', () => {
       expect(response.body.data.matchType).toBe('exact');
     });
 
+    it('should count different tracks that share a timestamp', async () => {
+      // Arrange
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+        entry: {
+          lastPlayed: 1640000000,
+          playCount: 2,
+          plays: [
+            { timestamp: 1640000000, track: 'Track 1' },
+            { timestamp: 1640000000, track: 'Track 2' },
+          ],
+        },
+        matchType: 'exact',
+        matchedKeys: ['test artist|test album'],
+      });
+
+      // Act
+      const response = await request(app).get(
+        '/api/v1/suggestions/album-history/Test%20Artist/Test%20Album'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.data.playCount).toBe(2);
+    });
+
     it('should handle errors gracefully', async () => {
       // Arrange
       mockHistoryStorage.getAlbumHistoryFuzzy.mockRejectedValue(
@@ -1092,6 +1117,155 @@ describe('Suggestions Routes', () => {
       // Assert
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
+    });
+  });
+
+  describe('album merge suggestions', () => {
+    const noDiscogsUser = {
+      discogs: { username: '' },
+      lastfm: {},
+      preferences: {
+        defaultTimestamp: 'now' as const,
+        batchSize: 50,
+        autoScrobble: false,
+      },
+    };
+
+    beforeEach(() => {
+      mockAuthService.getUserSettings.mockResolvedValue(noDiscogsUser);
+      mockMappingService.getAllAlbumMappings = jest.fn().mockResolvedValue([]);
+      mockHistoryStorage.getIndex = jest.fn().mockResolvedValue({
+        albums: {
+          'chromatics|kill for love': { playCount: 53, plays: [] },
+          'chromatics|kill for love (deluxe)': { playCount: 11, plays: [] },
+        },
+      });
+      mockFileStorage.writeJSONWithBackup = jest
+        .fn()
+        .mockResolvedValue(undefined);
+    });
+
+    it('GET lists versions still counted separately, minus dismissed ones', async () => {
+      mockFileStorage.readJSON.mockResolvedValue(null);
+
+      const response = await request(app).get(
+        '/api/v1/suggestions/album-merge-suggestions'
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0]).toMatchObject({
+        totalPlays: 64,
+        target: { album: 'kill for love', collectionId: 0 },
+      });
+
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        items: [{ id: response.body.data[0].id, dismissedAt: 0 }],
+      });
+      const afterDismiss = await request(app).get(
+        '/api/v1/suggestions/album-merge-suggestions'
+      );
+      expect(afterDismiss.body.data).toEqual([]);
+    });
+
+    it('POST dismiss saves the id once', async () => {
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        items: [{ id: 'existing', dismissedAt: 0 }],
+      });
+
+      const response = await request(app)
+        .post('/api/v1/suggestions/album-merge-suggestions/dismiss')
+        .send({ id: 'chromatics|killforlove' });
+      await request(app)
+        .post('/api/v1/suggestions/album-merge-suggestions/dismiss')
+        .send({ id: 'existing' });
+
+      expect(response.status).toBe(200);
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledTimes(1);
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
+        'mappings/dismissed-album-merges.json',
+        {
+          schemaVersion: 1,
+          items: [
+            { id: 'existing', dismissedAt: 0 },
+            { id: 'chromatics|killforlove', dismissedAt: expect.any(Number) },
+          ],
+        }
+      );
+    });
+
+    it('POST dismiss requires an id', async () => {
+      const response = await request(app)
+        .post('/api/v1/suggestions/album-merge-suggestions/dismiss')
+        .send({});
+
+      expect(response.status).toBe(400);
+    });
+  });
+
+  describe('POST /api/v1/suggestions/mappings/albums/batch', () => {
+    const mapping = {
+      historyArtist: 'the go-betweens',
+      historyAlbum: ' that striped sunlight sound (live) ',
+      collectionId: 0,
+      collectionArtist: 'the go-betweens',
+      collectionAlbum: 'that striped sunlight sound',
+    };
+
+    it('should add all mappings in one call with trimmed names', async () => {
+      mockMappingService.addAlbumMappings = jest.fn().mockResolvedValue(1);
+
+      const response = await request(app)
+        .post('/api/v1/suggestions/mappings/albums/batch')
+        .send({ mappings: [mapping] });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ success: true, data: { added: 1 } });
+      expect(mockMappingService.addAlbumMappings).toHaveBeenCalledWith([
+        { ...mapping, historyAlbum: 'that striped sunlight sound (live)' },
+      ]);
+    });
+
+    it('should refresh cached stats after mappings change', async () => {
+      mockMappingService.addAlbumMappings = jest.fn().mockResolvedValue(1);
+      mockStatsService.invalidateStatsCache = jest
+        .fn()
+        .mockResolvedValue(undefined);
+      mockStatsService.warmCache = jest.fn().mockResolvedValue(undefined);
+
+      await request(app)
+        .post('/api/v1/suggestions/mappings/albums/batch')
+        .send({ mappings: [mapping] });
+
+      // The refresh runs in the background after the response
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(mockStatsService.invalidateStatsCache).toHaveBeenCalled();
+      expect(mockStatsService.warmCache).toHaveBeenCalled();
+    });
+
+    it('should reject an empty batch', async () => {
+      mockMappingService.addAlbumMappings = jest.fn();
+
+      const response = await request(app)
+        .post('/api/v1/suggestions/mappings/albums/batch')
+        .send({ mappings: [] });
+
+      expect(response.status).toBe(400);
+      expect(mockMappingService.addAlbumMappings).not.toHaveBeenCalled();
+    });
+
+    it('should reject a negative or missing collectionId', async () => {
+      mockMappingService.addAlbumMappings = jest.fn();
+
+      for (const collectionId of [-1, undefined, '5']) {
+        const response = await request(app)
+          .post('/api/v1/suggestions/mappings/albums/batch')
+          .send({ mappings: [{ ...mapping, collectionId }] });
+        expect(response.status).toBe(400);
+      }
+      expect(mockMappingService.addAlbumMappings).not.toHaveBeenCalled();
     });
   });
 });

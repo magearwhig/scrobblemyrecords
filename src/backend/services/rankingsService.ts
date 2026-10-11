@@ -1,5 +1,12 @@
+import { AlbumMapping } from '../../shared/types';
+import {
+  createAlbumCanonicalizer,
+  stripDiscogsSuffix,
+} from '../../shared/utils/albumMapping';
 import { createLogger } from '../utils/logger';
 
+import { ArtistNameResolver } from './artistNameResolver';
+import { loadAlbumMappings } from './mergedAlbumHistory';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 
 export type RankingType = 'tracks' | 'artists' | 'albums';
@@ -29,10 +36,29 @@ export interface RankingsOverTimeResponse {
  */
 export class RankingsService {
   private historyStorage: ScrobbleHistoryStorage;
+  private mappingService: {
+    getAllAlbumMappings(): Promise<AlbumMapping[]>;
+  } | null = null;
+  private artistNameResolver: Pick<ArtistNameResolver, 'resolveArtist'> | null =
+    null;
   private logger = createLogger('RankingsService');
 
   constructor(historyStorage: ScrobbleHistoryStorage) {
     this.historyStorage = historyStorage;
+  }
+
+  /** Optional: album rankings group spellings of one artist (see ArtistNameResolver). */
+  setArtistNameResolver(
+    resolver: Pick<ArtistNameResolver, 'resolveArtist'>
+  ): void {
+    this.artistNameResolver = resolver;
+  }
+
+  /** Optional: album rankings count versions merged by album mappings as one album. */
+  setMappingService(service: {
+    getAllAlbumMappings(): Promise<AlbumMapping[]>;
+  }): void {
+    this.mappingService = service;
   }
 
   /**
@@ -62,11 +88,28 @@ export class RankingsService {
       timestamp: number;
       artist: string;
       album: string;
+      albumArtist: string;
+      albumKey: string;
       track?: string;
     }> = [];
 
+    const resolver = this.artistNameResolver;
+    const canonicalize = createAlbumCanonicalizer(
+      await loadAlbumMappings(this.mappingService),
+      resolver ? name => resolver.resolveArtist(name) : undefined
+    );
+
     for (const [albumKey, albumEntry] of Object.entries(index.albums)) {
-      const [artist, album] = albumKey.split('|');
+      const [artist, historyAlbum] = albumKey.split('|');
+      // Merged versions share the canonical album and its artist (index keys
+      // are lowercase); artist rankings still use the scrobble's own artist
+      const canonical = canonicalize(artist, historyAlbum);
+      const album = canonical.mapping
+        ? canonical.album.toLowerCase()
+        : historyAlbum;
+      const albumArtist = canonical.mapping
+        ? stripDiscogsSuffix(canonical.artist).toLowerCase()
+        : artist;
       for (const play of albumEntry.plays) {
         // Convert timestamp from seconds to milliseconds
         const timestampMs = play.timestamp * 1000;
@@ -77,6 +120,8 @@ export class RankingsService {
             timestamp: timestampMs,
             artist,
             album,
+            albumArtist,
+            albumKey: canonical.key,
             track: play.track,
           });
         }
@@ -153,29 +198,39 @@ export class RankingsService {
       timestamp: number;
       artist: string;
       album: string;
+      albumArtist: string;
+      albumKey: string;
       track?: string;
     }>,
     type: RankingType,
     topN: number
   ): RankingItem[] {
-    const counts = new Map<string, { count: number; artist?: string }>();
+    const counts = new Map<
+      string,
+      { count: number; name: string; artist?: string }
+    >();
 
     for (const scrobble of scrobbles) {
       let key: string;
+      let name: string;
       let artist: string | undefined;
 
       switch (type) {
         case 'tracks':
           if (!scrobble.track) continue;
           key = `${scrobble.artist}|${scrobble.track}`;
+          name = scrobble.track;
           artist = scrobble.artist;
           break;
         case 'artists':
           key = scrobble.artist;
+          name = scrobble.artist;
           break;
         case 'albums':
-          key = `${scrobble.artist}|${scrobble.album}`;
-          artist = scrobble.artist;
+          // Group spelling variants together; show the first name seen
+          key = scrobble.albumKey;
+          name = scrobble.album;
+          artist = scrobble.albumArtist;
           break;
       }
 
@@ -183,7 +238,7 @@ export class RankingsService {
       if (existing) {
         existing.count++;
       } else {
-        counts.set(key, { count: 1, artist });
+        counts.set(key, { count: 1, name, artist });
       }
     }
 
@@ -192,8 +247,8 @@ export class RankingsService {
       .sort((a, b) => b[1].count - a[1].count)
       .slice(0, topN);
 
-    return sorted.map(([name, data], index) => ({
-      name: type === 'tracks' || type === 'albums' ? name.split('|')[1] : name,
+    return sorted.map(([, data], index) => ({
+      name: data.name,
       artist: data.artist,
       count: data.count,
       rank: index + 1,

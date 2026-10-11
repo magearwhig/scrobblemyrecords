@@ -4,6 +4,7 @@ import {
   ArtistMapping,
   HistoryArtistMappingsStore,
 } from '../../shared/types';
+import { isCollectionLinked } from '../../shared/utils/albumMapping';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
@@ -91,6 +92,8 @@ export class MappingService {
       this.logger.debug('No artist mappings file found');
     }
 
+    // Imported or legacy data may contain chains; readers assume one hop
+    this.normalizeAlbumMappings();
     this.loaded = true;
   }
 
@@ -120,20 +123,105 @@ export class MappingService {
   async addAlbumMapping(
     mapping: Omit<AlbumMapping, 'createdAt'>
   ): Promise<void> {
+    await this.addAlbumMappings([mapping]);
+  }
+
+  /**
+   * Add or update several album mappings with a single save.
+   *
+   * Mappings are kept one hop deep (history name -> canonical album); see
+   * normalizeAlbumMappings. Merging an album into one that was itself merged
+   * into it reverses the earlier merge, so the newest merge wins.
+   *
+   * Returns the number of mappings stored.
+   */
+  async addAlbumMappings(
+    mappings: Array<Omit<AlbumMapping, 'createdAt'>>
+  ): Promise<number> {
     await this.loadMappings();
 
-    const key = this.albumKey(mapping.historyArtist, mapping.historyAlbum);
-    const fullMapping: AlbumMapping = {
-      ...mapping,
-      createdAt: Date.now(),
-    };
+    const now = Date.now();
+    let stored = 0;
 
-    this.albumMappings.set(key, fullMapping);
+    for (const mapping of mappings) {
+      const sourceKey = this.albumKey(
+        mapping.historyArtist,
+        mapping.historyAlbum
+      );
+      const targetKey = this.albumKey(
+        mapping.collectionArtist,
+        mapping.collectionAlbum
+      );
+      if (sourceKey === targetKey && !isCollectionLinked(mapping)) continue;
+
+      if (!isCollectionLinked(mapping)) {
+        // Reverse merge: the target was merged into this source; undo that
+        const reverse = this.albumMappings.get(targetKey);
+        if (
+          reverse &&
+          !isCollectionLinked(reverse) &&
+          this.albumKey(reverse.collectionArtist, reverse.collectionAlbum) ===
+            sourceKey
+        ) {
+          this.albumMappings.delete(targetKey);
+        }
+      }
+
+      this.albumMappings.set(sourceKey, { ...mapping, createdAt: now });
+      stored++;
+    }
+
+    if (stored === 0) return 0;
+
+    this.normalizeAlbumMappings();
     await this.saveMappings();
 
-    this.logger.info(
-      `Added album mapping: "${mapping.historyArtist}|${mapping.historyAlbum}" -> "${mapping.collectionArtist}|${mapping.collectionAlbum}"`
-    );
+    this.logger.info(`Added ${stored} album mapping(s)`);
+    return stored;
+  }
+
+  /**
+   * Resolve every album mapping to its final canonical album so all mappings
+   * are one hop deep:
+   * - an unlinked mapping whose target is itself a mapped history name follows
+   *   the chain and takes over the final target (and its collection link, so
+   *   ownership propagates to every merged version);
+   * - a linked mapping is an explicit collection target and is never redirected;
+   * - an unlinked mapping that resolves to itself (a cycle) is dropped, while a
+   *   linked self-mapping is kept because it records ownership.
+   */
+  private normalizeAlbumMappings(): void {
+    for (const [key, mapping] of Array.from(this.albumMappings)) {
+      if (!this.albumMappings.has(key) || isCollectionLinked(mapping)) continue;
+
+      let resolved = mapping;
+      const seen = new Set([key]);
+      while (!isCollectionLinked(resolved)) {
+        const targetKey = this.albumKey(
+          resolved.collectionArtist,
+          resolved.collectionAlbum
+        );
+        const next = this.albumMappings.get(targetKey);
+        if (!next || seen.has(targetKey)) break;
+        seen.add(targetKey);
+        resolved = next;
+      }
+
+      const finalKey = this.albumKey(
+        resolved.collectionArtist,
+        resolved.collectionAlbum
+      );
+      if (finalKey === key && !isCollectionLinked(resolved)) {
+        this.albumMappings.delete(key);
+      } else if (resolved !== mapping) {
+        this.albumMappings.set(key, {
+          ...mapping,
+          collectionArtist: resolved.collectionArtist,
+          collectionAlbum: resolved.collectionAlbum,
+          collectionId: resolved.collectionId,
+        });
+      }
+    }
   }
 
   /**
@@ -263,8 +351,10 @@ export class MappingService {
       collectionAlbum
     );
 
-    // Search through all mappings to find one that matches the collection artist/album
+    // Search through linked mappings to find one that matches the collection artist/album.
+    // Unlinked mappings target another history name, not a collection title.
     for (const mapping of this.albumMappings.values()) {
+      if (!isCollectionLinked(mapping)) continue;
       const mappingCollectionKey = this.albumKey(
         mapping.collectionArtist,
         mapping.collectionAlbum
@@ -295,8 +385,9 @@ export class MappingService {
 
     const mappings: AlbumMapping[] = [];
 
-    // Search through all mappings to find ALL that match the collection artist/album
+    // Search through linked mappings to find ALL that match the collection artist/album
     for (const mapping of this.albumMappings.values()) {
+      if (!isCollectionLinked(mapping)) continue;
       const mappingCollectionKey = this.albumKey(
         mapping.collectionArtist,
         mapping.collectionAlbum

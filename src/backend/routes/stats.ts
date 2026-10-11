@@ -12,6 +12,7 @@ import {
   DashboardTopAlbum,
   DashboardTopArtist,
 } from '../../shared/types';
+import { createCollectionNameResolver } from '../../shared/utils/albumMapping';
 import { AnalyticsService } from '../services/analyticsService';
 import { artistMappingService } from '../services/artistMappingService';
 import { AuthService } from '../services/authService';
@@ -19,6 +20,7 @@ import { GenreAnalysisService } from '../services/genreAnalysisService';
 import { HistoryIndexMergeService } from '../services/historyIndexMergeService';
 import { ImageService } from '../services/imageService';
 import { MappingService } from '../services/mappingService';
+import { loadAlbumMappings } from '../services/mergedAlbumHistory';
 import { RankingsService } from '../services/rankingsService';
 import { ScrobbleHistoryStorage } from '../services/scrobbleHistoryStorage';
 import { SellerMonitoringService } from '../services/sellerMonitoringService';
@@ -204,27 +206,20 @@ export default function createStatsRouter(
           // Check which albums are in collection using fuzzy matching
           const collection = username ? await loadCollection(username) : [];
           const collectionByFuzzyKey = new Map<string, CollectionItem>();
+          // Index each item's own name plus every history album mapped to it
+          const namesFor = createCollectionNameResolver(
+            await loadAlbumMappings(mappingService ?? null)
+          );
           for (const item of collection) {
-            let searchArtist = item.release.artist;
-            let searchAlbum = item.release.title;
-
-            if (mappingService) {
-              const albumMapping =
-                await mappingService.getAlbumMappingForCollection(
-                  item.release.artist,
-                  item.release.title
-                );
-              if (albumMapping) {
-                searchArtist = albumMapping.historyArtist;
-                searchAlbum = albumMapping.historyAlbum;
-              }
+            for (const name of namesFor(
+              item.release.artist,
+              item.release.title
+            )) {
+              collectionByFuzzyKey.set(
+                historyStorage!.fuzzyNormalizeKey(name.artist, name.album),
+                item
+              );
             }
-
-            const fuzzyKey = historyStorage!.fuzzyNormalizeKey(
-              searchArtist,
-              searchAlbum
-            );
-            collectionByFuzzyKey.set(fuzzyKey, item);
           }
 
           return recentAlbums.map(album => {
@@ -1124,103 +1119,80 @@ export default function createStatsRouter(
       const CHUNK_SIZE = 50;
       const countsOnly = { countsOnly: true };
       const results: AlbumPlayCountResult[] = [];
+      // Each album's own Discogs name plus every history album mapped to it
+      // (handles Discogs→Last.fm name differences and merged versions)
+      const namesFor = createCollectionNameResolver(
+        await loadAlbumMappings(mappingService ?? null)
+      );
 
       for (let i = 0; i < body.albums.length; i += CHUNK_SIZE) {
         const chunk = body.albums.slice(i, i + CHUNK_SIZE);
         const chunkResults = await Promise.all(
           chunk.map(async album => {
-            // Try album mappings first (handles Discogs→Last.fm name differences)
-            if (mappingService) {
-              const albumMappings =
-                await mappingService.getAllAlbumMappingsForCollection(
-                  album.artist,
-                  album.title
+            let totalPlayCount = 0;
+            let latestPlayed: number | null = null;
+            let bestMatchType: 'exact' | 'fuzzy' | 'none' = 'none';
+            const countedKeys = new Set<string>();
+
+            for (const name of namesFor(album.artist, album.title)) {
+              let result = await historyStorage.getAlbumHistoryFuzzy(
+                name.artist,
+                name.album,
+                countsOnly
+              );
+
+              // If not found, try artist name mapping as fallback
+              if (result.matchType === 'none') {
+                const mappedArtist = artistMappingService.getLastfmName(
+                  name.artist
                 );
-
-              if (albumMappings.length > 0) {
-                let totalPlayCount = 0;
-                let latestPlayed: number | null = null;
-                let bestMatchType: 'exact' | 'fuzzy' | 'none' = 'none';
-
-                for (const mapping of albumMappings) {
-                  let result = await historyStorage.getAlbumHistoryFuzzy(
-                    mapping.historyArtist,
-                    mapping.historyAlbum,
+                if (mappedArtist !== name.artist) {
+                  result = await historyStorage.getAlbumHistoryFuzzy(
+                    mappedArtist,
+                    name.album,
                     countsOnly
                   );
-
-                  // If not found, try artist name mapping as fallback
-                  if (result.matchType === 'none') {
-                    const mappedArtist = artistMappingService.getLastfmName(
-                      mapping.historyArtist
-                    );
-                    if (mappedArtist !== mapping.historyArtist) {
-                      result = await historyStorage.getAlbumHistoryFuzzy(
-                        mappedArtist,
-                        mapping.historyAlbum,
-                        countsOnly
-                      );
-                    }
-                  }
-
-                  if (result.entry && result.matchType !== 'none') {
-                    totalPlayCount += result.entry.playCount;
-                    if (
-                      result.entry.lastPlayed &&
-                      (!latestPlayed || result.entry.lastPlayed > latestPlayed)
-                    ) {
-                      latestPlayed = result.entry.lastPlayed;
-                    }
-                    if (result.matchType === 'exact') {
-                      bestMatchType = 'exact';
-                    } else if (
-                      result.matchType === 'fuzzy' &&
-                      bestMatchType !== 'exact'
-                    ) {
-                      bestMatchType = 'fuzzy';
-                    }
-                  }
-                }
-
-                if (bestMatchType !== 'none') {
-                  return {
-                    artist: album.artist,
-                    title: album.title,
-                    playCount: totalPlayCount,
-                    lastPlayed: latestPlayed,
-                    matchType: bestMatchType,
-                  };
                 }
               }
-            }
 
-            // No mappings found — try direct fuzzy match with raw Discogs names
-            let historyResult = await historyStorage.getAlbumHistoryFuzzy(
-              album.artist,
-              album.title,
-              countsOnly
-            );
+              if (!result.entry || result.matchType === 'none') continue;
 
-            // If still not found, try artist name mapping as last resort
-            if (historyResult.matchType === 'none') {
-              const mappedArtist = artistMappingService.getLastfmName(
-                album.artist
-              );
-              if (mappedArtist !== album.artist) {
-                historyResult = await historyStorage.getAlbumHistoryFuzzy(
-                  mappedArtist,
-                  album.title,
-                  countsOnly
+              // Count each history entry once, even if several names match it
+              const keys = result.matchedKeys ?? [];
+              const newKeys = keys.filter(k => !countedKeys.has(k));
+              if (keys.length > 0 && newKeys.length === 0) continue;
+              newKeys.forEach(k => countedKeys.add(k));
+
+              let counts: Array<{ playCount: number; lastPlayed: number }> = [
+                result.entry,
+              ];
+              if (newKeys.length < keys.length) {
+                // Partial overlap: count only the entries not already counted
+                const index = await historyStorage.getIndex();
+                counts = newKeys.flatMap(k =>
+                  index?.albums[k] ? [index.albums[k]] : []
                 );
+              }
+              for (const entry of counts) {
+                totalPlayCount += entry.playCount;
+                if (
+                  entry.lastPlayed &&
+                  (!latestPlayed || entry.lastPlayed > latestPlayed)
+                ) {
+                  latestPlayed = entry.lastPlayed;
+                }
+              }
+              if (bestMatchType !== 'exact') {
+                bestMatchType = result.matchType;
               }
             }
 
             return {
               artist: album.artist,
               title: album.title,
-              playCount: historyResult.entry?.playCount || 0,
-              lastPlayed: historyResult.entry?.lastPlayed || null,
-              matchType: historyResult.matchType,
+              playCount: totalPlayCount,
+              lastPlayed: latestPlayed,
+              matchType: bestMatchType,
             };
           })
         );

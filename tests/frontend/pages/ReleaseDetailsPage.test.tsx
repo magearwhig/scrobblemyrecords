@@ -352,6 +352,27 @@ describe('ReleaseDetailsPage Side Selection', () => {
     jest.restoreAllMocks();
   });
 
+  it('should use the stored collection item id when it belongs to this release', async () => {
+    mockLocalStorage.setItem('selectedRelease', JSON.stringify(mockRelease));
+    mockLocalStorage.setItem('selectedCollectionItemId', '123');
+    mockApiService.getReleaseDetails.mockResolvedValue(mockRelease);
+    renderWithProviders(<ReleaseDetailsPage />);
+
+    expect(await screen.findByText(/Add to Discard Pile/)).toBeInTheDocument();
+  });
+
+  it('should ignore a stale collection item id left by a previous release', async () => {
+    mockLocalStorage.setItem('selectedRelease', JSON.stringify(mockRelease));
+    mockLocalStorage.setItem('selectedCollectionItemId', '999');
+    mockApiService.getReleaseDetails.mockResolvedValue(mockRelease);
+    renderWithProviders(<ReleaseDetailsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Album')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Add to Discard Pile/)).not.toBeInTheDocument();
+  });
+
   it('should not show side selection buttons for single-side albums', async () => {
     mockLocalStorage.setItem('selectedRelease', JSON.stringify(mockRelease));
     mockApiService.getReleaseDetails.mockResolvedValue(mockRelease);

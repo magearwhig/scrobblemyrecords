@@ -1571,7 +1571,7 @@ export class ReleaseTrackingService {
     }
 
     try {
-      // Search for the release on Discogs to get a release ID
+      // Search Discogs for the album's master
       const searchResults = await this.wishlistService.searchForRelease(
         release.artistName,
         release.title
@@ -1611,9 +1611,21 @@ export class ReleaseTrackingService {
         }
       }
 
+      // The search returns masters; the wantlist needs a release, so add the
+      // master's main release
+      const mainReleaseId = await this.wishlistService.getMasterMainReleaseId(
+        bestMatch.masterId
+      );
+      if (!mainReleaseId) {
+        this.logger.warn(
+          `Cannot add to wishlist: no main release for master ${bestMatch.masterId} (${release.artistName} - ${release.title})`
+        );
+        return false;
+      }
+
       // Add to Discogs wantlist
       await this.wishlistService.addToDiscogsWantlist(
-        bestMatch.releaseId,
+        mainReleaseId,
         `Added from New Releases tracking`
       );
 

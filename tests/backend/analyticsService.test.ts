@@ -64,6 +64,7 @@ describe('AnalyticsService', () => {
 
     mockMappingService = {
       getAlbumMapping: jest.fn().mockResolvedValue(null),
+      getAllAlbumMappings: jest.fn().mockResolvedValue([]),
       getArtistMapping: jest.fn().mockResolvedValue(null),
     } as unknown as jest.Mocked<MappingService>;
 
@@ -407,6 +408,37 @@ describe('AnalyticsService', () => {
       expect(missing).toEqual([]);
     });
 
+    it('should treat an album as owned when any merged spelling matches the collection', async () => {
+      // Arrange: the first spelling seen doesn't match the owned copy
+      mockHistoryStorage.getAllAlbums.mockResolvedValue([
+        {
+          key: 'afghan whigs|1965',
+          artist: 'afghan whigs',
+          album: '1965',
+          history: { lastPlayed: 0, playCount: 2, plays: [] },
+        },
+        {
+          key: 'the afghan whigs|1965',
+          artist: 'the afghan whigs',
+          album: '1965',
+          history: { lastPlayed: 0, playCount: 2, plays: [] },
+        },
+      ]);
+      analyticsService.setArtistNameResolver({
+        resolveArtist: (name: string) =>
+          name === 'afghan whigs' ? 'the afghan whigs' : name,
+      });
+      const collection = [
+        createMockCollectionItem({ artist: 'The Afghan Whigs', title: '1965' }),
+      ];
+
+      // Act
+      const missing = await analyticsService.getMissingAlbums(collection);
+
+      // Assert
+      expect(missing).toEqual([]);
+    });
+
     it('should match albums with disambiguation suffix', async () => {
       // Arrange
       mockHistoryStorage.getAllAlbums.mockResolvedValue([
@@ -481,14 +513,16 @@ describe('AnalyticsService', () => {
     it('should skip albums with manual mappings', async () => {
       // Arrange
       analyticsService.setMappingService(mockMappingService);
-      mockMappingService.getAlbumMapping.mockResolvedValue({
-        historyArtist: 'radiohead',
-        historyAlbum: 'kid a',
-        collectionId: 123,
-        collectionArtist: 'Radiohead',
-        collectionAlbum: 'Kid A',
-        createdAt: Date.now(),
-      });
+      mockMappingService.getAllAlbumMappings.mockResolvedValue([
+        {
+          historyArtist: 'radiohead',
+          historyAlbum: 'kid a',
+          collectionId: 123,
+          collectionArtist: 'Radiohead',
+          collectionAlbum: 'Kid A',
+          createdAt: Date.now(),
+        },
+      ]);
       mockHistoryStorage.getAllAlbums.mockResolvedValue([
         {
           key: 'radiohead|kid a',
@@ -503,6 +537,48 @@ describe('AnalyticsService', () => {
 
       // Assert - should be skipped due to mapping
       expect(missing).toEqual([]);
+    });
+
+    it('should merge unlinked mapped versions into their album before thresholds', async () => {
+      // Arrange - a 100-play live version merged into a 1-play album name
+      analyticsService.setMappingService(mockMappingService);
+      mockMappingService.getAllAlbumMappings.mockResolvedValue([
+        {
+          historyArtist: 'the go-betweens',
+          historyAlbum: 'that striped sunlight sound (live)',
+          collectionId: 0,
+          collectionArtist: 'the go-betweens',
+          collectionAlbum: 'that striped sunlight sound',
+          createdAt: Date.now(),
+        },
+      ]);
+      mockHistoryStorage.getAllAlbums.mockResolvedValue([
+        {
+          key: 'the go-betweens|that striped sunlight sound (live)',
+          artist: 'the go-betweens',
+          album: 'that striped sunlight sound (live)',
+          history: { lastPlayed: 2000, playCount: 100, plays: [] },
+        },
+        {
+          key: 'the go-betweens|that striped sunlight sound',
+          artist: 'the go-betweens',
+          album: 'that striped sunlight sound',
+          history: { lastPlayed: 1000, playCount: 1, plays: [] },
+        },
+      ]);
+
+      // Act
+      const missing = await analyticsService.getMissingAlbums([]);
+
+      // Assert
+      expect(missing).toEqual([
+        {
+          artist: 'the go-betweens',
+          album: 'that striped sunlight sound',
+          playCount: 101,
+          lastPlayed: 2000,
+        },
+      ]);
     });
   });
 
