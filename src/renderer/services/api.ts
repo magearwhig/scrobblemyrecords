@@ -1276,7 +1276,6 @@ class ApiService {
   ): Promise<
     {
       masterId: number;
-      releaseId: number;
       title: string;
       artist: string;
       year?: number;
