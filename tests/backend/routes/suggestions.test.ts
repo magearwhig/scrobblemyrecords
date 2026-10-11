@@ -914,6 +914,31 @@ describe('Suggestions Routes', () => {
       expect(response.body.data.matchType).toBe('exact');
     });
 
+    it('should count different tracks that share a timestamp', async () => {
+      // Arrange
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+        entry: {
+          lastPlayed: 1640000000,
+          playCount: 2,
+          plays: [
+            { timestamp: 1640000000, track: 'Track 1' },
+            { timestamp: 1640000000, track: 'Track 2' },
+          ],
+        },
+        matchType: 'exact',
+        matchedKeys: ['test artist|test album'],
+      });
+
+      // Act
+      const response = await request(app).get(
+        '/api/v1/suggestions/album-history/Test%20Artist/Test%20Album'
+      );
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.data.playCount).toBe(2);
+    });
+
     it('should handle errors gracefully', async () => {
       // Arrange
       mockHistoryStorage.getAlbumHistoryFuzzy.mockRejectedValue(

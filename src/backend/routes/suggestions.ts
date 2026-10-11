@@ -809,13 +809,14 @@ export default function createSuggestionsRouter(
           }
         }
 
-        // Deduplicate plays by timestamp (same scrobble could appear in multiple searches)
+        // Deduplicate plays found by more than one search. Key on track as well
+        // as timestamp: consecutive tracks can share a scrobble timestamp.
         const uniquePlays = new Map<
-          number,
+          string,
           { timestamp: number; track?: string }
         >();
         for (const play of allPlays) {
-          const key = play.timestamp;
+          const key = `${play.timestamp}|${play.track ?? ''}`;
           if (!uniquePlays.has(key)) {
             uniquePlays.set(key, play);
           }
