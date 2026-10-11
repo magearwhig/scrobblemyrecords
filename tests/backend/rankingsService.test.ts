@@ -194,6 +194,34 @@ describe('RankingsService', () => {
       });
     });
 
+    it('should rank spellings the artist resolver treats as one artist as one album', async () => {
+      mockHistoryStorage.getIndex = jest.fn().mockResolvedValue({
+        albums: {
+          'the afghan whigs|1965': {
+            playCount: 2,
+            plays: [{ timestamp: 1705320000 }, { timestamp: 1705320000 }],
+          },
+          'afghan whigs|1965': {
+            playCount: 1,
+            plays: [{ timestamp: 1705320000 }],
+          },
+        },
+      });
+      service.setMappingService({
+        getAllAlbumMappings: jest.fn().mockResolvedValue([]),
+      });
+      service.setArtistNameResolver({
+        resolveArtist: (name: string) =>
+          name === 'afghan whigs' ? 'the afghan whigs' : name,
+      });
+
+      const result = await service.getRankingsOverTime('albums', 10);
+
+      const rankings = result.snapshots[0].rankings;
+      expect(rankings).toHaveLength(1);
+      expect(rankings[0]).toMatchObject({ name: '1965', count: 3 });
+    });
+
     it('should rank an album merged across artists as one album without changing artist rankings', async () => {
       mockHistoryStorage.getIndex = jest.fn().mockResolvedValue({
         albums: {

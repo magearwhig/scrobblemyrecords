@@ -1130,6 +1130,8 @@ describe('StatsService', () => {
       const warmBlock = {
         warmedAt: Math.floor(Date.now() / 1000),
         syncTimestamp,
+        version: 2,
+        artistAliasFingerprint: '',
         streaks: { currentStreak: 5, longestStreak: 10 },
         counts: {
           today: 3,
@@ -1175,6 +1177,37 @@ describe('StatsService', () => {
       expect(overview.streaks.currentStreak).toBe(5);
       expect(overview.counts.today).toBe(3);
       expect(overview.newArtistsThisMonth).toBe(4);
+    });
+
+    it.each([
+      ['was built by older code', { version: 1 }],
+      ['predates the artist aliases', { artistAliasFingerprint: 'old' }],
+    ])('should ignore a warm cache that %s', async (_reason, overrides) => {
+      // Arrange
+      const syncTimestamp = 1700000000000;
+      mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(syncTimestamp);
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        lastUpdated: 0,
+        streaks: { currentStreak: 5, longestStreak: 10 },
+        milestoneHistory: [],
+        warm: {
+          warmedAt: 0,
+          syncTimestamp,
+          version: 2,
+          artistAliasFingerprint: '',
+          topAlbums: { all: [{ artist: 'cached', album: 'cached' }] },
+          ...overrides,
+        },
+      });
+
+      // Act
+      const topAlbums = await statsService.getTopAlbums('all', 10);
+
+      // Assert — recomputed live from the (empty) index
+      expect(topAlbums).toEqual([]);
+      expect(mockHistoryStorage.getIndex).toHaveBeenCalled();
     });
 
     it('should fall back to live computation when no cache exists', async () => {
@@ -1366,6 +1399,8 @@ describe('StatsService', () => {
       warm: {
         warmedAt: Math.floor(Date.now() / 1000),
         syncTimestamp,
+        version: 2,
+        artistAliasFingerprint: '',
         streaks: { currentStreak: 7, longestStreak: 21 },
         counts: {
           today: 5,
@@ -4536,6 +4571,38 @@ describe('StatsService', () => {
         album: 'Tallulah',
         playCount: 7,
       });
+    });
+
+    it('getTopAlbums groups spellings the artist resolver treats as one artist', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'the afghan whigs|1965': {
+            lastPlayed: now,
+            playCount: 4,
+            plays: plays(4),
+          },
+          'afghan whigs|1965': {
+            lastPlayed: now,
+            playCount: 1,
+            plays: plays(1),
+          },
+        })
+      );
+      useMappings([]);
+      statsService.setArtistNameResolver({
+        resolveArtist: (name: string) =>
+          name.toLowerCase() === 'afghan whigs'
+            ? 'the afghan whigs'
+            : name.toLowerCase(),
+      } as unknown as ArtistNameResolver);
+
+      // Act
+      const topAlbums = await statsService.getTopAlbums('days30', 10);
+
+      // Assert
+      expect(topAlbums).toHaveLength(1);
+      expect(topAlbums[0]).toMatchObject({ playCount: 5 });
     });
 
     it('getTopAlbums uses a linked mapping to mark the album as owned', async () => {

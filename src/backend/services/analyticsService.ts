@@ -11,6 +11,7 @@ import {
 } from '../../shared/utils/albumMapping';
 import { createLogger } from '../utils/logger';
 
+import { ArtistNameResolver } from './artistNameResolver';
 import { LastFmService, LastFmTopArtist } from './lastfmService';
 import { MappingService } from './mappingService';
 import { loadAlbumMappings } from './mergedAlbumHistory';
@@ -24,6 +25,8 @@ export class AnalyticsService {
   private historyStorage: ScrobbleHistoryStorage;
   private lastFmService: LastFmService;
   private mappingService: MappingService | null = null;
+  private artistNameResolver: Pick<ArtistNameResolver, 'resolveArtist'> | null =
+    null;
   private logger = createLogger('AnalyticsService');
 
   // Cache for expensive computations
@@ -45,6 +48,13 @@ export class AnalyticsService {
    */
   setMappingService(mappingService: MappingService): void {
     this.mappingService = mappingService;
+  }
+
+  /** Optional: group spellings of one artist (see ArtistNameResolver). */
+  setArtistNameResolver(
+    resolver: Pick<ArtistNameResolver, 'resolveArtist'>
+  ): void {
+    this.artistNameResolver = resolver;
   }
 
   /**
@@ -318,17 +328,31 @@ export class AnalyticsService {
     // Merge history albums by album mapping first, so thresholds and ranking
     // apply to the whole album. A mapping linked to a collection item means the
     // album is owned; an unlinked one merges it into another history album.
+    const resolver = this.artistNameResolver;
     const canonicalize = createAlbumCanonicalizer(
-      await loadAlbumMappings(this.mappingService)
+      await loadAlbumMappings(this.mappingService),
+      resolver ? name => resolver.resolveArtist(name) : undefined
     );
 
     const merged = new Map<string, MissingAlbum>();
+    // Every name merged into each album, so ownership can match any of them
+    const mergedNames = new Map<
+      string,
+      Array<{ artist: string; album: string }>
+    >();
     for (const { artist, album, history } of historyAlbums) {
       const canonical = canonicalize(artist, album);
       if (canonical.mapping && isCollectionLinked(canonical.mapping)) {
         // Manual mapping to a collection item, skip this album (it's in collection)
         continue;
       }
+
+      const names = mergedNames.get(canonical.key) ?? [];
+      names.push({ artist, album });
+      if (canonical.mapping) {
+        names.push({ artist: canonical.artist, album: canonical.album });
+      }
+      mergedNames.set(canonical.key, names);
 
       const existing = merged.get(canonical.key);
       if (existing) {
@@ -346,23 +370,21 @@ export class AnalyticsService {
 
     // Find albums in history but not in collection
     const missing: MissingAlbum[] = [];
-    for (const candidate of merged.values()) {
+    for (const [key, candidate] of merged) {
       // Skip albums with too few plays
       if (candidate.playCount < 3) {
         continue;
       }
 
-      // Check if this album matches any collection item
-      let foundMatch = false;
-      for (const item of collection) {
-        if (
-          this.artistsMatch(item.release.artist, candidate.artist) &&
-          this.albumsMatch(item.release.title, candidate.album)
-        ) {
-          foundMatch = true;
-          break;
-        }
-      }
+      // Owned if any name merged into this album matches a collection item
+      const names = mergedNames.get(key) ?? [candidate];
+      const foundMatch = collection.some(item =>
+        names.some(
+          name =>
+            this.artistsMatch(item.release.artist, name.artist) &&
+            this.albumsMatch(item.release.title, name.album)
+        )
+      );
 
       if (!foundMatch) {
         missing.push(candidate);

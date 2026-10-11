@@ -408,6 +408,37 @@ describe('AnalyticsService', () => {
       expect(missing).toEqual([]);
     });
 
+    it('should treat an album as owned when any merged spelling matches the collection', async () => {
+      // Arrange: the first spelling seen doesn't match the owned copy
+      mockHistoryStorage.getAllAlbums.mockResolvedValue([
+        {
+          key: 'afghan whigs|1965',
+          artist: 'afghan whigs',
+          album: '1965',
+          history: { lastPlayed: 0, playCount: 2, plays: [] },
+        },
+        {
+          key: 'the afghan whigs|1965',
+          artist: 'the afghan whigs',
+          album: '1965',
+          history: { lastPlayed: 0, playCount: 2, plays: [] },
+        },
+      ]);
+      analyticsService.setArtistNameResolver({
+        resolveArtist: (name: string) =>
+          name === 'afghan whigs' ? 'the afghan whigs' : name,
+      });
+      const collection = [
+        createMockCollectionItem({ artist: 'The Afghan Whigs', title: '1965' }),
+      ];
+
+      // Act
+      const missing = await analyticsService.getMissingAlbums(collection);
+
+      // Assert
+      expect(missing).toEqual([]);
+    });
+
     it('should match albums with disambiguation suffix', async () => {
       // Arrange
       mockHistoryStorage.getAllAlbums.mockResolvedValue([

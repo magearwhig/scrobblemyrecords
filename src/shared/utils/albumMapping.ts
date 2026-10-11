@@ -52,14 +52,27 @@ export function albumGroupKey(artist: string, album: string): string {
  * into. Mappings are one hop deep, so the mapping target is the canonical
  * album; unmapped albums resolve to themselves. `key` identifies the merged
  * album (see albumGroupKey), so history albums with the same key are versions
- * of one album.
+ * of one album. Pass `resolveArtist` (the artist alias resolver) so spellings
+ * the app already treats as one artist, e.g. "afghan whigs" and "The Afghan
+ * Whigs", group together the way the artist page does.
  */
 export function createAlbumCanonicalizer(
-  mappings: AlbumMapping[] | null | undefined
+  mappings: AlbumMapping[] | null | undefined,
+  resolveArtist: (artist: string) => string = artist => artist
 ): (
   artist: string,
   album: string
 ) => AlbumName & { key: string; mapping?: AlbumMapping } {
+  // Discogs-numbered names ("Afghan Whigs (2)") the resolver doesn't know
+  // fall back to the plain name, so they group with its aliases
+  const groupArtist = (artist: string) => {
+    const resolved = resolveArtist(artist);
+    const plain = stripDiscogsSuffix(artist);
+    return plain !== artist && resolved.toLowerCase() === artist.toLowerCase()
+      ? resolveArtist(plain)
+      : resolved;
+  };
+
   const byHistoryKey = new Map<string, AlbumMapping>();
   for (const mapping of mappings ?? []) {
     byHistoryKey.set(
@@ -71,12 +84,15 @@ export function createAlbumCanonicalizer(
   return (artist, album) => {
     const mapping = byHistoryKey.get(albumNameKey(artist, album));
     if (!mapping) {
-      return { artist, album, key: albumGroupKey(artist, album) };
+      return { artist, album, key: albumGroupKey(groupArtist(artist), album) };
     }
     return {
       artist: mapping.collectionArtist,
       album: mapping.collectionAlbum,
-      key: albumGroupKey(mapping.collectionArtist, mapping.collectionAlbum),
+      key: albumGroupKey(
+        groupArtist(mapping.collectionArtist),
+        mapping.collectionAlbum
+      ),
       mapping,
     };
   };

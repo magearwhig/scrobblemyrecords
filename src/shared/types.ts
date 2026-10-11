@@ -911,6 +911,10 @@ export interface StatsCache {
   warm?: {
     warmedAt: number; // Unix timestamp seconds when cache was built
     syncTimestamp: number; // historyStorage.lastSyncTimestamp at warm time (ms)
+    /** Stats grouping logic version; older caches are recomputed */
+    version?: number;
+    /** ArtistNameResolver fingerprint at warm time; artist alias changes invalidate */
+    artistAliasFingerprint?: string;
     streaks: StreakInfo;
     counts: ScrobbleCounts;
     listeningHours: ListeningHours;

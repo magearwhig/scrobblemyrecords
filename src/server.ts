@@ -667,6 +667,8 @@ async function startServer() {
     statsService.setArtistNameResolver(artistNameResolver);
     historyStorage.setArtistNameResolver(artistNameResolver);
     wrappedService.setArtistNameResolver(artistNameResolver);
+    rankingsService.setArtistNameResolver(artistNameResolver);
+    analyticsService.setArtistNameResolver(artistNameResolver);
 
     // Create merge service for detecting and merging split history index entries
     const historyIndexMergeService = new HistoryIndexMergeService(

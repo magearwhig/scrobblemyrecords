@@ -648,6 +648,23 @@ describe('ArtistNameResolver', () => {
       expect(resolver.areSameArtist('New Alias', 'New Canonical')).toBe(true);
     });
 
+    it('should change the fingerprint only when the aliases change', async () => {
+      (mockArtistMappingService.getAllMappings as jest.Mock).mockReturnValue([
+        { discogsName: 'A', lastfmName: 'B', dateAdded: Date.now() },
+      ]);
+      await resolver.rebuild();
+      const first = resolver.getFingerprint();
+
+      await resolver.rebuild();
+      expect(resolver.getFingerprint()).toBe(first);
+
+      (mockArtistMappingService.getAllMappings as jest.Mock).mockReturnValue([
+        { discogsName: 'A', lastfmName: 'C', dateAdded: Date.now() },
+      ]);
+      await resolver.rebuild();
+      expect(resolver.getFingerprint()).not.toBe(first);
+    });
+
     it('should handle newly added mappings after rebuild', async () => {
       // Arrange - first build with one mapping
       (mockArtistMappingService.getAllMappings as jest.Mock).mockReturnValue([

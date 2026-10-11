@@ -153,8 +153,10 @@ export class WrappedService {
     // Track plays in range per artist
     const artistRangePlays = new Map<string, number>();
 
+    const resolver = this.artistNameResolver;
     const canonicalize = createAlbumCanonicalizer(
-      await loadAlbumMappings(this.mappingService)
+      await loadAlbumMappings(this.mappingService),
+      resolver ? name => resolver.resolveArtist(name) : undefined
     );
 
     for (const [key, albumHistory] of Object.entries(index.albums)) {

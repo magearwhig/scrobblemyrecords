@@ -5,6 +5,7 @@ import {
 } from '../../shared/utils/albumMapping';
 import { createLogger } from '../utils/logger';
 
+import { ArtistNameResolver } from './artistNameResolver';
 import { loadAlbumMappings } from './mergedAlbumHistory';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 
@@ -38,10 +39,19 @@ export class RankingsService {
   private mappingService: {
     getAllAlbumMappings(): Promise<AlbumMapping[]>;
   } | null = null;
+  private artistNameResolver: Pick<ArtistNameResolver, 'resolveArtist'> | null =
+    null;
   private logger = createLogger('RankingsService');
 
   constructor(historyStorage: ScrobbleHistoryStorage) {
     this.historyStorage = historyStorage;
+  }
+
+  /** Optional: album rankings group spellings of one artist (see ArtistNameResolver). */
+  setArtistNameResolver(
+    resolver: Pick<ArtistNameResolver, 'resolveArtist'>
+  ): void {
+    this.artistNameResolver = resolver;
   }
 
   /** Optional: album rankings count versions merged by album mappings as one album. */
@@ -83,8 +93,10 @@ export class RankingsService {
       track?: string;
     }> = [];
 
+    const resolver = this.artistNameResolver;
     const canonicalize = createAlbumCanonicalizer(
-      await loadAlbumMappings(this.mappingService)
+      await loadAlbumMappings(this.mappingService),
+      resolver ? name => resolver.resolveArtist(name) : undefined
     );
 
     for (const [albumKey, albumEntry] of Object.entries(index.albums)) {

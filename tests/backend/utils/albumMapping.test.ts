@@ -65,6 +65,26 @@ describe('albumMapping utils', () => {
       ).toBe(canonicalize('the format', 'dog problems').key);
     });
 
+    it('groups artist spellings the resolver treats as one artist', () => {
+      const canonicalize = createAlbumCanonicalizer([], artist =>
+        artist === 'afghan whigs' ? 'the afghan whigs' : artist
+      );
+
+      expect(canonicalize('afghan whigs', '1965').key).toBe(
+        canonicalize('the afghan whigs', '1965').key
+      );
+    });
+
+    it('groups an unknown Discogs-numbered artist with the plain name', () => {
+      const canonicalize = createAlbumCanonicalizer([], artist =>
+        artist.toLowerCase() === 'afghan whigs' ? 'the afghan whigs' : artist
+      );
+
+      expect(canonicalize('Afghan Whigs (2)', '1965').key).toBe(
+        canonicalize('the afghan whigs', '1965').key
+      );
+    });
+
     it('tolerates missing mappings', () => {
       expect(createAlbumCanonicalizer(undefined)('a', 'b').key).toBe('a|b');
     });

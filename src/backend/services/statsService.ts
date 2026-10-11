@@ -65,6 +65,12 @@ const MILESTONES = [
 const AVG_TRACK_DURATION_SECONDS = 210;
 
 /**
+ * Bump when a change alters what warm-cached stats contain (e.g. how albums
+ * are grouped), so caches built by older code are recomputed.
+ */
+const WARM_CACHE_VERSION = 2;
+
+/**
  * Service for calculating and caching listening statistics.
  * Uses scrobble history index as the data source.
  *
@@ -410,6 +416,8 @@ export class StatsService {
         warm: {
           warmedAt: now,
           syncTimestamp: lastSyncTimestamp,
+          version: WARM_CACHE_VERSION,
+          artistAliasFingerprint: this.artistAliasFingerprint(),
           streaks,
           counts,
           listeningHours,
@@ -458,7 +466,15 @@ export class StatsService {
     const lastSyncTimestamp = await this.historyStorage.getLastSyncTimestamp();
     if (lastSyncTimestamp === null) return null;
     if (cache.warm.syncTimestamp !== lastSyncTimestamp) return null;
+    if (cache.warm.version !== WARM_CACHE_VERSION) return null;
+    if (cache.warm.artistAliasFingerprint !== this.artistAliasFingerprint()) {
+      return null;
+    }
     return cache.warm;
+  }
+
+  private artistAliasFingerprint(): string {
+    return this.artistNameResolver?.getFingerprint() ?? '';
   }
 
   /**
@@ -850,7 +866,8 @@ export class StatsService {
     // Count plays per album in the period. Versions merged by album mappings
     // count as one album, shown under the artist with the most plays.
     const canonicalize = createAlbumCanonicalizer(
-      await loadAlbumMappings(this.mappingService)
+      await loadAlbumMappings(this.mappingService),
+      name => this.resolveArtistName(name)
     );
     const albumCounts = new Map<
       string,

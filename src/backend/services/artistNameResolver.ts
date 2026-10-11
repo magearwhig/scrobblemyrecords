@@ -1,3 +1,5 @@
+import { createHash } from 'crypto';
+
 import { AlbumMapping } from '../../shared/types';
 import { isCollectionLinked } from '../../shared/utils/albumMapping';
 import { createLogger } from '../utils/logger';
@@ -56,6 +58,9 @@ export class ArtistNameResolver {
   private artistMappingService: ArtistMappingServiceLike;
   private mappingService: MappingService;
   private compoundMappingService?: CompoundArtistMappingServiceLike;
+
+  /** Changes whenever a rebuild changes which names are the same artist */
+  private fingerprint = '';
 
   /** Optional callback to supply play counts for display name weighting */
   private playCountProvider?: () => Promise<Map<string, number>>;
@@ -292,6 +297,16 @@ export class ArtistNameResolver {
       this.assignPlayCountWeightedDisplayNames(playCounts);
     }
 
+    this.fingerprint = createHash('sha1')
+      .update(
+        JSON.stringify([
+          [...this.aliasToCanonical].sort(),
+          [...this.compoundToComponents].sort(),
+          [...this.displayNames].sort(),
+        ])
+      )
+      .digest('hex');
+
     log.info(
       `Alias graph built: ${this.canonicalToAliases.size} canonical artists, ` +
         `${this.aliasToCanonical.size} total aliases, ` +
@@ -482,6 +497,14 @@ export class ArtistNameResolver {
    * Returns the canonical lowercase name for an artist.
    * If the artist is unknown, returns the input lowercased.
    */
+  /**
+   * Identifies the current alias graph. Cached results that depend on artist
+   * grouping should be discarded when this changes.
+   */
+  getFingerprint(): string {
+    return this.fingerprint;
+  }
+
   resolveArtist(name: string): string {
     if (!name) return '';
     const key = name.toLowerCase();
