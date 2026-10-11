@@ -1,5 +1,6 @@
 import { AlbumMapping } from '../../../src/shared/types';
 import {
+  albumGroupKey,
   createAlbumCanonicalizer,
   createCollectionNameResolver,
   isCollectionLinked,
@@ -28,7 +29,7 @@ describe('albumMapping utils', () => {
       expect(canonicalize('The Go-Betweens', 'Tallulah (Remastered)')).toEqual({
         artist: 'The Go-Betweens',
         album: 'Tallulah',
-        key: 'the go-betweens|tallulah',
+        key: 'thegobetweens|tallulah',
         mapping: mapping({}),
       });
     });
@@ -40,15 +41,68 @@ describe('albumMapping utils', () => {
       expect(own).toEqual({
         artist: 'the go-betweens',
         album: 'tallulah',
-        key: 'the go-betweens|tallulah',
+        key: 'thegobetweens|tallulah',
       });
       expect(own.key).toBe(
         canonicalize('the go-betweens', 'tallulah (remastered)').key
       );
     });
 
+    it('groups a mapped version with an unmapped spelling of its target', () => {
+      // The bonus version maps to the Discogs name "The Format (2)"; the plain
+      // history name has no mapping but is the same album
+      const canonicalize = createAlbumCanonicalizer([
+        mapping({
+          historyArtist: 'the format',
+          historyAlbum: 'dog problems (bonus track version)',
+          collectionArtist: 'The Format (2)',
+          collectionAlbum: 'Dog Problems',
+        }),
+      ]);
+
+      expect(
+        canonicalize('the format', 'dog problems (bonus track version)').key
+      ).toBe(canonicalize('the format', 'dog problems').key);
+    });
+
     it('tolerates missing mappings', () => {
       expect(createAlbumCanonicalizer(undefined)('a', 'b').key).toBe('a|b');
+    });
+  });
+
+  describe('albumGroupKey', () => {
+    it('ignores case, punctuation, accents and Discogs suffixes', () => {
+      const key = albumGroupKey('Desaparecidos', 'Read Music, Speak Spanish');
+      expect(albumGroupKey('desaparecidos', 'read music/speak spanish')).toBe(
+        key
+      );
+      expect(albumGroupKey('Rodríguez', 'Cold Fact')).toBe(
+        albumGroupKey('rodriguez', 'cold fact')
+      );
+      expect(albumGroupKey('Girls (5)', 'Album')).toBe(
+        albumGroupKey('girls', 'album')
+      );
+    });
+
+    it('keeps edition words, so versions still need a mapping', () => {
+      expect(albumGroupKey('wye oak', 'shriek (deluxe version)')).not.toBe(
+        albumGroupKey('wye oak', 'shriek')
+      );
+    });
+
+    it('keeps names in other scripts distinct', () => {
+      expect(albumGroupKey('きのこ帝国', '渦になる')).not.toBe(
+        albumGroupKey('きのこ帝国', 'フェイクワールドワンダーランド')
+      );
+      expect(albumGroupKey('artist', '春 1')).not.toBe(
+        albumGroupKey('artist', '夏 1')
+      );
+    });
+
+    it('keeps punctuation-only names distinct', () => {
+      expect(albumGroupKey('artist', '...')).not.toBe(
+        albumGroupKey('artist', '!!!')
+      );
     });
   });
 
