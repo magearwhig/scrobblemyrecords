@@ -9,7 +9,7 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | done/button-system-consolidation.md | Complete -- all 4 phases, 54 files migrated, legacy .btn CSS removed |
 | done/mapping-resolution-plan.md | Complete -- Feature 16, all 6 phases implemented |
 | done/ui-audit-report.md | Complete -- All 3 phases (design tokens, visual polish, cleanup) implemented March 2026 |
-| tech-debt.md | Active -- 24 open (4 P1 quick wins, 7 P2, 13 P3), 41 completed; re-verified 2026-10-11 |
+| tech-debt.md | Active -- 24 open (4 P1 quick wins, 7 P2, 13 P3), 42 completed; re-verified 2026-10-11 |
 | done/wishlist-enhancements-plan.md | Complete -- all 4 enhancements implemented, tested, verified |
 | cancelled/spotify-integration-plan.md | Cancelled -- Spotify genre enrichment for embeddings |
 | cancelled/smart-scrobble-scheduling-plan.md | Cancelled -- superseded by memory-scrobble-plan |

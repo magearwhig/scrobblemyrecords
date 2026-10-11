@@ -2,9 +2,9 @@
 
 Consolidated from the January–February 2026 audits and the 2026-03-22 consistency audit. **Last re-verified against the code: 2026-10-11** (branch `feat/album-version-merging`, HEAD `0f43ff8`).
 
-**Status: 24 open, 41 completed / resolved.**
+**Status: 24 open, 42 completed / resolved.**
 
-- Open = C1 (coverage, ongoing) + 20 still-open items from the March 2026 audit + 3 new items from the October 2026 reviews (M31–M33). M32 and M33 came out of the 2026-10-11 planning review (data-export and marketplace plans).
+- Open = C1 (coverage, ongoing) + 20 still-open items from the March 2026 audit + 3 new open items from the October 2026 reviews (M31–M33). M32 and M33 came out of the 2026-10-11 planning review (data-export and marketplace plans). H15, found in the same review, was fixed the same day.
 - 2026-10-11 review closed M26 (not applicable) and M29 (resolved). It narrowed H14, M27, M28, M30, L15, L16 and L17 to what is still true.
 - Product feature ideas are in [Product ideas (not tech debt)](#product-ideas-not-tech-debt) at the end. They are not counted here.
 
@@ -405,6 +405,14 @@ No dedicated test: `ThemeContext`, `useConfirmModal`, `useEmbeddingStatus`, `use
 41 items. Newest first within each group. The original write-ups are kept below the table for history.
 
 ### Resolved in the 2026-10-11 review
+
+#### ~~H15. Wishlist search returned a master ID as `releaseId`~~ FIXED (2026-10-11)
+
+`WishlistService.searchForRelease()` searches Discogs with `type: 'master'` but returned the master ID as `releaseId`. `ReleaseTrackingService.addToWishlist()` (New Releases "add to wishlist") sent that value to `PUT /users/{username}/wants/{id}`, which expects a release ID, so it could add an unrelated release. Fix: the search result no longer has `releaseId`. The new `WishlistService.getMasterMainReleaseId()` reads `/masters/{id}.main_release`, and `addToWishlist` adds that release (or adds nothing and returns `false`). Local wants no longer store a `releaseId` from the search, and `getLocalWantList()` drops a stored `releaseId` equal to `masterId` (the file is corrected on the next save). Tests in `wishlistService.test.ts` and `releaseTrackingService.test.ts`.
+
+**Account check (2026-10-11, read-only):** none of the user's 207 live Discogs wants carries the "Added from New Releases tracking" note, no want's release ID equals a master ID known to the app, and no tracked release is marked `inWishlist`. No wrong items were found.
+
+**Related, still open:** `LabelMonitoringService.loadUserReferenceSets()` collects wishlist master IDs that the matching code never consults, so label items aren't cross-referenced against local wants by master.
 
 #### ~~M26. Backend pagination parameter naming~~ NOT APPLICABLE (2026-10-11)
 

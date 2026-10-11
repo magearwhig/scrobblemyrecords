@@ -77,7 +77,10 @@ Exports are read-only. They have no import path, and they are never used to rest
    | Mapping `createdAt` / `dateAdded` | **ms** |
 
    The `isLikelySeconds` / `normalizeToMs` helpers exist in `src/backend/utils/timestamps.ts`. Even so, the export uses an **explicit per-field unit** and never a heuristic.
-10. **Backup gaps (for context, out of scope here).** `backupService` FILE_PATHS do not include `mappings/track-mappings.json`, `mappings/compound-artist-mappings.json`, `mappings/dismissed-album-merges.json` or the `data/scrobbles/session-*.json` files. These belong in `tech-debt.md` or a backup follow-up, not here.
+10. **Local wants store a master id in `releaseId`.** `WishlistService.searchForRelease()` (`wishlistService.ts:821`) searches `/database/search` with `type: 'master'`, so each result's `id` *is* a master id, yet it is returned as `releaseId: result.id` (line 876) next to `masterId: result.master_id || result.id` (875). `addToLocalWantList()` (1025, 1044) and `checkLocalWantListForVinyl()` (1114) persist `searchResults[0].releaseId` into `LocalWantItem.releaseId` in `wishlist/local-want-list.json`. In the current data all 11 local wants that have one store `releaseId === masterId`. A master id and a release id are different number spaces, so treating it as a release id can collide with an unrelated collection release. The `masterId` is also only the **first search hit**, never confirmed by the user. Today's readers that trust it: `LabelMonitoringService.loadUserReferenceSets()` (`labelMonitoringService.ts:830`, adds it to `wishlistReleaseIds`) and `ReleaseTrackingService` (`releaseTrackingService.ts:1615`, passes `bestMatch.releaseId` from the same search to `addToDiscogsWantlist`, which PUTs `/users/{u}/wants/{id}`). The code fix is tracked as tech debt, not here. The export works around it (see [Local-want ids](#local-want-ids)).
+11. **The collection cache can be partial and still look fresh.** Each page file `collections/{username}-page-N.json` is `{ success, data, pagination, timestamp }`, and `pagination` carries the expected `pages` and `items` (24 / 1,189 today). `getAllCachedCollectionItems()` stops silently at the first missing or empty page and returns only what it read, with no timestamps. `preloadAllCollectionPages()` logs and skips a failed page, then writes `status: 'completed'` with every page listed in `completedPages`, so `{username}-progress.json` can't prove completeness either.
+12. **Discard-pile ids are release ids.** `DiscardPileItem.collectionItemId` is documented as the "instance ID (CollectionItem.id)", but `CollectionItem.id` is the release id (gap 1). A discard therefore can't tell two copies of one release apart. Today there are 36 discards, all `traded_in`, and none is still in the collection cache.
+13. **Backup gaps (for context, out of scope here).** `backupService` FILE_PATHS do not include `mappings/track-mappings.json`, `mappings/compound-artist-mappings.json`, `mappings/dismissed-album-merges.json` or the `data/scrobbles/session-*.json` files. These belong in `tech-debt.md` or a backup follow-up, not here.
 
 ---
 
@@ -98,21 +101,50 @@ export type ExportRowSource = 'discogs-collection' | 'discogs-want' | 'local-wan
 
 /** Whether a wanted item is already in the collection. */
 export type OwnedMatchStatus =
-  | 'owned-same-release'   // a collection row has the same releaseId
+  | 'owned-same-release'   // a collection row has the same *confirmed* releaseId
   | 'owned-other-version'  // a collection row has the same masterId (> 0)
-  | 'owned-name-match'     // no id match; albumGroupKey(artist, title) matches a collection row
+  | 'owned-name-match'     // no id match; the name keys match (see Identity and name keys)
   | 'not-owned'
-  | 'unknown';             // collection cache unavailable
+  | 'unknown';             // collection cache missing, unreadable, or partial (see Cache completeness)
+
+/**
+ * Where a masterId came from.
+ * - 'release-data': copied from Discogs data for this exact release
+ *   (collection basic_information.master_id, want basic_information.master_id).
+ *   This is a "confirmed master".
+ * - 'search-guess': the first hit of a Discogs master search by artist/album
+ *   (LocalWantItem.masterId via searchForRelease). Never confirmed by the user.
+ */
+export type MasterIdSource = 'release-data' | 'search-guess';
+
+/** How sure a cross-row link is. Consumers decide what to show or merge. */
+export type MatchConfidence =
+  | 'certain'    // same confirmed releaseId
+  | 'confident'  // same confirmed (release-data) masterId on both sides
+  | 'likely';    // involves a search-guess masterId, or names only
+
+export type MatchBasis = 'release-id' | 'master-id' | 'search-master-id' | 'name';
+
+export interface ExportRowLink {
+  rowId: string;
+  basis: MatchBasis;
+  confidence: MatchConfidence;
+}
 
 export interface ExportCollectionRow {
   rowId: string;               // stable: "discogs-collection:{releaseId}:{copyIndex}" (see Stable ids)
   source: 'discogs-collection';
   releaseId: number;
   masterId: number | null;     // null when absent or 0
+  masterIdSource: MasterIdSource | null; // 'release-data' whenever masterId is set
   copyIndex: number;           // 1-based among copies of this release, ordered by dateAdded then cache order
-  copyCount: number;           // copies of this release in the collection
+  copyCount: number;           // copies of this release in the collection, repeated on every copy's row:
+                               // two rows that each say copyCount: 2 are two copies in total, not four.
+                               // Count copies by counting rows; never sum copyCount.
   artistRaw: string;           // exactly as cached from Discogs, e.g. "Turnstile (2), Someone (3)"
-  artistDisplay: string;       // Discogs "(N)" suffixes stripped from every joined artist
+  artistDisplay: string;       // Discogs "(N)" suffixes stripped from every joined artist (display/sort only)
+  artistIdentityKey: string;   // see Identity and name keys; keeps the "(N)" suffixes
+  albumNameKey: string;        // see Identity and name keys; suffix-insensitive
   title: string;
   year: number | null;         // Discogs 0 → null
   formats: string[];           // e.g. ["Vinyl"]; descriptions added in Phase 4
@@ -134,10 +166,13 @@ export interface ExportCollectionRow {
 export interface ExportWishlistRow {
   rowId: string;               // "discogs-want:{wantId}" | "local-want:{localId}"
   source: 'discogs-want' | 'local-want';
-  releaseId: number | null;
+  releaseId: number | null;    // discogs-want: WishlistItem.releaseId. local-want: ALWAYS null (see Local-want ids)
   masterId: number | null;     // null when absent or 0
+  masterIdSource: MasterIdSource | null; // discogs-want: 'release-data'; local-want: 'search-guess'
   artistRaw: string;
   artistDisplay: string;
+  artistIdentityKey: string | null; // null for local wants (Last.fm names carry no Discogs identity)
+  albumNameKey: string;
   title: string;               // WishlistItem.title / LocalWantItem.album
   year: number | null;
   formats: string[];           // discogs-want: from VersionsCache entry matching releaseId, else []
@@ -153,15 +188,31 @@ export interface ExportWishlistRow {
   priceCurrency: string | null;
   playCount: number | null;    // LocalWantItem.playCount; null for discogs wants
   ownedMatch: OwnedMatchStatus;
-  ownedCollectionRowIds: string[];   // collection rowIds that produced the match
-  relatedWishlistRowIds: string[];   // same master/album in the other wishlist source
+  ownedMatchConfidence: MatchConfidence | null; // null for not-owned / unknown
+  ownedCollectionRowIds: string[];   // collection rowIds that produced the match (all of them, not just the first)
+  ownedCollectionLinks: ExportRowLink[]; // same rows, with basis and confidence per row
+  relatedWishlistLinks: ExportRowLink[]; // same release/master/album in the OTHER wishlist source, every
+                                         // confidence included; consumers must not treat 'likely' as "same item"
+  searchMasterIdCandidate: number | null; // local-want only: the stored LocalWantItem.releaseId when it
+                                          // differs from masterId (provenance only; never used for matching)
   coverImageUrl: string | null;
+}
+
+export interface ExportCollectionCacheInfo {
+  status: 'complete' | 'partial' | 'missing';
+  pagesExpected: number | null;  // page-1 pagination.pages
+  pagesRead: number;             // consecutive pages read from page 1
+  itemsExpected: number | null;  // page-1 pagination.items
+  itemsRead: number;
+  oldestPageAt: string | null;   // ISO; the age of the stalest data
+  newestPageAt: string | null;
 }
 
 export interface ExportSnapshotMeta {
   schemaVersion: typeof EXPORT_SCHEMA_VERSION;
   generatedAt: string;               // ISO 8601 UTC
-  collectionCachedAt: string | null; // newest page timestamp of the collection cache
+  collectionCachedAt: string | null; // OLDEST page timestamp of the pages read (= collectionCache.oldestPageAt)
+  collectionCache: ExportCollectionCacheInfo;
   wishlistUpdatedAt: string | null;  // WishlistStore.lastUpdated
   historySyncedAt: string | null;    // ScrobbleHistoryIndex.lastSyncTimestamp (ms → ISO)
   discogsUsername: string | null;    // identifies whose data it is; no tokens
@@ -181,15 +232,45 @@ class ExportDataService {
 ### Rules both consumers can rely on
 - **Machine order only.** Rows come back sorted by `source`, then `rowId`. Any human-readable sort or collation (articles, diacritics, grouping by artist) belongs to the Pocket List plan.
 - **Complete rows.** Every collection item and every want is included, with nothing filtered or hidden. Consumers curate. Absent values are `null` or `[]`, never `""`, `0` or `"Unknown"`.
-- **Raw and display both present.** `artistRaw` is never modified. `artistDisplay` comes from a new shared helper, `stripDiscogsSuffixes(artist)`, in `src/shared/utils/albumMapping.ts`. It removes `\s*\(\d+\)` before each `,` and at the end; the existing `stripDiscogsSuffix` stays as it is. Album-mapping and alias canonicalization is **not** applied to collection or wishlist rows, because Discogs names *are* the canonical targets. It appears only in the plays and mappings datasets.
-- **Owned-match rules**, in order:
-  1. Same `releaseId`.
-  2. Same `masterId` > 0.
-  3. `albumGroupKey(stripDiscogsSuffixes(artist), title)` equal, which ignores case, accents, punctuation and suffixes.
+- **Raw, display and identity all present.** `artistRaw` is never modified. Identity uses `artistIdentityKey` (suffixes kept); `artistDisplay` is for display and sorting only. `artistDisplay` comes from a new shared helper, `stripDiscogsSuffixes(artist)`, in `src/shared/utils/albumMapping.ts`. It removes `\s*\(\d+\)` before each `,` and at the end; the existing `stripDiscogsSuffix` stays as it is. Album-mapping and alias canonicalization is **not** applied to collection or wishlist rows, because Discogs names *are* the canonical targets. It appears only in the plays and mappings datasets.
+- **Owned-match rules**, first hit wins; every matching collection row is listed, not just the first:
+  1. Same confirmed `releaseId` → `owned-same-release`, `certain`. Only Discogs wants can reach this tier, because local-want `releaseId` is always `null`.
+  2. Same `masterId` > 0 → `owned-other-version`. Confidence is `confident` when both sides are `release-data`, `likely` (basis `search-master-id`) when the want's master is a `search-guess`.
+  3. Name match → `owned-name-match`, `likely`. Discogs want vs collection: equal `artistIdentityKey` **and** equal `albumNameKey`. Local want vs collection: equal `albumNameKey` only (Last.fm names have no suffix to compare; see below).
   4. Otherwise `not-owned`.
-  5. `unknown` only when the collection cache is empty or unreadable.
+  5. `unknown` when the collection cache is `missing` or unreadable. When it is `partial`, positive matches stay, but what would be `not-owned` becomes `unknown`, because the missing pages may hold the album.
 
-  Local wants match on `album` as the title.
+  Local wants match on `album` as the title. A search-guess master that matches is never upgraded to `confident`, even if the names also agree.
+- **Related wishlist links** (`relatedWishlistLinks`) use the same bases and confidences between a Discogs want and a local want (same master, or `albumNameKey`). Every link is kept, including `likely` ones. With today's data the only overlap (1 local want sharing a master with a Discogs want) is `likely`, because every local-want master is a search guess.
+
+### Identity and name keys
+
+Display normalization is not identity. Discogs "(N)" suffixes tell apart **different artists** with the same name ("Artist (2)" and "Artist (3)" are two people), so they stay in the identity key and are stripped only for display and sort.
+
+- `artistIdentityKey` (Discogs rows only): `albumGroupKey`-style simplification of `artistDisplay` per joined artist, followed by each artist's suffix (`""` when it has none), e.g. `"turnstile#2,someone#3"`. "Artist", "Artist (2)" and "Artist (3)" are three identities. New helper `discogsArtistIdentityKey(artistRaw)` in `src/shared/utils/albumMapping.ts`.
+- `albumNameKey`: `albumGroupKey(artistDisplay, title)`. It ignores case, Latin accents, punctuation and suffixes. Since the 2026-10-11 fix, `albumGroupKey` keeps Unicode combining marks (`[^\p{L}\p{N}\p{M}]` after stripping U+0300–U+036F), so Devanagari "क", "का", "कि", "कु" stay distinct. It is a *grouping/candidate* key, never proof of identity on its own.
+- Local wants are Last.fm-derived names, where a "(N)" suffix never exists, so they have no `artistIdentityKey` and can only reach `likely` matches.
+- Today's data: suffix-preserving name matching gives the same counts as the suffix-insensitive key (1 name-only match), and 1 collection artist name exists under two different suffixes, which now stays split.
+
+### Local-want ids
+
+`LocalWantItem.releaseId` holds a **master** id from a master search (gap 10), so the shared layer never exports it as `releaseId`:
+
+- `releaseId` is always `null` for local wants in schema v1.
+- `masterId` comes from `LocalWantItem.masterId` with `masterIdSource: 'search-guess'`.
+- If the stored `releaseId` differs from `masterId` (not the case in today's data), it is exported only as `searchMasterIdCandidate`, for provenance, and is never matched against anything.
+- Once the tech-debt fix stores a real, user-confirmed release or master, the source value changes additively (e.g. a new `MasterIdSource` value `'user-confirmed'`), with no schema bump.
+
+### Cache completeness
+
+`getAllCachedCollectionItems()` stays as it is for its current callers. The shared layer uses a new sibling `readCollectionCacheSnapshot(username, fileStorage)` in `collectionCache.ts`, which returns `{ items, info: ExportCollectionCacheInfo }`:
+
+- It reads consecutive pages from page 1, as today, and also collects each page's `timestamp` and page 1's `pagination.pages` / `pagination.items`.
+- `complete`: `pagesRead === pagesExpected` and `itemsRead === itemsExpected`. `partial`: anything less (or `pagination` absent on a page that has data). `missing`: no page 1.
+- `collectionCachedAt` reports the **oldest** page read, so a half-refreshed cache never looks newer than its stalest page.
+- The `{username}-progress.json` file is not used: it says `completed` even when pages failed.
+
+Discard-pile curation is **not** part of the contract. Rows stay complete, and ownership ignores discards. Release-level discard ids can't distinguish duplicate copies (gap 12), so any discard filtering waits until Phase 4 captures `instance_id`.
 - **No side effects.** Read-only, and no API calls. Don't call `artistMappingService.getLastfmName()`, which writes `lastUsed`.
 - **No secrets.** Settings are read only for `discogs.username`. Tokens, session keys, API tokens and AI keys never enter rows or meta.
 - **Stability.** Within `EXPORT_SCHEMA_VERSION = 1`, fields may be *added* but not renamed, removed or re-typed. A breaking change bumps the version and is noted in this plan.
@@ -256,13 +337,14 @@ New `src/backend/routes/export.ts`, mounted at `/api/v1/export` in `src/server.t
 
 | Method | Path | Returns |
 |--------|------|---------|
+| GET | `/meta` | `ExportSnapshotMeta` only (Phase 1; used by the Pocket List dialog and the Settings card) |
 | GET | `/datasets` | Available datasets with row counts and `ExportSnapshotMeta` (for the UI) |
 | GET | `/:dataset?format=csv\|json` | File download (`Content-Disposition: attachment; filename=...`, `text/csv; charset=utf-8` or `application/json`) |
 | GET | `/all?format=json` | Bundle download |
 
-`:dataset` is an explicit allow-list (`collection`, `wishlist`, `plays`, `mappings`). The Pocket List's `GET /api/v1/export/pocket-list` lives on the same router. Whichever plan lands first creates `routes/export.ts`, and the other plan's literal routes are registered **before** `/:dataset`. Both use `ExportDataService.getSnapshotMeta()` for "as of" freshness instead of reading cache timestamps separately.
+`:dataset` is an explicit allow-list (`collection`, `wishlist`, `plays`, `mappings`). The Pocket List's `GET /api/v1/export/pocket-list` lives on the same router. **Phase 1 creates `routes/export.ts`** with only `/meta` and mounts it, so the router exists before either consumer needs it. Every literal route (`/meta`, `/datasets`, `/all`, `/pocket-list`) is registered **before** `/:dataset`. Both use `ExportDataService.getSnapshotMeta()` for "as of" freshness instead of reading cache timestamps separately.
 
-Unknown dataset or format returns 400. If no collection cache exists, the response is still 200 with zero rows, and `meta.collectionCachedAt` is `null` so the UI can warn.
+Unknown dataset or format returns 400. If no collection cache exists, the response is still 200 with zero rows, and `meta.collectionCache.status` is `missing` (`collectionCachedAt` `null`) so the UI can warn. A `partial` cache also returns 200 with the rows read; the UI warns "N of M pages cached".
 
 `plays` (about 55k rows, roughly 5–7 MB CSV) is built in memory from the already-loaded index. This is acceptable at the current size. If the history grows past about 500k plays, stream it with `res.write` per chunk.
 
@@ -274,28 +356,31 @@ Unknown dataset or format returns 400. If no collection cache exists, the respon
 - The card has:
   - One row per dataset showing the name, row count, "as of" date from meta, and **CSV** and **JSON** buttons.
   - An "Everything (JSON)" button.
-  - A warning when the collection cache is missing or old.
-- Downloads use axios with `responseType: 'blob'`, as `ApiService.exportBackup` does, because a plain `<a href>` wouldn't send the bearer token when auth is enabled. A small `downloadBlob(blob, filename)` helper reads the filename from `Content-Disposition`.
+  - A warning when the collection cache is missing, partial or old.
+  - A "Pocket List (PDF)" row that opens the Pocket List dialog. Whichever plan lands second adds this row (see the Pocket List plan's dependencies).
+- Downloads use axios with `responseType: 'blob'`, as `ApiService.exportBackup` does, because a plain `<a href>` wouldn't send the bearer token when auth is enabled. A small `downloadBlob(blob, filename)` helper (`src/renderer/utils/downloadBlob.ts`, created by whichever plan lands first; three components hand-roll this today) reads the filename from `Content-Disposition`.
 - Icons: `Download`, `FileSpreadsheet` and `FileJson` from lucide. No inline styles. Use the existing button system and tokens.
 
 ---
 
 ## Implementation phases
 
-### Phase 1: Shared layer (~4–5 h)
-1. Add export types to `src/shared/types.ts`.
-2. Add `stripDiscogsSuffixes` to `src/shared/utils/albumMapping.ts`.
-3. Build `exportDataService.ts`:
-   - Collection rows: copy indexing, note-field split, genres and styles from the release cache when present, timestamp normalization.
-   - Wishlist rows: versions-cache format and label lookup, owned matching, related rows.
-   - Snapshot meta.
-4. Write tests.
+### Phase 1: Shared layer + router skeleton (~1–1.5 days)
+1. Add export types to `src/shared/types.ts`, including `MasterIdSource`, `MatchConfidence`, `ExportRowLink` and `ExportCollectionCacheInfo`.
+2. Add `stripDiscogsSuffixes` and `discogsArtistIdentityKey` to `src/shared/utils/albumMapping.ts`.
+3. Add `readCollectionCacheSnapshot` to `src/backend/utils/collectionCache.ts`.
+4. Build `exportDataService.ts`:
+   - Collection rows: copy indexing, note-field split, genres and styles from the release cache when present, timestamp normalization, identity and name keys.
+   - Wishlist rows: versions-cache format and label lookup, local-want id handling, owned matching with confidence, related links.
+   - Snapshot meta with cache completeness.
+5. Create `routes/export.ts` with `GET /meta` only and mount it at `/api/v1/export`.
+6. Write tests.
 
-**Unblocks the Pocket List plan.**
+**This is the only prerequisite for the Pocket List MVP.** Phase 2's `/datasets`, file downloads and Settings card are *not* required by it.
 
 ### Phase 2: Collection + wishlist files + UI (~4–5 h)
 1. Add `src/shared/utils/csv.ts`.
-2. Add `routes/export.ts` (datasets, collection, wishlist, all) and mount it.
+2. Add `datasets`, `collection`, `wishlist` and `all` to `routes/export.ts`.
 3. Collection play enrichment.
 4. API client methods.
 5. Settings card.
@@ -313,7 +398,7 @@ Unknown dataset or format returns 400. If no collection cache exists, the respon
 3. Values fill in on the next collection and wishlist sync. Rows already tolerate their absence.
 4. Separate PR. Check consumers of `CollectionItem.id` aren't affected, since the id stays the release id.
 
-**Total: about 2 days for Phases 1–3, plus about 0.5 day for Phase 4.**
+**Total: about 2.5–3 days for Phases 1–3, plus about 0.5 day for Phase 4.** (Phase 1 grew from ~4–5 h after the 2026-10-11 review added match confidence, identity keys and cache completeness.)
 
 ## Acceptance criteria
 
@@ -321,7 +406,11 @@ Unknown dataset or format returns 400. If no collection cache exists, the respon
 - [ ] `artistRaw` keeps `"(2)"` suffixes, and `artistDisplay` strips them from every joined artist.
 - [ ] Condition fields map to `mediaCondition` and `sleeveCondition`, and unknown field ids go to `customFields`.
 - [ ] Every timestamp appears as ISO 8601 UTC plus Unix seconds. Discogs offset strings convert correctly (e.g. `2020-12-04T19:42:05-08:00` → `2020-12-05T03:42:05Z`, `dateAddedUnix` 1607139725). `LocalWantItem.addedAt` (ms) and history play timestamps (s) are both handled correctly.
-- [ ] Wishlist rows include both sources. `ownedMatch` is right for the same release, another version of the same master, a name-only match and not owned. `unknown` appears when the collection cache is empty.
+- [ ] Wishlist rows include both sources. `ownedMatch` is right for the same release, another version of the same master, a name-only match and not owned. `unknown` appears when the collection cache is missing, and replaces `not-owned` when it is partial.
+- [ ] Local-want rows always have `releaseId: null` and `masterIdSource: 'search-guess'`. A local want whose stored `releaseId` equals a collection release id is **not** `owned-same-release`.
+- [ ] `ownedMatchConfidence` and every `ExportRowLink` carry the basis and confidence from the rules. `likely` related links are present, not dropped.
+- [ ] "Artist (2)" and "Artist (3)" with the same title get different `artistIdentityKey`s, so neither is a name match for the other. Both have the same `artistDisplay`.
+- [ ] `meta.collectionCache` reports `partial` when a middle page file is missing, and `collectionCachedAt` is the oldest page read.
 - [ ] CSV opens correctly in Numbers, Excel and LibreOffice with non-ASCII names (e.g. "Sigur Rós", "Björk"), embedded commas, quotes and newlines.
 - [ ] JSON has `format`, `schemaVersion`, `meta`, `rowCount` and `rows`, and `rowCount === rows.length`.
 - [ ] Exported files contain no string from `user-settings.json` other than the Discogs username (test asserts that tokens, secrets and session keys are absent).
@@ -336,12 +425,16 @@ Unknown dataset or format returns 400. If no collection cache exists, the respon
   - Fixture wants with `masterId: 0`.
   - Local wants with ms and second timestamps.
   - Versions-cache lookup.
-  - All five owned-match outcomes.
+  - All five owned-match outcomes, each with its confidence; a search-guess master match is `likely`.
+  - Local want whose stored `releaseId` (really a master id) equals an unrelated collection release id: not a same-release match, `releaseId` exported as `null`.
+  - Suffix identity: "Artist (2)" vs "Artist (3)" vs "Artist" never name-match each other; a local want "Artist" name-matches any of them as `likely`.
+  - Cache completeness: complete, missing page 3 of 5 (`partial`, rows from pages 1–2, `not-owned` → `unknown`), item-count mismatch, no cache.
+  - `copyCount` is the same on every copy's row.
   - The no-secrets assertion.
 - `tests/backend/utils/csv.test.ts` (shared utils are tested here, e.g. `albumMapping.test.ts`): quoting, CRLF, null, arrays, Unicode, leading `=`/`+` unchanged.
 - `tests/backend/routes/export.test.ts`: content types, `Content-Disposition` filenames, 400s, empty cache, `/all` bundle shape.
 - Plays and mappings: corrected vs original columns, `|`-in-key handling, row count parity.
-- `tests/backend/utils/albumMapping.test.ts` (extend): `stripDiscogsSuffixes` cases ("A (2), B (3)", "Discovery (7)", names with internal parentheses like "Sunn O)))", which stays unchanged).
+- `tests/backend/utils/albumMapping.test.ts` (extend): `stripDiscogsSuffixes` cases ("A (2), B (3)", "Discovery (7)", names with internal parentheses like "Sunn O)))", which stays unchanged). `discogsArtistIdentityKey` keeps suffixes per joined artist. Negative `albumGroupKey` fixtures that must **not** collide: Devanagari "क"/"का"/"कि"/"कु" (already added with the fix), Bengali "ক"/"কা", Thai "กิ"/"กี", "春 1" vs "夏 1", punctuation-only "!!!" vs "...". Positive fixtures that must still collide: "Björk"/"Bjork", "Sigur Rós"/"Sigur Ros".
 - Frontend: `SettingsBackupSection` export card renders counts, triggers blob download, shows the stale-cache warning.
 
 ## Open decisions
