@@ -1,5 +1,217 @@
 # Plan: Reissue & Label Discovery Features
 
+> **Status (audited 2026-10-11): MOSTLY IMPLEMENTED, small gaps remain.**
+> All three features (A reissues, B labels, C websites) shipped in commit
+> `6be3c73` ("feat: marketplace discovery — reissues, labels, websites + dev
+> sandbox"). What is left is one correctness gap in reissue detection, a
+> settings-defaults bug that turns reissue detection off for existing installs,
+> and the auto-scan and notification pieces for labels and websites. The plan
+> stays in `.plan/` until those are closed or explicitly dropped. The original
+> plan text below is kept for history. Where the code differs from it, the
+> code is the source of truth (see "Deliberate deviations").
+
+## Completed scope
+
+### Feature A: MusicBrainz reissue detection
+
+- `MusicBrainzService.getRecentReleases(artistMbid, monthsBack = 12)` in
+  `src/backend/services/musicbrainzService.ts` queries `/release` with
+  `arid:… AND date:[YYYY-MM TO *] AND status:official`. It paginates 100 at a
+  time with a 500-release cap per artist, uses the shared `enforceRateLimit` /
+  `executeWithBackoff`, and returns `MBReleaseLite` entries (title, date,
+  country, first label name, release-group MBID and types). It also sets
+  `originalReleaseDate` through `enrichWithReleaseGroupDates`.
+- `TrackedRelease` in `src/shared/types.ts` has `isReissue`,
+  `releaseGroupMbid`, `originalReleaseDate`, `sourceType`, `labelName` and
+  `country`. `ReleaseTrackingSettings.includeReissues` exists, and
+  `ReleaseTrackingService.getSettings` defaults it to `true`.
+- `ReleaseTrackingService.syncReleases` (`src/backend/services/releaseTrackingService.ts`)
+  runs a reissue branch for each artist when `settings.includeReissues` is on,
+  with a fixed 12-month lookback. The branch filters by enabled release types,
+  dedupes by release MBID against `existingMbids`, converts each entry through
+  the private `toReissueTrackedRelease`, and isolates failures in its own
+  try/catch.
+- `getFilteredReleases({ reissuesOnly })` handles the filter, and
+  `GET /api/v1/releases?reissuesOnly=true` exposes it
+  (`src/backend/routes/releases.ts`). `includeReissues` goes through the
+  release settings GET/POST.
+- Frontend:
+  - `api.getTrackedReleases({ reissuesOnly })` and the `includeReissues`
+    settings fields are in `src/renderer/services/api.ts`.
+  - The "Reissues" tab in `NewReleasesPage.tsx` shows the count and
+    "Orig. X → Reissue Y" dates through the `originalReleaseDates` map.
+  - `ReleaseCard.tsx` shows the reissue badge and label/country.
+  - The "Include reissues" toggle is in
+    `components/settings/SettingsFiltersSection.tsx`.
+- Tests:
+  - `tests/backend/musicbrainzService.test.ts` covers `getRecentReleases`.
+  - `tests/backend/releaseTrackingService.test.ts` has the
+    `toReissueTrackedRelease`, `getFilteredReleases reissuesOnly` and
+    `syncReleases reissue branch` suites.
+  - `tests/backend/routes/releases.test.ts` covers the `reissuesOnly` param.
+
+### Feature B: label monitoring
+
+- Types in `src/shared/types.ts`: `MonitoredLabel`, `LabelRelease`,
+  `LabelScanStatus`, `LabelMonitoringSettings`, `MonitoredLabelsStore`,
+  `LabelReleasesStore` and `LabelScanStatusStore`.
+- `LabelMonitoringService` (`src/backend/services/labelMonitoringService.ts`):
+  - Storage is `labels/{monitored-labels,releases,scan-status,settings}.json`.
+  - Label CRUD: `addLabel` validates through the Discogs `/labels/{id}` call,
+    plus `removeLabel` and `getLabels`. `searchLabels` uses
+    `/database/search?type=label`.
+  - Scanning: `startScan(targetLabelId?)`, `getScanStatus` and `cancelScan`.
+    It fetches newest-first and falls back to ascending when the descending
+    sort looks wrong (`looksDescending`). It stops at the lookback window and
+    caps at `maxReleasesPerLabel`.
+  - Releases are enriched with collection and wishlist status.
+  - `markReleaseAsSeen`, `dismissRelease` and their bulk versions.
+  - `getSettings` / `saveSettings`.
+- Routes in `src/backend/routes/labels.ts` are mounted at `/api/v1/labels` in
+  `src/server.ts`. They cover everything the plan listed, plus:
+  - per-label `POST /:labelId/scan`
+  - `releases/bulk-seen` and `releases/bulk-dismiss`
+  - `wishlist-label-options` and `wishlist-artist-options`
+  - `artist-urls` and `website-suggestions`
+- `migrationService.ts` registers all four label files. `backupService.ts`
+  backs up `labels/settings.json` and `labels/monitored-labels.json`.
+- Frontend: `src/renderer/pages/LabelsPage.tsx` with `LabelsPage.page.css`
+  (Discogs label search, wishlist-label quick-add, scan progress, release
+  cards, settings modal). It is embedded as the `labels` tab in
+  `MarketplacePage.tsx`, and the API methods are in `api.ts`
+  (e.g. `searchDiscogsLabels`).
+- Tests:
+  - `tests/backend/services/labelMonitoringService.test.ts`
+  - `tests/backend/routes/labels.test.ts`
+  - `tests/frontend/pages/LabelsPage.test.tsx`
+
+### Feature C: website monitoring
+
+- `cheerio` is a dependency in `package.json`.
+- Types in `src/shared/types.ts`: `MonitoredWebsite`, `WebsiteItem` (with
+  `confidence`, `formatKind` and `matches`), `WebsiteScanStatus` (with
+  `ollamaAvailable`), `WebsiteMonitoringSettings` and the store wrappers.
+- `WebsiteMonitoringService` (`src/backend/services/websiteMonitoringService.ts`):
+  - Website CRUD: `addWebsite`, `updateWebsite`, `removeWebsite` and
+    `getWebsites`, with URL validation.
+  - Extraction pipeline: `fetchPage` (timeout, user-agent, byte cap) →
+    `extractWithCheerio` (optional CSS selector) → `extractWithOllama`
+    (JSON prompt through `ollamaService.chat`) → `extractFallback` (regex).
+  - After extraction it applies `applyFormatFilter` and `applyMatches`, the
+    latter marking wishlist, local-want, collection and Last.fm top-artist
+    matches.
+  - `previewWebsite` returns items, a warning, `rawTextPreview` and a
+    suggested selector.
+  - Scanning: `startScan(targetWebsiteId?)`, `cancelScan` and `getScanStatus`.
+  - Item actions: seen, dismiss and their bulk versions.
+- Routes in `src/backend/routes/websites.ts` are mounted at `/api/v1/websites`
+  in `src/server.ts`, together with `ollamaService`. They cover everything the
+  plan listed, plus `items/:itemId/dismiss`, the bulk routes and
+  `GET /ollama/status`.
+- `migrationService.ts` registers all four website files. `backupService.ts`
+  backs up `websites/settings.json` and `websites/monitored-websites.json`.
+- Frontend: `src/renderer/pages/WebsitesPage.tsx` with `WebsitesPage.page.css`
+  (add/edit dialog with Preview, Ollama status, enable and `useOllama`
+  toggles, scan progress, item cards). It is embedded as the `websites` tab in
+  `MarketplacePage.tsx`.
+- Tests:
+  - `tests/backend/services/websiteMonitoringService.test.ts`
+  - `tests/backend/routes/websites.test.ts`
+  - `tests/frontend/pages/WebsitesPage.test.tsx`
+
+### Deliberate deviations from the original plan (accepted as-is)
+
+- The Discogs label calls (search, `/labels/{id}`, `/labels/{id}/releases`)
+  live inside `LabelMonitoringService` through `getDiscogsAxios()`, not as
+  new `DiscogsService` methods.
+- `MonitoredLabel` uses a local UUID `id` plus `discogsLabelId` and a
+  per-label `lookbackMonths`. `LabelRelease` uses boolean
+  `isInCollection` / `isInWishlist` flags and a `'dismissed'` status, not the
+  separate `notified` / `dismissed` fields.
+- `LabelMonitoringSettings` is `defaultLookbackMonths`,
+  `autoScanIntervalHours?` and `maxReleasesPerLabel?`. The plan's
+  `vinylOnly` and `notifyOnNewRelease` were not added.
+- `WebsiteMonitoringSettings` is `ollamaModel`, `ollamaEnabled`,
+  `fetchTimeoutMs`, `maxBytes` and `formatFilter`. Each site also has a
+  `useOllama` flag. `ollamaRequired`, `notifyOnNewItems` and
+  `checkFrequencyDays` were not added.
+- When Ollama is unavailable, the regex fallback produces items with
+  `confidence: 0.2` and preview returns a warning plus `rawTextPreview`.
+  The plan instead had raw-text items with `confidence: 0`.
+- No `websites/page-cache/` debug HTML snapshots are written.
+- `TrackedRelease.sourceType` is `'musicbrainz' | 'discogs' | 'website'`,
+  not `'release-group' | 'release'`. `isReissue` / `releaseGroupMbid` carry
+  that distinction instead.
+- Backups include only label and website *settings and monitored lists*.
+  Detected releases and items are treated as re-derivable cache.
+
+## Remaining work
+
+1. **Reissue dedupe against release-groups found in the same sync (Feature A,
+   step 3).** In `ReleaseTrackingService.syncReleases`, the reissue branch only
+   dedupes by individual release MBID (`existingMbids.has(r.mbid)`). It does
+   not skip releases whose `releaseGroupMbid` is a brand-new release-group in
+   this sync. It also does not check that the release-group was already known
+   before flagging the entry. As a result, the first pressing of a new album
+   is stored twice: once as the release-group row and once with
+   `isReissue: true`.
+   - *Fix:* before the reissue loop, build a set of release-group MBIDs added
+     as new albums in this sync, and skip any `r` whose `releaseGroupMbid` is
+     in that set. Optionally, also skip when `r.originalReleaseDate` is in the
+     same month as `r.date`.
+   - *Acceptance:* a new test in the `syncReleases reissue branch` suite of
+     `tests/backend/releaseTrackingService.test.ts`. When
+     `getRecentAndUpcomingReleases` returns release-group X and
+     `getRecentReleases` returns a pressing of X, only the release-group entry
+     is persisted. A pressing of an older, already-tracked or pre-window
+     release-group is still persisted with `isReissue: true`.
+
+2. **`includeReissues` (and other new settings) are lost on existing installs.**
+   `ReleaseTrackingService.getSettings` returns the stored file as-is whenever
+   `schemaVersion === 1`, without merging defaults. The live
+   `data/releases/settings.json` is `{ "schemaVersion": 1, "includeEps": true }`,
+   so `settings.includeReissues` is `undefined` and the reissue branch never
+   runs. `data/releases/tracked-releases.json` has 0 reissues among 408 entries
+   after the 2026-10 sync. `saveSettings` spreads the same partial `current`,
+   so nothing heals the file until the user toggles the checkbox.
+   - *Fix:* return `{ ...DEFAULTS, ...stored }` from `getSettings`.
+   - *Acceptance:* a unit test where a stored partial settings file yields
+     `includeReissues: true`, and the Settings toggle shows as checked for
+     such installs.
+
+3. **Label auto-scan is exposed in the UI but never runs.** `LabelsPage.tsx`
+   saves `LabelMonitoringSettings.autoScanIntervalHours`, but nothing reads
+   it. No scheduler in `src/server.ts` or anywhere else calls
+   `labelMonitoringService.startScan()`; the only `setInterval` is the
+   auto-backup check.
+   - *Fix:* add an interval or startup check in `src/server.ts`, next to the
+     auto-backup interval. It should call `startScan()` when
+     `lastScannedAt` is older than `autoScanIntervalHours` and no scan is
+     running.
+   - *Alternative:* remove the field from the UI.
+   - *Acceptance:* a test for the due-check helper, and no scan when the
+     setting is unset or 0.
+
+4. **No scheduled website scans.** The plan's `checkFrequencyDays` for
+   websites has no equivalent: there is no setting and no scheduler.
+   - *Fix:* add an `autoScanIntervalHours?` field to
+     `WebsiteMonitoringSettings` and reuse the scheduler from item 3.
+   - *Alternative:* explicitly drop this item.
+
+5. **No notifications for new label releases or website items.** The plan's
+   `notifyOnNewRelease` / `notifyOnNewItems` were not implemented, and neither
+   service creates notifications.
+   - *Fix:* follow the seller-monitoring pattern. `SellerMonitoringService`
+     has a `notifyOnNewMatch` setting and a `notified` flag on each match;
+     the frontend raises the notification and then marks the match as
+     notified. Do the same here with a setting that defaults to on, a
+     `notified` flag, and a mark-notified route.
+   - *Acceptance:* new items are notified exactly once, and nothing is
+     notified when the setting is off. Cover this in the service, route and
+     page tests.
+
+## Original plan
+
 ## Context
 
 Two albums (WHY? - Elephant Eyelash 20th Anniversary, billy woods & Kenny Segal - Maps reissue) were only found by chance on eBay/label sites. The current system catches new albums (MusicBrainz release groups) and new editions of wishlisted items (Discogs master versions), but misses reissues of non-wishlisted albums and label/website announcements.
