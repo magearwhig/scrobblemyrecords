@@ -176,7 +176,7 @@
 }
 
 .sellers-cache-stat-warning .sellers-cache-stat-value {
-  color: var(--accent-warning, #f59e0b);
+  color: var(--accent-warning);
 }
 
 .sellers-cache-actions {
@@ -197,7 +197,7 @@
   border: 1px solid rgba(245, 158, 11, 0.3);
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
-  color: var(--accent-warning, #f59e0b);
+  color: var(--accent-warning);
 }
 
 .sellers-scan-completed {
@@ -470,7 +470,7 @@
 }
 
 .seller-match-badge-unverified {
-  background: var(--accent-warning, #f59e0b);
+  background: var(--accent-warning);
   cursor: help;
 }
 

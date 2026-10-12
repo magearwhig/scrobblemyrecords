@@ -13,6 +13,7 @@
   --accent-primary-hover: #c4922e;
   --accent-primary-muted: rgba(212, 162, 78, 0.12);
   --accent-primary-rgb: 212, 162, 78;
+  --accent-warning: #f59e0b;
 
   /* --- Text --- */
   --text-default: #333333;
@@ -63,6 +64,7 @@
   --text-xl: 1.25rem;
   --text-2xl: 1.5rem;
   --text-3xl: 2rem;
+  --text-display: 4rem; /* oversized display glyphs, e.g. large empty-state icons */
   --weight-normal: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
@@ -129,6 +131,7 @@
   --accent-primary-hover: #d4a24e;
   --accent-primary-muted: rgba(224, 179, 102, 0.15);
   --accent-primary-rgb: 224, 179, 102;
+  --accent-warning: #fbbf24;
 
   /* --- Text --- */
   --text-default: #ffffff;
@@ -3031,7 +3034,7 @@ select.form-input:disabled {
 }
 
 .toast--warning {
-  border-left: 4px solid var(--warning-color, #f59e0b);
+  border-left: 4px solid var(--warning-color);
 }
 
 .toast--info {
@@ -3046,8 +3049,6 @@ select.form-input:disabled {
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-full);
-  font-size: var(--text-xs);
-  font-weight: bold;
   color: white;
 }
 
@@ -3060,7 +3061,7 @@ select.form-input:disabled {
 }
 
 .toast-icon--warning {
-  background: var(--warning-color, #f59e0b);
+  background: var(--warning-color);
 }
 
 .toast-icon--info {
@@ -3094,11 +3095,12 @@ select.form-input:disabled {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: var(--text-lg);
   cursor: pointer;
-  padding: 0.125rem 0.375rem;
+  padding: 0.25rem;
   border-radius: var(--radius-sm);
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .toast-dismiss:hover {
@@ -3294,7 +3296,7 @@ select.form-input:disabled {
 }
 
 .notification-type-warning {
-  background: var(--accent-warning, #f59e0b);
+  background: var(--accent-warning);
   color: white;
 }
 

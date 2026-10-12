@@ -153,7 +153,7 @@
   align-items: center;
   gap: 0.5rem;
   font-size: var(--text-base);
-  color: var(--accent-warning, #f59e0b);
+  color: var(--accent-warning);
   padding: 0.4rem 0.75rem;
   background-color: var(--bg-tertiary);
   border-radius: var(--radius-md);

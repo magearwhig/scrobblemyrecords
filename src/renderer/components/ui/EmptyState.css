@@ -32,7 +32,7 @@
 }
 
 .empty-state-container--large .empty-state-icon {
-  font-size: 4rem;
+  font-size: var(--text-display);
   margin-bottom: 1.5rem;
 }
 

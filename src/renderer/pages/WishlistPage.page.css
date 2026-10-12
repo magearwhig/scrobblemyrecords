@@ -131,7 +131,7 @@
 }
 
 .wishlist-badge-cd {
-  background: var(--accent-warning, #f59e0b);
+  background: var(--accent-warning);
   color: white;
 }
 
