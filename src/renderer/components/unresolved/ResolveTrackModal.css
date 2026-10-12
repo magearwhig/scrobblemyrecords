@@ -103,6 +103,68 @@
   color: var(--text-primary);
 }
 
+.resolve-modal-suggestion-cover {
+  flex-shrink: 0;
+  width: var(--space-12);
+  height: var(--space-12);
+  object-fit: cover;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-sunken);
+}
+
+.resolve-modal-suggestion-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.resolve-modal-verification {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.resolve-modal-verification svg {
+  flex-shrink: 0;
+}
+
+.resolve-modal-verification--confirmed svg {
+  color: var(--status-success);
+}
+
+.resolve-modal-verification--warning {
+  color: var(--text-primary);
+  font-weight: var(--weight-medium);
+}
+
+.resolve-modal-verification--warning svg {
+  color: var(--status-warning);
+}
+
+.resolve-modal-verification--unknown {
+  color: var(--text-muted);
+}
+
+.resolve-modal-lastfm-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--accent-primary);
+  text-decoration: underline;
+}
+
+.resolve-modal-lastfm-link:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
 .resolve-modal-hint {
   color: var(--text-muted);
 }

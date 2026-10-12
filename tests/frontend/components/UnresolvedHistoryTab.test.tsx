@@ -403,6 +403,68 @@ describe('UnresolvedHistoryTab', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the tracklist check with a Last.fm suggestion', async () => {
+    mockApi.lookupUnresolvedAlbum.mockResolvedValue({
+      album: 'Suggested LP',
+      verification: {
+        onTracklist: true,
+        position: 3,
+        trackCount: 12,
+        imageUrl: 'https://img.example/cover.jpg',
+        albumUrl: 'https://www.last.fm/music/Artist+Two/Suggested+LP',
+      },
+    });
+    renderTab();
+    await waitForList();
+
+    const dialog = await openResolve('Solo', 'Artist Two');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Suggest from Last.fm' })
+    );
+
+    expect(
+      await within(dialog).findByText('Track 3 of 12 on Suggested LP')
+    ).toBeInTheDocument();
+    expect(dialog.querySelector('img')).toHaveAttribute(
+      'src',
+      'https://img.example/cover.jpg'
+    );
+    const link = within(dialog).getByRole('link', { name: 'View on Last.fm' });
+    expect(link).toHaveAttribute(
+      'href',
+      'https://www.last.fm/music/Artist+Two/Suggested+LP'
+    );
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(
+      within(dialog).getByRole('button', { name: 'Use this album' })
+    ).toBeEnabled();
+  });
+
+  it('warns when the suggested album lacks the track', async () => {
+    mockApi.lookupUnresolvedAlbum.mockResolvedValue({
+      album: 'Suitcase 2',
+      verification: { onTracklist: false },
+    });
+    renderTab();
+    await waitForList();
+
+    const dialog = await openResolve('Solo', 'Artist Two');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Suggest from Last.fm' })
+    );
+
+    expect(
+      await within(dialog).findByText(
+        "Not on Suitcase 2's tracklist on Last.fm — check before saving"
+      )
+    ).toBeInTheDocument();
+    expect(dialog.querySelector('img')).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole('link', { name: 'View on Last.fm' })
+    ).not.toBeInTheDocument();
+  });
+
   describe('album suggestions', () => {
     const artistOneSuggestions: UnresolvedArtistAlbumSuggestions = {
       artist: 'artist one',

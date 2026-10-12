@@ -1,5 +1,6 @@
 import {
   UnresolvedAlbumOption,
+  UnresolvedAlbumVerification,
   UnresolvedArtistAlbumSuggestions,
   UnresolvedTrackAlbumSuggestion,
 } from '../../../shared/types';
@@ -73,4 +74,34 @@ export const albumChoices = (
     ...knownAlbums,
   ];
   return [...new Set(names.filter(Boolean))];
+};
+
+export type AlbumVerificationTone = 'confirmed' | 'warning' | 'unknown';
+
+/**
+ * Plain-text confirmation of a Last.fm album suggestion against that
+ * album's tracklist, or null when the suggestion wasn't checked.
+ */
+export const describeVerification = (
+  album: string,
+  verification: UnresolvedAlbumVerification | undefined
+): { tone: AlbumVerificationTone; text: string } | null => {
+  if (!verification) return null;
+  const { onTracklist, position, trackCount } = verification;
+  if (onTracklist === true) {
+    if (position !== undefined && trackCount !== undefined) {
+      return {
+        tone: 'confirmed',
+        text: `Track ${position} of ${trackCount} on ${album}`,
+      };
+    }
+    return { tone: 'confirmed', text: `On ${album}'s tracklist` };
+  }
+  if (onTracklist === false) {
+    return {
+      tone: 'warning',
+      text: `Not on ${album}'s tracklist on Last.fm — check before saving`,
+    };
+  }
+  return { tone: 'unknown', text: "Couldn't check the tracklist" };
 };

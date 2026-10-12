@@ -1,7 +1,16 @@
-import { Check, Search, Sparkles } from 'lucide-react';
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle2,
+  ExternalLink,
+  Info,
+  Search,
+  Sparkles,
+} from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 import {
+  UnresolvedAlbumVerification,
   UnresolvedHistoryGroup,
   UnresolvedHistoryTrack,
   UnresolvedTrackAlbumSuggestion,
@@ -17,6 +26,7 @@ import {
   albumChoices,
   AlbumSuggestionsCache,
   describeSuggestion,
+  describeVerification,
   findTrackSuggestion,
 } from './albumSuggestionsCache';
 import './ResolveTrackModal.css';
@@ -30,7 +40,11 @@ type Source = UnresolvedTrackResolution['source'];
 type LookupState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'found'; album: string }
+  | {
+      status: 'found';
+      album: string;
+      verification?: UnresolvedAlbumVerification;
+    }
   | { status: 'none' }
   | { status: 'error'; message: string };
 
@@ -122,6 +136,10 @@ export const ResolveTrackModal: React.FC<ResolveTrackModalProps> = ({
   const trimmedAlbum = album.trim();
   const suggestedOption = suggested?.suggestion ?? null;
   const choices = albumChoices(suggested ?? undefined, group.knownAlbums);
+  const lookupCheck =
+    lookup.status === 'found'
+      ? describeVerification(lookup.album, lookup.verification)
+      : null;
 
   const chooseAlbum = (value: string, valueSource: Source) => {
     touched.current = true;
@@ -140,7 +158,11 @@ export const ResolveTrackModal: React.FC<ResolveTrackModalProps> = ({
       if (seq !== lookupSeq.current) return;
       setLookup(
         result.album
-          ? { status: 'found', album: result.album }
+          ? {
+              status: 'found',
+              album: result.album,
+              verification: result.verification,
+            }
           : { status: 'none' }
       );
     } catch (err) {
@@ -247,12 +269,49 @@ export const ResolveTrackModal: React.FC<ResolveTrackModalProps> = ({
           <div className='resolve-modal-lookup-result' aria-live='polite'>
             {lookup.status === 'found' && (
               <div className='resolve-modal-suggestion'>
-                <span>
-                  Last.fm suggests{' '}
-                  <strong className='resolve-modal-suggestion-album'>
-                    {lookup.album}
-                  </strong>
-                </span>
+                {lookup.verification?.imageUrl && (
+                  // Decorative: the album name is shown next to it
+                  <img
+                    className='resolve-modal-suggestion-cover'
+                    src={lookup.verification.imageUrl}
+                    alt=''
+                  />
+                )}
+                <div className='resolve-modal-suggestion-text'>
+                  <span>
+                    Last.fm suggests{' '}
+                    <strong className='resolve-modal-suggestion-album'>
+                      {lookup.album}
+                    </strong>
+                  </span>
+                  {lookupCheck && (
+                    <span
+                      className={`resolve-modal-verification resolve-modal-verification--${lookupCheck.tone}`}
+                    >
+                      {lookupCheck.tone === 'confirmed' && (
+                        <CheckCircle2 size={16} aria-hidden='true' />
+                      )}
+                      {lookupCheck.tone === 'warning' && (
+                        <AlertTriangle size={16} aria-hidden='true' />
+                      )}
+                      {lookupCheck.tone === 'unknown' && (
+                        <Info size={16} aria-hidden='true' />
+                      )}
+                      {lookupCheck.text}
+                    </span>
+                  )}
+                  {lookup.verification?.albumUrl && (
+                    <a
+                      className='resolve-modal-lastfm-link'
+                      href={lookup.verification.albumUrl}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                    >
+                      View on Last.fm
+                      <ExternalLink size={16} aria-hidden='true' />
+                    </a>
+                  )}
+                </div>
                 <Button
                   size='small'
                   variant='outline'

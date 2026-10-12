@@ -507,6 +507,176 @@ describe('BulkResolveModal', () => {
     expect(screen.getByLabelText('Album for Motor Away')).toHaveValue('Mine');
   });
 
+  describe('Last.fm tracklist verification', () => {
+    const lookupByTrack = (results: Record<string, unknown>) =>
+      mockApi.lookupUnresolvedAlbum.mockImplementation(
+        async (_artist: string, trackName: string) =>
+          results[trackName] ?? { album: null }
+      );
+
+    const runLookup = async () => {
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Look up missing on Last.fm' })
+      );
+      await waitFor(() =>
+        expect(screen.getByRole('status')).toHaveTextContent(
+          /Last\.fm found albums/
+        )
+      );
+    };
+
+    const rowFor = (name: string) =>
+      screen.getByLabelText(`Album for ${name}`).closest('li') as HTMLElement;
+
+    it('confirms a fill on the tracklist and keeps it selected', async () => {
+      lookupByTrack({
+        'Motor Away': {
+          album: 'Alien Lanes',
+          verification: {
+            onTracklist: true,
+            position: 11,
+            trackCount: 28,
+            imageUrl: 'https://img.example/alien-lanes.jpg',
+            albumUrl: 'https://www.last.fm/music/GBV/Alien+Lanes',
+          },
+        },
+      });
+      renderModal();
+      await waitForRows();
+      await runLookup();
+
+      const row = rowFor('Motor Away');
+      expect(
+        within(row).getByText('Track 11 of 28 on Alien Lanes')
+      ).toBeInTheDocument();
+      expect(within(row).getByLabelText('Include Motor Away')).toBeChecked();
+      expect(row.querySelector('img')).toHaveAttribute(
+        'src',
+        'https://img.example/alien-lanes.jpg'
+      );
+      const link = within(row).getByRole('link', { name: 'View on Last.fm' });
+      expect(link).toHaveAttribute(
+        'href',
+        'https://www.last.fm/music/GBV/Alien+Lanes'
+      );
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    });
+
+    it('falls back to a generic confirmation without a position', async () => {
+      lookupByTrack({
+        'Motor Away': {
+          album: 'Alien Lanes',
+          verification: { onTracklist: true },
+        },
+      });
+      renderModal();
+      await waitForRows();
+      await runLookup();
+
+      expect(
+        within(rowFor('Motor Away')).getByText("On Alien Lanes's tracklist")
+      ).toBeInTheDocument();
+    });
+
+    it('warns about and leaves unselected a fill not on the tracklist', async () => {
+      lookupByTrack({
+        'Motor Away': {
+          album: 'Suitcase 2',
+          verification: { onTracklist: false, trackCount: 100 },
+        },
+      });
+      renderModal();
+      await waitForRows();
+      await runLookup();
+
+      const row = rowFor('Motor Away');
+      expect(
+        within(row).getByText(
+          "Not on Suitcase 2's tracklist on Last.fm — check before saving"
+        )
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Album for Motor Away')).toHaveValue(
+        'Suitcase 2'
+      );
+      const checkbox = within(row).getByLabelText('Include Motor Away');
+      expect(checkbox).not.toBeChecked();
+      expect(row.querySelector('img')).not.toBeInTheDocument();
+
+      // The user can still include it
+      await userEvent.click(checkbox);
+      expect(checkbox).toBeChecked();
+    });
+
+    it('notes when the tracklist could not be checked', async () => {
+      lookupByTrack({
+        'Motor Away': {
+          album: 'Alien Lanes',
+          verification: { onTracklist: null },
+        },
+      });
+      renderModal();
+      await waitForRows();
+      await runLookup();
+
+      const row = rowFor('Motor Away');
+      expect(
+        within(row).getByText("Couldn't check the tracklist")
+      ).toBeInTheDocument();
+      expect(within(row).getByLabelText('Include Motor Away')).toBeChecked();
+    });
+
+    it('hides the verification once the album is edited', async () => {
+      lookupByTrack({
+        'Motor Away': {
+          album: 'Alien Lanes',
+          verification: {
+            onTracklist: true,
+            position: 11,
+            trackCount: 28,
+            imageUrl: 'https://img.example/alien-lanes.jpg',
+            albumUrl: 'https://www.last.fm/music/GBV/Alien+Lanes',
+          },
+        },
+      });
+      renderModal();
+      await waitForRows();
+      await runLookup();
+
+      await userEvent.type(screen.getByLabelText('Album for Motor Away'), '!');
+
+      const row = rowFor('Motor Away');
+      expect(
+        within(row).queryByText('Track 11 of 28 on Alien Lanes')
+      ).not.toBeInTheDocument();
+      expect(row.querySelector('img')).not.toBeInTheDocument();
+      expect(
+        within(row).queryByRole('link', { name: 'View on Last.fm' })
+      ).not.toBeInTheDocument();
+      expect(within(row).getByText('your entry')).toBeInTheDocument();
+    });
+
+    it('summarizes how many fills were confirmed', async () => {
+      lookupByTrack({
+        'Motor Away': {
+          album: 'Alien Lanes',
+          verification: { onTracklist: true, position: 11, trackCount: 28 },
+        },
+        'Tractor Rape Chain': {
+          album: 'Suitcase 2',
+          verification: { onTracklist: false },
+        },
+      });
+      renderModal();
+      await waitForRows();
+      await runLookup();
+
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Last.fm found albums for 2 of 2 tracks — 1 confirmed on the tracklist, 1 not on the tracklist (left unselected).'
+      );
+    });
+  });
+
   it(`chunks saves into requests of at most ${RESOLUTIONS_CHUNK_SIZE}`, async () => {
     const many: UnresolvedArtistAlbumSuggestions = {
       ...suggestions,

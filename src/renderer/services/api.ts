@@ -77,6 +77,7 @@ import {
   TrackedRelease,
   TrackMapping,
   TrackSearchResult,
+  UnresolvedAlbumLookup,
   UnresolvedArtistAlbumSuggestions,
   UnresolvedHistoryPage,
   UnresolvedHistorySummary,
@@ -797,10 +798,14 @@ class ApiService {
     return response.data.data;
   }
 
+  /**
+   * Last.fm's album for a track, with a check of that album's tracklist
+   * (verification) when the backend could look the album up.
+   */
   async lookupUnresolvedAlbum(
     artist: string,
     track: string
-  ): Promise<{ album: string | null }> {
+  ): Promise<UnresolvedAlbumLookup> {
     const response = await this.api.post('/stats/unresolved-history/lookup', {
       artist,
       track,

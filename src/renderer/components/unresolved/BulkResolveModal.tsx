@@ -1,4 +1,14 @@
-import { Check, Globe, Square, SquareCheck, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle2,
+  ExternalLink,
+  Globe,
+  Info,
+  Square,
+  SquareCheck,
+  X,
+} from 'lucide-react';
 import React, {
   memo,
   useCallback,
@@ -10,6 +20,7 @@ import React, {
 
 import {
   UnresolvedAlbumOption,
+  UnresolvedAlbumVerification,
   UnresolvedArtistAlbumSuggestions,
   UnresolvedHistoryGroup,
   UnresolvedTrackResolution,
@@ -25,7 +36,9 @@ import { ListItemSkeleton } from '../ui/Skeleton';
 import {
   albumChoices,
   AlbumSuggestionsCache,
+  AlbumVerificationTone,
   describeSuggestion,
+  describeVerification,
 } from './albumSuggestionsCache';
 import './BulkResolveModal.css';
 import { formatCount, pluralize } from './unresolvedFormat';
@@ -41,6 +54,8 @@ interface RowSuggestion {
   album: string;
   origin: 'history' | 'collection' | 'lastfm';
   trackPlays: number;
+  /** Last.fm fills: check of the album's tracklist for this track */
+  verification?: UnresolvedAlbumVerification;
 }
 
 interface BulkRow {
@@ -72,6 +87,12 @@ type LookupProgress =
       total: number;
       found: number;
       failed: number;
+      /** Fills Last.fm confirmed are on the album's tracklist */
+      confirmed: number;
+      /** Fills whose album was found but the track isn't on it */
+      notOnTracklist: number;
+      /** Fills whose tracklist couldn't be checked */
+      unverified: number;
     };
 
 interface LookupRunToken {
@@ -131,7 +152,7 @@ const describeRow = (row: BulkRow): { text: string; muted: boolean } => {
     }
     return { text: 'no match', muted: true };
   }
-  if (row.suggestion?.origin === 'lastfm' && row.suggestion.album === value) {
+  if (isLastfmFill(row)) {
     return { text: 'from Last.fm', muted: false };
   }
   const option = row.options.find(o => o.album === value);
@@ -139,12 +160,14 @@ const describeRow = (row: BulkRow): { text: string; muted: boolean } => {
   return { text: 'your entry', muted: false };
 };
 
+/** True while a row still holds its unedited Last.fm fill. */
+const isLastfmFill = (row: BulkRow): boolean =>
+  row.suggestion?.origin === 'lastfm' &&
+  row.suggestion.album === row.album.trim();
+
 /** Rule source: an unedited Last.fm fill is attributed to Last.fm. */
 const rowSource = (row: BulkRow): Source =>
-  row.suggestion?.origin === 'lastfm' &&
-  row.suggestion.album === row.album.trim()
-    ? 'lastfm-track-info'
-    : 'user';
+  isLastfmFill(row) ? 'lastfm-track-info' : 'user';
 
 const lookupMessage = (progress: LookupProgress): string => {
   switch (progress.status) {
@@ -161,7 +184,19 @@ const lookupMessage = (progress: LookupProgress): string => {
         progress.failed > 0
           ? ` ${pluralize(progress.failed, 'lookup')} failed.`
           : '';
-      return `${prefix}Last.fm found albums for ${formatCount(progress.found)} of ${pluralize(progress.checked, 'track')}.${failed}`;
+      const checks = [
+        progress.confirmed > 0
+          ? `${formatCount(progress.confirmed)} confirmed on the tracklist`
+          : '',
+        progress.notOnTracklist > 0
+          ? `${formatCount(progress.notOnTracklist)} not on the tracklist (left unselected)`
+          : '',
+        progress.unverified > 0
+          ? `${formatCount(progress.unverified)} couldn't be checked`
+          : '',
+      ].filter(Boolean);
+      const verified = checks.length > 0 ? ` — ${checks.join(', ')}` : '';
+      return `${prefix}Last.fm found albums for ${formatCount(progress.found)} of ${pluralize(progress.checked, 'track')}${verified}.${failed}`;
     }
   }
 };
@@ -174,6 +209,15 @@ interface BulkRowItemProps {
   onAlbumChange: (key: string, album: string) => void;
 }
 
+const VerificationIcon: React.FC<{ tone: AlbumVerificationTone }> = ({
+  tone,
+}) => {
+  if (tone === 'confirmed')
+    return <CheckCircle2 size={16} aria-hidden='true' />;
+  if (tone === 'warning') return <AlertTriangle size={16} aria-hidden='true' />;
+  return <Info size={16} aria-hidden='true' />;
+};
+
 const BulkRowItem = memo(function BulkRowItem({
   row,
   listId,
@@ -183,6 +227,13 @@ const BulkRowItem = memo(function BulkRowItem({
 }: BulkRowItemProps) {
   const tag = describeRow(row);
   const hasAlbum = row.album.trim() !== '';
+  // Only an unedited Last.fm fill carries a tracklist check
+  const verification = isLastfmFill(row)
+    ? row.suggestion?.verification
+    : undefined;
+  const check = row.suggestion
+    ? describeVerification(row.suggestion.album, verification)
+    : null;
   return (
     <li
       className={`bulk-resolve-row${row.checked ? ' bulk-resolve-row--checked' : ''}`}
@@ -226,11 +277,41 @@ const BulkRowItem = memo(function BulkRowItem({
             ))}
           </datalist>
         )}
-        <span
-          className={`bulk-resolve-tag${tag.muted ? ' bulk-resolve-tag--muted' : ''}`}
-        >
-          {tag.text}
-        </span>
+        <div className='bulk-resolve-meta'>
+          {verification?.imageUrl && (
+            // Decorative: the album name is in the input and the check text
+            <img
+              className='bulk-resolve-cover'
+              src={verification.imageUrl}
+              alt=''
+              loading='lazy'
+            />
+          )}
+          <span
+            className={`bulk-resolve-tag${tag.muted ? ' bulk-resolve-tag--muted' : ''}`}
+          >
+            {tag.text}
+          </span>
+          {verification?.albumUrl && (
+            <a
+              className='bulk-resolve-lastfm-link'
+              href={verification.albumUrl}
+              target='_blank'
+              rel='noopener noreferrer'
+            >
+              View on Last.fm
+              <ExternalLink size={16} aria-hidden='true' />
+            </a>
+          )}
+        </div>
+        {check && (
+          <span
+            className={`bulk-resolve-verification bulk-resolve-verification--${check.tone}`}
+          >
+            <VerificationIcon tone={check.tone} />
+            {check.text}
+          </span>
+        )}
       </div>
     </li>
   );
@@ -367,14 +448,22 @@ export const BulkResolveModal: React.FC<BulkResolveModalProps> = ({
     let found = 0;
     let failed = 0;
     let checked = 0;
+    let confirmed = 0;
+    let notOnTracklist = 0;
+    let unverified = 0;
     for (const target of targets) {
       if (stopped()) break;
       setProgress({ status: 'running', current: checked + 1, total });
       let album: string | null = null;
+      let verification: UnresolvedAlbumVerification | undefined;
       let lookup: BulkRow['lookup'] = 'none';
       try {
-        album = (await api.lookupUnresolvedAlbum(artistName, target.track))
-          .album;
+        const result = await api.lookupUnresolvedAlbum(
+          artistName,
+          target.track
+        );
+        album = result.album;
+        verification = result.album ? result.verification : undefined;
       } catch (err) {
         logger.warn('Last.fm album lookup failed', err);
         lookup = 'error';
@@ -383,7 +472,11 @@ export const BulkResolveModal: React.FC<BulkResolveModalProps> = ({
       checked += 1;
       if (album) found += 1;
       if (lookup === 'error') failed += 1;
+      if (verification?.onTracklist === true) confirmed += 1;
+      else if (verification?.onTracklist === false) notOnTracklist += 1;
+      else if (verification) unverified += 1;
       const result = album;
+      const resultVerification = verification;
       setRows(prev =>
         prev.map(r => {
           if (r.key !== target.key) return r;
@@ -393,8 +486,14 @@ export const BulkResolveModal: React.FC<BulkResolveModalProps> = ({
           return {
             ...r,
             album: result,
-            checked: true,
-            suggestion: { album: result, origin: 'lastfm', trackPlays: 0 },
+            // Leave fills Last.fm can't find on the album for the user to tick
+            checked: resultVerification?.onTracklist !== false,
+            suggestion: {
+              album: result,
+              origin: 'lastfm',
+              trackPlays: 0,
+              verification: resultVerification,
+            },
             lookup: 'idle',
           };
         })
@@ -409,6 +508,9 @@ export const BulkResolveModal: React.FC<BulkResolveModalProps> = ({
       total,
       found,
       failed,
+      confirmed,
+      notOnTracklist,
+      unverified,
     });
   };
 

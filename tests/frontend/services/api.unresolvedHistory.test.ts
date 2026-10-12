@@ -74,6 +74,25 @@ describe('ApiService unresolved history methods', () => {
     });
   });
 
+  it('lookupUnresolvedAlbum returns the tracklist verification', async () => {
+    const lookup = {
+      album: 'Suitcase 2',
+      verification: {
+        onTracklist: false,
+        trackCount: 100,
+        imageUrl: 'https://img.example/suitcase2.jpg',
+        albumUrl: 'https://www.last.fm/music/Guided+By+Voices/Suitcase+2',
+      },
+    };
+    mock
+      .onPost('/stats/unresolved-history/lookup')
+      .reply(200, { success: true, data: lookup });
+
+    await expect(
+      api.lookupUnresolvedAlbum('Guided By Voices', 'Motor Away')
+    ).resolves.toEqual(lookup);
+  });
+
   it('getUnresolvedAlbumSuggestions GETs suggestions for an artist', async () => {
     mock
       .onGet('/stats/unresolved-history/album-suggestions')
