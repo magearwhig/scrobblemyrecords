@@ -16,6 +16,8 @@ import UnresolvedHistoryTab from '../../../src/renderer/components/UnresolvedHis
 import { ToastProvider } from '../../../src/renderer/context/ToastContext';
 import * as apiService from '../../../src/renderer/services/api';
 import {
+  ExcludedHistoryArtist,
+  ExclusionSuggestion,
   SyncStatus,
   UnresolvedHistoryGroup,
   UnresolvedHistoryPage,
@@ -94,6 +96,8 @@ const baseSummary: UnresolvedHistorySummary = {
   resolvedByRuleCount: 4,
   hiddenCount: 0,
   resolutionCount: 2,
+  excludedArtistCount: 0,
+  excludedPlayCount: 0,
   lastfmTotal: 1200,
   lastfmTotalCheckedAt: Date.now(),
   gap: 200,
@@ -131,7 +135,33 @@ const createMockApi = (summary: UnresolvedHistorySummary = baseSummary) => ({
   getHistorySyncStatus: jest
     .fn()
     .mockResolvedValue({ sync: idleSync, storage: {} }),
+  getExcludedHistoryArtists: jest
+    .fn()
+    .mockResolvedValue([] as ExcludedHistoryArtist[]),
+  excludeHistoryArtists: jest.fn().mockResolvedValue({ changed: 1 }),
+  includeHistoryArtists: jest.fn().mockResolvedValue({ changed: 1 }),
+  getHistoryExclusionSuggestions: jest
+    .fn()
+    .mockResolvedValue([] as ExclusionSuggestion[]),
 });
+
+const podcastSuggestion: ExclusionSuggestion = {
+  artist: 'the daily',
+  artistName: 'The Daily',
+  plays: 200,
+  distinctTracks: 180,
+  unresolvedShare: 0.94,
+  episodeTitleShare: 0.2,
+};
+
+const episodeSuggestion: ExclusionSuggestion = {
+  artist: 'radiolab',
+  artistName: 'Radiolab',
+  plays: 50,
+  distinctTracks: 48,
+  unresolvedShare: 0.3,
+  episodeTitleShare: 0.69,
+};
 
 let mockApi: ReturnType<typeof createMockApi>;
 
@@ -650,5 +680,319 @@ describe('UnresolvedHistoryTab', () => {
     expect(await screen.findByText('boom')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await waitForList()).toBeInTheDocument();
+  });
+
+  describe('artist exclusion', () => {
+    it('stops tracking an artist from its group, then undoes it', async () => {
+      renderTab();
+      await waitForList();
+
+      await userEvent.click(
+        screen.getByRole('button', {
+          name: "Don't track this artist: Artist One",
+        })
+      );
+      const dialog = await screen.findByRole('dialog');
+      expect(
+        within(dialog).getByText('Stop tracking Artist One?')
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByText(/left out of all listening stats/)
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByText(/including any plays with album info/)
+      ).toBeInTheDocument();
+      expect(mockApi.excludeHistoryArtists).not.toHaveBeenCalled();
+
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: "Don't track" })
+      );
+
+      await waitFor(() =>
+        expect(mockApi.excludeHistoryArtists).toHaveBeenCalledWith([
+          'artist one',
+        ])
+      );
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      );
+      expect(
+        await screen.findByText(/Stopped tracking Artist One\./)
+      ).toBeInTheDocument();
+      // List, summary and suggestions are refreshed
+      await waitFor(() =>
+        expect(mockApi.getUnresolvedHistory).toHaveBeenCalledTimes(2)
+      );
+      expect(mockApi.getUnresolvedHistorySummary).toHaveBeenCalledTimes(2);
+      expect(mockApi.getHistoryExclusionSuggestions).toHaveBeenCalledTimes(2);
+
+      await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+      await waitFor(() =>
+        expect(mockApi.includeHistoryArtists).toHaveBeenCalledWith([
+          'artist one',
+        ])
+      );
+      expect(
+        await screen.findByText(/Artist One is tracked again/)
+      ).toBeInTheDocument();
+    });
+
+    it('cancelling the confirm does not exclude', async () => {
+      renderTab();
+      await waitForList();
+
+      await userEvent.click(
+        screen.getByRole('button', {
+          name: "Don't track this artist: Artist Two",
+        })
+      );
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Cancel' })
+      );
+
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      );
+      expect(mockApi.excludeHistoryArtists).not.toHaveBeenCalled();
+    });
+
+    it('keeps the dialog open on Escape while excluding is in flight', async () => {
+      let resolveExclude: (value: { changed: number }) => void = () => {};
+      mockApi.excludeHistoryArtists.mockReturnValue(
+        new Promise(resolve => {
+          resolveExclude = resolve;
+        })
+      );
+      renderTab();
+      await waitForList();
+
+      await userEvent.click(
+        screen.getByRole('button', {
+          name: "Don't track this artist: Artist One",
+        })
+      );
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: "Don't track" })
+      );
+      await userEvent.keyboard('{Escape}');
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+      await act(async () => {
+        resolveExclude({ changed: 1 });
+      });
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      );
+    });
+
+    it('shows an error and keeps the dialog when excluding fails', async () => {
+      mockApi.excludeHistoryArtists.mockRejectedValue(new Error('Disk full'));
+      renderTab();
+      await waitForList();
+
+      await userEvent.click(
+        screen.getByRole('button', {
+          name: "Don't track this artist: Artist One",
+        })
+      );
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: "Don't track" })
+      );
+
+      expect(await screen.findByText('Disk full')).toBeInTheDocument();
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    it('renders podcast suggestions with reasons and excludes one', async () => {
+      mockApi.getHistoryExclusionSuggestions.mockResolvedValue([
+        podcastSuggestion,
+        episodeSuggestion,
+      ]);
+      renderTab();
+
+      const panel = (
+        await screen.findByRole('heading', { name: /Looks like a podcast/ })
+      ).closest('section') as HTMLElement;
+      expect(within(panel).getByText('The Daily')).toBeInTheDocument();
+      expect(
+        within(panel).getByText('200 plays · 180 tracks')
+      ).toBeInTheDocument();
+      expect(
+        within(panel).getByText('94% without album info')
+      ).toBeInTheDocument();
+      expect(
+        within(panel).getByText('69% episode-like titles')
+      ).toBeInTheDocument();
+
+      await userEvent.click(
+        within(panel).getByRole('button', { name: 'Exclude The Daily' })
+      );
+      const dialog = await screen.findByRole('dialog');
+      expect(
+        within(dialog).getByText('Stop tracking The Daily?')
+      ).toBeInTheDocument();
+      // 200 plays, 94% without album info -> 12 with album info
+      expect(
+        within(dialog).getByText(/including 12 plays with album info/)
+      ).toBeInTheDocument();
+
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: "Don't track" })
+      );
+      await waitFor(() =>
+        expect(mockApi.excludeHistoryArtists).toHaveBeenCalledWith([
+          'the daily',
+        ])
+      );
+    });
+
+    it('excludes all suggestions after confirming the list', async () => {
+      mockApi.getHistoryExclusionSuggestions.mockResolvedValue([
+        podcastSuggestion,
+        episodeSuggestion,
+      ]);
+      renderTab();
+
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Exclude all' })
+      );
+      const dialog = await screen.findByRole('dialog');
+      expect(
+        within(dialog).getByText('Stop tracking 2 artists?')
+      ).toBeInTheDocument();
+      const list = within(dialog).getByRole('list', {
+        name: 'Artists to exclude',
+      });
+      expect(within(list).getByText('The Daily')).toBeInTheDocument();
+      expect(within(list).getByText('Radiolab')).toBeInTheDocument();
+      expect(within(list).getByText('200 plays')).toBeInTheDocument();
+
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: "Don't track any of them" })
+      );
+      await waitFor(() =>
+        expect(mockApi.excludeHistoryArtists).toHaveBeenCalledWith([
+          'the daily',
+          'radiolab',
+        ])
+      );
+      expect(
+        await screen.findByText(/Stopped tracking 2 artists\./)
+      ).toBeInTheDocument();
+    });
+
+    it('collapses the suggestions panel', async () => {
+      mockApi.getHistoryExclusionSuggestions.mockResolvedValue([
+        podcastSuggestion,
+      ]);
+      renderTab();
+
+      const toggle = await screen.findByRole('button', { name: 'Collapse' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      await userEvent.click(toggle);
+
+      expect(screen.queryByText('The Daily')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Expand' })).toHaveAttribute(
+        'aria-expanded',
+        'false'
+      );
+    });
+
+    it('hides the suggestions panel when there are none', async () => {
+      renderTab();
+      await waitForList();
+
+      expect(
+        screen.queryByRole('heading', { name: /Looks like a podcast/ })
+      ).not.toBeInTheDocument();
+    });
+
+    it('notes excluded plays in the banner and lists them to track again', async () => {
+      mockApi.getUnresolvedHistorySummary.mockResolvedValue({
+        ...baseSummary,
+        excludedArtistCount: 2,
+        excludedPlayCount: 340,
+      });
+      mockApi.getExcludedHistoryArtists.mockResolvedValue([
+        { artist: 'the daily', artistName: 'The Daily', plays: 300 },
+        { artist: 'radiolab', artistName: 'Radiolab', plays: 40 },
+      ]);
+      renderTab();
+
+      expect(
+        await screen.findByText(
+          "340 plays from 2 excluded artists aren't counted in listening stats."
+        )
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('2 artists not tracked (340 plays)')
+      ).toBeInTheDocument();
+      expect(mockApi.getExcludedHistoryArtists).not.toHaveBeenCalled();
+
+      const toggle = screen.getByRole('button', {
+        name: 'Manage not tracked',
+      });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await userEvent.click(toggle);
+      expect(
+        screen.getByRole('button', { name: 'Hide not tracked' })
+      ).toHaveAttribute('aria-expanded', 'true');
+
+      const panel = (
+        await screen.findByRole('heading', { name: 'Not tracked' })
+      ).closest('section') as HTMLElement;
+      expect(await within(panel).findByText('The Daily')).toBeInTheDocument();
+      expect(within(panel).getByText('300 plays')).toBeInTheDocument();
+
+      await userEvent.click(
+        within(panel).getByRole('button', { name: 'Track again: The Daily' })
+      );
+      await waitFor(() =>
+        expect(mockApi.includeHistoryArtists).toHaveBeenCalledWith([
+          'the daily',
+        ])
+      );
+      expect(
+        await screen.findByText(/The Daily is tracked again/)
+      ).toBeInTheDocument();
+      await waitFor(() =>
+        expect(mockApi.getExcludedHistoryArtists).toHaveBeenCalledTimes(2)
+      );
+      expect(mockApi.excludeHistoryArtists).not.toHaveBeenCalled();
+    });
+
+    it('keeps the Last.fm totals neutral when the only difference is exclusions', async () => {
+      mockApi.getUnresolvedHistorySummary.mockResolvedValue({
+        ...baseSummary,
+        indexedTotal: 1200,
+        gap: 0,
+        excludedArtistCount: 1,
+        excludedPlayCount: 1,
+      });
+      renderTab();
+
+      expect(
+        await screen.findByText(/Last\.fm reports 1,200 · indexed 1,200/)
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/plays? missing\)/)).not.toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "1 play from 1 excluded artist isn't counted in listening stats."
+        )
+      ).toBeInTheDocument();
+    });
+
+    it('does not show the not-tracked row when nothing is excluded', async () => {
+      renderTab();
+      await screen.findByText('10 plays without album info');
+
+      expect(
+        screen.queryByRole('button', { name: 'Manage not tracked' })
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/excluded artist/)).not.toBeInTheDocument();
+    });
   });
 });

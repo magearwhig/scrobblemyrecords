@@ -32,6 +32,8 @@ import {
   EnrichedWishlistItem,
   EntireCollectionResponse,
   ExcludedArtistResponse,
+  ExcludedHistoryArtist,
+  ExclusionSuggestion,
   ForgottenTrack,
   HiddenAlbum,
   HiddenArtist,
@@ -845,6 +847,40 @@ class ApiService {
     const response = await this.api.post('/stats/unresolved-history/unhide', {
       keys,
     });
+    return response.data.data;
+  }
+
+  /** Artists left out of all listening stats (e.g. podcasts). */
+  async getExcludedHistoryArtists(): Promise<ExcludedHistoryArtist[]> {
+    const response = await this.api.get(
+      '/stats/unresolved-history/excluded-artists'
+    );
+    return response.data.data;
+  }
+
+  /** Exclude artists (normalized keys) from all listening stats. */
+  async excludeHistoryArtists(artists: string[]): Promise<{ changed: number }> {
+    const response = await this.api.post(
+      '/stats/unresolved-history/excluded-artists',
+      { artists }
+    );
+    return response.data.data;
+  }
+
+  /** Count excluded artists (normalized keys) in listening stats again. */
+  async includeHistoryArtists(artists: string[]): Promise<{ changed: number }> {
+    const response = await this.api.post(
+      '/stats/unresolved-history/excluded-artists/remove',
+      { artists }
+    );
+    return response.data.data;
+  }
+
+  /** Artists whose plays look like podcast episodes. */
+  async getHistoryExclusionSuggestions(): Promise<ExclusionSuggestion[]> {
+    const response = await this.api.get(
+      '/stats/unresolved-history/exclusion-suggestions'
+    );
     return response.data.data;
   }
 

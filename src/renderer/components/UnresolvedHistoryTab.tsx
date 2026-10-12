@@ -1,7 +1,17 @@
-import { CheckCircle2, Eye, EyeOff, Link2, SearchX, X } from 'lucide-react';
+import {
+  Ban,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Link2,
+  SearchX,
+  X,
+} from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
+  ExcludedHistoryArtist,
+  ExclusionSuggestion,
   UnresolvedHistoryGroup,
   UnresolvedHistoryPage,
   UnresolvedHistorySummary,
@@ -17,6 +27,12 @@ import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { EmptyState } from './ui/EmptyState';
 import { ListItemSkeleton } from './ui/Skeleton';
+import {
+  ExcludeArtistsModal,
+  ExcludeTarget,
+} from './unresolved/ExcludeArtistsModal';
+import { ExcludedArtistsList } from './unresolved/ExcludedArtistsList';
+import { ExclusionSuggestionsPanel } from './unresolved/ExclusionSuggestionsPanel';
 import { ResolutionRulesList } from './unresolved/ResolutionRulesList';
 import { ResolveTrackModal } from './unresolved/ResolveTrackModal';
 import {
@@ -38,6 +54,23 @@ interface ResolveTarget {
   group: UnresolvedHistoryGroup;
   track: UnresolvedHistoryTrack;
 }
+
+const suggestionTarget = (suggestion: ExclusionSuggestion): ExcludeTarget => {
+  const unresolvedPlays = Math.round(
+    suggestion.plays * suggestion.unresolvedShare
+  );
+  return {
+    artist: suggestion.artist,
+    artistName: suggestion.artistName,
+    unresolvedPlays,
+    albumPlays: Math.max(0, suggestion.plays - unresolvedPlays),
+  };
+};
+
+const targetsLabel = (targets: { artistName: string }[]): string =>
+  targets.length === 1
+    ? targets[0].artistName
+    : pluralize(targets.length, 'artist');
 
 /**
  * History tab listing plays that have no album info ("unresolved"), with
@@ -66,12 +99,27 @@ const UnresolvedHistoryTab: React.FC = () => {
   const [rulesLoading, setRulesLoading] = useState(false);
   const [removingRuleId, setRemovingRuleId] = useState<string | null>(null);
 
+  const [suggestions, setSuggestions] = useState<ExclusionSuggestion[]>([]);
+  const [excludedOpen, setExcludedOpen] = useState(false);
+  const [excludedArtists, setExcludedArtists] = useState<
+    ExcludedHistoryArtist[]
+  >([]);
+  const [excludedLoading, setExcludedLoading] = useState(false);
+  const [restoringArtist, setRestoringArtist] = useState<string | null>(null);
+  const [excludeTargets, setExcludeTargets] = useState<ExcludeTarget[] | null>(
+    null
+  );
+  const [excluding, setExcluding] = useState(false);
+
   const [resolveTarget, setResolveTarget] = useState<ResolveTarget | null>(
     null
   );
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  // Only the latest list request may update state
+  // Only the latest request of each kind may update state
   const listSeq = useRef(0);
+  const summarySeq = useRef(0);
+  const suggestionsSeq = useRef(0);
+  const excludedSeq = useRef(0);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -82,15 +130,44 @@ const UnresolvedHistoryTab: React.FC = () => {
   }, [searchQuery]);
 
   const loadSummary = useCallback(async () => {
+    const seq = ++summarySeq.current;
     setSummaryLoading(true);
     try {
-      setSummary(await api.getUnresolvedHistorySummary());
+      const result = await api.getUnresolvedHistorySummary();
+      if (seq === summarySeq.current) setSummary(result);
     } catch (err) {
       logger.warn('Failed to load unresolved summary', err);
     } finally {
-      setSummaryLoading(false);
+      if (seq === summarySeq.current) setSummaryLoading(false);
     }
   }, [api]);
+
+  const loadSuggestions = useCallback(async () => {
+    const seq = ++suggestionsSeq.current;
+    try {
+      const result = await api.getHistoryExclusionSuggestions();
+      if (seq === suggestionsSeq.current) setSuggestions(result ?? []);
+    } catch (err) {
+      // Suggestions are optional; the panel simply stays hidden
+      logger.warn('Failed to load exclusion suggestions', err);
+    }
+  }, [api]);
+
+  const loadExcluded = useCallback(async () => {
+    const seq = ++excludedSeq.current;
+    setExcludedLoading(true);
+    try {
+      const result = await api.getExcludedHistoryArtists();
+      if (seq === excludedSeq.current) setExcludedArtists(result ?? []);
+    } catch (err) {
+      logger.warn('Failed to load excluded artists', err);
+      if (seq === excludedSeq.current) {
+        showToast('error', 'Failed to load artists that are not tracked');
+      }
+    } finally {
+      if (seq === excludedSeq.current) setExcludedLoading(false);
+    }
+  }, [api, showToast]);
 
   const loadList = useCallback(async () => {
     const seq = ++listSeq.current;
@@ -142,12 +219,98 @@ const UnresolvedHistoryTab: React.FC = () => {
     if (rulesOpen) loadRules();
   }, [rulesOpen, loadRules]);
 
-  /** Refresh everything that a rule/hide/backfill change can affect. */
+  useEffect(() => {
+    loadSuggestions();
+  }, [loadSuggestions]);
+
+  useEffect(() => {
+    if (excludedOpen) loadExcluded();
+  }, [excludedOpen, loadExcluded]);
+
+  /** Refresh everything that a rule/hide/exclude/backfill change can affect. */
   const refreshAll = useCallback(() => {
     loadSummary();
     loadList();
+    loadSuggestions();
     if (rulesOpen) loadRules();
-  }, [loadSummary, loadList, loadRules, rulesOpen]);
+    if (excludedOpen) loadExcluded();
+  }, [
+    loadSummary,
+    loadList,
+    loadSuggestions,
+    loadRules,
+    loadExcluded,
+    rulesOpen,
+    excludedOpen,
+  ]);
+
+  // Latest refreshAll, for toast actions that outlive the render they came from
+  const refreshAllRef = useRef(refreshAll);
+  refreshAllRef.current = refreshAll;
+
+  const trackArtistsAgain = async (
+    targets: { artist: string; artistName: string }[]
+  ) => {
+    if (targets.length === 1) setRestoringArtist(targets[0].artist);
+    try {
+      await api.includeHistoryArtists(targets.map(t => t.artist));
+      showToast(
+        'success',
+        `${targetsLabel(targets)} ${targets.length === 1 ? 'is' : 'are'} tracked again. ${targets.length === 1 ? 'Its' : 'Their'} plays count in your listening stats.`
+      );
+      refreshAllRef.current();
+    } catch (err) {
+      logger.error('Failed to track artists again', err);
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to track artist again'
+      );
+    } finally {
+      setRestoringArtist(null);
+    }
+  };
+
+  const confirmExclude = async (targets: ExcludeTarget[]) => {
+    setExcluding(true);
+    try {
+      await api.excludeHistoryArtists(targets.map(t => t.artist));
+      setExcludeTargets(null);
+      showToast(
+        'success',
+        `Stopped tracking ${targetsLabel(targets)}. ${targets.length === 1 ? 'Its' : 'Their'} plays are left out of your listening stats.`,
+        {
+          action: {
+            label: 'Undo',
+            onClick: () => {
+              void trackArtistsAgain(targets);
+            },
+          },
+        }
+      );
+      refreshAllRef.current();
+    } catch (err) {
+      logger.error('Failed to exclude artists', err);
+      showToast(
+        'error',
+        err instanceof Error ? err.message : 'Failed to stop tracking artist'
+      );
+    } finally {
+      setExcluding(false);
+    }
+  };
+
+  const excludeGroup = (group: UnresolvedHistoryGroup) => {
+    const suggestion = suggestions.find(s => s.artist === group.artist);
+    setExcludeTargets([
+      suggestion
+        ? suggestionTarget(suggestion)
+        : {
+            artist: group.artist,
+            artistName: group.artistName,
+            unresolvedPlays: group.playCount,
+          },
+    ]);
+  };
 
   const handleUndoRule = async (rule: UnresolvedTrackResolution) => {
     setRemovingRuleId(rule.id);
@@ -253,13 +416,37 @@ const UnresolvedHistoryTab: React.FC = () => {
 
   return (
     <div className='unresolved-history'>
+      <ExclusionSuggestionsPanel
+        suggestions={suggestions}
+        busy={excluding}
+        onExclude={suggestion =>
+          setExcludeTargets([suggestionTarget(suggestion)])
+        }
+        onExcludeAll={() =>
+          setExcludeTargets(suggestions.map(suggestionTarget))
+        }
+      />
+
       <UnresolvedSummaryBanner
         summary={summary}
         loading={summaryLoading}
         rulesOpen={rulesOpen}
         onToggleRules={() => setRulesOpen(open => !open)}
+        excludedOpen={excludedOpen}
+        onToggleExcluded={() => setExcludedOpen(open => !open)}
         onBackfillComplete={refreshAll}
       />
+
+      {excludedOpen && (
+        <ExcludedArtistsList
+          artists={excludedArtists}
+          loading={excludedLoading}
+          restoringArtist={restoringArtist}
+          onTrackAgain={artist => {
+            void trackArtistsAgain([artist]);
+          }}
+        />
+      )}
 
       {rulesOpen && (
         <ResolutionRulesList
@@ -361,10 +548,23 @@ const UnresolvedHistoryTab: React.FC = () => {
             <li key={group.artist} className='card unresolved-group'>
               <div className='unresolved-group-header'>
                 <h3 className='unresolved-group-artist'>{group.artistName}</h3>
-                <span className='unresolved-group-meta'>
-                  {pluralize(group.playCount, 'play')} ·{' '}
-                  {pluralize(group.tracks.length, 'track')}
-                </span>
+                <div className='unresolved-group-side'>
+                  <span className='unresolved-group-meta'>
+                    {pluralize(group.playCount, 'play')} ·{' '}
+                    {pluralize(group.tracks.length, 'track')}
+                  </span>
+                  <Button
+                    variant='ghost'
+                    size='small'
+                    onClick={() => excludeGroup(group)}
+                    disabled={excluding}
+                    aria-label={`Don't track this artist: ${group.artistName}`}
+                    title='Leave all of this artist’s plays out of listening stats (e.g. podcasts)'
+                    iconLeft={<Ban size={16} aria-hidden='true' />}
+                  >
+                    Don&apos;t track this artist
+                  </Button>
+                </div>
               </div>
               <ul
                 className='unresolved-tracks'
@@ -456,6 +656,15 @@ const UnresolvedHistoryTab: React.FC = () => {
           </Button>
         </nav>
       )}
+
+      <ExcludeArtistsModal
+        targets={excludeTargets}
+        busy={excluding}
+        onCancel={() => setExcludeTargets(null)}
+        onConfirm={targets => {
+          void confirmExclude(targets);
+        }}
+      />
 
       <ResolveTrackModal
         group={resolveTarget?.group ?? null}

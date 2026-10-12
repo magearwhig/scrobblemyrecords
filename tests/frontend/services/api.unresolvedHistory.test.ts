@@ -138,4 +138,48 @@ describe('ApiService unresolved history methods', () => {
       to: 200,
     });
   });
+
+  it('getExcludedHistoryArtists GETs the excluded artists', async () => {
+    mock
+      .onGet('/stats/unresolved-history/excluded-artists')
+      .reply(200, envelope);
+
+    await expect(api.getExcludedHistoryArtists()).resolves.toEqual(DATA);
+  });
+
+  it('excludeHistoryArtists POSTs normalized artist keys', async () => {
+    mock
+      .onPost('/stats/unresolved-history/excluded-artists')
+      .reply(200, { success: true, data: { changed: 2 } });
+
+    const result = await api.excludeHistoryArtists(['the daily', 'radiolab']);
+
+    expect(result).toEqual({ changed: 2 });
+    expect(JSON.parse(lastRequest('post').data)).toEqual({
+      artists: ['the daily', 'radiolab'],
+    });
+  });
+
+  it('includeHistoryArtists POSTs to the remove endpoint', async () => {
+    mock
+      .onPost('/stats/unresolved-history/excluded-artists/remove')
+      .reply(200, { success: true, data: { changed: 1 } });
+
+    const result = await api.includeHistoryArtists(['the daily']);
+
+    expect(result).toEqual({ changed: 1 });
+    const request = lastRequest('post');
+    expect(request.url).toBe(
+      '/stats/unresolved-history/excluded-artists/remove'
+    );
+    expect(JSON.parse(request.data)).toEqual({ artists: ['the daily'] });
+  });
+
+  it('getHistoryExclusionSuggestions GETs the suggestions', async () => {
+    mock
+      .onGet('/stats/unresolved-history/exclusion-suggestions')
+      .reply(200, envelope);
+
+    await expect(api.getHistoryExclusionSuggestions()).resolves.toEqual(DATA);
+  });
 });

@@ -1,4 +1,4 @@
-import { History, ListChecks, RefreshCw } from 'lucide-react';
+import { Ban, History, ListChecks, RefreshCw } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { SyncStatus, UnresolvedHistorySummary } from '../../../shared/types';
@@ -33,6 +33,8 @@ export interface UnresolvedSummaryBannerProps {
   loading: boolean;
   rulesOpen: boolean;
   onToggleRules: () => void;
+  excludedOpen: boolean;
+  onToggleExcluded: () => void;
   /** Called when a sync/backfill finishes so the caller can refresh. */
   onBackfillComplete: () => void;
 }
@@ -43,7 +45,15 @@ export interface UnresolvedSummaryBannerProps {
  */
 export const UnresolvedSummaryBanner: React.FC<
   UnresolvedSummaryBannerProps
-> = ({ summary, loading, rulesOpen, onToggleRules, onBackfillComplete }) => {
+> = ({
+  summary,
+  loading,
+  rulesOpen,
+  onToggleRules,
+  excludedOpen,
+  onToggleExcluded,
+  onBackfillComplete,
+}) => {
   const api = getApiService();
   const { showToast } = useToast();
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
@@ -157,6 +167,9 @@ export const UnresolvedSummaryBanner: React.FC<
 
   const hasBackfilled = summary.lastFullBackfillAt !== null;
   const busy = starting || isSyncing || watching;
+  // Older servers may not report exclusions yet
+  const excludedArtistCount = summary.excludedArtistCount ?? 0;
+  const excludedPlayCount = summary.excludedPlayCount ?? 0;
 
   return (
     <section
@@ -182,6 +195,14 @@ export const UnresolvedSummaryBanner: React.FC<
             )}
           </p>
         )}
+        {excludedPlayCount > 0 && (
+          <p className='unresolved-banner-meta'>
+            {pluralize(excludedPlayCount, 'play')} from{' '}
+            {pluralize(excludedArtistCount, 'excluded artist')}{' '}
+            {excludedPlayCount === 1 ? "isn't" : "aren't"} counted in listening
+            stats.
+          </p>
+        )}
       </div>
 
       <div className='unresolved-banner-rules'>
@@ -200,6 +221,25 @@ export const UnresolvedSummaryBanner: React.FC<
           {rulesOpen ? 'Hide rules' : 'Manage rules'}
         </Button>
       </div>
+
+      {(excludedArtistCount > 0 || excludedOpen) && (
+        <div className='unresolved-banner-rules'>
+          <span className='unresolved-banner-rules-text'>
+            {pluralize(excludedArtistCount, 'artist')} not tracked (
+            {pluralize(excludedPlayCount, 'play')})
+          </span>
+          <Button
+            variant='ghost'
+            size='small'
+            onClick={onToggleExcluded}
+            aria-expanded={excludedOpen}
+            aria-controls='unresolved-excluded-panel'
+            iconLeft={<Ban size={16} aria-hidden='true' />}
+          >
+            {excludedOpen ? 'Hide not tracked' : 'Manage not tracked'}
+          </Button>
+        </div>
+      )}
 
       <div className='unresolved-banner-backfill'>
         {hasBackfilled ? (

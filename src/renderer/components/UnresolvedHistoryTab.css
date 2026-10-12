@@ -183,3 +183,10 @@
   font-size: var(--text-sm);
   color: var(--text-secondary);
 }
+
+.unresolved-group-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
