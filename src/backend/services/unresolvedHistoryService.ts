@@ -4,7 +4,9 @@ import {
   ExcludedHistoryArtist,
   ExclusionSuggestion,
   ScrobbleHistoryIndex,
+  UnresolvedAlbumLookup,
   UnresolvedAlbumOption,
+  UnresolvedAlbumVerification,
   UnresolvedArtistAlbumSuggestions,
   UnresolvedHistoryGroup,
   UnresolvedHistoryPage,
@@ -40,6 +42,44 @@ export interface TrackInfoLookup {
     artist: string,
     track: string
   ): Promise<{ album?: string } | null>;
+  /** Last.fm album.getInfo response (album object), used to verify */
+  getAlbumInfo?(artist: string, album: string): Promise<unknown>;
+}
+
+/** How long a looked-up album tracklist is reused (ms) */
+const ALBUM_INFO_TTL = 60 * 60 * 1000;
+const ALBUM_INFO_CACHE_LIMIT = 200;
+
+interface AlbumTracklist {
+  /** Track titles in order; null if Last.fm gave no tracklist */
+  tracks: string[] | null;
+  imageUrl?: string;
+  albumUrl?: string;
+}
+
+/** Pull tracklist, cover and URL out of a Last.fm album.getInfo album */
+function parseLastfmAlbum(album: unknown): AlbumTracklist | null {
+  if (!album || typeof album !== 'object') return null;
+  const data = album as {
+    tracks?: { track?: unknown };
+    image?: Array<{ size?: string; '#text'?: string }>;
+    url?: string;
+  };
+  const raw = data.tracks?.track;
+  const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const tracks = list
+    .map(t => (t && typeof t === 'object' ? (t as { name?: string }).name : ''))
+    .filter((name): name is string => Boolean(name));
+  const images = data.image ?? [];
+  const imageUrl =
+    ['extralarge', 'large', 'medium']
+      .map(size => images.find(i => i.size === size)?.['#text'])
+      .find(url => Boolean(url)) || undefined;
+  return {
+    tracks: tracks.length > 0 ? tracks : null,
+    imageUrl,
+    albumUrl: data.url || undefined,
+  };
 }
 
 export type UnresolvedSort = 'plays' | 'artist' | 'recent';
@@ -84,6 +124,10 @@ export function trackMatchKey(track: string): string {
  */
 export class UnresolvedHistoryService {
   private logger = createLogger('UnresolvedHistoryService');
+  private albumInfoCache = new Map<
+    string,
+    { value: AlbumTracklist | null; at: number }
+  >();
   private writeQueue: Promise<unknown> = Promise.resolve();
 
   constructor(
@@ -366,11 +410,70 @@ export class UnresolvedHistoryService {
   }
 
   /** Album suggestion for an unresolved track from Last.fm track.getInfo. */
-  async lookupAlbum(artist: string, track: string): Promise<string | null> {
-    if (!this.trackInfo) return null;
+  async lookupAlbum(
+    artist: string,
+    track: string
+  ): Promise<UnresolvedAlbumLookup> {
+    if (!this.trackInfo) return { album: null };
     const info = await this.trackInfo.getTrackInfo(artist, track);
     const album = info?.album?.trim();
-    return album ? album : null;
+    if (!album) return { album: null };
+    return {
+      album,
+      verification: await this.verifyOnAlbum(artist, album, track),
+    };
+  }
+
+  /**
+   * Check a suggested album's tracklist (Last.fm album.getInfo) for the
+   * song, so the user can see the suggestion is right before saving.
+   */
+  private async verifyOnAlbum(
+    artist: string,
+    album: string,
+    track: string
+  ): Promise<UnresolvedAlbumVerification> {
+    const info = await this.getAlbumTracklist(artist, album);
+    if (!info) return { onTracklist: null };
+    const base = {
+      trackCount: info.tracks?.length,
+      imageUrl: info.imageUrl,
+      albumUrl: info.albumUrl,
+    };
+    if (!info.tracks) return { onTracklist: null, ...base };
+    const song = trackMatchKey(track);
+    const index = info.tracks.findIndex(title => trackMatchKey(title) === song);
+    return index === -1
+      ? { onTracklist: false, ...base }
+      : { onTracklist: true, position: index + 1, ...base };
+  }
+
+  /** album.getInfo, cached per album (many songs often share one album) */
+  private async getAlbumTracklist(
+    artist: string,
+    album: string
+  ): Promise<AlbumTracklist | null> {
+    if (!this.trackInfo?.getAlbumInfo) return null;
+    const key = JSON.stringify([
+      normalizeHistoryName(artist),
+      normalizeHistoryName(album),
+    ]);
+    const cached = this.albumInfoCache.get(key);
+    if (cached && Date.now() - cached.at < ALBUM_INFO_TTL) return cached.value;
+    let value: AlbumTracklist | null;
+    try {
+      value = parseLastfmAlbum(
+        await this.trackInfo.getAlbumInfo(artist, album)
+      );
+    } catch {
+      value = null;
+    }
+    if (this.albumInfoCache.size >= ALBUM_INFO_CACHE_LIMIT) {
+      const oldest = this.albumInfoCache.keys().next().value;
+      if (oldest !== undefined) this.albumInfoCache.delete(oldest);
+    }
+    this.albumInfoCache.set(key, { value, at: Date.now() });
+    return value;
   }
 
   /**

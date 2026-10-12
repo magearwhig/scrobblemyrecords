@@ -3271,3 +3271,26 @@ export interface UnresolvedArtistAlbumSuggestions {
   artistName: string;
   tracks: UnresolvedTrackAlbumSuggestion[];
 }
+
+/** Check of a Last.fm album suggestion against that album's tracklist */
+export interface UnresolvedAlbumVerification {
+  /**
+   * true: the song is on the album's tracklist; false: the album was found
+   * but the song isn't listed; null: the tracklist couldn't be checked
+   */
+  onTracklist: boolean | null;
+  /** 1-based position on the album, when found */
+  position?: number;
+  /** Number of tracks on the album, when known */
+  trackCount?: number;
+  /** Album cover from Last.fm, when available */
+  imageUrl?: string;
+  /** Last.fm page for the album */
+  albumUrl?: string;
+}
+
+/** Result of POST /stats/unresolved-history/lookup */
+export interface UnresolvedAlbumLookup {
+  album: string | null;
+  verification?: UnresolvedAlbumVerification;
+}

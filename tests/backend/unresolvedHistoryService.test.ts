@@ -159,18 +159,78 @@ describe('UnresolvedHistoryService', () => {
     });
   });
 
-  it('suggests an album from Last.fm track info', async () => {
+  it('suggests an album from Last.fm and checks it against the tracklist', async () => {
     const { storage } = memoryStorage();
     const lookup = {
-      getTrackInfo: jest.fn().mockResolvedValue({ album: ' Disintegration ' }),
+      getTrackInfo: jest.fn(async (_artist: string, track: string) =>
+        track === 'Nowhere'
+          ? null
+          : { album: ' Suitcase 2: American Magnetic Wave Generator ' }
+      ),
+      getAlbumInfo: jest.fn().mockResolvedValue({
+        name: 'Suitcase 2',
+        url: 'https://www.last.fm/music/Guided+By+Voices/Suitcase+2',
+        image: [
+          { size: 'small', '#text': 'small.png' },
+          { size: 'extralarge', '#text': 'xl.png' },
+        ],
+        tracks: {
+          track: [
+            { name: 'Bunco Men', '@attr': { rank: 1 } },
+            { name: 'Mini Twister (Remastered)', '@attr': { rank: 2 } },
+          ],
+        },
+      }),
     };
     const service = new UnresolvedHistoryService(storage, lookup);
 
-    await expect(service.lookupAlbum('The Cure', 'Lovesong')).resolves.toBe(
-      'Disintegration'
+    const onAlbum = await service.lookupAlbum(
+      'Guided By Voices',
+      'Mini Twister'
     );
-    lookup.getTrackInfo.mockResolvedValue(null);
-    await expect(service.lookupAlbum('x', 'y')).resolves.toBeNull();
+    const notOnAlbum = await service.lookupAlbum(
+      'Guided By Voices',
+      'Elsewhere'
+    );
+    const none = await service.lookupAlbum('Guided By Voices', 'Nowhere');
+
+    expect(onAlbum).toEqual({
+      album: 'Suitcase 2: American Magnetic Wave Generator',
+      verification: {
+        onTracklist: true,
+        position: 2,
+        trackCount: 2,
+        imageUrl: 'xl.png',
+        albumUrl: 'https://www.last.fm/music/Guided+By+Voices/Suitcase+2',
+      },
+    });
+    expect(notOnAlbum.verification).toMatchObject({
+      onTracklist: false,
+      trackCount: 2,
+    });
+    expect(none).toEqual({ album: null });
+    // One album lookup serves every song suggested onto that album
+    expect(lookup.getAlbumInfo).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports an unverifiable suggestion when the tracklist is unavailable', async () => {
+    const { storage } = memoryStorage();
+    const service = new UnresolvedHistoryService(storage, {
+      getTrackInfo: jest.fn().mockResolvedValue({ album: 'Album' }),
+      getAlbumInfo: jest.fn().mockRejectedValue(new Error('Last.fm down')),
+    });
+
+    await expect(service.lookupAlbum('a', 'x')).resolves.toEqual({
+      album: 'Album',
+      verification: { onTracklist: null },
+    });
+    const noAlbumInfo = new UnresolvedHistoryService(storage, {
+      getTrackInfo: jest.fn().mockResolvedValue({ album: 'Album' }),
+    });
+    await expect(noAlbumInfo.lookupAlbum('a', 'x')).resolves.toEqual({
+      album: 'Album',
+      verification: { onTracklist: null },
+    });
   });
 
   it('excludes and restores artists, and reports their stored plays', async () => {

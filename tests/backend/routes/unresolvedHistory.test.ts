@@ -33,7 +33,10 @@ describe('unresolved history routes', () => {
         limit: 50,
       }),
       getSummary: jest.fn().mockResolvedValue({ unresolvedCount: 1 }),
-      lookupAlbum: jest.fn().mockResolvedValue('Album'),
+      lookupAlbum: jest.fn().mockResolvedValue({
+        album: 'Album',
+        verification: { onTracklist: true, position: 3 },
+      }),
       getStore: jest
         .fn()
         .mockResolvedValue({ schemaVersion: 1, resolutions: [], hidden: [] }),
@@ -176,7 +179,10 @@ describe('unresolved history routes', () => {
     const response = await request(app)
       .post('/api/v1/stats/unresolved-history/lookup')
       .send({ artist: 'a', track: 'x' });
-    expect(response.body.data).toEqual({ album: 'Album' });
+    expect(response.body.data).toEqual({
+      album: 'Album',
+      verification: { onTracklist: true, position: 3 },
+    });
     const bad = await request(app)
       .post('/api/v1/stats/unresolved-history/lookup')
       .send({ artist: 'a' });

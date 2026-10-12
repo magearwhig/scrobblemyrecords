@@ -115,8 +115,10 @@ export default function createUnresolvedHistoryRouter(
           error: 'artist and track are required',
         });
       }
-      const album = await service.lookupAlbum(artist, track);
-      res.json({ success: true, data: { album } });
+      // { album, verification }: the album and whether the song is on its
+      // Last.fm tracklist
+      const lookup = await service.lookupAlbum(artist, track);
+      res.json({ success: true, data: lookup });
     } catch (error) {
       fail(res, error, 'Error looking up album');
     }
