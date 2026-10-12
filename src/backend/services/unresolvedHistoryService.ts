@@ -4,12 +4,15 @@ import {
   ExcludedHistoryArtist,
   ExclusionSuggestion,
   ScrobbleHistoryIndex,
+  UnresolvedAlbumOption,
+  UnresolvedArtistAlbumSuggestions,
   UnresolvedHistoryGroup,
   UnresolvedHistoryPage,
   UnresolvedHistoryStore,
   UnresolvedHistorySummary,
   UnresolvedTrackResolution,
 } from '../../shared/types';
+import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import { FileStorage } from '../utils/fileStorage';
 import {
   albumFromAlbumKey,
@@ -40,6 +43,37 @@ export interface TrackInfoLookup {
 }
 
 export type UnresolvedSort = 'plays' | 'artist' | 'recent';
+
+/** An owned release's title and track titles (from the Discogs cache) */
+export interface OwnedReleaseTracks {
+  title: string;
+  tracks: string[];
+}
+
+/** "bee thousand" -> "Bee Thousand" (history album keys are lowercase) */
+function titleCase(name: string): string {
+  return name.replace(
+    /(^|[\s([{"'/-])(\p{L})/gu,
+    (_match, before, letter) => `${before}${letter.toUpperCase()}`
+  );
+}
+
+/**
+ * Key for matching a song across albums: ignores case, version tags
+ * ("(Remastered)", " - 2011 Remaster", "[Explicit]"), "feat." credits,
+ * quotes and punctuation.
+ */
+export function trackMatchKey(track: string): string {
+  const simplified = normalizeForMatching(track)
+    .replace(
+      /\s+-\s+[^-]*\b(remaster(ed)?|version|mono|stereo|edit|mix|live|demo|single)\b.*$/i,
+      ''
+    )
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}\p{M}]/gu, '');
+  return simplified || track.toLowerCase().trim();
+}
 
 /**
  * Albumless ("unresolved") plays: the rules that attribute them to albums,
@@ -211,6 +245,124 @@ export class UnresolvedHistoryService {
         ...candidate,
         artistName: displayName(candidate.artist),
       }));
+  }
+
+  /**
+   * Suggest an album for each of an artist's unresolved tracks, from albums
+   * that already have that song: first your listening history (the album the
+   * song was played on most), then releases you own (Discogs tracklists).
+   * Suggestions only; nothing is saved.
+   */
+  async suggestAlbums(
+    index: ScrobbleHistoryIndex | null,
+    artist: string,
+    options: {
+      includeHidden?: boolean;
+      displayName?: (artist: string) => string;
+      /** Whether another index artist key is the same artist (aliases) */
+      isSameArtist?: (otherArtistKey: string) => boolean;
+      ownedReleases?: () => Promise<OwnedReleaseTracks[]>;
+    } = {}
+  ): Promise<UnresolvedArtistAlbumSuggestions> {
+    const artistKey = normalizeHistoryName(artist);
+    const displayName = options.displayName ?? ((name: string) => name);
+    const result: UnresolvedArtistAlbumSuggestions = {
+      artist: artistKey,
+      artistName: displayName(artistKey),
+      tracks: [],
+    };
+    const entry = index?.unresolved?.[artistKey];
+    if (!index || !entry) return result;
+
+    // Proper casing for album titles you own
+    const owned = options.ownedReleases ? await options.ownedReleases() : [];
+    const ownedTitle = new Map(
+      owned.map(release => [normalizeHistoryName(release.title), release.title])
+    );
+
+    // song -> album -> plays of that song on that album
+    const historyAlbums = new Map<string, Map<string, number>>();
+    for (const [key, album] of Object.entries(index.albums)) {
+      const keyArtist = artistFromAlbumKey(key);
+      if (keyArtist !== artistKey && !options.isSameArtist?.(keyArtist)) {
+        continue;
+      }
+      const albumName = albumFromAlbumKey(key);
+      const title = ownedTitle.get(albumName) ?? titleCase(albumName);
+      for (const play of album.plays) {
+        const song = trackMatchKey(play.track ?? '');
+        const albums = historyAlbums.get(song) ?? new Map<string, number>();
+        albums.set(title, (albums.get(title) ?? 0) + 1);
+        historyAlbums.set(song, albums);
+      }
+    }
+    // song -> owned release titles with that song
+    const ownedAlbums = new Map<string, Set<string>>();
+    for (const release of owned) {
+      for (const track of release.tracks) {
+        const song = trackMatchKey(track);
+        const titles = ownedAlbums.get(song) ?? new Set<string>();
+        titles.add(release.title);
+        ownedAlbums.set(song, titles);
+      }
+    }
+
+    const store = await this.getStore();
+    const hidden = new Set(store.hidden);
+    const byKey = new Map<string, { track: string; plays: number }>();
+    for (const play of entry.plays) {
+      const track = play.track ?? '';
+      const key = unresolvedTrackKey(artistKey, track);
+      const current = byKey.get(key);
+      if (current) current.plays++;
+      else byKey.set(key, { track, plays: 1 });
+    }
+
+    for (const [key, { track, plays }] of byKey) {
+      const isHidden = hidden.has(key);
+      if (isHidden && !options.includeHidden) continue;
+      const song = trackMatchKey(track);
+      const fromHistory: UnresolvedAlbumOption[] = [
+        ...(historyAlbums.get(song) ?? new Map<string, number>()),
+      ]
+        .map(([album, trackPlays]) => ({
+          album,
+          source: 'history' as const,
+          trackPlays,
+        }))
+        .sort(
+          (a, b) =>
+            b.trackPlays - a.trackPlays || a.album.localeCompare(b.album)
+        );
+      const seen = new Set(fromHistory.map(o => normalizeHistoryName(o.album)));
+      const fromCollection: UnresolvedAlbumOption[] = [
+        ...(ownedAlbums.get(song) ?? new Set<string>()),
+      ]
+        .filter(album => !seen.has(normalizeHistoryName(album)))
+        .sort((a, b) => a.localeCompare(b))
+        .map(album => ({
+          album,
+          source: 'collection' as const,
+          trackPlays: 0,
+        }));
+      const [suggestion = null, ...alternatives] = [
+        ...fromHistory,
+        ...fromCollection,
+      ];
+      result.tracks.push({
+        key,
+        track,
+        playCount: plays,
+        hidden: isHidden,
+        suggestion,
+        alternatives,
+      });
+    }
+
+    result.tracks.sort(
+      (a, b) => b.playCount - a.playCount || a.track.localeCompare(b.track)
+    );
+    return result;
   }
 
   /** Album suggestion for an unresolved track from Last.fm track.getInfo. */

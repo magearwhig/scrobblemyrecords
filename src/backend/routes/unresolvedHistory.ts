@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 
 import { ScrobbleHistoryStorage } from '../services/scrobbleHistoryStorage';
 import {
+  OwnedReleaseTracks,
   UnresolvedHistoryService,
   UnresolvedSort,
 } from '../services/unresolvedHistoryService';
@@ -24,7 +25,15 @@ export default function createUnresolvedHistoryRouter(
   service: UnresolvedHistoryService,
   historyStorage: ScrobbleHistoryStorage,
   stats: UnresolvedHistoryStatsHooks,
-  getDisplayName: () => ((artist: string) => string) | undefined
+  getDisplayName: () => ((artist: string) => string) | undefined,
+  extras: {
+    /** Whether two index artist keys are the same artist (aliases) */
+    getSameArtist?: () => ((a: string, b: string) => boolean) | undefined;
+    /** Owned releases (title + tracklist) by an artist, for album matching */
+    ownedReleases?: (
+      isArtist: (name: string) => boolean
+    ) => Promise<OwnedReleaseTracks[]>;
+  } = {}
 ) {
   const router = express.Router();
   const logger = createLogger('UnresolvedHistoryRoutes');
@@ -110,6 +119,46 @@ export default function createUnresolvedHistoryRouter(
       res.json({ success: true, data: { album } });
     } catch (error) {
       fail(res, error, 'Error looking up album');
+    }
+  });
+
+  /**
+   * GET /album-suggestions?artist=&includeHidden=
+   * For each of an artist's unresolved tracks, the album it was played on
+   * most in your history (or an owned release with that song).
+   */
+  router.get('/album-suggestions', async (req: Request, res: Response) => {
+    try {
+      const artist = req.query.artist;
+      if (!isNonEmptyString(artist)) {
+        return res.status(400).json({
+          success: false,
+          error: 'artist is required',
+        });
+      }
+      const artistKey = artist.toLowerCase().trim();
+      const sameArtist = extras.getSameArtist?.();
+      const isArtist = (name: string) => {
+        const key = name.toLowerCase().trim();
+        return key === artistKey || Boolean(sameArtist?.(key, artistKey));
+      };
+      const suggestions = await service.suggestAlbums(
+        await historyStorage.getIndex(),
+        artistKey,
+        {
+          includeHidden: req.query.includeHidden === 'true',
+          displayName: getDisplayName(),
+          isSameArtist: sameArtist
+            ? other => sameArtist(other, artistKey)
+            : undefined,
+          ownedReleases: extras.ownedReleases
+            ? () => extras.ownedReleases!(isArtist)
+            : undefined,
+        }
+      );
+      res.json({ success: true, data: suggestions });
+    } catch (error) {
+      fail(res, error, 'Error suggesting albums');
     }
   });
 

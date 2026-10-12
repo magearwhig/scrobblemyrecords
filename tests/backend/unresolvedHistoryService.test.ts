@@ -1,4 +1,5 @@
 import {
+  trackMatchKey,
   UNRESOLVED_HISTORY_FILE,
   UnresolvedHistoryService,
 } from '../../src/backend/services/unresolvedHistoryService';
@@ -215,5 +216,110 @@ describe('UnresolvedHistoryService', () => {
     );
     await service.setExcluded(['the onion'], true);
     expect(await service.suggestExclusions(index)).toEqual([]);
+  });
+
+  describe('suggestAlbums', () => {
+    const gbvIndex = (): ScrobbleHistoryIndex => ({
+      lastSyncTimestamp: 0,
+      totalScrobbles: 0,
+      oldestScrobbleDate: 0,
+      albums: {
+        'guided by voices|bee thousand': {
+          lastPlayed: 5,
+          playCount: 3,
+          plays: [
+            { timestamp: 1, track: 'Tractor Rape Chain' },
+            { timestamp: 2, track: 'Tractor Rape Chain' },
+            { timestamp: 3, track: 'Gold Star for Robot Boy' },
+          ],
+        },
+        'guided by voices|human amusements at hourly rates': {
+          lastPlayed: 6,
+          playCount: 1,
+          plays: [{ timestamp: 6, track: 'Tractor Rape Chain (Remastered)' }],
+        },
+        'gbv|alien lanes': {
+          lastPlayed: 7,
+          playCount: 1,
+          plays: [{ timestamp: 7, track: 'Game of Pricks' }],
+        },
+      },
+      unresolved: {
+        'guided by voices': {
+          lastPlayed: 30,
+          playCount: 5,
+          plays: [
+            { timestamp: 10, track: 'Tractor Rape Chain' },
+            { timestamp: 11, track: 'Game of Pricks' },
+            { timestamp: 12, track: 'I Am A Scientist' },
+            { timestamp: 13, track: 'Unknown Demo' },
+            { timestamp: 14, track: 'Hidden Song' },
+          ],
+        },
+      },
+    });
+
+    it('suggests the album each song was played on most, with alternatives and fallbacks', async () => {
+      const { storage } = memoryStorage();
+      const service = new UnresolvedHistoryService(storage);
+      await service.setHidden(['guided by voices|hidden song'], true);
+
+      const result = await service.suggestAlbums(
+        gbvIndex(),
+        'Guided By Voices',
+        {
+          displayName: () => 'Guided By Voices',
+          isSameArtist: other => other === 'gbv',
+          ownedReleases: async () => [
+            { title: 'Bee Thousand', tracks: ['Tractor Rape Chain'] },
+            {
+              title: 'Bee Thousand (Director’s Cut)',
+              tracks: ['I Am A Scientist'],
+            },
+          ],
+        }
+      );
+      const byTrack = Object.fromEntries(result.tracks.map(t => [t.track, t]));
+
+      // Most plays: Bee Thousand (2) over Human Amusements (1, remaster tag ignored)
+      expect(byTrack['Tractor Rape Chain'].suggestion).toEqual({
+        album: 'Bee Thousand',
+        source: 'history',
+        trackPlays: 2,
+      });
+      expect(byTrack['Tractor Rape Chain'].alternatives).toEqual([
+        {
+          album: 'Human Amusements At Hourly Rates',
+          source: 'history',
+          trackPlays: 1,
+        },
+      ]);
+      // Found under an alias of the artist
+      expect(byTrack['Game of Pricks'].suggestion?.album).toBe('Alien Lanes');
+      // Only on an owned release
+      expect(byTrack['I Am A Scientist'].suggestion).toEqual({
+        album: 'Bee Thousand (Director’s Cut)',
+        source: 'collection',
+        trackPlays: 0,
+      });
+      expect(byTrack['Unknown Demo'].suggestion).toBeNull();
+      expect(byTrack['Hidden Song']).toBeUndefined();
+    });
+
+    it('returns no tracks for an artist with nothing unresolved', async () => {
+      const { storage } = memoryStorage();
+      const service = new UnresolvedHistoryService(storage);
+      const result = await service.suggestAlbums(gbvIndex(), 'nobody');
+      expect(result.tracks).toEqual([]);
+    });
+
+    it('trackMatchKey ignores version tags, feat. credits and punctuation', () => {
+      expect(trackMatchKey('Tractor Rape Chain - 2011 Remaster')).toBe(
+        trackMatchKey('tractor rape chain')
+      );
+      expect(trackMatchKey('Song (feat. Someone)')).toBe(trackMatchKey('Song'));
+      expect(trackMatchKey('Don’t Stop')).toBe(trackMatchKey("Don't Stop"));
+      expect(trackMatchKey('Song (Live)')).not.toBe(trackMatchKey('Song'));
+    });
   });
 });

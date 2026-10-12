@@ -45,6 +45,9 @@ describe('unresolved history routes', () => {
         .mockResolvedValue([{ artist: 'a', artistName: 'A', plays: 1 }]),
       setExcluded: jest.fn().mockResolvedValue(1),
       suggestExclusions: jest.fn().mockResolvedValue([]),
+      suggestAlbums: jest
+        .fn()
+        .mockResolvedValue({ artist: 'a', artistName: 'A', tracks: [] }),
     } as unknown as jest.Mocked<UnresolvedHistoryService>;
     historyStorage = {
       getIndex: jest.fn().mockResolvedValue(index),
@@ -214,5 +217,47 @@ describe('unresolved history routes', () => {
     expect(service.listExcluded.mock.calls[0][0]).toBe(index);
     expect(historyStorage.getRawIndex).toHaveBeenCalled();
     expect(service.suggestExclusions).toHaveBeenCalled();
+  });
+
+  it('suggests albums for an artist, passing alias and owned-release lookups', async () => {
+    const ownedReleases = jest
+      .fn()
+      .mockResolvedValue([{ title: 'T', tracks: ['x'] }]);
+    const appWithExtras = express();
+    appWithExtras.use(express.json());
+    appWithExtras.use(
+      '/u',
+      createUnresolvedHistoryRouter(
+        service,
+        historyStorage,
+        stats,
+        () => undefined,
+        {
+          getSameArtist: () => (a, b) =>
+            a === 'gbv' && b === 'guided by voices',
+          ownedReleases,
+        }
+      )
+    );
+
+    const response = await request(appWithExtras).get(
+      '/u/album-suggestions?artist=Guided%20By%20Voices&includeHidden=true'
+    );
+
+    expect(response.status).toBe(200);
+    const [passedIndex, artist, options] = service.suggestAlbums.mock.calls[0];
+    expect(passedIndex).toBe(index);
+    expect(artist).toBe('guided by voices');
+    expect(options!.includeHidden).toBe(true);
+    expect(options!.isSameArtist!('gbv')).toBe(true);
+    await options!.ownedReleases!();
+    const isArtist = ownedReleases.mock.calls[0][0];
+    expect(isArtist('GBV')).toBe(true);
+    expect(isArtist('Pavement')).toBe(false);
+
+    const missing = await request(app).get(
+      '/api/v1/stats/unresolved-history/album-suggestions'
+    );
+    expect(missing.status).toBe(400);
   });
 });

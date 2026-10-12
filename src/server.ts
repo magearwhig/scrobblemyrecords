@@ -89,9 +89,11 @@ import {
   AuthPolicy,
   resolveAuthPolicy,
 } from './backend/utils/authPolicy';
+import { getAllCachedCollectionItems } from './backend/utils/collectionCache';
 import { resolveDataDir } from './backend/utils/dataDir';
 import { FileStorage } from './backend/utils/fileStorage';
 import { createLogger } from './backend/utils/logger';
+import { stripDiscogsSuffix } from './shared/utils/albumMapping';
 
 const log = createLogger('Server');
 
@@ -717,7 +719,33 @@ async function startServer() {
         unresolvedHistoryService,
         historyStorage,
         statsService,
-        () => artist => artistNameResolver.getDisplayName(artist)
+        () => artist => artistNameResolver.getDisplayName(artist),
+        {
+          getSameArtist: () => (a, b) => artistNameResolver.areSameArtist(a, b),
+          ownedReleases: async isArtist => {
+            const username = (await authService.getUserSettings()).discogs
+              .username;
+            if (!username) return [];
+            const items = await getAllCachedCollectionItems(
+              username,
+              fileStorage
+            );
+            const releases = [];
+            for (const item of items) {
+              if (!isArtist(stripDiscogsSuffix(item.release.artist))) continue;
+              const details = await fileStorage.readJSON<{
+                tracklist?: Array<{ title?: string; position?: string }>;
+              }>(`collections/release-${item.release.id}.json`);
+              const tracks = (details?.tracklist ?? [])
+                .filter(t => t.title && t.position !== '')
+                .map(t => t.title as string);
+              if (tracks.length > 0) {
+                releases.push({ title: item.release.title, tracks });
+              }
+            }
+            return releases;
+          },
+        }
       )
     );
 

@@ -3240,3 +3240,34 @@ export interface UnresolvedHistorySummary {
   gap: number | null;
   lastFullBackfillAt: number | null;
 }
+
+/** Where a suggested album for an unresolved track came from */
+export type UnresolvedAlbumSuggestionSource = 'history' | 'collection';
+
+/** An album that has a given track */
+export interface UnresolvedAlbumOption {
+  album: string;
+  source: UnresolvedAlbumSuggestionSource;
+  /** Plays of this track on this album in your history (0 for collection) */
+  trackPlays: number;
+}
+
+/** Suggested album for one unresolved track */
+export interface UnresolvedTrackAlbumSuggestion {
+  /** "artist|track" key, as in UnresolvedHistoryTrack */
+  key: string;
+  track: string;
+  playCount: number;
+  hidden: boolean;
+  /** Best match (most plays of this track), or null if none found */
+  suggestion: UnresolvedAlbumOption | null;
+  /** Other albums that have this track, best first */
+  alternatives: UnresolvedAlbumOption[];
+}
+
+export interface UnresolvedArtistAlbumSuggestions {
+  /** Normalized artist key */
+  artist: string;
+  artistName: string;
+  tracks: UnresolvedTrackAlbumSuggestion[];
+}
