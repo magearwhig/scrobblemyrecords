@@ -48,6 +48,13 @@ export class MappingService {
    * Load mappings from disk.
    * Handles both legacy (raw array) and new (versioned store) formats.
    */
+  /** Drop the in-memory mappings so the next access reloads from disk. */
+  clearCache(): void {
+    this.albumMappings.clear();
+    this.artistMappings.clear();
+    this.loaded = false;
+  }
+
   async loadMappings(): Promise<void> {
     if (this.loaded) return;
 

@@ -33,6 +33,12 @@ class ArtistMappingService {
     this.loadMappings();
   }
 
+  /** Re-read the mappings file (e.g. after a backup restore). */
+  reload(): void {
+    this.isLoaded = false;
+    this.loadMappings();
+  }
+
   private loadMappings(): void {
     try {
       if (fs.existsSync(this.mappingsFilePath)) {

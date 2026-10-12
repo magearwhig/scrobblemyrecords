@@ -2,6 +2,7 @@ import * as fs from 'fs/promises';
 import path from 'path';
 
 import { BackupService } from '../../src/backend/services/backupService';
+import { MappingService } from '../../src/backend/services/mappingService';
 import { FileStorage } from '../../src/backend/utils/fileStorage';
 import {
   AlbumMapping,
@@ -14,6 +15,8 @@ import {
   HiddenRelease,
   ExcludedArtist,
   BackupFile,
+  CompoundArtistMapping,
+  TrackMapping,
 } from '../../src/shared/types';
 
 describe('BackupService', () => {
@@ -526,6 +529,66 @@ describe('BackupService', () => {
       expect(result.success).toBe(true);
     });
 
+    it('lets a running service see restored data before its next edit (afterImport hook)', async () => {
+      // A backup that contains mapping A
+      const mappingA = createAlbumMapping({
+        historyArtist: 'artist a',
+        historyAlbum: 'album a',
+      });
+      await fileStorage.writeJSON('mappings/album-mappings.json', {
+        schemaVersion: 1,
+        mappings: [mappingA],
+      });
+      const backupJson = await service.exportBackup({
+        includeCredentials: false,
+      });
+
+      // A running service loads, then A is removed
+      const mappingService = new MappingService(fileStorage);
+      await mappingService.removeAlbumMapping('artist a', 'album a');
+      expect(await mappingService.getAllAlbumMappings()).toHaveLength(0);
+
+      service.setAfterImport(async () => mappingService.clearCache());
+      const result = await service.importBackup(backupJson, {
+        mode: 'replace',
+      });
+      expect(result.success).toBe(true);
+
+      // The restored mapping is visible, and survives the next edit
+      expect(
+        (await mappingService.getAllAlbumMappings()).map(m => m.historyAlbum)
+      ).toEqual(['album a']);
+      await mappingService.addAlbumMapping(
+        createAlbumMapping({
+          historyArtist: 'artist b',
+          historyAlbum: 'album b',
+        })
+      );
+      const stored = await fileStorage.readJSON<{ mappings: AlbumMapping[] }>(
+        'mappings/album-mappings.json'
+      );
+      expect(stored?.mappings.map(m => m.historyAlbum).sort()).toEqual([
+        'album a',
+        'album b',
+      ]);
+    });
+
+    it('reports a failing afterImport hook without hiding the import', async () => {
+      const backupJson = await service.exportBackup({
+        includeCredentials: false,
+      });
+      service.setAfterImport(async () => {
+        throw new Error('reload failed');
+      });
+
+      const result = await service.importBackup(backupJson, { mode: 'merge' });
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toContain(
+        'Reloading restored data failed: reload failed'
+      );
+    });
+
     it('should import in replace mode overwriting all data', async () => {
       // Setup existing data
       await fileStorage.writeJSON('mappings/album-mappings.json', {
@@ -572,6 +635,317 @@ describe('BackupService', () => {
       expect(result.success).toBe(true);
       expect(result.itemsAdded).toBeGreaterThan(0);
     });
+  });
+
+  describe('track, compound-artist and dismissed-merge files (M32)', () => {
+    const TRACK_FILE = 'mappings/track-mappings.json';
+    const COMPOUND_FILE = 'mappings/compound-artist-mappings.json';
+    const DISMISSED_FILE = 'mappings/dismissed-album-merges.json';
+
+    const createTrackMapping = (
+      overrides: Partial<TrackMapping> = {}
+    ): TrackMapping => ({
+      historyArtist: 'El-p',
+      historyAlbum: 'Cancer 4 Cure',
+      historyTrack: 'Request Denied',
+      cacheArtist: 'El-P',
+      cacheAlbum: 'Cancer 4 Cure [Explicit]',
+      cacheTrack: 'Request Denied [Explicit]',
+      createdAt: 1000,
+      ...overrides,
+    });
+
+    const createCompoundMapping = (
+      overrides: Partial<CompoundArtistMapping> = {}
+    ): CompoundArtistMapping => ({
+      compoundName: 'Danny Brown (2), Jane Remover',
+      components: ['Danny Brown', 'Jane Remover'],
+      autoDetected: false,
+      createdAt: 1000,
+      ...overrides,
+    });
+
+    const seed = async (
+      tracks: TrackMapping[],
+      compounds: CompoundArtistMapping[],
+      dismissed: Array<{ id: string; dismissedAt: number }>
+    ) => {
+      await fileStorage.writeJSON(TRACK_FILE, {
+        schemaVersion: 1,
+        mappings: tracks,
+      });
+      await fileStorage.writeJSON(COMPOUND_FILE, {
+        schemaVersion: 1,
+        mappings: compounds,
+      });
+      await fileStorage.writeJSON(DISMISSED_FILE, {
+        schemaVersion: 1,
+        items: dismissed,
+      });
+    };
+
+    const readTracks = async () =>
+      (await fileStorage.readJSON<{ mappings: TrackMapping[] }>(TRACK_FILE))
+        ?.mappings ?? [];
+    const readCompounds = async () =>
+      (
+        await fileStorage.readJSON<{ mappings: CompoundArtistMapping[] }>(
+          COMPOUND_FILE
+        )
+      )?.mappings ?? [];
+    const readDismissed = async () =>
+      (
+        await fileStorage.readJSON<{
+          items: Array<{ id: string; dismissedAt: number }>;
+        }>(DISMISSED_FILE)
+      )?.items ?? [];
+
+    it('counts the three files in the backup preview', async () => {
+      await seed(
+        [
+          createTrackMapping(),
+          createTrackMapping({ historyTrack: 'Oh Hail No' }),
+        ],
+        [createCompoundMapping()],
+        [
+          { id: 'a', dismissedAt: 1 },
+          { id: 'b', dismissedAt: 2 },
+          { id: 'c', dismissedAt: 3 },
+        ]
+      );
+
+      const preview = await service.getBackupPreview();
+
+      expect(preview.trackMappingsCount).toBe(2);
+      expect(preview.compoundArtistMappingsCount).toBe(1);
+      expect(preview.dismissedAlbumMergesCount).toBe(3);
+    });
+
+    it('includes the three files in the export', async () => {
+      const track = createTrackMapping();
+      const compound = createCompoundMapping();
+      await seed([track], [compound], [{ id: 'merge-1', dismissedAt: 5 }]);
+
+      const backup: BackupFile = JSON.parse(
+        await service.exportBackup({ includeCredentials: false })
+      );
+
+      expect(backup.data.trackMappings).toEqual([track]);
+      expect(backup.data.compoundArtistMappings).toEqual([compound]);
+      expect(backup.data.dismissedAlbumMerges).toEqual([
+        { id: 'merge-1', dismissedAt: 5 },
+      ]);
+    });
+
+    it('exports track mappings stored in the legacy raw-array format', async () => {
+      const track = createTrackMapping();
+      await fileStorage.writeJSON(TRACK_FILE, [track]);
+
+      const backup: BackupFile = JSON.parse(
+        await service.exportBackup({ includeCredentials: false })
+      );
+
+      expect(backup.data.trackMappings).toEqual([track]);
+    });
+
+    it('reports new and existing items in the import preview', async () => {
+      await seed(
+        [createTrackMapping(), createTrackMapping({ historyTrack: 'Two' })],
+        [createCompoundMapping()],
+        [{ id: 'keep', dismissedAt: 1 }]
+      );
+      const backupJson = await service.exportBackup({
+        includeCredentials: false,
+      });
+      // Current data: one track matches (different case), one compound
+      // matches (different case), nothing dismissed in common
+      await seed(
+        [createTrackMapping({ historyArtist: 'EL-P ' })],
+        [
+          createCompoundMapping({
+            compoundName: 'danny brown (2), jane remover',
+          }),
+        ],
+        [{ id: 'other', dismissedAt: 1 }]
+      );
+
+      const preview = await service.previewImport(backupJson);
+
+      expect(preview.valid).toBe(true);
+      expect(preview.summary.trackMappings).toEqual({ new: 1, existing: 1 });
+      expect(preview.summary.compoundArtistMappings).toEqual({
+        new: 0,
+        existing: 1,
+      });
+      expect(preview.summary.dismissedAlbumMerges).toEqual({
+        new: 1,
+        existing: 0,
+      });
+    });
+
+    it('merges each file, keeping newer entries and existing extras', async () => {
+      // Backup contents
+      await seed(
+        [
+          createTrackMapping({ cacheTrack: 'Backup Target', createdAt: 2000 }),
+          createTrackMapping({ historyTrack: 'Backup Only' }),
+        ],
+        [
+          createCompoundMapping({
+            components: ['Danny Brown (2)', 'Jane Remover'],
+            createdAt: 2000,
+          }),
+        ],
+        [
+          { id: 'shared', dismissedAt: 2000 },
+          { id: 'backup-only', dismissedAt: 2000 },
+        ]
+      );
+      const backupJson = await service.exportBackup({
+        includeCredentials: false,
+      });
+
+      // Current contents: older versions of shared items, plus local extras.
+      // Keys differ only in case/whitespace, as the services normalize them.
+      await seed(
+        [
+          createTrackMapping({
+            historyArtist: 'EL-P',
+            cacheTrack: 'Old Target',
+            createdAt: 1000,
+          }),
+          createTrackMapping({ historyTrack: 'Local Only' }),
+        ],
+        [
+          createCompoundMapping({
+            compoundName: 'DANNY BROWN (2), JANE REMOVER',
+            createdAt: 1000,
+          }),
+          createCompoundMapping({
+            compoundName: 'A & B',
+            components: ['A', 'B'],
+          }),
+        ],
+        [
+          { id: 'shared', dismissedAt: 1000 },
+          { id: 'local-only', dismissedAt: 1000 },
+        ]
+      );
+
+      const result = await service.importBackup(backupJson, {
+        mode: 'merge',
+      });
+
+      expect(result.success).toBe(true);
+
+      const tracks = await readTracks();
+      expect(tracks).toHaveLength(3);
+      expect(tracks.map(t => t.cacheTrack)).toContain('Backup Target');
+      expect(tracks.map(t => t.cacheTrack)).not.toContain('Old Target');
+      expect(tracks.map(t => t.historyTrack)).toEqual(
+        expect.arrayContaining(['Backup Only', 'Local Only'])
+      );
+
+      const compounds = await readCompounds();
+      expect(compounds).toHaveLength(2);
+      expect(
+        compounds.find(c => c.compoundName === 'Danny Brown (2), Jane Remover')
+          ?.components
+      ).toEqual(['Danny Brown (2)', 'Jane Remover']);
+      expect(compounds.map(c => c.compoundName)).toContain('A & B');
+
+      const dismissed = await readDismissed();
+      expect(dismissed.map(d => d.id).sort()).toEqual([
+        'backup-only',
+        'local-only',
+        'shared',
+      ]);
+      expect(dismissed.find(d => d.id === 'shared')?.dismissedAt).toBe(2000);
+    });
+
+    it('merges into a legacy raw-array track mappings file without losing it', async () => {
+      await seed([createTrackMapping({ historyTrack: 'From Backup' })], [], []);
+      const backupJson = await service.exportBackup({
+        includeCredentials: false,
+      });
+      await fileStorage.writeJSON(TRACK_FILE, [
+        createTrackMapping({ historyTrack: 'Legacy Local' }),
+      ]);
+
+      const result = await service.importBackup(backupJson, {
+        mode: 'merge',
+      });
+
+      expect(result.success).toBe(true);
+      const tracks = await readTracks();
+      expect(tracks.map(t => t.historyTrack).sort()).toEqual([
+        'From Backup',
+        'Legacy Local',
+      ]);
+    });
+
+    it('replaces each file with the backup contents in replace mode', async () => {
+      await seed(
+        [createTrackMapping({ historyTrack: 'Backup Track' })],
+        [createCompoundMapping({ compoundName: 'Backup X Duo' })],
+        [{ id: 'backup-dismissed', dismissedAt: 1 }]
+      );
+      const backupJson = await service.exportBackup({
+        includeCredentials: false,
+      });
+      await seed(
+        [createTrackMapping({ historyTrack: 'Local Track' })],
+        [createCompoundMapping({ compoundName: 'Local & Duo' })],
+        [{ id: 'local-dismissed', dismissedAt: 1 }]
+      );
+
+      const result = await service.importBackup(backupJson, {
+        mode: 'replace',
+      });
+
+      expect(result.success).toBe(true);
+      expect((await readTracks()).map(t => t.historyTrack)).toEqual([
+        'Backup Track',
+      ]);
+      expect((await readCompounds()).map(c => c.compoundName)).toEqual([
+        'Backup X Duo',
+      ]);
+      expect((await readDismissed()).map(d => d.id)).toEqual([
+        'backup-dismissed',
+      ]);
+    });
+
+    it.each(['merge', 'replace'] as const)(
+      'imports an older backup without the new fields (%s mode)',
+      async mode => {
+        const backup: BackupFile = JSON.parse(
+          await service.exportBackup({ includeCredentials: false })
+        );
+        delete backup.data.trackMappings;
+        delete backup.data.compoundArtistMappings;
+        delete backup.data.dismissedAlbumMerges;
+        backup.checksum = service['computeChecksum'](backup.data);
+        const oldBackupJson = JSON.stringify(backup);
+
+        const track = createTrackMapping();
+        const compound = createCompoundMapping();
+        await seed([track], [compound], [{ id: 'local', dismissedAt: 1 }]);
+
+        const preview = await service.previewImport(oldBackupJson);
+        expect(preview.valid).toBe(true);
+        expect(preview.summary.trackMappings).toEqual({ new: 0, existing: 0 });
+
+        const result = await service.importBackup(oldBackupJson, { mode });
+
+        expect(result.success).toBe(true);
+        expect(result.errors).toEqual([]);
+        expect(await readTracks()).toEqual([track]);
+        expect(await readCompounds()).toEqual([compound]);
+        expect(await readDismissed()).toEqual([
+          { id: 'local', dismissedAt: 1 },
+        ]);
+      }
+    );
   });
 
   describe('credential encryption', () => {

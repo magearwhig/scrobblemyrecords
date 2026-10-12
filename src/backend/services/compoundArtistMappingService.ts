@@ -45,6 +45,12 @@ export class CompoundArtistMappingService
     return compoundName.toLowerCase().trim();
   }
 
+  /** Drop the in-memory mappings so the next access reloads from disk. */
+  clearCache(): void {
+    this.mappings.clear();
+    this.loaded = false;
+  }
+
   async load(): Promise<void> {
     if (this.loaded) return;
 

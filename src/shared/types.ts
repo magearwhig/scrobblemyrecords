@@ -954,6 +954,8 @@ export interface StatsCache {
     version?: number;
     /** ArtistNameResolver fingerprint at warm time; artist alias changes invalidate */
     artistAliasFingerprint?: string;
+    /** Album mappings fingerprint at warm time; mapping changes invalidate */
+    albumMappingFingerprint?: string;
     streaks: StreakInfo;
     counts: ScrobbleCounts;
     listeningHours: ListeningHours;
@@ -1902,6 +1904,10 @@ export interface BackupData {
   albumMappings: AlbumMapping[];
   artistMappings: ArtistMapping[];
   historyArtistMappings: ArtistMapping[];
+  // Optional for backward compatibility (added 2026-10, M32)
+  trackMappings?: TrackMapping[];
+  compoundArtistMappings?: CompoundArtistMapping[];
+  dismissedAlbumMerges?: DismissedAlbumMergesStore['items'];
 
   // Discovery
   hiddenAlbums: HiddenAlbum[];
@@ -1964,6 +1970,9 @@ export interface BackupPreview {
   albumMappingsCount: number;
   artistMappingsCount: number;
   historyArtistMappingsCount: number;
+  trackMappingsCount?: number;
+  compoundArtistMappingsCount?: number;
+  dismissedAlbumMergesCount?: number;
   hiddenAlbumsCount: number;
   hiddenArtistsCount: number;
   localWantListCount: number;
@@ -1999,6 +2008,9 @@ export interface BackupImportPreview {
     albumMappings: ImportCategorySummary;
     artistMappings: ImportCategorySummary;
     historyArtistMappings: ImportCategorySummary;
+    trackMappings?: ImportCategorySummary;
+    compoundArtistMappings?: ImportCategorySummary;
+    dismissedAlbumMerges?: ImportCategorySummary;
     hiddenAlbums: ImportCategorySummary;
     hiddenArtists: ImportCategorySummary;
     localWantList: ImportCategorySummary;

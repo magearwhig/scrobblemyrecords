@@ -1210,6 +1210,59 @@ describe('StatsService', () => {
       expect(mockHistoryStorage.getIndex).toHaveBeenCalled();
     });
 
+    it('should ignore a warm cache built before an album mapping change, and serve it once warmed again', async () => {
+      // Arrange
+      const syncTimestamp = 1700000000000;
+      mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(syncTimestamp);
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
+      const cached = [{ artist: 'cached', album: 'cached' }];
+      const warmBlock = {
+        warmedAt: 0,
+        syncTimestamp,
+        version: 2,
+        artistAliasFingerprint: '',
+        // Built when there were no album mappings
+        topAlbums: { all: cached },
+      };
+      let stored: unknown = {
+        schemaVersion: 1,
+        lastUpdated: 0,
+        streaks: { currentStreak: 0, longestStreak: 0 },
+        milestoneHistory: [],
+        warm: warmBlock,
+      };
+      mockFileStorage.readJSON.mockImplementation(async () => stored);
+      mockFileStorage.writeJSONWithBackup.mockImplementation(
+        async (_p, data) => {
+          stored = data;
+        }
+      );
+      statsService.setMappingService({
+        getAllAlbumMappings: jest.fn().mockResolvedValue([
+          {
+            historyArtist: 'a',
+            historyAlbum: 'b (deluxe)',
+            collectionId: 0,
+            collectionArtist: 'a',
+            collectionAlbum: 'b',
+            createdAt: 0,
+          },
+        ]),
+        getAlbumMapping: jest.fn().mockResolvedValue(null),
+      } as unknown as MappingService);
+
+      // Act + Assert — a mapping now exists, so the cache is stale
+      await expect(statsService.getTopAlbums('all', 10)).resolves.toEqual([]);
+
+      // Re-warm with the mapping in place; the new cache is served
+      await statsService.warmCache();
+      const rewarmed = stored as { warm: { albumMappingFingerprint?: string } };
+      expect(rewarmed.warm.albumMappingFingerprint).toMatch(/^[0-9a-f]{40}$/);
+      mockHistoryStorage.getIndex.mockClear();
+      await statsService.getTopAlbums('all', 10);
+      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
+    });
+
     it('should fall back to live computation when no cache exists', async () => {
       // Arrange
       mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(null);

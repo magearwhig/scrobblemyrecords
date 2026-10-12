@@ -47,6 +47,25 @@ describe('CompoundArtistMappingService', () => {
     });
   });
 
+  describe('clearCache', () => {
+    it('reloads from disk on next access', async () => {
+      const mapping = {
+        compoundName: 'A & B',
+        components: ['a', 'b'],
+        autoDetected: false,
+        createdAt: 0,
+      };
+      await service.getAllMappings(); // loads the empty store
+      mockFileStorage.readJSON = jest
+        .fn()
+        .mockResolvedValue({ schemaVersion: 1, mappings: [mapping] });
+
+      expect(await service.getAllMappings()).toEqual([]);
+      service.clearCache();
+      expect(await service.getAllMappings()).toEqual([mapping]);
+    });
+  });
+
   describe('addMapping', () => {
     it('should add a mapping and persist', async () => {
       await service.addMapping('A, B', ['A', 'B']);
