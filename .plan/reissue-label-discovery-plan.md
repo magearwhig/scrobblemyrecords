@@ -3,9 +3,10 @@
 > **Status (audited 2026-10-11): MOSTLY IMPLEMENTED, small gaps remain.**
 > All three features (A reissues, B labels, C websites) shipped in commit
 > `6be3c73` ("feat: marketplace discovery — reissues, labels, websites + dev
-> sandbox"). What is left is one correctness gap in reissue detection, a
-> settings-defaults bug that turns reissue detection off for existing installs,
-> and the auto-scan and notification pieces for labels and websites. The plan
+> sandbox"). The reissue
+> dedupe gap and the settings-defaults bug were fixed on 2026-10-11 (branch
+> `fix/plan-audit-bugs`). What is left is the auto-scan and notification
+> pieces for labels and websites (gaps 3-5). The plan
 > stays in `.plan/` until those are closed or explicitly dropped. The original
 > plan text below is kept for history. Where the code differs from it, the
 > code is the source of truth (see "Deliberate deviations").
@@ -147,8 +148,13 @@
 
 ## Remaining work
 
-1. **Reissue dedupe against release-groups found in the same sync (Feature A,
-   step 3).** In `ReleaseTrackingService.syncReleases`, the reissue branch only
+1. ~~**Reissue dedupe against release-groups found in the same sync (Feature A,
+   step 3).**~~ **FIXED 2026-10-11.** `syncReleases` now skips a reissue
+   candidate whose release group is tracked as a new album (from this sync or
+   earlier) when the pressing is from the album's original era: before, or
+   within 180 days after, the album's release date (`ORIGINAL_ERA_WINDOW_DAYS`,
+   `isOriginalEraPressing`). Partial dates are compared conservatively. Later
+   represses are still stored with `isReissue: true`. Original description: In `ReleaseTrackingService.syncReleases`, the reissue branch only
    dedupes by individual release MBID (`existingMbids.has(r.mbid)`). It does
    not skip releases whose `releaseGroupMbid` is a brand-new release-group in
    this sync. It also does not check that the release-group was already known
@@ -166,7 +172,9 @@
      is persisted. A pressing of an older, already-tracked or pre-window
      release-group is still persisted with `isReissue: true`.
 
-2. **`includeReissues` (and other new settings) are lost on existing installs.**
+2. ~~**`includeReissues` (and other new settings) are lost on existing installs.**~~
+   **FIXED 2026-10-11.** `getSettings` merges stored values over the defaults
+   (explicit `false` is kept). Original description:
    `ReleaseTrackingService.getSettings` returns the stored file as-is whenever
    `schemaVersion === 1`, without merging defaults. The live
    `data/releases/settings.json` is `{ "schemaVersion": 1, "includeEps": true }`,
