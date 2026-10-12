@@ -1928,7 +1928,10 @@ export interface BackupData {
   compoundArtistMappings?: CompoundArtistMapping[];
   dismissedAlbumMerges?: DismissedAlbumMergesStore['items'];
   /** Unresolved Listening History rules and hidden list (added 2026-10) */
-  unresolvedHistory?: Pick<UnresolvedHistoryStore, 'resolutions' | 'hidden'>;
+  unresolvedHistory?: Pick<
+    UnresolvedHistoryStore,
+    'resolutions' | 'hidden' | 'excludedArtists'
+  >;
 
   // Discovery
   hiddenAlbums: HiddenAlbum[];
@@ -3155,6 +3158,35 @@ export interface UnresolvedHistoryStore extends VersionedStore {
   resolutions: UnresolvedTrackResolution[];
   /** "artist|track" keys hidden from the list (still counted in stats) */
   hidden: string[];
+  /**
+   * Normalized artists left out of all listening stats (e.g. podcasts).
+   * Their plays stay in the stored history, so un-excluding is instant.
+   */
+  excludedArtists?: string[];
+}
+
+/** An artist excluded from listening stats */
+export interface ExcludedHistoryArtist {
+  /** Normalized artist key */
+  artist: string;
+  /** Display name */
+  artistName: string;
+  /** Plays in the stored history that are being left out */
+  plays: number;
+}
+
+/** An artist whose plays look like podcast episodes */
+export interface ExclusionSuggestion {
+  /** Normalized artist key */
+  artist: string;
+  /** Display name */
+  artistName: string;
+  plays: number;
+  distinctTracks: number;
+  /** Share of plays with no album info (0-1) */
+  unresolvedShare: number;
+  /** Share of plays whose title looks like an episode (0-1) */
+  episodeTitleShare: number;
 }
 
 /** One unresolved track of an artist, as listed in the Unresolved tab. */
@@ -3198,6 +3230,10 @@ export interface UnresolvedHistorySummary {
   /** Unresolved plays hidden from the list */
   hiddenCount: number;
   resolutionCount: number;
+  /** Artists left out of listening stats (e.g. podcasts) */
+  excludedArtistCount: number;
+  /** Plays by excluded artists (stored, but not counted) */
+  excludedPlayCount: number;
   lastfmTotal: number | null;
   lastfmTotalCheckedAt: number | null;
   /** lastfmTotal - indexedTotal, when known */

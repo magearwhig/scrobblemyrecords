@@ -337,6 +337,29 @@ describe('AnalyticsService', () => {
     });
   });
 
+  describe('getTopArtistsMap exclusions', () => {
+    it('leaves out excluded artists on every read, including cached results', async () => {
+      mockLastFmService.getTopArtists = jest.fn().mockResolvedValue([
+        { name: 'The Onion', playcount: '100' },
+        { name: 'Radiohead', playcount: '50' },
+      ]);
+      let excluded = true;
+      (
+        mockHistoryStorage as unknown as { getExclusionMatcher: jest.Mock }
+      ).getExclusionMatcher = jest.fn(async () =>
+        excluded ? (name: string) => (name === 'the onion' ? name : null) : null
+      );
+
+      const first = await analyticsService.getTopArtistsMap();
+      excluded = false;
+      const second = await analyticsService.getTopArtistsMap();
+
+      expect([...first.keys()]).toEqual(['radiohead']);
+      expect([...second.keys()].sort()).toEqual(['radiohead', 'the onion']);
+      expect(mockLastFmService.getTopArtists).toHaveBeenCalledTimes(3);
+    });
+  });
+
   describe('getMissingAlbums', () => {
     it('should return empty array when no history', async () => {
       // Arrange

@@ -907,6 +907,26 @@ describe('StatsService', () => {
       expect(milestones.progressPercent).toBeGreaterThan(0);
     });
 
+    it('should drop recorded milestones above the current total', async () => {
+      // e.g. excluding a podcast took the total back below 1,000
+      mockHistoryStorage.getTotalScrobbles.mockResolvedValue(900);
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        lastUpdated: 0,
+        streaks: { currentStreak: 0, longestStreak: 0 },
+        milestoneHistory: [{ milestone: 1000, reachedAt: 1000000 }],
+      });
+
+      const milestones = await statsService.getMilestones();
+
+      expect(milestones.history).toEqual([]);
+      expect(milestones.nextMilestone).toBe(1000);
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ milestoneHistory: [] })
+      );
+    });
+
     it('should record new milestones', async () => {
       // Arrange
       mockHistoryStorage.getTotalScrobbles.mockResolvedValue(5100);

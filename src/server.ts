@@ -355,6 +355,9 @@ const unresolvedHistoryService = new UnresolvedHistoryService(
 historyStorage.setResolutionRulesProvider(() =>
   unresolvedHistoryService.getRules()
 );
+historyStorage.setExcludedArtistsProvider(() =>
+  unresolvedHistoryService.getExcludedArtists()
+);
 const syncService = new ScrobbleHistorySyncService(
   fileStorage,
   authService,
@@ -770,6 +773,7 @@ async function startServer() {
       ollamaService,
       wishlistService
     );
+    websiteMonitoringService.setHistoryStorage(historyStorage);
     const ollamaEmbedderService = new OllamaEmbedderService(ollamaService);
     const listeningSessionStorageService = new ListeningSessionStorageService(
       fileStorage

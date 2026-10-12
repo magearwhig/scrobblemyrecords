@@ -4,6 +4,8 @@ import { ScrobbleHistoryIndex, AlbumHistoryEntry } from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
 import {
   applyUnresolvedResolutions,
+  creditedArtists,
+  excludeArtists,
   forEachListeningPlay,
   UNKNOWN_ALBUM_LABEL,
   UnresolvedResolutionRule,
@@ -39,6 +41,9 @@ export class ScrobbleHistoryStorage {
   private resolutionRules: (() => Promise<UnresolvedResolutionRule[]>) | null =
     null;
 
+  /** Artists left out of listening stats entirely (e.g. podcasts) */
+  private excludedArtists: (() => Promise<string[]>) | null = null;
+
   constructor(fileStorage: FileStorage) {
     this.fileStorage = fileStorage;
   }
@@ -52,6 +57,15 @@ export class ScrobbleHistoryStorage {
     provider: () => Promise<UnresolvedResolutionRule[]>
   ): void {
     this.resolutionRules = provider;
+    this.invalidateCache();
+  }
+
+  /**
+   * Supply the excluded artists. getIndex() then leaves their plays out
+   * entirely. Call invalidateCache() after the list changes.
+   */
+  setExcludedArtistsProvider(provider: () => Promise<string[]>): void {
+    this.excludedArtists = provider;
     this.invalidateCache();
   }
 
@@ -206,10 +220,15 @@ export class ScrobbleHistoryStorage {
 
     try {
       const raw = await this.getRawIndex();
+      // Leave excluded artists out first, then apply resolution rules
+      const withoutExcluded = await this.applyExclusions(raw);
       const index =
-        raw && this.resolutionRules
-          ? applyUnresolvedResolutions(raw, await this.resolutionRules()).index
-          : raw;
+        withoutExcluded && this.resolutionRules
+          ? applyUnresolvedResolutions(
+              withoutExcluded,
+              await this.resolutionRules()
+            ).index
+          : withoutExcluded;
       if (index) {
         this.cachedIndex = index;
         this.cacheTimestamp = now;
@@ -225,14 +244,82 @@ export class ScrobbleHistoryStorage {
     }
   }
 
-  /** Hash of the current resolution rules; '' when there are none. */
+  /**
+   * Hash of the current resolution rules and excluded artists; '' when there
+   * are none. Both change what getIndex() returns.
+   */
   async getResolutionRulesFingerprint(): Promise<string> {
     const rules = this.resolutionRules ? await this.resolutionRules() : [];
-    if (rules.length === 0) return '';
-    const lines = rules
-      .map(rule => JSON.stringify([rule.artist, rule.track, rule.album]))
-      .sort();
+    const excluded = this.excludedArtists ? await this.excludedArtists() : [];
+    if (rules.length === 0 && excluded.length === 0) return '';
+    const lines = [
+      ...rules.map(rule =>
+        JSON.stringify([rule.artist, rule.track, rule.album])
+      ),
+      ...excluded.map(artist => JSON.stringify(['excluded', artist])),
+    ].sort();
     return createHash('sha1').update(lines.join('\n')).digest('hex');
+  }
+
+  /**
+   * Which excluded artist (if any) an index artist key belongs to: the exact
+   * name, an alias the artist resolver links to it, or a credit naming it
+   * ("doug benson, guest", "x feat. doug benson"). Null when nothing is
+   * excluded.
+   */
+  async getExclusionMatcher(): Promise<
+    ((artistKey: string) => string | null) | null
+  > {
+    const excluded = this.excludedArtists ? await this.excludedArtists() : [];
+    if (excluded.length === 0) return null;
+
+    const byName = new Map<string, string>();
+    for (const name of excluded) {
+      const key = name.toLowerCase().trim();
+      byName.set(key, key);
+      const canonical = this.artistNameResolver?.resolveArtist(key);
+      if (canonical && !byName.has(canonical)) byName.set(canonical, key);
+    }
+    const lookup = (name: string): string | null => {
+      const direct = byName.get(name);
+      if (direct) return direct;
+      const canonical = this.artistNameResolver?.resolveArtist(name);
+      return (canonical && byName.get(canonical)) || null;
+    };
+
+    const memo = new Map<string, string | null>();
+    return (artistKey: string) => {
+      const cached = memo.get(artistKey);
+      if (cached !== undefined) return cached;
+      let match = lookup(artistKey);
+      if (!match) {
+        const parts = [
+          ...creditedArtists(artistKey),
+          ...(this.artistNameResolver?.resolveArtistMulti(artistKey) ?? []),
+        ];
+        for (const part of parts) {
+          match = lookup(part);
+          if (match) break;
+        }
+      }
+      memo.set(artistKey, match);
+      return match;
+    };
+  }
+
+  /** The stored index with excluded artists left out (no resolution rules). */
+  async getExclusionView(): Promise<ScrobbleHistoryIndex | null> {
+    return this.applyExclusions(await this.getRawIndex());
+  }
+
+  private async applyExclusions(
+    raw: ScrobbleHistoryIndex | null
+  ): Promise<ScrobbleHistoryIndex | null> {
+    if (!raw) return raw;
+    const matcher = await this.getExclusionMatcher();
+    return matcher
+      ? excludeArtists(raw, key => matcher(key) !== null).index
+      : raw;
   }
 
   /** The index exactly as stored, without resolution rules applied. */

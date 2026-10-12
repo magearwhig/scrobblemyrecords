@@ -40,10 +40,17 @@ describe('unresolved history routes', () => {
       addResolutions: jest.fn().mockResolvedValue([{ id: 'r1' }]),
       removeResolution: jest.fn().mockResolvedValue(true),
       setHidden: jest.fn().mockResolvedValue(1),
+      listExcluded: jest
+        .fn()
+        .mockResolvedValue([{ artist: 'a', artistName: 'A', plays: 1 }]),
+      setExcluded: jest.fn().mockResolvedValue(1),
+      suggestExclusions: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<UnresolvedHistoryService>;
     historyStorage = {
       getIndex: jest.fn().mockResolvedValue(index),
       getRawIndex: jest.fn().mockResolvedValue(index),
+      getExclusionView: jest.fn().mockResolvedValue(index),
+      getExclusionMatcher: jest.fn().mockResolvedValue(null),
       invalidateCache: jest.fn(),
     } as unknown as jest.Mocked<ScrobbleHistoryStorage>;
     stats = {
@@ -94,7 +101,7 @@ describe('unresolved history routes', () => {
       '/api/v1/stats/unresolved-history/summary'
     );
     expect(response.body.data).toEqual({ unresolvedCount: 1 });
-    expect(service.getSummary).toHaveBeenCalledWith(index, index);
+    expect(service.getSummary).toHaveBeenCalledWith(index, index, index);
   });
 
   it('saves resolutions and refreshes the index and stats', async () => {
@@ -171,5 +178,41 @@ describe('unresolved history routes', () => {
       .post('/api/v1/stats/unresolved-history/lookup')
       .send({ artist: 'a' });
     expect(bad.status).toBe(400);
+  });
+
+  it('excludes and restores artists and refreshes stats', async () => {
+    const exclude = await request(app)
+      .post('/api/v1/stats/unresolved-history/excluded-artists')
+      .send({ artists: ['the onion'] });
+    const restore = await request(app)
+      .post('/api/v1/stats/unresolved-history/excluded-artists/remove')
+      .send({ artists: ['the onion'] });
+
+    expect(exclude.body.data).toEqual({ changed: 1 });
+    expect(restore.status).toBe(200);
+    expect(service.setExcluded).toHaveBeenCalledWith(['the onion'], true);
+    expect(service.setExcluded).toHaveBeenCalledWith(['the onion'], false);
+    expect(historyStorage.invalidateCache).toHaveBeenCalledTimes(2);
+
+    const bad = await request(app)
+      .post('/api/v1/stats/unresolved-history/excluded-artists')
+      .send({ artists: [''] });
+    expect(bad.status).toBe(400);
+  });
+
+  it('lists excluded artists from the raw index and suggestions from the view', async () => {
+    const list = await request(app).get(
+      '/api/v1/stats/unresolved-history/excluded-artists'
+    );
+    await request(app).get(
+      '/api/v1/stats/unresolved-history/exclusion-suggestions'
+    );
+
+    expect(list.body.data).toEqual([
+      { artist: 'a', artistName: 'A', plays: 1 },
+    ]);
+    expect(service.listExcluded.mock.calls[0][0]).toBe(index);
+    expect(historyStorage.getRawIndex).toHaveBeenCalled();
+    expect(service.suggestExclusions).toHaveBeenCalled();
   });
 });

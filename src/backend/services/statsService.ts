@@ -1473,12 +1473,19 @@ export class StatsService {
       history = [];
     }
 
+    // A milestone above the current total is no longer reached (e.g. after
+    // excluding an artist); drop it so it is re-dated if reached again
+    let historyChanged = false;
+    if (history.some(h => h.milestone > total)) {
+      history = history.filter(h => h.milestone <= total);
+      historyChanged = true;
+    }
+
     // Check if we've hit any new milestones
     const reachedMilestones = MILESTONES.filter(m => m <= total);
     const newMilestones = reachedMilestones.filter(
       m => !history.some(h => h.milestone === m)
     );
-    let historyChanged = false;
 
     if (newMilestones.length > 0 || (refreshHistoryDates && history.length)) {
       // Get all timestamps to find when each milestone was actually reached

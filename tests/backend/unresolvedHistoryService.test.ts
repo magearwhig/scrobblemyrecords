@@ -3,6 +3,7 @@ import {
   UnresolvedHistoryService,
 } from '../../src/backend/services/unresolvedHistoryService';
 import { FileStorage } from '../../src/backend/utils/fileStorage';
+import { excludeArtists } from '../../src/backend/utils/historyPlays';
 import { ScrobbleHistoryIndex } from '../../src/shared/types';
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -140,7 +141,7 @@ describe('UnresolvedHistoryService', () => {
       { timestamp: 30, track: 'Friday I’m In Love' },
     ];
 
-    const summary = await service.getSummary(raw, resolved);
+    const summary = await service.getSummary(raw, raw, resolved);
 
     expect(summary).toEqual({
       indexedTotal: 5,
@@ -148,6 +149,8 @@ describe('UnresolvedHistoryService', () => {
       resolvedByRuleCount: 2,
       hiddenCount: 1,
       resolutionCount: 0,
+      excludedArtistCount: 0,
+      excludedPlayCount: 0,
       lastfmTotal: 7,
       lastfmTotalCheckedAt: 99,
       gap: 2,
@@ -167,5 +170,50 @@ describe('UnresolvedHistoryService', () => {
     );
     lookup.getTrackInfo.mockResolvedValue(null);
     await expect(service.lookupAlbum('x', 'y')).resolves.toBeNull();
+  });
+
+  it('excludes and restores artists, and reports their stored plays', async () => {
+    const { storage } = memoryStorage();
+    const service = new UnresolvedHistoryService(storage);
+
+    expect(await service.setExcluded(['Radiohead', 'radiohead '], true)).toBe(
+      1
+    );
+    expect(await service.getExcludedArtists()).toEqual(['radiohead']);
+    expect(
+      await service.listExcluded(historyIndex(), artist => `[${artist}]`)
+    ).toEqual([{ artist: 'radiohead', artistName: '[radiohead]', plays: 1 }]);
+
+    // The storage view leaves excluded artists out before rules apply
+    const view = excludeArtists(historyIndex(), ['radiohead']).index;
+    const summary = await service.getSummary(historyIndex(), view, view);
+    expect(summary.excludedArtistCount).toBe(1);
+    expect(summary.excludedPlayCount).toBe(1);
+    // The excluded artist's unresolved play isn't counted as resolved
+    expect(summary.resolvedByRuleCount).toBe(0);
+    expect(summary.unresolvedCount).toBe(3);
+
+    expect(await service.setExcluded(['radiohead'], false)).toBe(1);
+    expect(await service.getExcludedArtists()).toEqual([]);
+  });
+
+  it('suggests podcast-like artists that are not already excluded', async () => {
+    const { storage } = memoryStorage();
+    const service = new UnresolvedHistoryService(storage);
+    const index = historyIndex();
+    index.unresolved!['the onion'] = {
+      lastPlayed: 100,
+      playCount: 30,
+      plays: Array.from({ length: 30 }, (_, i) => ({
+        timestamp: 100 + i,
+        track: `Headline ${i}`,
+      })),
+    };
+
+    expect((await service.suggestExclusions(index)).map(s => s.artist)).toEqual(
+      ['the onion']
+    );
+    await service.setExcluded(['the onion'], true);
+    expect(await service.suggestExclusions(index)).toEqual([]);
   });
 });

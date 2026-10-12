@@ -87,6 +87,7 @@ export default function createUnresolvedHistoryRouter(
     try {
       const summary = await service.getSummary(
         await historyStorage.getRawIndex(),
+        await historyStorage.getExclusionView(),
         await historyStorage.getIndex()
       );
       res.json({ success: true, data: summary });
@@ -194,6 +195,64 @@ export default function createUnresolvedHistoryRouter(
   /** POST /hide and /unhide { keys } — list visibility only; stats unchanged */
   router.post('/hide', setHidden(true));
   router.post('/unhide', setHidden(false));
+
+  /** GET /excluded-artists — artists left out of listening stats */
+  router.get('/excluded-artists', async (_req: Request, res: Response) => {
+    try {
+      const matcher = await historyStorage.getExclusionMatcher();
+      const artists = await service.listExcluded(
+        await historyStorage.getRawIndex(),
+        getDisplayName(),
+        matcher ?? undefined
+      );
+      res.json({ success: true, data: artists });
+    } catch (error) {
+      fail(res, error, 'Error listing excluded artists');
+    }
+  });
+
+  const setExcluded =
+    (excluded: boolean) => async (req: Request, res: Response) => {
+      try {
+        const { artists } = req.body ?? {};
+        if (
+          !Array.isArray(artists) ||
+          artists.length === 0 ||
+          artists.length > 500 ||
+          !artists.every(isNonEmptyString)
+        ) {
+          return res.status(400).json({
+            success: false,
+            error: 'artists must be 1-500 artist names',
+          });
+        }
+        const changed = await service.setExcluded(artists, excluded);
+        if (changed > 0) refreshAfterChange();
+        res.json({ success: true, data: { changed } });
+      } catch (error) {
+        fail(res, error, 'Error updating excluded artists');
+      }
+    };
+
+  /**
+   * POST /excluded-artists { artists } — stop counting these artists (e.g.
+   * podcasts). Plays stay stored; POST /excluded-artists/remove undoes it.
+   */
+  router.post('/excluded-artists', setExcluded(true));
+  router.post('/excluded-artists/remove', setExcluded(false));
+
+  /** GET /exclusion-suggestions — artists whose plays look like podcasts */
+  router.get('/exclusion-suggestions', async (_req: Request, res: Response) => {
+    try {
+      const suggestions = await service.suggestExclusions(
+        await historyStorage.getIndex(),
+        getDisplayName()
+      );
+      res.json({ success: true, data: suggestions });
+    } catch (error) {
+      fail(res, error, 'Error suggesting exclusions');
+    }
+  });
 
   return router;
 }

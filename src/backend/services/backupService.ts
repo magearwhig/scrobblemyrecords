@@ -390,13 +390,15 @@ export class BackupService {
     return {
       resolutions: store?.resolutions ?? [],
       hidden: store?.hidden ?? [],
+      excludedArtists: store?.excludedArtists ?? [],
     };
   }
 
   /**
-   * Import Unresolved Listening History rules and hidden keys. The store has
-   * two lists, so it can't use mergeAndSave (which keeps one array key).
-   * Merge: union by artist|track (newer rule wins) and union of hidden keys.
+   * Import Unresolved Listening History rules, hidden keys and excluded
+   * artists. The store has several lists, so it can't use mergeAndSave
+   * (which keeps one array key). Merge: union by artist|track (newer rule
+   * wins) and unions of hidden keys and excluded artists.
    * Replace: the backup's store replaces the current one.
    */
   private async importUnresolvedHistory(
@@ -408,6 +410,8 @@ export class BackupService {
     let updated = 0;
     let resolutions = backup.resolutions;
     let hidden = backup.hidden;
+    // Older backups have no excluded artists: keep the current ones
+    let excludedArtists = backup.excludedArtists ?? current.excludedArtists;
     if (merge) {
       const byKey = new Map(
         current.resolutions.map(r => [unresolvedResolutionKey(r), r])
@@ -425,6 +429,12 @@ export class BackupService {
       }
       resolutions = [...byKey.values()];
       hidden = [...new Set([...current.hidden, ...backup.hidden])];
+      excludedArtists = [
+        ...new Set([
+          ...(current.excludedArtists ?? []),
+          ...(backup.excludedArtists ?? []),
+        ]),
+      ].sort();
     } else {
       added = backup.resolutions.length;
     }
@@ -432,6 +442,7 @@ export class BackupService {
       schemaVersion: 1,
       resolutions,
       hidden,
+      excludedArtists,
     });
     return { added, updated };
   }

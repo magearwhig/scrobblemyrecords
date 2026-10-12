@@ -274,3 +274,136 @@ export function applyUnresolvedResolutions<T extends ScrobbleHistoryIndex>(
     resolvedPlays,
   };
 }
+
+/**
+ * Derived view of the index without excluded artists (e.g. podcasts the user
+ * doesn't want tracked). `excluded` is either normalized artist names
+ * (exact match) or a predicate over normalized artist keys. Album entries
+ * and unresolved plays of matching artists are left out, and
+ * totalScrobbles and oldestScrobbleDate are recomputed. The input is not
+ * modified, so un-excluding restores the plays immediately.
+ */
+export function excludeArtists<T extends ScrobbleHistoryIndex>(
+  index: T,
+  excluded: Iterable<string> | ((artistKey: string) => boolean)
+): { index: T; excludedPlays: number } {
+  let isExcluded: (artistKey: string) => boolean;
+  if (typeof excluded === 'function') {
+    isExcluded = excluded;
+  } else {
+    const names = new Set(
+      [...excluded].map(name => normalizeHistoryName(name))
+    );
+    if (names.size === 0) return { index, excludedPlays: 0 };
+    isExcluded = artistKey => names.has(artistKey);
+  }
+
+  let excludedPlays = 0;
+  const albums: Record<string, AlbumHistoryEntry> = {};
+  for (const [key, entry] of Object.entries(index.albums)) {
+    if (isExcluded(artistFromAlbumKey(key))) {
+      excludedPlays += entry.plays.length;
+    } else {
+      albums[key] = entry;
+    }
+  }
+  const unresolved: Record<string, AlbumHistoryEntry> = {};
+  for (const [artist, entry] of Object.entries(index.unresolved ?? {})) {
+    if (isExcluded(artist)) {
+      excludedPlays += entry.plays.length;
+    } else {
+      unresolved[artist] = entry;
+    }
+  }
+  if (excludedPlays === 0) return { index, excludedPlays: 0 };
+
+  const view = { ...index, albums, unresolved };
+  view.totalScrobbles = countListeningPlays(view);
+  // The earliest play may have been an excluded one
+  let oldest = 0;
+  forEachListeningPlay(view, play => {
+    if (oldest === 0 || play.timestamp < oldest) oldest = play.timestamp;
+  });
+  view.oldestScrobbleDate = oldest;
+  return { index: view, excludedPlays };
+}
+
+/**
+ * Split a credit into the artists it names, for matching exclusions:
+ * "doug benson, guest" and "doug benson feat. x" both name "doug benson".
+ * Only unambiguous joiners are used ("&" and "and" are often part of a
+ * single artist's name).
+ */
+export function creditedArtists(artistKey: string): string[] {
+  return artistKey
+    .split(/\s*,\s*|\s+(?:feat\.?|ft\.?|featuring|with)\s+/)
+    .map(part => part.trim())
+    .filter(Boolean);
+}
+
+/** An artist whose listening looks like a podcast (or similar) */
+export interface ExclusionCandidate {
+  /** Normalized artist key */
+  artist: string;
+  plays: number;
+  distinctTracks: number;
+  /** Share of plays with no album info (0-1) */
+  unresolvedShare: number;
+  /** Share of plays whose title looks like an episode (0-1) */
+  episodeTitleShare: number;
+}
+
+/** Titles like "Episode 12", "#123", "Ep. 4", dates, "... guest" */
+const EPISODE_TITLE =
+  /(episode|\bep\.?\s*\d|#\s?\d|\bpart\s+\d|\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b|\b(19|20)\d{2}[/.-]\d{1,2}[/.-]\d{1,2}\b|podcast|\bguests?\b)/i;
+
+/**
+ * Artists whose plays look like podcast episodes. Requires many distinct
+ * tracks each played about once (music gets replayed) AND a podcast signal:
+ * mostly no album info, or episode-like titles. Checked against real data,
+ * where "one play per track" alone also matched albums heard once.
+ * Suggestions only; the user decides what to exclude.
+ */
+export function findExclusionCandidates(
+  index: Pick<ScrobbleHistoryIndex, 'albums' | 'unresolved'>,
+  options: { minDistinctTracks?: number; maxPlaysPerTrack?: number } = {}
+): ExclusionCandidate[] {
+  const minDistinctTracks = options.minDistinctTracks ?? 25;
+  const maxPlaysPerTrack = options.maxPlaysPerTrack ?? 1.15;
+  const stats = new Map<
+    string,
+    { plays: number; unresolved: number; episodes: number; tracks: Set<string> }
+  >();
+  forEachListeningPlay(index, (play, artist, album) => {
+    const entry = stats.get(artist) ?? {
+      plays: 0,
+      unresolved: 0,
+      episodes: 0,
+      tracks: new Set<string>(),
+    };
+    const track = play.track ?? '';
+    entry.plays++;
+    if (album === null) entry.unresolved++;
+    if (EPISODE_TITLE.test(track)) entry.episodes++;
+    entry.tracks.add(normalizeHistoryName(track));
+    stats.set(artist, entry);
+  });
+
+  const candidates: ExclusionCandidate[] = [];
+  for (const [artist, entry] of stats) {
+    const distinctTracks = entry.tracks.size;
+    if (distinctTracks < minDistinctTracks) continue;
+    if (entry.plays / distinctTracks > maxPlaysPerTrack) continue;
+    const unresolvedShare = entry.unresolved / entry.plays;
+    const episodeTitleShare = entry.episodes / entry.plays;
+    if (unresolvedShare < 0.6 && episodeTitleShare < 0.3) continue;
+    candidates.push({
+      artist,
+      plays: entry.plays,
+      distinctTracks,
+      unresolvedShare,
+      episodeTitleShare,
+    });
+  }
+  return candidates.sort((a, b) => b.plays - a.plays);
+}

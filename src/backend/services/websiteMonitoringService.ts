@@ -22,6 +22,7 @@ import { createLogger } from '../utils/logger';
 import { defaultSsrfGuard, SsrfGuard } from '../utils/ssrfGuard';
 
 import { OllamaService } from './ollamaService';
+import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 import { WishlistService } from './wishlistService';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -74,6 +75,8 @@ export class WebsiteMonitoringService {
   private initialized = false;
 
   private wishlistService: WishlistService;
+  private historyStorage: Pick<ScrobbleHistoryStorage, 'getIndex'> | null =
+    null;
   private ssrfGuard: SsrfGuard;
 
   constructor(
@@ -89,6 +92,12 @@ export class WebsiteMonitoringService {
     this.wishlistService = wishlistService;
     this.ssrfGuard = ssrfGuard;
     this.initialize();
+  }
+  /** Read listening history through the storage (excluded artists left out) */
+  setHistoryStorage(
+    historyStorage: Pick<ScrobbleHistoryStorage, 'getIndex'>
+  ): void {
+    this.historyStorage = historyStorage;
   }
 
   private async initialize(): Promise<void> {
@@ -756,9 +765,20 @@ export class WebsiteMonitoringService {
     }
 
     try {
-      const index = await this.fileStorage.readJSON<{
-        albums?: Record<string, unknown>;
-      }>('history/scrobble-history-index.json');
+      // Through the history storage when available, so artists the user
+      // excluded from listening stats (e.g. podcasts) don't count
+      const index = this.historyStorage
+        ? await this.historyStorage.getIndex()
+        : await this.fileStorage.readJSON<{
+            albums?: Record<string, unknown>;
+          }>('history/scrobble-history-index.json');
+      const unresolvedArtists = Object.keys(
+        (index as { unresolved?: Record<string, unknown> } | null)
+          ?.unresolved ?? {}
+      );
+      for (const artist of unresolvedArtists) {
+        ctx.lastfmArtists.add(normalizeArtistName(artist));
+      }
       for (const key of Object.keys(index?.albums ?? {})) {
         // keys look like "artist|album" already lowercased — re-normalize so
         // "the von bondies|..." and "von bondies|..." both collapse correctly.

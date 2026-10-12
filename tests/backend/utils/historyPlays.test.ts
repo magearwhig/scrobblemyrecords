@@ -1,5 +1,7 @@
 import {
   applyUnresolvedResolutions,
+  excludeArtists,
+  findExclusionCandidates,
   buildIdentitySets,
   countListeningPlays,
   dedupeHistoryIndex,
@@ -247,6 +249,94 @@ describe('historyPlays', () => {
     it('returns the same index when there is nothing to apply', () => {
       const input = raw();
       expect(applyUnresolvedResolutions(input, []).index).toBe(input);
+    });
+  });
+
+  describe('excludeArtists', () => {
+    it('leaves the artist out of both stores and recomputes the total', () => {
+      const input = index({
+        totalScrobbles: 4,
+        albums: {
+          'the onion|the onion radio news': {
+            lastPlayed: 1,
+            playCount: 1,
+            plays: [{ timestamp: 1, track: 'Ep 1' }],
+          },
+          'a|b': { lastPlayed: 2, playCount: 1, plays: [{ timestamp: 2 }] },
+        },
+        unresolved: {
+          'the onion': {
+            lastPlayed: 3,
+            playCount: 2,
+            plays: [{ timestamp: 3 }, { timestamp: 4 }],
+          },
+        },
+      });
+      const snapshot = JSON.stringify(input);
+
+      const { index: view, excludedPlays } = excludeArtists(input, [
+        'The Onion',
+      ]);
+
+      expect(excludedPlays).toBe(3);
+      expect(Object.keys(view.albums)).toEqual(['a|b']);
+      expect(view.unresolved).toEqual({});
+      expect(view.totalScrobbles).toBe(1);
+      expect(JSON.stringify(input)).toBe(snapshot);
+      expect(excludeArtists(input, []).index).toBe(input);
+    });
+  });
+
+  describe('findExclusionCandidates', () => {
+    const plays = (count: number, title: (i: number) => string) =>
+      Array.from({ length: count }, (_, i) => ({
+        timestamp: i + 1,
+        track: title(i),
+      }));
+
+    it('suggests podcast-like artists and not albums heard once', () => {
+      const candidates = findExclusionCandidates(
+        index({
+          albums: {
+            // An album heard once: one play per track, but real titles
+            'band|record': {
+              lastPlayed: 40,
+              playCount: 40,
+              plays: plays(
+                40,
+                i => `Song ${String.fromCharCode(65 + (i % 26))}${i}`
+              ),
+            },
+            // Podcast scrobbled with the show as album: episode titles
+            'doug benson|doug loves movies': {
+              lastPlayed: 30,
+              playCount: 30,
+              plays: plays(30, i => `Guest ${i} and friends guest`),
+            },
+          },
+          unresolved: {
+            // Podcast with no album info
+            'the onion': {
+              lastPlayed: 50,
+              playCount: 50,
+              plays: plays(50, i => `Headline number ${i}`),
+            },
+            // Music without album info, but replayed
+            singer: {
+              lastPlayed: 90,
+              playCount: 90,
+              plays: plays(90, i => `Hit ${i % 30}`),
+            },
+          },
+        })
+      );
+
+      expect(candidates.map(c => c.artist)).toEqual([
+        'the onion',
+        'doug benson',
+      ]);
+      expect(candidates[0].unresolvedShare).toBe(1);
+      expect(candidates[1].episodeTitleShare).toBe(1);
     });
   });
 });

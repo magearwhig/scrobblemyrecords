@@ -544,6 +544,7 @@ describe('BackupService', () => {
           schemaVersion: 1,
           resolutions: [rule('a', 'Album A', 1), rule('b', 'Album B', 1)],
           hidden: ['artist|x'],
+          excludedArtists: ['the onion'],
         }
       );
       const backupJson = await service.exportBackup({
@@ -563,6 +564,7 @@ describe('BackupService', () => {
           schemaVersion: 1,
           resolutions: [rule('a', 'Album A2', 5), rule('c', 'Album C', 5)],
           hidden: ['artist|y'],
+          excludedArtists: ['doug benson'],
         }
       );
 
@@ -575,6 +577,9 @@ describe('BackupService', () => {
         merged!.resolutions.map(r => `${r.track}:${r.album}`).sort()
       ).toEqual(['a:Album A2', 'b:Album B', 'c:Album C']);
       expect(merged!.hidden.sort()).toEqual(['artist|x', 'artist|y']);
+      expect(
+        (merged as unknown as { excludedArtists: string[] }).excludedArtists
+      ).toEqual(['doug benson', 'the onion']);
 
       await service.importBackup(backupJson, { mode: 'replace' });
       const replaced = await fileStorage.readJSON<{
@@ -586,6 +591,9 @@ describe('BackupService', () => {
         'b',
       ]);
       expect(replaced!.hidden).toEqual(['artist|x']);
+      expect(
+        (replaced as unknown as { excludedArtists: string[] }).excludedArtists
+      ).toEqual(['the onion']);
     });
 
     it('lets a running service see restored data before its next edit (afterImport hook)', async () => {

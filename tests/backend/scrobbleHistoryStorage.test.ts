@@ -58,6 +58,66 @@ describe('ScrobbleHistoryStorage', () => {
         },
       });
 
+    it('leaves excluded artists out entirely, restoring them when removed', async () => {
+      await fileStorage.writeJSON(indexFile, raw());
+      let excluded = ['The Cure'];
+      storage.setExcludedArtistsProvider(async () => excluded);
+      storage.setResolutionRulesProvider(async () => [
+        { artist: 'the cure', track: 'lovesong', album: 'Disintegration' },
+      ]);
+
+      const view = (await storage.getIndex())!;
+      expect(view.albums).toEqual({});
+      expect(view.unresolved).toEqual({});
+      expect(view.totalScrobbles).toBe(0);
+      const fingerprint = await storage.getResolutionRulesFingerprint();
+
+      excluded = [];
+      storage.invalidateCache();
+      expect((await storage.getIndex())!.totalScrobbles).toBe(3);
+      expect(await storage.getResolutionRulesFingerprint()).not.toBe(
+        fingerprint
+      );
+    });
+
+    it('matches excluded artists by alias and by credit, not by "&" names', async () => {
+      storage.setExcludedArtistsProvider(async () => ['Doug Benson']);
+      storage.setArtistNameResolver({
+        resolveArtist: (name: string) =>
+          name === 'dlm podcast' ? 'doug benson' : name,
+        resolveArtistMulti: (name: string) => [name],
+      } as unknown as Parameters<typeof storage.setArtistNameResolver>[0]);
+
+      const matcher = (await storage.getExclusionMatcher())!;
+
+      expect(matcher('doug benson')).toBe('doug benson');
+      expect(matcher('dlm podcast')).toBe('doug benson');
+      expect(matcher('doug benson, paul f. tompkins')).toBe('doug benson');
+      expect(matcher('someone feat. doug benson')).toBe('doug benson');
+      expect(matcher('doug benson & friends')).toBeNull();
+      expect(matcher('brendan benson')).toBeNull();
+    });
+
+    it('recomputes the earliest play when it belonged to an excluded artist', async () => {
+      await fileStorage.writeJSON(indexFile, {
+        ...raw(),
+        oldestScrobbleDate: 50,
+        unresolved: {
+          podcast: {
+            lastPlayed: 50,
+            playCount: 1,
+            plays: [{ timestamp: 50, track: 'Episode 1' }],
+          },
+        },
+      });
+      storage.setExcludedArtistsProvider(async () => ['podcast']);
+
+      const view = (await storage.getIndex())!;
+
+      expect(view.oldestScrobbleDate).toBe(100);
+      expect(view.totalScrobbles).toBe(1);
+    });
+
     it('serves the index with rules applied and never rewrites the file', async () => {
       await fileStorage.writeJSON(indexFile, raw());
       const before = JSON.stringify(await fileStorage.readJSON(indexFile));
