@@ -3,6 +3,8 @@
  * Mirrors the backend logger pattern for consistency
  */
 
+import { redactSensitiveText } from '../../shared/utils/logRedaction';
+
 export enum LogLevel {
   DEBUG = 0,
   INFO = 1,
@@ -18,41 +20,6 @@ interface LoggerConfig {
 
 class SecureLogger {
   private config: LoggerConfig;
-
-  // Patterns for detecting sensitive data (same as backend)
-  private readonly SENSITIVE_PATTERNS = [
-    // OAuth headers and Authorization headers
-    /Authorization:\s*OAuth[^,\s]*/gi,
-    /Authorization:\s*Bearer\s+[^\s,]*/gi,
-    /Authorization:\s*[^\s,]*/gi,
-
-    // API keys and tokens
-    /['"]\s*api_key\s*['"]\s*:\s*['"][^'"]+['"]/gi,
-    /['"]\s*apiKey\s*['"]\s*:\s*['"][^'"]+['"]/gi,
-    /['"]\s*session_key\s*['"]\s*:\s*['"][^'"]+['"]/gi,
-    /['"]\s*sessionKey\s*['"]\s*:\s*['"][^'"]+['"]/gi,
-    /['"]\s*token\s*['"]\s*:\s*['"][^'"]+['"]/gi,
-    /['"]\s*oauth_token[^'"]*['"]\s*:\s*['"][^'"]+['"]/gi,
-    /['"]\s*oauth_token_secret\s*['"]\s*:\s*['"][^'"]+['"]/gi,
-    /['"]\s*oauth_verifier\s*['"]\s*:\s*['"][^'"]+['"]/gi,
-    /['"]\s*api_sig\s*['"]\s*:\s*['"][^'"]+['"]/gi,
-
-    // API signatures
-    /oauth_signature=[^&\s]*/gi,
-    /api_sig=[^&\s]*/gi,
-
-    // Discogs tokens (start with specific format)
-    /Discogs\s+token=[^\s,]*/gi,
-
-    // Generic long hex strings (likely tokens/hashes)
-    /[a-fA-F0-9]{32,}/g,
-
-    // Query parameters with sensitive names
-    /[?&](api_key|token|session_key|oauth_token|oauth_verifier|oauth_signature)=[^&\s]*/gi,
-
-    // URLs with auth tokens embedded
-    /https?:\/\/[^\s]*[?&](token|api_key|oauth_token)=[^&\s]*/gi,
-  ];
 
   constructor(config?: Partial<LoggerConfig>) {
     // Determine if we're in production mode
@@ -75,29 +42,7 @@ class SecureLogger {
       return this.stringifyData(data);
     }
 
-    let text = this.stringifyData(data);
-
-    // Apply all redaction patterns
-    this.SENSITIVE_PATTERNS.forEach(pattern => {
-      text = text.replace(pattern, match => {
-        // Keep the beginning to show what type of data was redacted
-        const colonIndex = match.indexOf(':');
-        const equalIndex = match.indexOf('=');
-        const splitIndex =
-          colonIndex >= 0
-            ? equalIndex >= 0
-              ? Math.min(colonIndex, equalIndex)
-              : colonIndex
-            : equalIndex;
-        const prefix = match.substring(
-          0,
-          Math.min(20, splitIndex >= 0 ? splitIndex + 1 : match.length)
-        );
-        return `${prefix}[REDACTED]`;
-      });
-    });
-
-    return text;
+    return redactSensitiveText(this.stringifyData(data));
   }
 
   /**
