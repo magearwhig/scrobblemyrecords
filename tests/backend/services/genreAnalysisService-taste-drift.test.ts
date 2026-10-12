@@ -361,4 +361,45 @@ describe('GenreAnalysisService.getTasteDrift', () => {
       }
     });
   });
+
+  describe('with unresolved (albumless) plays', () => {
+    it('should count unresolved plays toward their artist and quarter', async () => {
+      // Arrange — radiohead has album plays in Q1; boards of canada only
+      // has unresolved plays, in Q2
+      const index: ScrobbleHistoryIndex = {
+        ...createIndex([
+          { key: 'radiohead|ok computer', timestamps: [Q1_2025_TS + 100] },
+        ]),
+        unresolved: {
+          'boards of canada': {
+            lastPlayed: Q2_2025_TS + 200,
+            playCount: 2,
+            plays: [
+              { timestamp: Q2_2025_TS + 100, track: 'Roygbiv' },
+              { timestamp: Q2_2025_TS + 200, track: 'Roygbiv' },
+            ],
+          },
+        },
+      };
+      mockHistoryStorage.getIndex = jest.fn().mockResolvedValue(index);
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(
+        createTagCache({
+          radiohead: [{ name: 'alternative rock', count: 80 }],
+          'boards of canada': [{ name: 'electronic', count: 90 }],
+        })
+      );
+
+      // Act
+      const result = await service.getTasteDrift(24);
+
+      // Assert
+      expect(result.snapshots.map(s => s.period)).toEqual([
+        '2025-Q1',
+        '2025-Q2',
+      ]);
+      expect(result.snapshots[1].genres.map(g => g.name)).toEqual([
+        'electronic',
+      ]);
+    });
+  });
 });

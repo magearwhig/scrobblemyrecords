@@ -239,10 +239,27 @@ export interface AlbumHistoryEntry {
 }
 
 export interface ScrobbleHistoryIndex {
+  /** Newest scrobble timestamp (ms) seen by a sync; the incremental watermark */
   lastSyncTimestamp: number;
+  /** Listening events in the index: album plays + unresolved plays */
   totalScrobbles: number;
   oldestScrobbleDate: number;
   albums: Record<string, AlbumHistoryEntry>; // key: normalized "artist|album"
+  /**
+   * Scrobbles with artist, track and timestamp but no album, keyed by
+   * normalized artist. Counted in listening stats, not album stats.
+   * Missing in files written before schema v2.
+   */
+  unresolved?: Record<string, AlbumHistoryEntry>;
+  /** Scrobble total Last.fm reported on the last sync */
+  lastfmTotal?: number;
+  /** When lastfmTotal was read (ms) */
+  lastfmTotalCheckedAt?: number;
+  /** When the last sync finished successfully (ms) */
+  lastSyncCompletedAt?: number;
+  /** When a full-range backfill last finished (ms) */
+  lastFullBackfillAt?: number;
+  schemaVersion?: number;
 }
 
 export interface SyncStatus {
@@ -956,6 +973,8 @@ export interface StatsCache {
     artistAliasFingerprint?: string;
     /** Album mappings fingerprint at warm time; mapping changes invalidate */
     albumMappingFingerprint?: string;
+    /** History contents at warm time (play totals); backfills and moves invalidate */
+    historyFingerprint?: string;
     streaks: StreakInfo;
     counts: ScrobbleCounts;
     listeningHours: ListeningHours;
@@ -1908,6 +1927,11 @@ export interface BackupData {
   trackMappings?: TrackMapping[];
   compoundArtistMappings?: CompoundArtistMapping[];
   dismissedAlbumMerges?: DismissedAlbumMergesStore['items'];
+  /** Unresolved Listening History rules and hidden list (added 2026-10) */
+  unresolvedHistory?: Pick<
+    UnresolvedHistoryStore,
+    'resolutions' | 'hidden' | 'excludedArtists'
+  >;
 
   // Discovery
   hiddenAlbums: HiddenAlbum[];
@@ -1973,6 +1997,7 @@ export interface BackupPreview {
   trackMappingsCount?: number;
   compoundArtistMappingsCount?: number;
   dismissedAlbumMergesCount?: number;
+  unresolvedResolutionsCount?: number;
   hiddenAlbumsCount: number;
   hiddenArtistsCount: number;
   localWantListCount: number;
@@ -2011,6 +2036,7 @@ export interface BackupImportPreview {
     trackMappings?: ImportCategorySummary;
     compoundArtistMappings?: ImportCategorySummary;
     dismissedAlbumMerges?: ImportCategorySummary;
+    unresolvedResolutions?: ImportCategorySummary;
     hiddenAlbums: ImportCategorySummary;
     hiddenArtists: ImportCategorySummary;
     localWantList: ImportCategorySummary;
@@ -3107,4 +3133,201 @@ export interface DurationLookupResult {
   track: string;
   duration: number | null; // seconds, null if not found
   source: 'discogs_collection' | 'lastfm' | 'discogs_search' | 'not_found';
+}
+
+// ============================================
+// Unresolved Listening History (albumless scrobbles)
+// ============================================
+
+/** A rule attributing an unresolved artist + track to an album. */
+export interface UnresolvedTrackResolution {
+  id: string;
+  /** Normalized scrobbled artist */
+  artist: string;
+  /** Normalized scrobbled track */
+  track: string;
+  /** Album to attribute (display name) */
+  album: string;
+  source: 'user' | 'lastfm-track-info';
+  createdAt: number;
+}
+
+/** Stored at mappings/unresolved-track-resolutions.json */
+export interface UnresolvedHistoryStore extends VersionedStore {
+  schemaVersion: 1;
+  resolutions: UnresolvedTrackResolution[];
+  /** "artist|track" keys hidden from the list (still counted in stats) */
+  hidden: string[];
+  /**
+   * Normalized artists left out of all listening stats (e.g. podcasts).
+   * Their plays stay in the stored history, so un-excluding is instant.
+   */
+  excludedArtists?: string[];
+}
+
+/** An artist excluded from listening stats */
+export interface ExcludedHistoryArtist {
+  /** Normalized artist key */
+  artist: string;
+  /** Display name */
+  artistName: string;
+  /** Plays in the stored history that are being left out */
+  plays: number;
+}
+
+/** An artist whose plays look like podcast episodes */
+export interface ExclusionSuggestion {
+  /** Normalized artist key */
+  artist: string;
+  /** Display name */
+  artistName: string;
+  plays: number;
+  distinctTracks: number;
+  /** Share of plays with no album info (0-1) */
+  unresolvedShare: number;
+  /** Share of plays whose title looks like an episode (0-1) */
+  episodeTitleShare: number;
+}
+
+/** One unresolved track of an artist, as listed in the Unresolved tab. */
+export interface UnresolvedHistoryTrack {
+  /** "artist|track" (normalized), used to hide and resolve */
+  key: string;
+  track: string;
+  playCount: number;
+  firstPlayed: number;
+  lastPlayed: number;
+  hidden: boolean;
+}
+
+/** An artist's unresolved tracks. */
+export interface UnresolvedHistoryGroup {
+  /** Normalized artist */
+  artist: string;
+  /** Display name */
+  artistName: string;
+  playCount: number;
+  lastPlayed: number;
+  tracks: UnresolvedHistoryTrack[];
+  /** Albums this artist already has in the history index (for resolving) */
+  knownAlbums: string[];
+}
+
+export interface UnresolvedHistoryPage {
+  groups: UnresolvedHistoryGroup[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface UnresolvedHistorySummary {
+  /** Listening events in the index (album + unresolved) */
+  indexedTotal: number;
+  /** Plays still without an album (after rules) */
+  unresolvedCount: number;
+  /** Plays given an album by a resolution rule */
+  resolvedByRuleCount: number;
+  /** Unresolved plays hidden from the list */
+  hiddenCount: number;
+  resolutionCount: number;
+  /** Artists left out of listening stats (e.g. podcasts) */
+  excludedArtistCount: number;
+  /** Plays by excluded artists (stored, but not counted) */
+  excludedPlayCount: number;
+  lastfmTotal: number | null;
+  lastfmTotalCheckedAt: number | null;
+  /** lastfmTotal - indexedTotal, when known */
+  gap: number | null;
+  lastFullBackfillAt: number | null;
+}
+
+/** Where a suggested album for an unresolved track came from */
+export type UnresolvedAlbumSuggestionSource = 'history' | 'collection';
+
+/** An album that has a given track */
+export interface UnresolvedAlbumOption {
+  album: string;
+  source: UnresolvedAlbumSuggestionSource;
+  /** Plays of this track on this album in your history (0 for collection) */
+  trackPlays: number;
+}
+
+/** Suggested album for one unresolved track */
+export interface UnresolvedTrackAlbumSuggestion {
+  /** "artist|track" key, as in UnresolvedHistoryTrack */
+  key: string;
+  track: string;
+  playCount: number;
+  hidden: boolean;
+  /** Best match (most plays of this track), or null if none found */
+  suggestion: UnresolvedAlbumOption | null;
+  /** Other albums that have this track, best first */
+  alternatives: UnresolvedAlbumOption[];
+}
+
+export interface UnresolvedArtistAlbumSuggestions {
+  /** Normalized artist key */
+  artist: string;
+  artistName: string;
+  tracks: UnresolvedTrackAlbumSuggestion[];
+}
+
+/** Check of a Last.fm album suggestion against that album's tracklist */
+export interface UnresolvedAlbumVerification {
+  /**
+   * true: the song is on the album's tracklist; false: the album was found
+   * but the song isn't listed; null: the tracklist couldn't be checked
+   */
+  onTracklist: boolean | null;
+  /** 1-based position on the album, when found */
+  position?: number;
+  /** Number of tracks on the album, when known */
+  trackCount?: number;
+  /** Album cover from Last.fm, when available */
+  imageUrl?: string;
+  /** Last.fm page for the album */
+  albumUrl?: string;
+}
+
+/** Result of POST /stats/unresolved-history/lookup */
+export interface UnresolvedAlbumLookup {
+  album: string | null;
+  verification?: UnresolvedAlbumVerification;
+}
+
+/** How an unresolved track matched a song on a chosen album */
+export type AlbumTrackMatchQuality =
+  /** Same title */
+  | 'exact'
+  /** Same title once bracketed tags like "(live)" are ignored */
+  | 'tags'
+  /** Close but not identical (e.g. "Landscapes" vs "Landscape") */
+  | 'near';
+
+export interface AlbumTrackMatch {
+  /** "artist|track" key of the unresolved track */
+  key: string;
+  track: string;
+  playCount: number;
+  /** Title on the album's tracklist */
+  albumTrack: string;
+  /** 1-based position in the tracklist */
+  position: number;
+  /** Position label from the source, e.g. "A3" or "12" */
+  positionLabel?: string;
+  quality: AlbumTrackMatchQuality;
+  /** One side says "live" and the other doesn't: may be a different version */
+  liveMismatch: boolean;
+}
+
+/** An artist's unresolved tracks matched against one album's tracklist */
+export interface AlbumTracklistMatch {
+  album: string;
+  albumArtist: string;
+  trackCount: number;
+  imageUrl?: string;
+  albumUrl?: string;
+  matches: AlbumTrackMatch[];
+  /** Unresolved tracks of the artist that weren't on the album */
+  unmatchedCount: number;
 }

@@ -1,0 +1,223 @@
+/* Unresolved history tab (plays without album info) */
+
+.unresolved-history {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Controls: search, sort, show hidden */
+.unresolved-controls {
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.unresolved-controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.unresolved-search {
+  position: relative;
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.unresolved-search-input {
+  width: 100%;
+  padding-right: var(--space-8);
+}
+
+.unresolved-search-clear {
+  position: absolute;
+  right: var(--space-2);
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.unresolved-search-clear:hover {
+  color: var(--text-primary);
+}
+
+.unresolved-search-clear:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.unresolved-sort {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.unresolved-sort .form-label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.unresolved-sort-select {
+  width: auto;
+}
+
+.unresolved-show-hidden {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.unresolved-controls-hint {
+  margin: var(--space-2) 0 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* Grouped list */
+.unresolved-groups {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.unresolved-groups[aria-busy='true'] {
+  opacity: 0.6;
+}
+
+.unresolved-group {
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.unresolved-group-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.unresolved-group-artist {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.unresolved-group--folded .unresolved-group-header {
+  margin-bottom: 0;
+}
+
+.unresolved-group-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background-color: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.unresolved-group-toggle:hover:not(:disabled) {
+  color: var(--accent-primary);
+}
+
+.unresolved-group-toggle:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.unresolved-group-toggle:disabled {
+  cursor: default;
+}
+
+.unresolved-group-meta {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.unresolved-tracks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.unresolved-track {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.unresolved-track--hidden .unresolved-track-name {
+  color: var(--text-muted);
+}
+
+.unresolved-track-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.unresolved-track-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.unresolved-track-meta {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.unresolved-track-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* Pagination */
+.unresolved-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-2);
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.unresolved-page-info {
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.unresolved-group-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}

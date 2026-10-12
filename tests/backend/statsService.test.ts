@@ -1,7 +1,11 @@
 import { ArtistNameResolver } from '../../src/backend/services/artistNameResolver';
 import { MappingService } from '../../src/backend/services/mappingService';
 import { ScrobbleHistoryStorage } from '../../src/backend/services/scrobbleHistoryStorage';
-import { StatsService } from '../../src/backend/services/statsService';
+import {
+  computeHistoryFingerprint,
+  StatsService,
+  UNKNOWN_ALBUM_LABEL,
+} from '../../src/backend/services/statsService';
 import { TrackMappingService } from '../../src/backend/services/trackMappingService';
 import { FileStorage } from '../../src/backend/utils/fileStorage';
 import { CollectionItem, ScrobbleHistoryIndex } from '../../src/shared/types';
@@ -903,6 +907,26 @@ describe('StatsService', () => {
       expect(milestones.progressPercent).toBeGreaterThan(0);
     });
 
+    it('should drop recorded milestones above the current total', async () => {
+      // e.g. excluding a podcast took the total back below 1,000
+      mockHistoryStorage.getTotalScrobbles.mockResolvedValue(900);
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        lastUpdated: 0,
+        streaks: { currentStreak: 0, longestStreak: 0 },
+        milestoneHistory: [{ milestone: 1000, reachedAt: 1000000 }],
+      });
+
+      const milestones = await statsService.getMilestones();
+
+      expect(milestones.history).toEqual([]);
+      expect(milestones.nextMilestone).toBe(1000);
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ milestoneHistory: [] })
+      );
+    });
+
     it('should record new milestones', async () => {
       // Arrange
       mockHistoryStorage.getTotalScrobbles.mockResolvedValue(5100);
@@ -1138,8 +1162,9 @@ describe('StatsService', () => {
       const warmBlock = {
         warmedAt: Math.floor(Date.now() / 1000),
         syncTimestamp,
-        version: 2,
+        version: 3,
         artistAliasFingerprint: '',
+        historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
         streaks: { currentStreak: 5, longestStreak: 10 },
         counts: {
           today: 3,
@@ -1189,7 +1214,13 @@ describe('StatsService', () => {
 
     it.each([
       ['was built by older code', { version: 1 }],
+      ['was built before unresolved plays were counted', { version: 2 }],
       ['predates the artist aliases', { artistAliasFingerprint: 'old' }],
+      [
+        'was built from different history contents',
+        { historyFingerprint: 'scrobbles:0;unresolved:5' },
+      ],
+      ['has no history fingerprint', { historyFingerprint: undefined }],
     ])('should ignore a warm cache that %s', async (_reason, overrides) => {
       // Arrange
       const syncTimestamp = 1700000000000;
@@ -1203,8 +1234,9 @@ describe('StatsService', () => {
         warm: {
           warmedAt: 0,
           syncTimestamp,
-          version: 2,
+          version: 3,
           artistAliasFingerprint: '',
+          historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
           topAlbums: { all: [{ artist: 'cached', album: 'cached' }] },
           ...overrides,
         },
@@ -1218,6 +1250,40 @@ describe('StatsService', () => {
       expect(mockHistoryStorage.getIndex).toHaveBeenCalled();
     });
 
+    it('should ignore a warm cache built before a resolution rule changed', async () => {
+      const syncTimestamp = 1700000000000;
+      mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(syncTimestamp);
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
+      (
+        mockHistoryStorage as unknown as {
+          getResolutionRulesFingerprint: jest.Mock;
+        }
+      ).getResolutionRulesFingerprint = jest.fn().mockResolvedValue('rules-v2');
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        lastUpdated: 0,
+        streaks: { currentStreak: 0, longestStreak: 0 },
+        milestoneHistory: [],
+        warm: {
+          warmedAt: 0,
+          syncTimestamp,
+          version: 3,
+          artistAliasFingerprint: '',
+          // Built when a rule pointed somewhere else (same counts)
+          historyFingerprint: computeHistoryFingerprint(
+            createMockIndex({}),
+            'rules-v1'
+          ),
+          topAlbums: { all: [{ artist: 'cached', album: 'cached' }] },
+        },
+      });
+
+      await expect(statsService.getTopAlbums('all', 10)).resolves.toEqual([]);
+      expect(computeHistoryFingerprint(createMockIndex({}), 'x')).toContain(
+        ';rules:x'
+      );
+    });
+
     it('should ignore a warm cache built before an album mapping change, and serve it once warmed again', async () => {
       // Arrange
       const syncTimestamp = 1700000000000;
@@ -1227,8 +1293,9 @@ describe('StatsService', () => {
       const warmBlock = {
         warmedAt: 0,
         syncTimestamp,
-        version: 2,
+        version: 3,
         artistAliasFingerprint: '',
+        historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
         // Built when there were no album mappings
         topAlbums: { all: cached },
       };
@@ -1266,9 +1333,11 @@ describe('StatsService', () => {
       await statsService.warmCache();
       const rewarmed = stored as { warm: { albumMappingFingerprint?: string } };
       expect(rewarmed.warm.albumMappingFingerprint).toMatch(/^[0-9a-f]{40}$/);
-      mockHistoryStorage.getIndex.mockClear();
-      await statsService.getTopAlbums('all', 10);
-      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
+      (rewarmed.warm as { topAlbums: Record<string, unknown> }).topAlbums.all =
+        cached;
+      await expect(statsService.getTopAlbums('all', 10)).resolves.toEqual(
+        cached
+      );
     });
 
     it('should fall back to live computation when no cache exists', async () => {
@@ -1460,8 +1529,9 @@ describe('StatsService', () => {
       warm: {
         warmedAt: Math.floor(Date.now() / 1000),
         syncTimestamp,
-        version: 2,
+        version: 3,
         artistAliasFingerprint: '',
+        historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
         streaks: { currentStreak: 7, longestStreak: 21 },
         counts: {
           today: 5,
@@ -1526,6 +1596,9 @@ describe('StatsService', () => {
 
     beforeEach(() => {
       mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(syncTimestamp);
+      // The warm cache reads the index to check the history fingerprint, so
+      // "served from cache" is shown by the cached values, not by getIndex
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
     });
 
     it('calculateStreaks serves from warm cache', async () => {
@@ -1535,7 +1608,6 @@ describe('StatsService', () => {
 
       expect(result.currentStreak).toBe(7);
       expect(result.longestStreak).toBe(21);
-      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
     });
 
     it('getScrobbleCounts serves from warm cache', async () => {
@@ -1545,7 +1617,6 @@ describe('StatsService', () => {
 
       expect(result.today).toBe(5);
       expect(result.allTime).toBe(9999);
-      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
     });
 
     it('getListeningHours serves from warm cache', async () => {
@@ -1555,7 +1626,6 @@ describe('StatsService', () => {
 
       expect(result.today).toBe(0.5);
       expect(result.thisMonth).toBe(8);
-      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
     });
 
     it('getNewArtistsThisMonth serves from warm cache', async () => {
@@ -1564,7 +1634,6 @@ describe('StatsService', () => {
       const result = await statsService.getNewArtistsThisMonth();
 
       expect(result).toBe(3);
-      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
     });
 
     it('getMilestones serves from warm cache', async () => {
@@ -1574,7 +1643,6 @@ describe('StatsService', () => {
       const result = await statsService.getMilestones();
 
       expect(result.progressPercent).toBe(99);
-      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
     });
 
     it('getTopArtists(month) serves from warm cache at default limit', async () => {
@@ -1583,7 +1651,6 @@ describe('StatsService', () => {
       const result = await statsService.getTopArtists('month', 10);
 
       expect(result[0].artist).toBe('Cached Artist');
-      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
     });
 
     it('getTopArtists(week) skips cache — not a cached period', async () => {
@@ -1601,7 +1668,6 @@ describe('StatsService', () => {
       const result = await statsService.getTopAlbums('month', 10);
 
       expect(result[0].album).toBe('Cached Month Album');
-      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
     });
 
     it('getTopAlbums with collection bypasses cache for live enrichment', async () => {
@@ -1615,13 +1681,12 @@ describe('StatsService', () => {
       expect(mockHistoryStorage.getIndex).toHaveBeenCalled();
     });
 
-    it('getTopTracks(all) serves from warm cache at default limit', async () => {
+    it('getTopTracks(month) serves from warm cache at default limit', async () => {
       mockFileStorage.readJSON.mockResolvedValue(buildWarmCache());
 
-      const result = await statsService.getTopTracks('all', 10);
+      const result = await statsService.getTopTracks('month', 10);
 
-      expect(result).toEqual([]);
-      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
+      expect(result[0].track).toBe('Cached Track');
     });
 
     it('getHourlyDistribution serves from warm cache', async () => {
@@ -1631,7 +1696,6 @@ describe('StatsService', () => {
 
       expect(result.peakHour).toBe(22);
       expect(result.totalScrobbles).toBe(99);
-      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
     });
 
     it('getDayOfWeekDistribution serves from warm cache', async () => {
@@ -1640,7 +1704,6 @@ describe('StatsService', () => {
       const result = await statsService.getDayOfWeekDistribution();
 
       expect(result.peakDay).toBe(0);
-      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
     });
 
     it('falls back to live when syncTimestamp does not match', async () => {
@@ -4893,6 +4956,446 @@ describe('StatsService', () => {
 
       // Assert
       expect(tracks.sort()).toEqual(['Bye Bye', 'Cut It Out']);
+    });
+  });
+  describe('unresolved (albumless) plays', () => {
+    // Monday 2026-06-15, noon local time
+    const NOW = new Date(2026, 5, 15, 12, 0, 0);
+    const at = (daysAgo: number, hour: number, extraSeconds = 0) =>
+      new Date(2026, 5, 15 - daysAgo, hour, 0, 0).getTime() / 1000 +
+      extraSeconds;
+
+    const albumPlays = [
+      { timestamp: at(0, 9), track: 'Airbag' },
+      { timestamp: at(1, 9), track: 'Airbag' },
+      { timestamp: at(1, 10), track: 'Lucky' },
+    ];
+    const radioheadUnresolved = [
+      { timestamp: at(0, 10), track: 'Airbag' },
+      // The only play on 2026-06-13
+      { timestamp: at(2, 9), track: 'Creep' },
+    ];
+    const bocUnresolved = [
+      { timestamp: at(0, 11), track: 'Roygbiv' },
+      { timestamp: at(0, 11, 200), track: 'Roygbiv' },
+      { timestamp: at(0, 11, 400), track: 'Roygbiv' },
+    ];
+
+    const entry = (plays: { timestamp: number; track: string }[]) => ({
+      lastPlayed: Math.max(...plays.map(p => p.timestamp)),
+      playCount: plays.length,
+      plays,
+    });
+
+    // 3 album plays + 5 unresolved plays
+    const buildIndex = (): ScrobbleHistoryIndex => ({
+      albums: { 'radiohead|ok computer': entry(albumPlays) },
+      unresolved: {
+        radiohead: entry(radioheadUnresolved),
+        'boards of canada': entry(bocUnresolved),
+      },
+      totalScrobbles: 8,
+      lastSyncTimestamp: 1700000000000,
+      oldestScrobbleDate: 0,
+    });
+
+    const withoutUnresolved = (): ScrobbleHistoryIndex => ({
+      ...buildIndex(),
+      unresolved: {},
+      totalScrobbles: 3,
+    });
+
+    beforeEach(() => {
+      jest.useFakeTimers({ now: NOW });
+      mockHistoryStorage.getIndex.mockResolvedValue(buildIndex());
+    });
+
+    describe('listening stats include them', () => {
+      it('getScrobbleCounts counts unresolved plays', async () => {
+        const counts = await statsService.getScrobbleCounts();
+
+        expect(counts).toEqual({
+          today: 5,
+          thisWeek: 5,
+          thisMonth: 8,
+          thisYear: 8,
+          allTime: 8,
+        });
+      });
+
+      it('calculateStreaks counts a day with only unresolved plays', async () => {
+        const streaks = await statsService.calculateStreaks();
+        expect(streaks.currentStreak).toBe(3);
+
+        mockHistoryStorage.getIndex.mockResolvedValue(withoutUnresolved());
+        const albumOnly = await statsService.calculateStreaks();
+        expect(albumOnly.currentStreak).toBe(2);
+      });
+
+      it('getCalendarHeatmap counts unresolved plays per day', async () => {
+        const heatmap = await statsService.getCalendarHeatmap(2026);
+
+        expect(heatmap).toEqual([
+          { date: '2026-06-13', count: 1 },
+          { date: '2026-06-14', count: 2 },
+          { date: '2026-06-15', count: 5 },
+        ]);
+      });
+
+      it('getListeningTimeline counts unresolved plays', async () => {
+        const timeline = await statsService.getListeningTimeline('week', 'day');
+
+        expect(timeline).toEqual([
+          { date: '2026-06-13', count: 1 },
+          { date: '2026-06-14', count: 2 },
+          { date: '2026-06-15', count: 5 },
+        ]);
+      });
+
+      it('getTopArtists counts unresolved plays, including unresolved-only artists', async () => {
+        const artists = await statsService.getTopArtists('all', 10);
+
+        expect(artists).toEqual([
+          { artist: 'Radiohead', playCount: 5 },
+          { artist: 'Boards Of Canada', playCount: 3 },
+        ]);
+      });
+
+      it('buildArtistPlayCountMap counts unresolved plays', async () => {
+        const counts = await statsService.buildArtistPlayCountMap();
+
+        expect(Object.fromEntries(counts)).toEqual({
+          radiohead: 5,
+          'boards of canada': 3,
+        });
+      });
+
+      it('getNewArtistsDetails finds an artist heard only without album info', async () => {
+        const details = await statsService.getNewArtistsDetails();
+
+        expect(details).toContainEqual(
+          expect.objectContaining({ artist: 'boards of canada', playCount: 3 })
+        );
+      });
+
+      it('getSourceBreakdown counts unresolved plays', async () => {
+        mockFileStorage.listFiles = jest.fn().mockResolvedValue([]);
+
+        const breakdown = await statsService.getSourceBreakdown();
+
+        expect(breakdown).toEqual([
+          { source: 'Other', count: 8, percentage: 100 },
+        ]);
+      });
+    });
+
+    describe('track stats show them under "Unknown album"', () => {
+      it('getTopTracks gives unresolved plays their own Unknown album row', async () => {
+        const tracks = await statsService.getTopTracks('all', 10);
+
+        expect(UNKNOWN_ALBUM_LABEL).toBe('Unknown album');
+        expect(tracks[0]).toEqual(
+          expect.objectContaining({
+            artist: 'Boards Of Canada',
+            album: 'Unknown album',
+            track: 'Roygbiv',
+            playCount: 3,
+          })
+        );
+        const airbag = tracks
+          .filter(t => t.track === 'Airbag')
+          .map(t => [t.album, t.playCount]);
+        expect(airbag).toEqual([
+          ['Ok Computer', 2],
+          ['Unknown album', 1],
+        ]);
+        expect(tracks.reduce((sum, t) => sum + t.playCount, 0)).toBe(8);
+      });
+
+      it('getTopTracks keeps unresolved plays apart from a real album named "Unknown Album"', async () => {
+        const index = buildIndex();
+        index.albums['boards of canada|unknown album'] = entry([
+          { timestamp: at(0, 8), track: 'Roygbiv' },
+        ]);
+        mockHistoryStorage.getIndex.mockResolvedValue(index);
+
+        const tracks = await statsService.getTopTracks('all', 10);
+
+        const roygbiv = tracks
+          .filter(t => t.track === 'Roygbiv')
+          .map(t => [t.album, t.playCount]);
+        expect(roygbiv).toEqual([
+          ['Unknown album', 3],
+          ['Unknown Album', 1],
+        ]);
+      });
+
+      it('getForgottenFavorites includes unresolved tracks as Unknown album', async () => {
+        const { tracks } = await statsService.getForgottenFavorites(0, 3);
+
+        expect(tracks).toEqual([
+          expect.objectContaining({
+            artist: 'Boards Of Canada',
+            album: 'Unknown album',
+            track: 'Roygbiv',
+            allTimePlayCount: 3,
+          }),
+        ]);
+      });
+
+      it('getTrackDetail adds an Unknown album bucket to appearsOn', async () => {
+        const detail = await statsService.getTrackDetail('radiohead', 'airbag');
+
+        expect(detail.totalPlayCount).toBe(3);
+        expect(
+          detail.appearsOn.map(a => [a.album, a.playCount, a.inCollection])
+        ).toEqual([
+          ['Ok Computer', 2, false],
+          ['Unknown album', 1, false],
+        ]);
+      });
+
+      it('getTrackDetail album filters select album or unresolved plays', async () => {
+        const album = await statsService.getTrackDetail(
+          'radiohead',
+          'airbag',
+          'ok computer'
+        );
+        const unknown = await statsService.getTrackDetail(
+          'radiohead',
+          'airbag',
+          UNKNOWN_ALBUM_LABEL
+        );
+
+        expect(album.totalPlayCount).toBe(2);
+        expect(unknown.totalPlayCount).toBe(1);
+        expect(unknown.appearsOn.map(a => a.album)).toEqual(['Unknown album']);
+      });
+
+      it('getArtistDetail counts unresolved plays but lists only real albums', async () => {
+        const detail = await statsService.getArtistDetail(
+          'radiohead',
+          'month',
+          []
+        );
+
+        expect(detail.totalPlayCount).toBe(5);
+        expect(detail.periodCounts).toEqual({
+          thisWeek: 2,
+          thisMonth: 5,
+          thisYear: 5,
+          allTime: 5,
+        });
+        expect(detail.firstPlayed).toBe(at(2, 9));
+        expect(detail.playTrend).toEqual([{ period: '2026-06', count: 5 }]);
+        expect(detail.albums.map(a => [a.album, a.playCount])).toEqual([
+          ['Ok Computer', 3],
+        ]);
+        expect(
+          detail.topTracks.map(t => [t.track, t.album, t.playCount])
+        ).toEqual(
+          expect.arrayContaining([
+            ['Airbag', 'Ok Computer', 2],
+            ['Airbag', 'Unknown album', 1],
+            ['Creep', 'Unknown album', 1],
+          ])
+        );
+      });
+    });
+
+    describe('day views group them per artist', () => {
+      it('getAlbumsForDate includes unresolved plays as Unknown album groups', async () => {
+        const result = await statsService.getAlbumsForDate('2026-06-15');
+
+        expect(result.totalScrobbles).toBe(5);
+        expect(
+          result.albums.map(a => [a.artist, a.album, a.playCount])
+        ).toEqual([
+          ['Boards Of Canada', 'Unknown album', 3],
+          ['Radiohead', 'Ok Computer', 1],
+          ['Radiohead', 'Unknown album', 1],
+        ]);
+      });
+
+      it('getOnThisDay includes unresolved plays in the day total', async () => {
+        const result = await statsService.getOnThisDay(6, 15);
+
+        expect(result.years).toHaveLength(1);
+        expect(result.years[0].totalScrobbles).toBe(5);
+        expect(result.years[0].albums).toContainEqual(
+          expect.objectContaining({
+            artist: 'Boards Of Canada',
+            album: 'Unknown album',
+            playCount: 3,
+          })
+        );
+      });
+    });
+
+    describe('album stats ignore them', () => {
+      it('getTopAlbums is identical with and without unresolved plays', async () => {
+        const withUnresolved = await statsService.getTopAlbums('all', 10);
+        mockHistoryStorage.getIndex.mockResolvedValue(withoutUnresolved());
+        const albumOnly = await statsService.getTopAlbums('all', 10);
+
+        expect(withUnresolved).toEqual(albumOnly);
+        expect(withUnresolved).toEqual([
+          expect.objectContaining({ album: 'Ok Computer', playCount: 3 }),
+        ]);
+      });
+
+      it('getAlbumListeningArc is identical with and without unresolved plays', async () => {
+        const withUnresolved = await statsService.getAlbumListeningArc(
+          'radiohead',
+          'ok computer'
+        );
+        mockHistoryStorage.getIndex.mockResolvedValue(withoutUnresolved());
+        const albumOnly = await statsService.getAlbumListeningArc(
+          'radiohead',
+          'ok computer'
+        );
+
+        expect(withUnresolved).toEqual(albumOnly);
+        expect(withUnresolved).toEqual([
+          { period: '2026-06', playCount: 3, trackCount: 2 },
+        ]);
+      });
+
+      it('getAlbumDetail is identical with and without unresolved plays', async () => {
+        const index = buildIndex();
+        mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+          entry: index.albums['radiohead|ok computer'],
+          matchType: 'exact',
+          matchedKeys: ['radiohead|ok computer'],
+        });
+
+        const withUnresolved = await statsService.getAlbumDetail(
+          'radiohead',
+          'ok computer'
+        );
+        mockHistoryStorage.getIndex.mockResolvedValue(withoutUnresolved());
+        const albumOnly = await statsService.getAlbumDetail(
+          'radiohead',
+          'ok computer'
+        );
+
+        expect(withUnresolved).toEqual(albumOnly);
+        expect(withUnresolved.playCount).toBe(3);
+      });
+    });
+
+    describe('warm cache', () => {
+      it('records the history fingerprint when warming', async () => {
+        mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(
+          1700000000000
+        );
+
+        await statsService.warmCache();
+
+        expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
+          expect.stringContaining('stats-cache'),
+          expect.objectContaining({
+            warm: expect.objectContaining({
+              version: 3,
+              historyFingerprint: 'scrobbles:8;unresolved:5',
+            }),
+          })
+        );
+      });
+
+      it('rejects a cache built before plays were added below the newest timestamp', async () => {
+        mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(
+          1700000000000
+        );
+        let stored: unknown = null;
+        mockFileStorage.readJSON.mockImplementation(async () => stored);
+        mockFileStorage.writeJSONWithBackup.mockImplementation(
+          async (_p, data) => {
+            stored = data;
+          }
+        );
+        await statsService.warmCache();
+        expect((await statsService.getScrobbleCounts()).today).toBe(5);
+
+        // A backfill adds an older-than-newest unresolved play; the sync
+        // timestamp does not move
+        const backfilled = buildIndex();
+        backfilled.unresolved!['radiohead'] = entry([
+          ...radioheadUnresolved,
+          { timestamp: at(0, 8), track: 'Creep' },
+        ]);
+        backfilled.totalScrobbles = 9;
+        mockHistoryStorage.getIndex.mockResolvedValue(backfilled);
+
+        const counts = await statsService.getScrobbleCounts();
+
+        expect(counts.today).toBe(6);
+        expect(counts.allTime).toBe(9);
+      });
+
+      it('corrects recorded milestone dates from unresolved plays when warming', async () => {
+        // 1000 album plays one minute apart, plus 5 earlier unresolved plays
+        const base = at(10, 0);
+        const plays = Array.from({ length: 1000 }, (_, i) => ({
+          timestamp: base + i * 60,
+          track: `Track ${i}`,
+        }));
+        const earlier = Array.from({ length: 5 }, (_, i) => ({
+          timestamp: base - 3600 + i,
+          track: 'Single',
+        }));
+        mockHistoryStorage.getIndex.mockResolvedValue({
+          albums: { 'radiohead|ok computer': entry(plays) },
+          unresolved: { radiohead: entry(earlier) },
+          totalScrobbles: 1005,
+          lastSyncTimestamp: 1700000000000,
+          oldestScrobbleDate: 0,
+        });
+        mockHistoryStorage.getTotalScrobbles.mockResolvedValue(1005);
+        mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(
+          1700000000000
+        );
+        // Recorded by older code from album plays only: the 1000th album play
+        let stored: unknown = {
+          schemaVersion: 1,
+          lastUpdated: 0,
+          streaks: { currentStreak: 0, longestStreak: 0 },
+          milestoneHistory: [
+            { milestone: 1000, reachedAt: plays[999].timestamp },
+          ],
+        };
+        mockFileStorage.readJSON.mockImplementation(async () => stored);
+        mockFileStorage.writeJSONWithBackup.mockImplementation(
+          async (_p, data) => {
+            stored = data;
+          }
+        );
+
+        await statsService.warmCache();
+
+        // The 1000th listening event is now album play #995
+        const saved = stored as {
+          milestoneHistory: { milestone: number; reachedAt: number }[];
+          warm: { milestones: { history: unknown[] } };
+        };
+        const expected = [{ milestone: 1000, reachedAt: plays[994].timestamp }];
+        expect(saved.milestoneHistory).toEqual(expected);
+        expect(saved.warm.milestones.history).toEqual(expected);
+      });
+
+      it('changes the fingerprint when plays move between unresolved and albums', async () => {
+        const index = buildIndex();
+        expect(computeHistoryFingerprint(index)).not.toBe(
+          computeHistoryFingerprint({
+            ...index,
+            unresolved: { 'boards of canada': entry(bocUnresolved) },
+          })
+        );
+        expect(computeHistoryFingerprint(null)).toBe('');
+        expect(computeHistoryFingerprint({ totalScrobbles: 3 })).toBe(
+          'scrobbles:3;unresolved:0'
+        );
+      });
     });
   });
 });

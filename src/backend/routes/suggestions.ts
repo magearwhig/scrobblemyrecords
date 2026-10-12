@@ -374,6 +374,74 @@ export default function createSuggestionsRouter(
   });
 
   /**
+   * POST /api/v1/suggestions/history/sync/backfill
+   * Re-fetch history and add plays the index is missing (e.g. albumless
+   * scrobbles older syncs dropped). Body: { from?, to? } in Unix seconds.
+   * Only adds plays; runs in the background as a sync job.
+   */
+  router.post('/history/sync/backfill', async (req: Request, res: Response) => {
+    try {
+      const { from, to } = req.body ?? {};
+      const isTimestamp = (value: unknown) =>
+        value === undefined ||
+        (typeof value === 'number' && Number.isInteger(value) && value > 0);
+      if (!isTimestamp(from) || !isTimestamp(to)) {
+        return res.status(400).json({
+          success: false,
+          error: 'from and to must be positive Unix timestamps in seconds',
+        });
+      }
+      if (from !== undefined && to !== undefined && from >= to) {
+        return res.status(400).json({
+          success: false,
+          error: 'from must be before to',
+        });
+      }
+      if (syncService.getSyncStatus().status === 'syncing') {
+        return res.status(409).json({
+          success: false,
+          error: 'A sync is already in progress',
+        });
+      }
+
+      const jobId = jobStatusService.startJob(
+        'sync',
+        'Recovering missing listening history...'
+      );
+      syncService
+        .startBackfill({ from, to })
+        .then(result => {
+          if (result.cancelled) {
+            jobStatusService.failJob(jobId, 'History recovery cancelled');
+          } else {
+            jobStatusService.completeJob(
+              jobId,
+              `History recovery complete: ${result.added} plays added`
+            );
+          }
+        })
+        .catch(error => {
+          logger.error('Background history backfill failed', error);
+          jobStatusService.failJob(
+            jobId,
+            error instanceof Error ? error.message : 'History recovery failed'
+          );
+        });
+
+      res.json({
+        success: true,
+        data: { message: 'History recovery started' },
+      });
+    } catch (error) {
+      logger.error('Error starting history backfill', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
    * POST /api/v1/suggestions/history/sync/pause
    * Pause an ongoing sync
    */

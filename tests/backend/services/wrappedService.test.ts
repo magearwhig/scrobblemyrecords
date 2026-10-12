@@ -628,6 +628,89 @@ describe('WrappedService', () => {
     });
   });
 
+  describe('unresolved (albumless) plays', () => {
+    const withUnresolved: ScrobbleHistoryIndex = {
+      ...sampleIndex,
+      unresolved: {
+        // Known artist, unresolved plays on a new day
+        radiohead: {
+          lastPlayed: new Date('2024-03-05T12:00:00Z').getTime() / 1000,
+          playCount: 2,
+          plays: [
+            {
+              timestamp: new Date('2024-03-05T12:00:00Z').getTime() / 1000,
+              track: 'Creep',
+            },
+            {
+              timestamp: new Date('2024-03-05T12:05:00Z').getTime() / 1000,
+              track: 'Creep',
+            },
+          ],
+        },
+        // Artist known only through unresolved plays
+        'aphex twin': {
+          lastPlayed: new Date('2024-07-01T12:00:00Z').getTime() / 1000,
+          playCount: 1,
+          plays: [
+            {
+              timestamp: new Date('2024-07-01T12:00:00Z').getTime() / 1000,
+              track: 'Avril 14th',
+            },
+          ],
+        },
+      },
+    };
+
+    it('counts unresolved plays in totals, artists, days and hours', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex = jest.fn().mockResolvedValue(withUnresolved);
+
+      // Act
+      const result = await wrappedService.generateWrapped(
+        startDateMs,
+        endDateMs
+      );
+
+      // Assert: 8 album plays + 3 unresolved plays
+      expect(result.listening.totalScrobbles).toBe(11);
+      expect(result.listening.uniqueArtists).toBe(4);
+      const heatmap = new Map(
+        result.listening.heatmapData.map(d => [d.date, d.count])
+      );
+      expect(heatmap.get('2024-03-05')).toBe(2);
+      expect(heatmap.get('2024-07-01')).toBe(1);
+      expect(
+        result.listening.newArtistsList.map(a => a.name.toLowerCase())
+      ).toEqual(expect.arrayContaining(['aphex twin']));
+      // Source breakdown covers every listening event
+      expect(
+        result.crossSource.vinylScrobbles + result.crossSource.otherScrobbles
+      ).toBe(11);
+    });
+
+    it('never counts unresolved plays as albums', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex = jest.fn().mockResolvedValue(sampleIndex);
+      const without = await wrappedService.generateWrapped(
+        startDateMs,
+        endDateMs
+      );
+      mockHistoryStorage.getIndex = jest.fn().mockResolvedValue(withUnresolved);
+
+      // Act
+      const result = await wrappedService.generateWrapped(
+        startDateMs,
+        endDateMs
+      );
+
+      // Assert: same 3 albums as without unresolved plays
+      expect(result.listening.uniqueAlbums).toBe(3);
+      expect(result.listening.uniqueAlbums).toBe(
+        without.listening.uniqueAlbums
+      );
+    });
+  });
+
   describe('collection stats - most played new addition', () => {
     it('should find most-played new addition with fuzzy matching', async () => {
       // Arrange: collection item added in range

@@ -1115,6 +1115,57 @@ describe('WishlistService', () => {
   // Search for Release
   // ============================================
 
+  describe('getDiscogsAlbum', () => {
+    it('returns title, artist, tracklist without headings, and cover', async () => {
+      mockAxiosInstance.get.mockResolvedValueOnce({
+        data: {
+          title: 'Live at The Casbah',
+          artists: [{ name: 'John Vanderslice' }],
+          uri: 'https://www.discogs.com/master/1750039-Live',
+          images: [
+            { type: 'secondary', uri150: 'back.jpg' },
+            { type: 'primary', uri150: 'front.jpg' },
+          ],
+          tracklist: [
+            { position: '', title: 'Set 1', type_: 'heading' },
+            { position: '1', title: 'Wild Strawberries', type_: 'track' },
+            { position: '2', title: "They Won't Let Me Run", type_: 'track' },
+          ],
+        },
+      });
+
+      const album = await service.getDiscogsAlbum('master', 1750039);
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+        '/masters/1750039',
+        expect.anything()
+      );
+      expect(album).toEqual({
+        title: 'Live at The Casbah',
+        artist: 'John Vanderslice',
+        tracks: [
+          { position: '1', title: 'Wild Strawberries' },
+          { position: '2', title: "They Won't Let Me Run" },
+        ],
+        imageUrl: 'front.jpg',
+        url: 'https://www.discogs.com/master/1750039-Live',
+      });
+    });
+
+    it('returns null when Discogs has no such album', async () => {
+      mockAxiosInstance.get.mockRejectedValueOnce({
+        response: { status: 404 },
+      });
+      await expect(service.getDiscogsAlbum('release', 1)).resolves.toBeNull();
+    });
+
+    it('throws on other failures so the caller can report them', async () => {
+      const error = { response: { status: 429 } };
+      mockAxiosInstance.get.mockRejectedValueOnce(error);
+      await expect(service.getDiscogsAlbum('release', 1)).rejects.toBe(error);
+    });
+  });
+
   describe('getMasterMainReleaseId', () => {
     it("should return the master's main release", async () => {
       mockAxiosInstance.get.mockResolvedValueOnce({

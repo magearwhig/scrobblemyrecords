@@ -19,6 +19,13 @@ jest.mock('../../../src/renderer/components/LastFmHistoryTab', () => {
   };
 });
 
+// Mock UnresolvedHistoryTab to simplify tests
+jest.mock('../../../src/renderer/components/UnresolvedHistoryTab', () => {
+  return function MockUnresolvedHistoryTab() {
+    return <div data-testid='unresolved-history-tab'>Unresolved Content</div>;
+  };
+});
+
 // Mock the API service
 jest.mock('../../../src/renderer/services/api');
 const mockApiService = apiService as jest.Mocked<typeof apiService>;
@@ -839,6 +846,75 @@ describe('HistoryPage', () => {
 
       const sessionsTab = screen.getByText('App Scrobble Sessions');
       expect(sessionsTab).not.toHaveClass('active');
+    });
+
+    describe('Unresolved tab', () => {
+      afterEach(() => {
+        window.location.hash = '';
+      });
+
+      it('shows a third "Unresolved" tab and switches to it', async () => {
+        const user = userEvent.setup();
+        renderHistoryPageWithProviders(authStatus);
+
+        const tab = await screen.findByRole('tab', { name: 'Unresolved' });
+        expect(screen.getAllByRole('tab')).toHaveLength(3);
+        expect(tab).toHaveAttribute('aria-selected', 'false');
+
+        await user.click(tab);
+
+        expect(tab).toHaveAttribute('aria-selected', 'true');
+        expect(tab).toHaveAttribute('tabindex', '0');
+        expect(
+          screen.getByTestId('unresolved-history-tab')
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByText('Scrobbled from This App')
+        ).not.toBeInTheDocument();
+      });
+
+      it('opens the Unresolved tab from #history?tab=unresolved', async () => {
+        window.location.hash = '#history?tab=unresolved';
+        renderHistoryPageWithProviders(authStatus);
+
+        expect(
+          await screen.findByTestId('unresolved-history-tab')
+        ).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Unresolved' })).toHaveAttribute(
+          'aria-selected',
+          'true'
+        );
+        // URL takes priority over the saved default tab preference
+        expect(mockApi.getUserPreferences).not.toHaveBeenCalled();
+      });
+
+      it('follows a hash change to ?tab=unresolved while mounted', async () => {
+        renderHistoryPageWithProviders(authStatus);
+        await screen.findByText('Scrobbled from This App');
+
+        window.location.hash = '#history?tab=unresolved';
+        window.dispatchEvent(new Event('hashchange'));
+
+        expect(
+          await screen.findByTestId('unresolved-history-tab')
+        ).toBeInTheDocument();
+      });
+
+      it('moves between tabs with arrow keys', async () => {
+        const user = userEvent.setup();
+        renderHistoryPageWithProviders(authStatus);
+
+        const lastfmTab = await screen.findByRole('tab', {
+          name: 'Last.fm Listening History',
+        });
+        await user.click(lastfmTab);
+        await user.keyboard('{ArrowRight}');
+
+        expect(screen.getByRole('tab', { name: 'Unresolved' })).toHaveFocus();
+        expect(
+          screen.getByTestId('unresolved-history-tab')
+        ).toBeInTheDocument();
+      });
     });
   });
 });

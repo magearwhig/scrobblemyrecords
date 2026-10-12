@@ -55,7 +55,7 @@ A crate answers "what should I pull off the shelf?" for a mood or situation the 
 | `date_added` | Bulk days: 26 items on 2013-02-10 and 24 on 2020-12-04. 497 items were added in 2021. | `date_added` is "added to Discogs", **not** a purchase date. |
 | Notes | 272 items have custom notes (media/sleeve condition). | Could become a later rule. Not MVP. |
 | History | 55,159 scrobbles across 5,083 history albums. `oldestScrobbleDate` = 1108339019 (Feb 2005, **seconds**). `lastSyncTimestamp` = 1791750068000 (**milliseconds**). Play timestamps are seconds. | Units differ. Coverage starts at the first Last.fm scrobble. |
-| Dropped scrobbles | `ScrobbleHistorySyncService` skips any scrobble without `artist`, `album` or `timestamp` (`if (!artist \|\| !album \|\| !timestamp)`). | Some real plays never reach the index. See `unresolved-listening-history-plan.md`. |
+| Albumless scrobbles | Since Unresolved Listening History (2026-10-11), scrobbles without an album are kept in `index.unresolved` and counted in listening stats, but not attributed to an album unless the user resolves them. | Album-level rules (crate membership, per-album scrobble counts) don't see unresolved plays. See `done/unresolved-listening-history-plan.md`. |
 | App sessions are not "vinyl plays" | `MemoryScrobblePage` also calls `api.scrobbleBatch`, so in-app `ScrobbleSession`s include from-memory listening (e.g. swimming headphones). Sessions store no release ID. | Neither Last.fm scrobbles nor in-app sessions prove that a physical record was played. |
 | Album mappings | 157 mappings. 151 are collection-linked and 6 are unlinked (`collectionId: 0`). None of the 6 currently targets a collection name. | Plays should resolve through the same mapping logic as album detail (section 5.3). |
 
@@ -832,7 +832,7 @@ Smart Crates ships and works fully without context tags. When `.plan/context-tag
 | `year` is the pressing year | Decade crates miss reissues of old albums | Label "Pressing year" | Cache master `year` (original) and add an `originalYear` rule |
 | Ratings unused (0/1,189) | Rating rules empty for this user | Builder shows rated count; templates avoid ratings | — |
 | `date_added` ≠ purchase date; bulk cataloguing | "Recently added" could include old records catalogued late | Copy "Added to Discogs" | A user-editable acquisition date (Discogs notes field) |
-| Scrobbles from any source; history starts at the first Last.fm scrobble; missing-album scrobbles dropped | "No recorded scrobbles" ≠ not listened | Honest copy, coverage header, stale-sync banner | `unresolved-listening-history-plan.md` |
+| Scrobbles from any source; history starts at the first Last.fm scrobble; albumless scrobbles count toward listening but not toward an album until resolved | "No recorded scrobbles" ≠ not listened | Honest copy, coverage header, stale-sync banner | `done/unresolved-listening-history-plan.md` |
 | Name mismatches between Discogs and Last.fm | False "none recorded" | Fuzzy matching, `matchType` shown, link to Mappings | Suggested Album Merges already helps |
 | No `instance_id`; same release owned twice collapses | Cannot address individual copies | Show "owned ×N" | Persist `instance_id` during collection sync (separate change) |
 | Collection sync emits no change events; removals untracked | — | Fingerprinting + stale overrides | Hook `markAsOrphaned` and crates into a collection-sync event |

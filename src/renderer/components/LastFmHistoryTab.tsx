@@ -8,7 +8,7 @@ import {
   useCollectionLookup,
   lookupInCollection,
 } from '../hooks/useCollectionLookup';
-import { navigate } from '../routes';
+import { navigate, ROUTES } from '../routes';
 import { getApiService } from '../services/api';
 import { playTrackOnSpotify } from '../utils/spotifyUtils';
 
@@ -68,6 +68,23 @@ const LastFmHistoryTab: React.FC = () => {
 
   // Collection lookup for "In Collection" badges
   const { collectionMap, collectionArtistCounts } = useCollectionLookup();
+
+  // Plays without album info aren't in the Albums view; point to them
+  const [unresolvedCount, setUnresolvedCount] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getUnresolvedHistorySummary()
+      .then(summary => {
+        if (!cancelled) setUnresolvedCount(summary.unresolvedCount);
+      })
+      .catch(() => {
+        // The note is optional; leave it hidden on failure
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
   const hasCollection = collectionMap.size > 0;
 
   // Navigate to a collection item's release details page
@@ -278,6 +295,19 @@ const LastFmHistoryTab: React.FC = () => {
 
   return (
     <div className='lastfm-history-tab'>
+      {viewMode === 'albums' && unresolvedCount > 0 && (
+        <p className='lastfm-history-unresolved-note'>
+          {unresolvedCount.toLocaleString()} plays without album info
+          aren&apos;t listed here.{' '}
+          <button
+            type='button'
+            className='lastfm-history-unresolved-link'
+            onClick={() => navigate(ROUTES.HISTORY, { tab: 'unresolved' })}
+          >
+            Review them
+          </button>
+        </p>
+      )}
       {/* Search and Controls */}
       <div className='card'>
         <div className='lastfm-history-controls'>

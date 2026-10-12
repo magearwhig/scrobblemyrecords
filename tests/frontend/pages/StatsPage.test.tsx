@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 
 import '@testing-library/jest-dom';
@@ -39,6 +39,14 @@ jest.mock('../../../src/renderer/services/statsApi', () => ({
     batchGetAlbumCovers: jest.fn(),
     batchGetArtistImages: jest.fn(),
   },
+}));
+
+// Mock the main API service (unresolved history summary for the album note)
+const mockGetUnresolvedHistorySummary = jest.fn();
+jest.mock('../../../src/renderer/services/api', () => ({
+  getApiService: () => ({
+    getUnresolvedHistorySummary: mockGetUnresolvedHistorySummary,
+  }),
 }));
 
 const mockStatsApi = statsApi as jest.Mocked<typeof statsApi>;
@@ -169,6 +177,7 @@ describe('StatsPage', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetUnresolvedHistorySummary.mockResolvedValue({ unresolvedCount: 0 });
 
     // Set up default successful responses
     mockStatsApi.getStreaks.mockResolvedValue({
@@ -453,6 +462,50 @@ describe('StatsPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Stats Dashboard')).toBeInTheDocument();
+    });
+  });
+
+  describe('plays without album info note', () => {
+    afterEach(() => {
+      window.location.hash = '';
+    });
+
+    it('shows the note and links to the Unresolved history tab', async () => {
+      mockGetUnresolvedHistorySummary.mockResolvedValue({
+        unresolvedCount: 1234,
+      });
+
+      render(<StatsPage />);
+
+      expect(
+        await screen.findByText(
+          /1,234 plays without album info are excluded from album stats/
+        )
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Review them' }));
+      expect(window.location.hash).toBe('#history?tab=unresolved');
+    });
+
+    it('hides the note when every play has album info', async () => {
+      render(<StatsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Stats Dashboard')).toBeInTheDocument();
+      });
+      expect(mockGetUnresolvedHistorySummary).toHaveBeenCalled();
+      expect(screen.queryByText(/without album info/)).not.toBeInTheDocument();
+    });
+
+    it('ignores summary failures', async () => {
+      mockGetUnresolvedHistorySummary.mockRejectedValue(new Error('down'));
+
+      render(<StatsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Stats Dashboard')).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/without album info/)).not.toBeInTheDocument();
     });
   });
 });

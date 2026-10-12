@@ -12,8 +12,10 @@ import {
   VersionedStore,
   DataFileMeta,
   MigrationReport,
+  ScrobbleHistoryIndex,
 } from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
+import { dedupeHistoryIndex } from '../utils/historyPlays';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('MigrationService');
@@ -37,8 +39,27 @@ export class MigrationService {
     // ============================================
     this.register('scrobble-history-index', {
       path: 'history/scrobble-history-index.json',
-      currentVersion: 1,
-      migrations: [],
+      currentVersion: 2,
+      migrations: [
+        {
+          // Unversioned files are v1 data; keeps the chain to v2 intact
+          fromVersion: 0,
+          toVersion: 1,
+          migrate: data => data,
+        },
+        {
+          fromVersion: 1,
+          toVersion: 2,
+          description:
+            'Add unresolved (albumless) plays store; drop duplicate plays; recompute totalScrobbles',
+          migrate: data =>
+            dedupeHistoryIndex({
+              ...(data as unknown as ScrobbleHistoryIndex),
+              unresolved:
+                (data as unknown as ScrobbleHistoryIndex).unresolved ?? {},
+            }).index,
+        },
+      ],
     });
 
     // ============================================
@@ -119,6 +140,13 @@ export class MigrationService {
     // Compound artist mappings (used by compoundArtistMappingService)
     this.register('compound-artist-mappings', {
       path: 'mappings/compound-artist-mappings.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('unresolved-track-resolutions', {
+      path: 'mappings/unresolved-track-resolutions.json',
       currentVersion: 1,
       migrations: [],
       optional: true,
@@ -617,6 +645,13 @@ export class MigrationService {
             };
             log.info(
               `Wrapped array in ${key} with key '${meta.arrayWrapperKey}' and schemaVersion: 1`
+            );
+          } else if (meta.currentVersion > 1) {
+            // Unversioned data is v1; run the chain to the current version
+            // now rather than only stamping it until the next startup
+            migratedData = this.applyMigrations(data, 0, meta);
+            log.info(
+              `Migrated unversioned ${key} to schemaVersion: ${meta.currentVersion}`
             );
           } else {
             // Just add schemaVersion to existing object

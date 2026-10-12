@@ -66,7 +66,7 @@ export class AnalyticsService {
       this.topArtistsCache &&
       now - this.topArtistsCacheTime < this.CACHE_TTL
     ) {
-      return this.topArtistsCache;
+      return this.withoutExcludedArtists(this.topArtistsCache);
     }
 
     try {
@@ -97,11 +97,29 @@ export class AnalyticsService {
       this.topArtistsMaxPlayCount =
         artistMap.size > 0 ? Math.max(...artistMap.values()) : 0;
 
-      return artistMap;
+      return this.withoutExcludedArtists(artistMap);
     } catch (error) {
       this.logger.error('Error fetching top artists', error);
       return new Map();
     }
+  }
+
+  /**
+   * Leave out artists the user excluded from listening stats (e.g. podcasts).
+   * Applied on every read, so a change takes effect without waiting for the
+   * cache to expire.
+   */
+  private async withoutExcludedArtists(
+    artists: Map<string, number>
+  ): Promise<Map<string, number>> {
+    const matcher =
+      typeof this.historyStorage.getExclusionMatcher === 'function'
+        ? await this.historyStorage.getExclusionMatcher()
+        : null;
+    if (!matcher) return artists;
+    return new Map(
+      [...artists].filter(([name]) => matcher(name.trim()) === null)
+    );
   }
 
   /**

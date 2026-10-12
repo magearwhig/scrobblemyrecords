@@ -1,0 +1,76 @@
+/* "Looks like a podcast" exclusion suggestions */
+
+.unresolved-suggestions {
+  border-left: 3px solid var(--status-warning);
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.unresolved-suggestions-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.unresolved-suggestions-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.unresolved-suggestions-header-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.unresolved-suggestions-description {
+  margin: var(--space-2) 0 var(--space-3) 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.unresolved-suggestions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.unresolved-suggestions-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.unresolved-suggestions-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.unresolved-suggestions-item-name {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.unresolved-suggestions-item-meta {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.unresolved-suggestions-item-reason {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}

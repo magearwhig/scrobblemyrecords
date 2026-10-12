@@ -1,0 +1,56 @@
+/* Confirm dialog for excluding artists from listening stats */
+
+.exclude-modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  color: var(--text-primary);
+}
+
+.exclude-modal-text {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  line-height: var(--leading-normal);
+}
+
+.exclude-modal-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.exclude-modal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-sunken);
+}
+
+.exclude-modal-list-item {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+}
+
+.exclude-modal-list-item:last-child {
+  border-bottom: none;
+}
+
+.exclude-modal-artist {
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.exclude-modal-plays {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}

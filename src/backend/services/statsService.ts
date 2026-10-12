@@ -24,6 +24,7 @@ import {
   OnThisDayYear,
   RoiScoreItem,
   ScrobbleCounts,
+  ScrobbleHistoryIndex,
   ScrobbleSession,
   SourceBreakdownItem,
   StatsCache,
@@ -44,6 +45,13 @@ import {
   normalizeForMatching,
 } from '../../shared/utils/trackNormalization';
 import { FileStorage } from '../utils/fileStorage';
+import {
+  albumFromAlbumKey,
+  artistFromAlbumKey,
+  countUnresolvedPlays,
+  forEachListeningPlay,
+  UNKNOWN_ALBUM_LABEL,
+} from '../utils/historyPlays';
 import { createLogger } from '../utils/logger';
 
 import { artistMappingService } from './artistMappingService';
@@ -71,7 +79,69 @@ const AVG_TRACK_DURATION_SECONDS = 210;
  * Bump when a change alters what warm-cached stats contain (e.g. how albums
  * are grouped), so caches built by older code are recomputed.
  */
-const WARM_CACHE_VERSION = 2;
+const WARM_CACHE_VERSION = 3;
+
+// Album shown for unresolved plays; re-exported for existing importers
+export { UNKNOWN_ALBUM_LABEL };
+
+/**
+ * Prefix for grouping keys of unresolved plays, so they never merge with a
+ * real album that happens to be called "Unknown album".
+ */
+const UNRESOLVED_GROUP_PREFIX = '\u0000unresolved|';
+
+/** One stored history entry: an album entry, or an artist's unresolved plays. */
+interface ListeningEntry {
+  /** Normalized scrobbled artist */
+  artist: string;
+  /** Normalized album, or null for unresolved plays */
+  album: string | null;
+  entry: AlbumHistoryEntry;
+}
+
+/**
+ * Every history entry that holds listening events: album entries plus
+ * unresolved (albumless) entries. For per-entry loops in listening-level
+ * stats; album-level stats keep iterating `index.albums`.
+ */
+function listeningEntries(
+  index: Pick<ScrobbleHistoryIndex, 'albums' | 'unresolved'>
+): ListeningEntry[] {
+  const entries: ListeningEntry[] = [];
+  for (const [key, entry] of Object.entries(index.albums)) {
+    entries.push({
+      artist: artistFromAlbumKey(key),
+      album: albumFromAlbumKey(key),
+      entry,
+    });
+  }
+  for (const [artist, entry] of Object.entries(index.unresolved ?? {})) {
+    entries.push({ artist, album: null, entry });
+  }
+  return entries;
+}
+
+/**
+ * Identifies the history contents the warm cache was built from. The sync
+ * timestamp alone misses plays added below the newest one (backfill), and
+ * plays moving between albums and unresolved.
+ *
+ * Parts are `name:value` joined with ';' so more can be appended later (e.g.
+ * a resolution-rules hash) without changing how existing parts read.
+ */
+export function computeHistoryFingerprint(
+  index: Pick<ScrobbleHistoryIndex, 'totalScrobbles' | 'unresolved'> | null,
+  rulesFingerprint = ''
+): string {
+  if (!index) return '';
+  const parts = [
+    `scrobbles:${index.totalScrobbles}`,
+    `unresolved:${countUnresolvedPlays(index)}`,
+  ];
+  // Re-pointing a rule to another album changes neither count above
+  if (rulesFingerprint) parts.push(`rules:${rulesFingerprint}`);
+  return parts.join(';');
+}
 
 /**
  * Service for calculating and caching listening statistics.
@@ -307,10 +377,10 @@ export class StatsService {
     const counts = new Map<string, number>();
     if (!index) return counts;
 
-    for (const [key, albumHistory] of Object.entries(index.albums)) {
-      const [artist] = key.split('|');
+    // Unresolved plays count too: the artist is known
+    for (const { artist, entry } of listeningEntries(index)) {
       const lc = artist.toLowerCase();
-      counts.set(lc, (counts.get(lc) ?? 0) + albumHistory.playCount);
+      counts.set(lc, (counts.get(lc) ?? 0) + entry.playCount);
     }
 
     return counts;
@@ -372,6 +442,7 @@ export class StatsService {
       // invalidates the result
       const artistAliasFingerprint = this.artistAliasFingerprint();
       const albumMappingFingerprint = await this.albumMappingFingerprint();
+      const historyFingerprint = await this.historyFingerprint();
 
       const WARM_PERIODS = ['month', 'year', 'all'] as const;
       const TOP_LIMIT = 10;
@@ -388,7 +459,7 @@ export class StatsService {
         this.calculateStreaks(),
         this.getScrobbleCounts(),
         this.getListeningHours(),
-        this.getMilestones(),
+        this.getMilestones({ refreshHistoryDates: true }),
         this.getNewArtistsThisMonth(),
         this.getHourlyDistribution(),
         this.getDayOfWeekDistribution(),
@@ -427,6 +498,7 @@ export class StatsService {
           version: WARM_CACHE_VERSION,
           artistAliasFingerprint,
           albumMappingFingerprint,
+          historyFingerprint,
           streaks,
           counts,
           listeningHours,
@@ -487,7 +559,22 @@ export class StatsService {
     ) {
       return null;
     }
+    // Plays added below the newest timestamp (backfill) or moved between
+    // albums and unresolved leave syncTimestamp unchanged
+    if (cache.warm.historyFingerprint !== (await this.historyFingerprint())) {
+      return null;
+    }
     return cache.warm;
+  }
+
+  /** History contents plus Unresolved Listening History rules */
+  private async historyFingerprint(): Promise<string> {
+    const index = await this.historyStorage.getIndex();
+    const rules =
+      typeof this.historyStorage.getResolutionRulesFingerprint === 'function'
+        ? await this.historyStorage.getResolutionRulesFingerprint()
+        : '';
+    return computeHistoryFingerprint(index, rules);
   }
 
   private artistAliasFingerprint(): string {
@@ -529,13 +616,11 @@ export class StatsService {
       };
     }
 
-    // Collect all play timestamps
+    // Collect all play timestamps, including unresolved plays
     const allTimestamps: number[] = [];
-    for (const albumHistory of Object.values(index.albums)) {
-      for (const play of albumHistory.plays) {
-        allTimestamps.push(play.timestamp);
-      }
-    }
+    forEachListeningPlay(index, play => {
+      allTimestamps.push(play.timestamp);
+    });
 
     if (allTimestamps.length === 0) {
       return {
@@ -679,28 +764,28 @@ export class StatsService {
     let thisMonth = 0;
     let thisYear = 0;
 
-    for (const albumHistory of Object.values(index.albums)) {
-      for (const play of albumHistory.plays) {
-        if (play.timestamp >= todayStart) {
-          today++;
-        }
-        if (play.timestamp >= weekStart) {
-          thisWeek++;
-        }
-        if (play.timestamp >= monthStart) {
-          thisMonth++;
-        }
-        if (play.timestamp >= yearStart) {
-          thisYear++;
-        }
+    // Listening events: album plays and unresolved plays
+    forEachListeningPlay(index, play => {
+      if (play.timestamp >= todayStart) {
+        today++;
       }
-    }
+      if (play.timestamp >= weekStart) {
+        thisWeek++;
+      }
+      if (play.timestamp >= monthStart) {
+        thisMonth++;
+      }
+      if (play.timestamp >= yearStart) {
+        thisYear++;
+      }
+    });
 
     return {
       today,
       thisWeek,
       thisMonth,
       thisYear,
+      // Album plays + unresolved plays (recomputed by the sync)
       allTime: index.totalScrobbles,
     };
   }
@@ -814,20 +899,25 @@ export class StatsService {
     // Count plays per artist in the period.
     // Uses resolveArtistNames for multi-attribution: compound artists
     // (e.g., "Danny Brown, Jane Remover") add a play to each component.
+    // Unresolved plays count: the artist is known.
     const artistCounts = new Map<string, number>();
 
-    for (const [key, albumHistory] of Object.entries(index.albums)) {
-      const [artist] = key.split('|');
-      for (const play of albumHistory.plays) {
+    for (const { artist, entry } of listeningEntries(index)) {
+      let periodPlays = 0;
+      for (const play of entry.plays) {
         if (
           play.timestamp >= cutoffTimestamp &&
           play.timestamp <= endTimestamp
         ) {
-          const canonicals = this.resolveArtistNames(artist);
-          for (const canonical of canonicals) {
-            artistCounts.set(canonical, (artistCounts.get(canonical) || 0) + 1);
-          }
+          periodPlays++;
         }
+      }
+      if (periodPlays === 0) continue;
+      for (const canonical of this.resolveArtistNames(artist)) {
+        artistCounts.set(
+          canonical,
+          (artistCounts.get(canonical) || 0) + periodPlays
+        );
       }
     }
 
@@ -1059,23 +1149,22 @@ export class StatsService {
       string,
       {
         artist: string;
-        album: string;
+        album: string | null;
         track: string;
         count: number;
         lastPlayed: number;
       }
     >();
 
-    for (const [key, albumHistory] of Object.entries(index.albums)) {
-      const [artist, album] = key.split('|');
-
-      for (const play of albumHistory.plays) {
+    // Unresolved plays form their own "Unknown album" row per track (album: null)
+    for (const { artist, album, entry } of listeningEntries(index)) {
+      for (const play of entry.plays) {
         if (
           play.timestamp >= cutoffTimestamp &&
           play.timestamp <= endTimestamp &&
           play.track
         ) {
-          const trackKey = createNormalizedTrackKey(artist, album, play.track);
+          const trackKey = this.trackGroupKey(artist, album, play.track);
           const existing = trackCounts.get(trackKey);
           if (existing) {
             existing.count++;
@@ -1101,7 +1190,7 @@ export class StatsService {
       .slice(0, limit)
       .map(item => ({
         artist: this.capitalizeArtist(item.artist),
-        album: this.capitalizeTitle(item.album),
+        album: this.displayAlbum(item.album),
         track: this.capitalizeTitle(item.track),
         playCount: item.count,
         lastPlayed: item.lastPlayed,
@@ -1314,15 +1403,13 @@ export class StatsService {
     // Count scrobbles per day
     const dayCounts = new Map<string, number>();
 
-    for (const albumHistory of Object.values(index.albums)) {
-      for (const play of albumHistory.plays) {
-        if (play.timestamp >= yearStart && play.timestamp < yearEnd) {
-          const date = new Date(play.timestamp * 1000);
-          const dayKey = this.formatDateKey(date);
-          dayCounts.set(dayKey, (dayCounts.get(dayKey) || 0) + 1);
-        }
+    forEachListeningPlay(index, play => {
+      if (play.timestamp >= yearStart && play.timestamp < yearEnd) {
+        const date = new Date(play.timestamp * 1000);
+        const dayKey = this.formatDateKey(date);
+        dayCounts.set(dayKey, (dayCounts.get(dayKey) || 0) + 1);
       }
-    }
+    });
 
     // Convert to array
     return Array.from(dayCounts.entries())
@@ -1334,8 +1421,16 @@ export class StatsService {
    * Get milestone information
    * Calculates when each milestone was actually reached based on scrobble history
    */
-  async getMilestones(): Promise<MilestoneInfo> {
-    const warm = await this.getValidWarmCache();
+  async getMilestones(options?: {
+    /**
+     * Recompute the dates of already-recorded milestones from the index
+     * (used when warming, so plays added to the history, such as backfilled
+     * or newly counted unresolved plays, correct earlier dates)
+     */
+    refreshHistoryDates?: boolean;
+  }): Promise<MilestoneInfo> {
+    const refreshHistoryDates = options?.refreshHistoryDates ?? false;
+    const warm = refreshHistoryDates ? null : await this.getValidWarmCache();
     if (warm) {
       this.logger.debug('Serving getMilestones from warm cache');
       return warm.milestones;
@@ -1378,24 +1473,42 @@ export class StatsService {
       history = [];
     }
 
+    // A milestone above the current total is no longer reached (e.g. after
+    // excluding an artist); drop it so it is re-dated if reached again
+    let historyChanged = false;
+    if (history.some(h => h.milestone > total)) {
+      history = history.filter(h => h.milestone <= total);
+      historyChanged = true;
+    }
+
     // Check if we've hit any new milestones
     const reachedMilestones = MILESTONES.filter(m => m <= total);
     const newMilestones = reachedMilestones.filter(
       m => !history.some(h => h.milestone === m)
     );
 
-    if (newMilestones.length > 0) {
+    if (newMilestones.length > 0 || (refreshHistoryDates && history.length)) {
       // Get all timestamps to find when each milestone was actually reached
       const index = await this.historyStorage.getIndex();
       if (index) {
+        // Every listening event counts, including unresolved plays
         const allTimestamps: number[] = [];
-        for (const albumHistory of Object.values(index.albums)) {
-          for (const play of albumHistory.plays) {
-            allTimestamps.push(play.timestamp);
-          }
-        }
+        forEachListeningPlay(index, play => {
+          allTimestamps.push(play.timestamp);
+        });
         // Sort chronologically (oldest first)
         allTimestamps.sort((a, b) => a - b);
+
+        // Correct recorded dates the index can now place exactly; keep the
+        // rest (the index may hold fewer plays than were counted)
+        if (refreshHistoryDates) {
+          history = history.map(h => {
+            const reachedAt = allTimestamps[h.milestone - 1];
+            if (reachedAt === undefined || reachedAt === h.reachedAt) return h;
+            historyChanged = true;
+            return { ...h, reachedAt };
+          });
+        }
 
         for (const milestone of newMilestones) {
           // The Nth scrobble is at index N-1, so milestone 1000 = index 999
@@ -1413,7 +1526,9 @@ export class StatsService {
           history.push({ milestone, reachedAt: now });
         }
       }
+    }
 
+    if (newMilestones.length > 0 || historyChanged) {
       // Update cache — preserve the warm block so we don't inadvertently clear it
       const now = Math.floor(Date.now() / 1000);
       await this.saveStatsCache({
@@ -1469,8 +1584,9 @@ export class StatsService {
     const artistFirstPlay = new Map<string, number>();
     const artistOriginalName = new Map<string, string>();
 
-    for (const [key, albumHistory] of Object.entries(index.albums)) {
-      const [artist] = key.split('|');
+    // Unresolved plays count: an artist heard only on singles is still new
+    const entries = listeningEntries(index);
+    for (const { artist, entry: albumHistory } of entries) {
       const canonicals = this.resolveArtistNames(artist);
 
       for (const normalizedArtist of canonicals) {
@@ -1504,8 +1620,7 @@ export class StatsService {
       if (firstPlay >= monthStart) {
         // Calculate total plays this month for this artist
         let playCount = 0;
-        for (const [key, albumHistory] of Object.entries(index.albums)) {
-          const [artist] = key.split('|');
+        for (const { artist, entry: albumHistory } of entries) {
           if (this.isArtistMatch(artist, normalizedArtist)) {
             playCount += albumHistory.plays.filter(
               p => p.timestamp >= monthStart
@@ -1609,14 +1724,13 @@ export class StatsService {
     let totalScrobbles = 0;
     let ourScrobbles = 0;
 
-    for (const albumHistory of Object.values(index.albums)) {
-      for (const play of albumHistory.plays) {
-        totalScrobbles++;
-        if (isOurScrobble(play.timestamp)) {
-          ourScrobbles++;
-        }
+    // All listening events, including unresolved plays
+    forEachListeningPlay(index, play => {
+      totalScrobbles++;
+      if (isOurScrobble(play.timestamp)) {
+        ourScrobbles++;
       }
-    }
+    });
 
     const otherScrobbles = totalScrobbles - ourScrobbles;
 
@@ -1719,36 +1833,31 @@ export class StatsService {
 
     const counts = new Map<string, number>();
 
-    // Aggregate scrobbles
-    for (const albumHistory of Object.values(index.albums)) {
-      for (const play of albumHistory.plays) {
-        if (
-          play.timestamp >= startTimestamp &&
-          play.timestamp <= endTimestamp
-        ) {
-          const date = new Date(play.timestamp * 1000);
-          let key: string;
+    // Aggregate scrobbles (album plays and unresolved plays)
+    forEachListeningPlay(index, play => {
+      if (play.timestamp >= startTimestamp && play.timestamp <= endTimestamp) {
+        const date = new Date(play.timestamp * 1000);
+        let key: string;
 
-          switch (granularity) {
-            case 'day':
-              key = this.formatDateKey(date);
-              break;
-            case 'week': {
-              // Use ISO week format: YYYY-Www
-              const weekStart = this.getStartOfWeek(date);
-              key = this.formatDateKey(weekStart);
-              break;
-            }
-            case 'month':
-            default:
-              key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-              break;
+        switch (granularity) {
+          case 'day':
+            key = this.formatDateKey(date);
+            break;
+          case 'week': {
+            // Use ISO week format: YYYY-Www
+            const weekStart = this.getStartOfWeek(date);
+            key = this.formatDateKey(weekStart);
+            break;
           }
-
-          counts.set(key, (counts.get(key) || 0) + 1);
+          case 'month':
+          default:
+            key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            break;
         }
+
+        counts.set(key, (counts.get(key) || 0) + 1);
       }
-    }
+    });
 
     // Convert to sorted array
     return Array.from(counts.entries())
@@ -1804,7 +1913,7 @@ export class StatsService {
       string,
       {
         artist: string;
-        album: string;
+        album: string | null;
         track: string;
         count: number;
         lastPlayed: number;
@@ -1812,19 +1921,21 @@ export class StatsService {
       }
     >();
 
-    for (const [key, albumHistory] of Object.entries(index.albums)) {
-      const [artist, album] = key.split('|');
-
+    // Unresolved plays (album null) form their own "Unknown album" track rows
+    for (const { artist, album, entry: albumHistory } of listeningEntries(
+      index
+    )) {
       for (const play of albumHistory.plays) {
         // Skip plays without track info
         if (!play.track) continue;
 
-        // Check if this track has a mapping and apply it
+        // Check if this track has a mapping and apply it. Track mappings
+        // are keyed by album, so they never apply to unresolved plays.
         let targetArtist = artist;
-        let targetAlbum = album;
+        let targetAlbum: string | null = album;
         let targetTrack = play.track;
 
-        if (this.trackMappingService) {
+        if (this.trackMappingService && album !== null) {
           const mapping = await this.trackMappingService.getTrackMapping(
             artist,
             album,
@@ -1838,7 +1949,7 @@ export class StatsService {
           }
         }
 
-        const trackKey = createNormalizedTrackKey(
+        const trackKey = this.trackGroupKey(
           targetArtist,
           targetAlbum,
           targetTrack
@@ -1874,7 +1985,12 @@ export class StatsService {
       if (stats.count >= minPlayCount && stats.lastPlayed < cutoffTimestamp) {
         forgottenTracks.push({
           artist: this.capitalizeArtist(stats.artist),
-          album: stats.album ? this.capitalizeTitle(stats.album) : '',
+          album:
+            stats.album === null
+              ? UNKNOWN_ALBUM_LABEL
+              : stats.album
+                ? this.capitalizeTitle(stats.album)
+                : '',
           track: this.capitalizeTitle(stats.track),
           allTimePlayCount: stats.count,
           lastPlayed: stats.lastPlayed,
@@ -1974,7 +2090,7 @@ export class StatsService {
     // Track play counts: key = normalized track name, value = { track, album, count, lastPlayed }
     const trackCounts = new Map<
       string,
-      { track: string; album: string; count: number; lastPlayed: number }
+      { track: string; album: string | null; count: number; lastPlayed: number }
     >();
 
     // Album data: key = normalized album name, value = { artist, album, playCount, lastPlayed }.
@@ -2002,38 +2118,46 @@ export class StatsService {
     // Play trend data: key = period string (YYYY-MM or YYYY-Www), value = count
     const trendCounts = new Map<string, number>();
 
-    for (const [key, albumHistory] of Object.entries(index.albums)) {
-      const [artist, historyAlbum] = key.split('|');
+    // Unresolved plays (historyAlbum null) count in totals, periods, trend and
+    // top tracks (as "Unknown album"), but never in the albums list
+    for (const {
+      artist,
+      album: historyAlbum,
+      entry: albumHistory,
+    } of listeningEntries(index)) {
       if (!this.isArtistMatch(artist, artistName)) {
         continue;
       }
 
-      // Mappings are one hop deep, so the target is the canonical album
-      const { album, mapping: albumMapping } = canonicalize(
-        artist,
-        historyAlbum
-      );
+      // Mappings are one hop deep, so the target is the canonical album.
+      // Unresolved plays have no album: album stays null.
+      let album: string | null = null;
+      if (historyAlbum !== null) {
+        const canonical = canonicalize(artist, historyAlbum);
+        album = canonical.album;
+        const albumMapping = canonical.mapping;
 
-      const normalizedAlbum = album.toLowerCase().trim();
-      const existingAlbum = albumCounts.get(normalizedAlbum);
-      if (existingAlbum) {
-        existingAlbum.playCount += albumHistory.playCount;
-        if (albumHistory.lastPlayed > existingAlbum.lastPlayed) {
-          existingAlbum.lastPlayed = albumHistory.lastPlayed;
+        const normalizedAlbum = album.toLowerCase().trim();
+        const existingAlbum = albumCounts.get(normalizedAlbum);
+        if (existingAlbum) {
+          existingAlbum.playCount += albumHistory.playCount;
+          if (albumHistory.lastPlayed > existingAlbum.lastPlayed) {
+            existingAlbum.lastPlayed = albumHistory.lastPlayed;
+          }
+          existingAlbum.historyEntries.push({ artist, album: historyAlbum });
+          if (!existingAlbum.collectionId && albumMapping?.collectionId) {
+            existingAlbum.collectionId = albumMapping.collectionId;
+          }
+        } else {
+          albumCounts.set(normalizedAlbum, {
+            artist,
+            album,
+            playCount: albumHistory.playCount,
+            lastPlayed: albumHistory.lastPlayed,
+            historyEntries: [{ artist, album: historyAlbum }],
+            collectionId: albumMapping?.collectionId || undefined,
+          });
         }
-        existingAlbum.historyEntries.push({ artist, album: historyAlbum });
-        if (!existingAlbum.collectionId && albumMapping?.collectionId) {
-          existingAlbum.collectionId = albumMapping.collectionId;
-        }
-      } else {
-        albumCounts.set(normalizedAlbum, {
-          artist,
-          album,
-          playCount: albumHistory.playCount,
-          lastPlayed: albumHistory.lastPlayed,
-          historyEntries: [{ artist, album: historyAlbum }],
-          collectionId: albumMapping?.collectionId || undefined,
-        });
       }
 
       for (const play of albumHistory.plays) {
@@ -2054,7 +2178,7 @@ export class StatsService {
 
         // Track aggregation
         if (play.track) {
-          const trackKey = createNormalizedTrackKey(artist, album, play.track);
+          const trackKey = this.trackGroupKey(artist, album, play.track);
           const existing = trackCounts.get(trackKey);
           if (existing) {
             existing.count++;
@@ -2102,7 +2226,7 @@ export class StatsService {
       .slice(0, 20)
       .map(t => ({
         track: this.capitalizeTitle(t.track),
-        album: this.capitalizeTitle(t.album),
+        album: this.displayAlbum(t.album),
         playCount: t.count,
         lastPlayed: t.lastPlayed,
       }));
@@ -2207,7 +2331,12 @@ export class StatsService {
     // Versions merged by album mappings count as one album.
     const albumAppearances = new Map<
       string,
-      { album: string; artist: string; playCount: number; lastPlayed: number }
+      {
+        album: string | null;
+        artist: string;
+        playCount: number;
+        lastPlayed: number;
+      }
     >();
     const canonicalize = createAlbumCanonicalizer(
       await loadAlbumMappings(this.mappingService)
@@ -2216,17 +2345,28 @@ export class StatsService {
       ? canonicalize(artist, album).album.toLowerCase()
       : undefined;
 
-    for (const [key, albumHistory] of Object.entries(index.albums)) {
-      const [entryArtist, entryAlbum] = key.split('|');
-
+    // Unresolved plays (entryAlbum null) appear as one "Unknown album"
+    // bucket; an album filter of "Unknown album" selects only them
+    const unknownAlbumFilter =
+      normalizedAlbumFilter === UNKNOWN_ALBUM_LABEL.toLowerCase();
+    for (const {
+      artist: entryArtist,
+      album: entryAlbum,
+      entry: albumHistory,
+    } of listeningEntries(index)) {
       // Filter by artist (includes compound decomposition)
       if (!this.isArtistMatch(entryArtist, artist)) {
         continue;
       }
 
       // If album filter is provided, only look at that album (any of its versions)
-      const canonicalAlbum = canonicalize(entryArtist, entryAlbum).album;
-      if (
+      const canonicalAlbum =
+        entryAlbum === null
+          ? null
+          : canonicalize(entryArtist, entryAlbum).album;
+      if (entryAlbum === null || canonicalAlbum === null) {
+        if (normalizedAlbumFilter && !unknownAlbumFilter) continue;
+      } else if (
         normalizedAlbumFilter &&
         entryAlbum.toLowerCase() !== normalizedAlbumFilter &&
         canonicalAlbum.toLowerCase() !== canonicalAlbumFilter
@@ -2251,7 +2391,10 @@ export class StatsService {
         }
 
         // Album appearances
-        const normalizedEntryAlbum = canonicalAlbum.toLowerCase();
+        const normalizedEntryAlbum =
+          canonicalAlbum === null
+            ? UNRESOLVED_GROUP_PREFIX
+            : canonicalAlbum.toLowerCase();
         const existing = albumAppearances.get(normalizedEntryAlbum);
         if (existing) {
           existing.playCount++;
@@ -2294,13 +2437,16 @@ export class StatsService {
     const appearsOn = Array.from(albumAppearances.values())
       .sort((a, b) => b.playCount - a.playCount)
       .map(a => {
-        const collectionItem = this.lookupCollectionItem(
-          collectionByFuzzyKey,
-          a.artist,
-          a.album
-        );
+        const collectionItem =
+          a.album === null
+            ? undefined
+            : this.lookupCollectionItem(
+                collectionByFuzzyKey,
+                a.artist,
+                a.album
+              );
         return {
-          album: this.capitalizeTitle(a.album),
+          album: this.displayAlbum(a.album),
           artist: this.capitalizeArtist(a.artist),
           playCount: a.playCount,
           lastPlayed: a.lastPlayed,
@@ -2505,20 +2651,20 @@ export class StatsService {
     let totalScrobbles = 0;
 
     if (index) {
-      for (const [key, albumHistory] of Object.entries(index.albums)) {
-        const [artist, album] = key.split('|');
-
-        for (const play of albumHistory.plays) {
+      // The day total includes unresolved plays, grouped as one
+      // "Unknown album" entry per artist
+      for (const { artist, album, entry } of listeningEntries(index)) {
+        for (const play of entry.plays) {
           if (play.timestamp >= dayStart && play.timestamp < dayEnd) {
             totalScrobbles++;
-            const albumKey = `${artist}|${album}`;
+            const albumKey = this.albumGroupKey(artist, album);
             const existing = albumMap.get(albumKey);
             if (existing) {
               existing.playCount++;
             } else {
               albumMap.set(albumKey, {
                 artist: this.capitalizeArtist(artist),
-                album: this.capitalizeTitle(album),
+                album: this.displayAlbum(album),
                 playCount: 1,
               });
             }
@@ -2563,10 +2709,10 @@ export class StatsService {
     >();
 
     if (index) {
-      for (const [key, albumHistory] of Object.entries(index.albums)) {
-        const [artist, album] = key.split('|');
-
-        for (const play of albumHistory.plays) {
+      // Unresolved plays count toward the day, as one "Unknown album" group
+      // per artist
+      for (const { artist, album, entry } of listeningEntries(index)) {
+        for (const play of entry.plays) {
           const date = new Date(play.timestamp * 1000);
           // month is 1-based, getMonth() is 0-based
           if (date.getMonth() + 1 === month && date.getDate() === day) {
@@ -2575,14 +2721,14 @@ export class StatsService {
               yearData.set(yr, new Map());
             }
             const albums = yearData.get(yr)!;
-            const albumKey = `${artist}|${album}`;
+            const albumKey = this.albumGroupKey(artist, album);
             const existing = albums.get(albumKey);
             if (existing) {
               existing.playCount++;
             } else {
               albums.set(albumKey, {
                 artist: this.capitalizeArtist(artist),
-                album: this.capitalizeTitle(album),
+                album: this.displayAlbum(album),
                 playCount: 1,
               });
             }
@@ -2658,6 +2804,33 @@ export class StatsService {
   ): CollectionItem | undefined {
     const fuzzyKey = this.historyStorage.fuzzyNormalizeKey(artist, album);
     return collectionByFuzzyKey.get(fuzzyKey);
+  }
+
+  /**
+   * Grouping key for a track: normalized artist|album|track. Unresolved plays
+   * (album null) get a distinct "Unknown album" key that no real album shares.
+   */
+  private trackGroupKey(
+    artist: string,
+    album: string | null,
+    track: string
+  ): string {
+    return album === null
+      ? UNRESOLVED_GROUP_PREFIX +
+          createNormalizedTrackKey(artist, UNKNOWN_ALBUM_LABEL, track)
+      : createNormalizedTrackKey(artist, album, track);
+  }
+
+  /** Grouping key for an artist's album, or its unresolved plays (album null). */
+  private albumGroupKey(artist: string, album: string | null): string {
+    return album === null
+      ? `${UNRESOLVED_GROUP_PREFIX}${artist}`
+      : `${artist}|${album}`;
+  }
+
+  /** Display name for an album; "Unknown album" for unresolved plays. */
+  private displayAlbum(album: string | null): string {
+    return album === null ? UNKNOWN_ALBUM_LABEL : this.capitalizeTitle(album);
   }
 
   private formatDateKey(date: Date): string {

@@ -529,6 +529,73 @@ describe('BackupService', () => {
       expect(result.success).toBe(true);
     });
 
+    it('backs up and restores unresolved history rules with their hidden list', async () => {
+      const rule = (track: string, album: string, createdAt: number) => ({
+        id: `id-${track}-${createdAt}`,
+        artist: 'artist',
+        track,
+        album,
+        source: 'user' as const,
+        createdAt,
+      });
+      await fileStorage.writeJSON(
+        'mappings/unresolved-track-resolutions.json',
+        {
+          schemaVersion: 1,
+          resolutions: [rule('a', 'Album A', 1), rule('b', 'Album B', 1)],
+          hidden: ['artist|x'],
+          excludedArtists: ['the onion'],
+        }
+      );
+      const backupJson = await service.exportBackup({
+        includeCredentials: false,
+      });
+      expect(JSON.parse(backupJson).data.unresolvedHistory.hidden).toEqual([
+        'artist|x',
+      ]);
+      expect(
+        (await service.getBackupPreview()).unresolvedResolutionsCount
+      ).toBe(2);
+
+      // Local changes after the backup: a newer rule for "a", a new rule "c"
+      await fileStorage.writeJSON(
+        'mappings/unresolved-track-resolutions.json',
+        {
+          schemaVersion: 1,
+          resolutions: [rule('a', 'Album A2', 5), rule('c', 'Album C', 5)],
+          hidden: ['artist|y'],
+          excludedArtists: ['doug benson'],
+        }
+      );
+
+      await service.importBackup(backupJson, { mode: 'merge' });
+      const merged = await fileStorage.readJSON<{
+        resolutions: Array<{ track: string; album: string }>;
+        hidden: string[];
+      }>('mappings/unresolved-track-resolutions.json');
+      expect(
+        merged!.resolutions.map(r => `${r.track}:${r.album}`).sort()
+      ).toEqual(['a:Album A2', 'b:Album B', 'c:Album C']);
+      expect(merged!.hidden.sort()).toEqual(['artist|x', 'artist|y']);
+      expect(
+        (merged as unknown as { excludedArtists: string[] }).excludedArtists
+      ).toEqual(['doug benson', 'the onion']);
+
+      await service.importBackup(backupJson, { mode: 'replace' });
+      const replaced = await fileStorage.readJSON<{
+        resolutions: Array<{ track: string }>;
+        hidden: string[];
+      }>('mappings/unresolved-track-resolutions.json');
+      expect(replaced!.resolutions.map(r => r.track).sort()).toEqual([
+        'a',
+        'b',
+      ]);
+      expect(replaced!.hidden).toEqual(['artist|x']);
+      expect(
+        (replaced as unknown as { excludedArtists: string[] }).excludedArtists
+      ).toEqual(['the onion']);
+    });
+
     it('lets a running service see restored data before its next edit (afterImport hook)', async () => {
       // A backup that contains mapping A
       const mappingA = createAlbumMapping({

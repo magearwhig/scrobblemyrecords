@@ -9,6 +9,7 @@ import ScrobbleSessionCard from '../components/ScrobbleSessionCard';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { SessionCardSkeleton } from '../components/ui/Skeleton';
+import UnresolvedHistoryTab from '../components/UnresolvedHistoryTab';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -21,7 +22,7 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('HistoryPage');
 
-type HistoryTab = 'sessions' | 'lastfm';
+type HistoryTab = 'sessions' | 'lastfm' | 'unresolved';
 
 // Returns the tab from URL params, or null if no URL override
 const getTabFromUrl = (): HistoryTab | null => {
@@ -31,6 +32,10 @@ const getTabFromUrl = (): HistoryTab | null => {
 
   const queryString = hash.slice(queryIndex + 1);
   const params = new URLSearchParams(queryString);
+  const tab = params.get('tab');
+  if (tab === 'sessions' || tab === 'lastfm' || tab === 'unresolved') {
+    return tab;
+  }
   if (params.get('view')) return 'lastfm';
   return null;
 };
@@ -89,6 +94,16 @@ const HistoryPage: React.FC = () => {
         logger.warn('Failed to load history tab preference', err);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Follow in-app deep links (e.g. #history?tab=unresolved) while mounted
+  useEffect(() => {
+    const handleHashChange = () => {
+      const urlTab = getTabFromUrl();
+      if (urlTab) setActiveTab(urlTab);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   useEffect(() => {
@@ -301,10 +316,22 @@ const HistoryPage: React.FC = () => {
         >
           Last.fm Listening History
         </button>
+        <button
+          role='tab'
+          className={`history-tab ${activeTab === 'unresolved' ? 'active' : ''}`}
+          onClick={() => setActiveTab('unresolved')}
+          onKeyDown={handleTabKeyDown}
+          aria-selected={activeTab === 'unresolved'}
+          tabIndex={activeTab === 'unresolved' ? 0 : -1}
+        >
+          Unresolved
+        </button>
       </div>
 
       {/* Tab Content */}
       {activeTab === 'lastfm' && <LastFmHistoryTab />}
+
+      {activeTab === 'unresolved' && <UnresolvedHistoryTab />}
 
       {activeTab === 'sessions' && (
         <>

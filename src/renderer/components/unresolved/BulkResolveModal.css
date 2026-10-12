@@ -1,0 +1,347 @@
+/* Bulk album resolution for an artist's unresolved tracks */
+
+.bulk-resolve {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  color: var(--text-primary);
+}
+
+.bulk-resolve-summary {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
+}
+
+.bulk-resolve-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.bulk-resolve-toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.bulk-resolve-filter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.bulk-resolve-lookup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.bulk-resolve-lookup-status {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.bulk-resolve-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-raised);
+}
+
+.bulk-resolve-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 2fr) minmax(0, 3fr);
+  align-items: start;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.bulk-resolve-row:last-child {
+  border-bottom: none;
+}
+
+.bulk-resolve-row--checked {
+  background-color: var(--accent-primary-muted);
+}
+
+.bulk-resolve-check {
+  margin-top: var(--space-2);
+  accent-color: var(--accent-primary);
+}
+
+.bulk-resolve-track {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding-top: var(--space-1);
+}
+
+.bulk-resolve-track-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.bulk-resolve-track-plays {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.bulk-resolve-album {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.bulk-resolve-album-input {
+  width: 100%;
+}
+
+.bulk-resolve-tag {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.bulk-resolve-tag--muted {
+  color: var(--text-muted);
+}
+
+.bulk-resolve-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.bulk-resolve-cover {
+  flex-shrink: 0;
+  width: var(--space-8);
+  height: var(--space-8);
+  object-fit: cover;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-sunken);
+}
+
+.bulk-resolve-lastfm-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--accent-primary);
+  text-decoration: underline;
+}
+
+.bulk-resolve-lastfm-link:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.bulk-resolve-verification {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.bulk-resolve-verification svg {
+  flex-shrink: 0;
+}
+
+.bulk-resolve-verification--confirmed svg {
+  color: var(--status-success);
+}
+
+.bulk-resolve-verification--warning {
+  color: var(--text-primary);
+  font-weight: var(--weight-medium);
+}
+
+.bulk-resolve-verification--warning svg {
+  color: var(--status-warning);
+}
+
+.bulk-resolve-verification--unknown {
+  color: var(--text-muted);
+}
+
+.bulk-resolve-footer-note {
+  margin-right: auto;
+  align-self: center;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* Match tracks from a Discogs album the user pastes a link to */
+
+.bulk-resolve-discogs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-sunken);
+  color: var(--text-primary);
+}
+
+.bulk-resolve-discogs-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.bulk-resolve-discogs-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+}
+
+.bulk-resolve-discogs-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.bulk-resolve-discogs-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.bulk-resolve-discogs-live:empty {
+  display: none;
+}
+
+.bulk-resolve-discogs-message {
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
+}
+
+.bulk-resolve-discogs-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--status-error);
+}
+
+.bulk-resolve-discogs-error svg {
+  flex-shrink: 0;
+}
+
+.bulk-resolve-discogs-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bulk-resolve-discogs-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-raised);
+  color: var(--text-primary);
+}
+
+.bulk-resolve-discogs-cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-12);
+  height: var(--space-12);
+  object-fit: cover;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-sunken);
+}
+
+.bulk-resolve-discogs-cover--empty {
+  color: var(--text-muted);
+}
+
+.bulk-resolve-discogs-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.bulk-resolve-discogs-title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.bulk-resolve-discogs-artist,
+.bulk-resolve-discogs-counts {
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
+}
+
+.bulk-resolve-discogs-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+}
+
+@media (max-width: 640px) {
+  .bulk-resolve-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .bulk-resolve-album {
+    grid-column: 2;
+  }
+
+  .bulk-resolve-footer-note {
+    flex-basis: 100%;
+  }
+
+  .bulk-resolve-discogs-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .bulk-resolve-discogs-actions {
+    grid-column: 2;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+  }
+}

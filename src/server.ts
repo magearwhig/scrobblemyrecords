@@ -30,6 +30,7 @@ import createScrobbleRouter from './backend/routes/scrobble';
 import createSellersRouter from './backend/routes/sellers';
 import createStatsRouter from './backend/routes/stats';
 import createSuggestionsRouter from './backend/routes/suggestions';
+import createUnresolvedHistoryRouter from './backend/routes/unresolvedHistory';
 import createWebsitesRouter from './backend/routes/websites';
 import createWishlistRouter from './backend/routes/wishlist';
 import createWrappedRouter from './backend/routes/wrapped';
@@ -78,6 +79,7 @@ import { StatsService } from './backend/services/statsService';
 import { SuggestionService } from './backend/services/suggestionService';
 import { TagEnricherService } from './backend/services/tagEnricherService';
 import { TrackMappingService } from './backend/services/trackMappingService';
+import { UnresolvedHistoryService } from './backend/services/unresolvedHistoryService';
 import { WebsiteMonitoringService } from './backend/services/websiteMonitoringService';
 import { WishlistService } from './backend/services/wishlistService';
 import { WrappedService } from './backend/services/wrappedService';
@@ -87,9 +89,12 @@ import {
   AuthPolicy,
   resolveAuthPolicy,
 } from './backend/utils/authPolicy';
+import { getAllCachedCollectionItems } from './backend/utils/collectionCache';
 import { resolveDataDir } from './backend/utils/dataDir';
 import { FileStorage } from './backend/utils/fileStorage';
 import { createLogger } from './backend/utils/logger';
+import { CollectionItem } from './shared/types';
+import { stripDiscogsSuffix } from './shared/utils/albumMapping';
 
 const log = createLogger('Server');
 
@@ -345,6 +350,17 @@ const discogsService = new DiscogsService(fileStorage, authService);
 
 // Initialize suggestion-related services
 const historyStorage = new ScrobbleHistoryStorage(fileStorage);
+// Unresolved Listening History rules are applied whenever the index is read
+const unresolvedHistoryService = new UnresolvedHistoryService(
+  fileStorage,
+  lastfmService
+);
+historyStorage.setResolutionRulesProvider(() =>
+  unresolvedHistoryService.getRules()
+);
+historyStorage.setExcludedArtistsProvider(() =>
+  unresolvedHistoryService.getExcludedArtists()
+);
 const syncService = new ScrobbleHistorySyncService(
   fileStorage,
   authService,
@@ -677,6 +693,8 @@ async function startServer() {
       trackMappingService.clearCache();
       compoundMappingService.clearCache();
       artistMappingService.reload();
+      // Restored unresolved-history rules change the derived index
+      historyStorage.invalidateCache();
       await artistNameResolver.rebuild();
       await statsService.invalidateStatsCache();
     });
@@ -694,6 +712,63 @@ async function startServer() {
         `Found ${splitEntries.length} split history index entries that can be merged via /api/v1/stats/merge-split-entries`
       );
     }
+
+    // Owned releases' tracklists for album suggestions. Release files rarely
+    // change, so tracklists are kept; the collection list is re-read after
+    // 5 minutes.
+    const releaseTracklists = new Map<number, string[] | null>();
+    let collectionItems: { at: number; items: CollectionItem[] } | null = null;
+    const ownedReleaseTracks = async (isArtist: (name: string) => boolean) => {
+      const username = (await authService.getUserSettings()).discogs.username;
+      if (!username) return [];
+      if (!collectionItems || Date.now() - collectionItems.at > 5 * 60 * 1000) {
+        collectionItems = {
+          at: Date.now(),
+          items: await getAllCachedCollectionItems(username, fileStorage),
+        };
+      }
+      const releases: Array<{ title: string; tracks: string[] }> = [];
+      const seen = new Set<number>();
+      for (const item of collectionItems.items) {
+        const id = item.release.id;
+        if (
+          seen.has(id) ||
+          !isArtist(stripDiscogsSuffix(item.release.artist))
+        ) {
+          continue;
+        }
+        seen.add(id);
+        if (!releaseTracklists.has(id)) {
+          const details = await fileStorage.readJSON<{
+            tracklist?: Array<{ title?: string; position?: string }>;
+          }>(`collections/release-${id}.json`);
+          const tracks = (details?.tracklist ?? [])
+            .filter(t => t.title && t.position !== '')
+            .map(t => t.title as string);
+          releaseTracklists.set(id, tracks.length > 0 ? tracks : null);
+        }
+        const tracks = releaseTracklists.get(id);
+        if (tracks) releases.push({ title: item.release.title, tracks });
+      }
+      return releases;
+    };
+
+    // Unresolved Listening History (mounted before the stats router)
+    app.use(
+      '/api/v1/stats/unresolved-history',
+      createUnresolvedHistoryRouter(
+        unresolvedHistoryService,
+        historyStorage,
+        statsService,
+        () => artist => artistNameResolver.getDisplayName(artist),
+        {
+          getSameArtist: () => (a, b) => artistNameResolver.areSameArtist(a, b),
+          fetchDiscogsAlbum: (kind, id) =>
+            wishlistService.getDiscogsAlbum(kind, id),
+          ownedReleases: isArtist => ownedReleaseTracks(isArtist),
+        }
+      )
+    );
 
     // Mount stats routes now that historyIndexMergeService is available
     app.use(
@@ -747,6 +822,7 @@ async function startServer() {
       ollamaService,
       wishlistService
     );
+    websiteMonitoringService.setHistoryStorage(historyStorage);
     const ollamaEmbedderService = new OllamaEmbedderService(ollamaService);
     const listeningSessionStorageService = new ListeningSessionStorageService(
       fileStorage

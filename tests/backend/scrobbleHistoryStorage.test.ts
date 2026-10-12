@@ -34,6 +34,119 @@ describe('ScrobbleHistoryStorage', () => {
     }
   });
 
+  describe('resolution rules (Unresolved Listening History)', () => {
+    const indexFile = 'history/scrobble-history-index.json';
+    const raw = (): ScrobbleHistoryIndex =>
+      createMockIndex({
+        totalScrobbles: 3,
+        albums: {
+          'the cure|disintegration': {
+            lastPlayed: 100,
+            playCount: 1,
+            plays: [{ timestamp: 100, track: 'Lullaby' }],
+          },
+        },
+        unresolved: {
+          'the cure': {
+            lastPlayed: 300,
+            playCount: 2,
+            plays: [
+              { timestamp: 200, track: 'Lovesong' },
+              { timestamp: 300, track: 'Creep' },
+            ],
+          },
+        },
+      });
+
+    it('leaves excluded artists out entirely, restoring them when removed', async () => {
+      await fileStorage.writeJSON(indexFile, raw());
+      let excluded = ['The Cure'];
+      storage.setExcludedArtistsProvider(async () => excluded);
+      storage.setResolutionRulesProvider(async () => [
+        { artist: 'the cure', track: 'lovesong', album: 'Disintegration' },
+      ]);
+
+      const view = (await storage.getIndex())!;
+      expect(view.albums).toEqual({});
+      expect(view.unresolved).toEqual({});
+      expect(view.totalScrobbles).toBe(0);
+      const fingerprint = await storage.getResolutionRulesFingerprint();
+
+      excluded = [];
+      storage.invalidateCache();
+      expect((await storage.getIndex())!.totalScrobbles).toBe(3);
+      expect(await storage.getResolutionRulesFingerprint()).not.toBe(
+        fingerprint
+      );
+    });
+
+    it('matches excluded artists by alias and by credit, not by "&" names', async () => {
+      storage.setExcludedArtistsProvider(async () => ['Doug Benson']);
+      storage.setArtistNameResolver({
+        resolveArtist: (name: string) =>
+          name === 'dlm podcast' ? 'doug benson' : name,
+        resolveArtistMulti: (name: string) => [name],
+      } as unknown as Parameters<typeof storage.setArtistNameResolver>[0]);
+
+      const matcher = (await storage.getExclusionMatcher())!;
+
+      expect(matcher('doug benson')).toBe('doug benson');
+      expect(matcher('dlm podcast')).toBe('doug benson');
+      expect(matcher('doug benson, paul f. tompkins')).toBe('doug benson');
+      expect(matcher('someone feat. doug benson')).toBe('doug benson');
+      expect(matcher('doug benson & friends')).toBeNull();
+      expect(matcher('brendan benson')).toBeNull();
+    });
+
+    it('recomputes the earliest play when it belonged to an excluded artist', async () => {
+      await fileStorage.writeJSON(indexFile, {
+        ...raw(),
+        oldestScrobbleDate: 50,
+        unresolved: {
+          podcast: {
+            lastPlayed: 50,
+            playCount: 1,
+            plays: [{ timestamp: 50, track: 'Episode 1' }],
+          },
+        },
+      });
+      storage.setExcludedArtistsProvider(async () => ['podcast']);
+
+      const view = (await storage.getIndex())!;
+
+      expect(view.oldestScrobbleDate).toBe(100);
+      expect(view.totalScrobbles).toBe(1);
+    });
+
+    it('serves the index with rules applied and never rewrites the file', async () => {
+      await fileStorage.writeJSON(indexFile, raw());
+      const before = JSON.stringify(await fileStorage.readJSON(indexFile));
+      let rules = [
+        { artist: 'the cure', track: 'lovesong', album: 'Disintegration' },
+      ];
+      storage.setResolutionRulesProvider(async () => rules);
+
+      const resolved = (await storage.getIndex())!;
+      expect(resolved.albums['the cure|disintegration'].plays).toHaveLength(2);
+      expect(resolved.unresolved!['the cure'].plays).toEqual([
+        { timestamp: 300, track: 'Creep' },
+      ]);
+      expect(
+        (await storage.getRawIndex())!.unresolved!['the cure'].plays
+      ).toHaveLength(2);
+      expect(JSON.stringify(await fileStorage.readJSON(indexFile))).toBe(
+        before
+      );
+
+      // Removing the rule restores the previous view after invalidation
+      rules = [];
+      storage.invalidateCache();
+      const restored = (await storage.getIndex())!;
+      expect(restored.albums['the cure|disintegration'].plays).toHaveLength(1);
+      expect(restored.unresolved!['the cure'].plays).toHaveLength(2);
+    });
+  });
+
   describe('normalizeKey', () => {
     it('should normalize artist and album to lowercase', () => {
       // Arrange
@@ -2039,6 +2152,221 @@ describe('ScrobbleHistoryStorage', () => {
       expect(stats.newestScrobble).toBeInstanceOf(Date);
       expect(stats.lastSync).toBeInstanceOf(Date);
       expect(stats.estimatedSizeBytes).toBeGreaterThan(0);
+    });
+  });
+
+  describe('unresolved (albumless) plays', () => {
+    // Fixed local-time timestamps so hour/day buckets are deterministic
+    const ts = (y: number, m: number, d: number, h: number) =>
+      Math.floor(new Date(y, m - 1, d, h, 0, 0).getTime() / 1000);
+    const tueAt9 = ts(2024, 1, 2, 9); // Tuesday 09:00
+    const tueAt10 = ts(2024, 1, 2, 10);
+    const satAt22 = ts(2024, 1, 6, 22); // Saturday 22:00
+    const sunAt23 = ts(2024, 1, 7, 23); // Sunday 23:00
+
+    const albums = {
+      'radiohead|kid a': {
+        lastPlayed: tueAt10,
+        playCount: 2,
+        plays: [
+          { timestamp: tueAt9, track: 'Idioteque' },
+          { timestamp: tueAt10, track: 'Idioteque' },
+        ],
+      },
+    };
+    const unresolved = {
+      radiohead: {
+        lastPlayed: satAt22,
+        playCount: 1,
+        plays: [{ timestamp: satAt22, track: 'Idioteque' }],
+      },
+      'singles only': {
+        lastPlayed: sunAt23,
+        playCount: 2,
+        plays: [
+          { timestamp: sunAt23 - 600, track: 'B-Side' },
+          { timestamp: sunAt23, track: 'B-Side' },
+        ],
+      },
+    };
+
+    const writeIndex = async (withUnresolved: boolean) => {
+      // Fresh storage so the 60s in-memory cache never leaks between writes
+      storage = new ScrobbleHistoryStorage(fileStorage);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          totalScrobbles: withUnresolved ? 5 : 2,
+          albums: JSON.parse(JSON.stringify(albums)),
+          ...(withUnresolved
+            ? { unresolved: JSON.parse(JSON.stringify(unresolved)) }
+            : {}),
+        })
+      );
+    };
+
+    it('hourly and day-of-week distributions include unresolved plays', async () => {
+      await writeIndex(true);
+      await storage.getIndex();
+
+      const hours = await storage.getHourlyDistribution();
+      const days = await storage.getDayOfWeekDistribution();
+
+      expect(hours.get(9)).toBe(1);
+      expect(hours.get(10)).toBe(1);
+      expect(hours.get(22)).toBe(2); // Saturday 22:00 + Sunday 22:50
+      expect(hours.get(23)).toBe(1);
+      expect(Array.from(hours.values()).reduce((a, b) => a + b, 0)).toBe(5);
+      expect(days.get(2)).toBe(2); // Tuesday
+      expect(days.get(6)).toBe(1); // Saturday
+      expect(days.get(0)).toBe(2); // Sunday
+    });
+
+    it('decade distribution includes unresolved plays', async () => {
+      await writeIndex(true);
+
+      const decades = await storage.getDecadeDistribution();
+
+      expect(decades.get(2020)).toBe(5);
+    });
+
+    it('getArtistsPaginated adds unresolved plays without counting albums', async () => {
+      await writeIndex(true);
+
+      const result = await storage.getArtistsPaginated(1, 50);
+
+      expect(result.total).toBe(2);
+      const radiohead = result.items.find(i => i.artist === 'radiohead');
+      expect(radiohead).toEqual({
+        artist: 'radiohead',
+        playCount: 3,
+        albumCount: 1,
+        lastPlayed: satAt22,
+      });
+      const singles = result.items.find(i => i.artist === 'singles only');
+      expect(singles).toEqual({
+        artist: 'singles only',
+        playCount: 2,
+        albumCount: 0,
+        lastPlayed: sunAt23,
+      });
+    });
+
+    it('getUniqueArtists adds unresolved plays without counting albums', async () => {
+      await writeIndex(true);
+
+      const artists = await storage.getUniqueArtists();
+
+      expect(artists.get('radiohead')).toEqual({
+        playCount: 3,
+        albumCount: 1,
+        lastPlayed: satAt22,
+      });
+      expect(artists.get('singles only')).toEqual({
+        playCount: 2,
+        albumCount: 0,
+        lastPlayed: sunAt23,
+      });
+    });
+
+    it('getTracksPaginated shows unresolved plays as a separate Unknown album row', async () => {
+      await writeIndex(true);
+
+      const result = await storage.getTracksPaginated(1, 50);
+
+      expect(result.total).toBe(3);
+      const idioteque = result.items.filter(i => i.track === 'Idioteque');
+      expect(idioteque).toEqual(
+        expect.arrayContaining([
+          {
+            artist: 'radiohead',
+            album: 'kid a',
+            track: 'Idioteque',
+            playCount: 2,
+            lastPlayed: tueAt10,
+          },
+          {
+            artist: 'radiohead',
+            album: 'Unknown album',
+            track: 'Idioteque',
+            playCount: 1,
+            lastPlayed: satAt22,
+          },
+        ])
+      );
+      expect(result.items.find(i => i.track === 'B-Side')).toEqual({
+        artist: 'singles only',
+        album: 'Unknown album',
+        track: 'B-Side',
+        playCount: 2,
+        lastPlayed: sunAt23,
+      });
+    });
+
+    it('does not merge unresolved plays with a real album named "Unknown album"', async () => {
+      storage = new ScrobbleHistoryStorage(fileStorage);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'artist|unknown album': {
+              lastPlayed: tueAt9,
+              playCount: 1,
+              plays: [{ timestamp: tueAt9, track: 'Song' }],
+            },
+          },
+          unresolved: {
+            artist: {
+              lastPlayed: tueAt10,
+              playCount: 1,
+              plays: [{ timestamp: tueAt10, track: 'Song' }],
+            },
+          },
+        })
+      );
+
+      const result = await storage.getTracksPaginated(1, 50);
+
+      expect(result.total).toBe(2);
+    });
+
+    it('album-level lookups are identical with and without unresolved plays', async () => {
+      await writeIndex(false);
+      const albumsBefore = await storage.getAllAlbums();
+      const pageBefore = await storage.getAlbumsPaginated(1, 50);
+      const topBefore = await storage.getTopAlbumsByPlayCount();
+      const recentBefore = await storage.getRecentlyPlayedAlbums();
+      const fuzzyBefore = await storage.getAlbumHistoryFuzzy(
+        'Radiohead',
+        'Kid A (Deluxe Edition)'
+      );
+      const missingBefore = await storage.getAlbumHistory('Singles Only', '');
+
+      await writeIndex(true);
+      expect(await storage.getAllAlbums()).toEqual(albumsBefore);
+      expect(await storage.getAlbumsPaginated(1, 50)).toEqual(pageBefore);
+      expect(await storage.getTopAlbumsByPlayCount()).toEqual(topBefore);
+      expect(await storage.getRecentlyPlayedAlbums()).toEqual(recentBefore);
+      expect(
+        await storage.getAlbumHistoryFuzzy(
+          'Radiohead',
+          'Kid A (Deluxe Edition)'
+        )
+      ).toEqual(fuzzyBefore);
+      expect(await storage.getAlbumHistory('Singles Only', '')).toEqual(
+        missingBefore
+      );
+      expect(missingBefore).toBeNull();
+    });
+
+    it('getStorageStats counts unresolved in totals and newest play but not albums', async () => {
+      await writeIndex(true);
+
+      const stats = await storage.getStorageStats();
+
+      expect(stats.totalAlbums).toBe(1);
+      expect(stats.totalScrobbles).toBe(5);
+      expect(stats.newestScrobble).toEqual(new Date(sunAt23 * 1000));
     });
   });
 });

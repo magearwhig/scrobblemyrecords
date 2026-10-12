@@ -1,5 +1,80 @@
 # Unresolved Listening History - Implementation Plan
 
+> **Status: Complete (2026-10-11), branch `feat/unresolved-listening-history`.**
+>
+> **Shipped:** all five phases. Sync keeps albumless scrobbles in
+> `index.unresolved` (schema v2, migration with backup). Listening stats count
+> them and album stats don't. Backfill is at
+> `POST /suggestions/history/sync/backfill`. Resolution rules are applied as a
+> derived view in `ScrobbleHistoryStorage.getIndex()` and backed up. Routes are
+> under `/stats/unresolved-history`, and History has an **Unresolved** tab,
+> plus notes on the Stats page and the Last.fm Albums view.
+>
+> **Verified on a copy of real data:** backfill added 10,707 plays (6,947
+> without album info, 3,760 album plays missing from earlier syncs). The index
+> went from 55,164 to 65,871 plays, equal to Last.fm's total. Resolving a
+> 28-play track moved it into Top Albums with the total unchanged, and undo
+> restored it.
+>
+> **Deviations from this plan (from peer review):**
+> - Play identity is **timestamp + track**, not timestamp + artist + track.
+>   `HistoryIndexMergeService` moves plays between artist spellings, so the
+>   artist part let a backfill re-add merged plays. It is the same key the merge
+>   already uses, JSON-encoded so "|" can't collide.
+> - Backfill collects fetched plays and merges them into a **fresh read** at
+>   the end, instead of saving a working copy, so concurrent changes survive.
+>   It takes the sync lock before reading, and re-checks for cancellation after
+>   the last page. There is no resumable checkpoint; a re-run is safe and costs
+>   about 5 minutes.
+> - The warm-cache fingerprint includes a resolution-rules hash.
+> - "Resolve all" in the modal applies to the tracks currently listed.
+>
+> **Open decisions, as resolved:**
+> 1. Separate "Unknown album" rows.
+> 2. Lookups are suggestions only.
+> 3. "All tracks" creates one rule per listed track.
+> 4. Backfill runs from the banner only.
+> 5. The 5-minute incremental overlap was adopted.
+>
+> **Added after the plan (user request: "I don't want to track podcasts at
+> all"): artist exclusion.** It answers open decision 6.
+> - Excluded artists are removed from the derived index before rules apply
+>   (`excludeArtists()` with a matcher from
+>   `ScrobbleHistoryStorage.getExclusionMatcher()`). The matcher covers the
+>   exact name, resolver aliases and credits that name the artist ("x, guest",
+>   "x feat. y"), so every listening and album stat drops them.
+> - Analytics top artists and website-monitoring matches are filtered too.
+> - Plays stay in the stored history, so "Track again" is instant and the
+>   Last.fm gap stays 0.
+> - `findExclusionCandidates()` suggests podcast-like artists: many distinct
+>   tracks played about once, plus mostly no album info or episode-like titles.
+>   On real data it flags Doug Benson and The Onion and no music artists.
+> - Milestones above the new total are dropped, and the earliest play date is
+>   recomputed.
+>
+> **Added after the plan: bulk album fill per artist** (user request: Guided By
+> Voices had too many tracks to resolve one at a time). Open decision 2 still
+> holds: nothing is saved until the user reviews the filled-in list.
+> - `UnresolvedHistoryService.suggestAlbums()` fills each track with the
+>   history album it was played on most, then an owned Discogs release whose
+>   tracklist has it. Titles are compared with `trackMatchKey()`, which ignores
+>   remaster/explicit/feat. tags but keeps live, demo and part numbers apart.
+>   On real data this filled 76 of 135 GBV tracks and 59 of 68 Robert Pollard
+>   tracks.
+> - Last.fm lookups are checked against the album's Last.fm tracklist
+>   (`album.getInfo`, cached an hour; failures retried after 2 minutes), so the
+>   modal shows whether the song is on the suggested album, its track number
+>   and the cover.
+> - `POST /discogs-album-match` matches an artist's plays against a pasted
+>   Discogs master or release link (`matchAlbumTracklist()`): exact, tag-only
+>   and near matches, with live/studio mismatches flagged. Discogs errors other
+>   than not-found return 502 with the reason. On real data, John Vanderslice
+>   "Live at The Casbah" matched 10 of 27 tracks.
+>
+> **Known limits:** the incremental sync's 50-page cap can still skip history
+> after a very long gap; backfill repairs it. The saved default-tab preference
+> can't select Unresolved yet.
+
 > Renamed from `missing-albums-page-plan.md` ("Missing Albums Page") on 2026-10-11. The new name keeps this feature apart from the Marketplace **Missing Albums** tab, which lists albums you have listened to but don't own (see [Naming](#naming)).
 
 ## Summary
@@ -321,4 +396,4 @@ Jest mocks CSS, so check the UI manually or with a Playwright smoke test (`tests
 
 ## Status
 
-**Backlog**: plan revised 2026-10-11 against current code; not started.
+**Complete** (2026-10-11). See the status block at the top.

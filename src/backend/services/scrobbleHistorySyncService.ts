@@ -9,6 +9,13 @@ import {
   AlbumHistoryEntry,
 } from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
+import {
+  buildIdentitySets,
+  countListeningPlays,
+  normalizeHistoryName,
+  playIdentity,
+  refreshEntryStats,
+} from '../utils/historyPlays';
 import { createLogger } from '../utils/logger';
 
 import { AuthService } from './authService';
@@ -35,6 +42,42 @@ interface LastFmTrack {
 const HISTORY_INDEX_FILE = 'history/scrobble-history-index.json';
 const SYNC_SETTINGS_FILE = 'history/sync-settings.json';
 const SCROBBLES_PER_PAGE = 200; // Last.fm max per page
+/**
+ * Incremental sync re-reads this many seconds before the watermark, so plays
+ * sharing the watermark timestamp aren't missed; identity dedup absorbs the
+ * overlap.
+ */
+const INCREMENTAL_OVERLAP_SECONDS = 300;
+
+/** Where processScrobbles looks up identities it has already indexed */
+interface IdentitySets {
+  withAlbum: Set<string>;
+  unresolved: Set<string>;
+}
+
+/** Result of a history backfill */
+export interface BackfillResult {
+  /** Listening events added */
+  added: number;
+  /** Of those, how many have no album */
+  addedUnresolved: number;
+  /** Events fetched that the index already had */
+  alreadyIndexed: number;
+  pages: number;
+  /** True when cancelled before finishing (nothing was saved) */
+  cancelled?: boolean;
+}
+
+/** Result of processing one batch of scrobbles */
+interface ProcessResult {
+  /** New listening events added (album or unresolved) */
+  processed: number;
+  /** Of those, how many have no album */
+  unresolved: number;
+  /** Events already in the index, skipped */
+  duplicatesSkipped: number;
+  newestTimestamp: number;
+}
 
 export class ScrobbleHistorySyncService extends EventEmitter {
   private axios: AxiosInstance;
@@ -123,9 +166,12 @@ export class ScrobbleHistorySyncService extends EventEmitter {
   }
 
   /**
-   * Save index and invalidate storage cache so stats are fresh
+   * Save index and invalidate storage cache so stats are fresh.
+   * totalScrobbles is recomputed from the stored plays so it can't drift.
    */
   private async saveIndex(index: ScrobbleHistoryIndex): Promise<void> {
+    index.unresolved ??= {};
+    index.totalScrobbles = countListeningPlays(index);
     await this.fileStorage.writeJSON(HISTORY_INDEX_FILE, index);
     // Invalidate the storage cache so getStorageStats returns fresh data
     if (this.historyStorage) {
@@ -186,7 +232,10 @@ export class ScrobbleHistorySyncService extends EventEmitter {
   /**
    * Fetch a single page of scrobbles from Last.fm
    */
-  private async fetchScrobblePage(page: number): Promise<{
+  private async fetchScrobblePage(
+    page: number,
+    window: { from?: number; to?: number } = {}
+  ): Promise<{
     tracks: LastFmTrack[];
     totalPages: number;
     totalScrobbles: number;
@@ -205,6 +254,9 @@ export class ScrobbleHistorySyncService extends EventEmitter {
         page,
         format: 'json',
         extended: 0,
+        // Optional Unix-seconds window (user.getRecentTracks from/to)
+        ...(window.from !== undefined ? { from: window.from } : {}),
+        ...(window.to !== undefined ? { to: window.to } : {}),
       },
     });
 
@@ -225,15 +277,27 @@ export class ScrobbleHistorySyncService extends EventEmitter {
   }
 
   /**
-   * Process a batch of scrobbles and update the index
-   * Returns { processed: number, newestTimestamp: number }
+   * Add a batch of scrobbles to the index.
+   *
+   * A valid event has an artist, a track and a timestamp; the album is
+   * optional. Events without an album go to `index.unresolved`. Each event's
+   * identity (timestamp + artist + track) is added once across both stores:
+   * events already indexed are skipped (so re-reading a window, e.g. after a
+   * backdated scrobble lowers the watermark, adds nothing), and an event that
+   * now has an album replaces its unresolved copy.
    */
   private processScrobbles(
     tracks: LastFmTrack[],
-    index: ScrobbleHistoryIndex
-  ): { processed: number; newestTimestamp: number } {
-    let processed = 0;
-    let newestTimestamp = 0;
+    index: ScrobbleHistoryIndex,
+    identities: IdentitySets
+  ): ProcessResult {
+    const result: ProcessResult = {
+      processed: 0,
+      unresolved: 0,
+      duplicatesSkipped: 0,
+      newestTimestamp: 0,
+    };
+    index.unresolved ??= {};
 
     for (const track of tracks) {
       // Skip currently playing tracks (they don't have a date)
@@ -243,39 +307,69 @@ export class ScrobbleHistorySyncService extends EventEmitter {
 
       const artist =
         typeof track.artist === 'object' ? track.artist['#text'] : track.artist;
-      const album =
+      const album = (
         typeof track.album === 'object'
           ? track.album['#text']
-          : track.album || '';
+          : track.album || ''
+      ).trim();
       const trackName = track.name;
       const timestamp = parseInt(track.date?.uts || '0', 10);
 
-      if (!artist || !album || !timestamp) {
+      if (!artist?.trim() || !trackName?.trim() || !timestamp) {
         continue;
       }
 
       // Track newest timestamp seen for accurate lastSyncTimestamp
-      if (timestamp > newestTimestamp) {
-        newestTimestamp = timestamp;
+      if (timestamp > result.newestTimestamp) {
+        result.newestTimestamp = timestamp;
       }
 
-      const key = this.normalizeKey(artist, album);
+      const id = playIdentity(timestamp, trackName);
+      if (identities.withAlbum.has(id)) {
+        result.duplicatesSkipped++;
+        continue;
+      }
 
-      if (!index.albums[key]) {
-        index.albums[key] = {
+      if (!album) {
+        if (identities.unresolved.has(id)) {
+          result.duplicatesSkipped++;
+          continue;
+        }
+        const artistKey = normalizeHistoryName(artist);
+        const entry = (index.unresolved[artistKey] ??= {
           lastPlayed: timestamp,
           playCount: 0,
           plays: [],
-        };
-      }
+        });
+        entry.plays.push({ timestamp, track: trackName });
+        entry.playCount++;
+        if (timestamp > entry.lastPlayed) entry.lastPlayed = timestamp;
+        identities.unresolved.add(id);
+        result.unresolved++;
+      } else {
+        // An album copy wins over an unresolved copy of the same event
+        const replacesUnresolved = identities.unresolved.has(id);
+        if (replacesUnresolved) {
+          this.removeUnresolvedPlay(index, artist, timestamp, trackName);
+          identities.unresolved.delete(id);
+        }
 
-      const entry = index.albums[key];
-      entry.playCount++;
-      entry.plays.push({ timestamp, track: trackName });
+        const key = this.normalizeKey(artist, album);
+        const entry = (index.albums[key] ??= {
+          lastPlayed: timestamp,
+          playCount: 0,
+          plays: [],
+        });
+        entry.playCount++;
+        entry.plays.push({ timestamp, track: trackName });
+        if (timestamp > entry.lastPlayed) entry.lastPlayed = timestamp;
+        identities.withAlbum.add(id);
 
-      // Update lastPlayed if this is more recent
-      if (timestamp > entry.lastPlayed) {
-        entry.lastPlayed = timestamp;
+        // Moving an event between stores doesn't add a listening event
+        if (replacesUnresolved) {
+          result.duplicatesSkipped++;
+          continue;
+        }
       }
 
       // Track oldest scrobble
@@ -286,10 +380,51 @@ export class ScrobbleHistorySyncService extends EventEmitter {
         index.oldestScrobbleDate = timestamp;
       }
 
-      processed++;
+      result.processed++;
     }
 
-    return { processed, newestTimestamp };
+    return result;
+  }
+
+  /** Remove one unresolved play (by identity), e.g. when it gains an album. */
+  private removeUnresolvedPlay(
+    index: ScrobbleHistoryIndex,
+    artist: string,
+    timestamp: number,
+    trackName: string
+  ): void {
+    const unresolved = index.unresolved ?? {};
+    const id = playIdentity(timestamp, trackName);
+    // Usually under this artist, but a merge may have moved it to another
+    // spelling of the artist, so fall back to every artist
+    const artistKey = normalizeHistoryName(artist);
+    const candidates = [
+      artistKey,
+      ...Object.keys(unresolved).filter(key => key !== artistKey),
+    ];
+    for (const key of candidates) {
+      const entry = unresolved[key];
+      if (!entry) continue;
+      const before = entry.plays.length;
+      entry.plays = entry.plays.filter(
+        play => playIdentity(play.timestamp, play.track) !== id
+      );
+      if (entry.plays.length === before) continue;
+      if (entry.plays.length === 0) {
+        delete unresolved[key];
+      } else {
+        refreshEntryStats(entry);
+      }
+      return;
+    }
+  }
+
+  /** Record the scrobble total Last.fm reported for this account. */
+  private recordLastfmTotal(index: ScrobbleHistoryIndex, total: number): void {
+    if (total > 0) {
+      index.lastfmTotal = total;
+      index.lastfmTotalCheckedAt = Date.now();
+    }
   }
 
   /**
@@ -321,6 +456,12 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       totalScrobbles: 0,
       oldestScrobbleDate: 0,
       albums: {},
+      unresolved: {},
+      schemaVersion: 2,
+    };
+    const identities: IdentitySets = {
+      withAlbum: new Set(),
+      unresolved: new Set(),
     };
 
     try {
@@ -328,6 +469,7 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       const firstPage = await this.fetchScrobblePage(1);
       const totalPages = firstPage.totalPages;
       const totalScrobbles = firstPage.totalScrobbles;
+      this.recordLastfmTotal(index, totalScrobbles);
 
       this.syncStatus = {
         status: 'syncing',
@@ -343,8 +485,13 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       let newestScrobbleTimestamp = 0;
 
       // Process first page
-      const firstResult = this.processScrobbles(firstPage.tracks, index);
+      const firstResult = this.processScrobbles(
+        firstPage.tracks,
+        index,
+        identities
+      );
       let processedCount = firstResult.processed;
+      let unresolvedCount = firstResult.unresolved;
       if (firstResult.newestTimestamp > newestScrobbleTimestamp) {
         newestScrobbleTimestamp = firstResult.newestTimestamp;
       }
@@ -380,8 +527,13 @@ export class ScrobbleHistorySyncService extends EventEmitter {
 
         try {
           const pageData = await this.fetchScrobblePage(page);
-          const pageResult = this.processScrobbles(pageData.tracks, index);
+          const pageResult = this.processScrobbles(
+            pageData.tracks,
+            index,
+            identities
+          );
           processedCount += pageResult.processed;
+          unresolvedCount += pageResult.unresolved;
           if (pageResult.newestTimestamp > newestScrobbleTimestamp) {
             newestScrobbleTimestamp = pageResult.newestTimestamp;
           }
@@ -409,6 +561,7 @@ export class ScrobbleHistorySyncService extends EventEmitter {
 
       // Final save - use the newest scrobble timestamp (in ms) for accurate sync tracking
       index.lastSyncTimestamp = newestScrobbleTimestamp * 1000;
+      index.lastSyncCompletedAt = Date.now();
       await this.saveIndex(index);
 
       this.syncStatus.status = 'completed';
@@ -417,7 +570,7 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       this.emit('statusChange', this.syncStatus);
 
       this.logger.info(
-        `Full sync completed: ${processedCount} scrobbles indexed, ${Object.keys(index.albums).length} albums`
+        `Full sync completed: ${processedCount} scrobbles indexed (${unresolvedCount} without album info), ${Object.keys(index.albums).length} albums`
       );
 
       // Warm stats cache asynchronously — does not block sync completion
@@ -468,8 +621,15 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       let page = 1;
       let hasMore = true;
       let newScrobbles = 0;
+      let newUnresolved = 0;
+      let duplicatesSkipped = 0;
       let newestScrobbleTimestamp = existingIndex.lastSyncTimestamp / 1000; // Start with existing (Unix timestamp)
-      const lastSyncTime = existingIndex.lastSyncTimestamp / 1000; // Convert to Unix timestamp
+      // Re-read a little before the watermark; identity dedup skips plays
+      // already indexed (including after a backdated scrobble lowered it)
+      const lastSyncTime =
+        existingIndex.lastSyncTimestamp / 1000 - INCREMENTAL_OVERLAP_SECONDS;
+      existingIndex.unresolved ??= {};
+      const identities = buildIdentitySets(existingIndex);
 
       this.syncStatus = {
         status: 'syncing',
@@ -487,6 +647,9 @@ export class ScrobbleHistorySyncService extends EventEmitter {
         );
 
         const pageData = await this.fetchScrobblePage(page);
+        if (page === 1) {
+          this.recordLastfmTotal(existingIndex, pageData.totalScrobbles);
+        }
 
         // Check if we've reached scrobbles older than our last sync
         const oldestInPage = pageData.tracks.reduce(
@@ -503,15 +666,27 @@ export class ScrobbleHistorySyncService extends EventEmitter {
             const ts = parseInt(track.date?.uts || '0', 10);
             return ts > lastSyncTime;
           });
-          const result = this.processScrobbles(newTracks, existingIndex);
+          const result = this.processScrobbles(
+            newTracks,
+            existingIndex,
+            identities
+          );
           newScrobbles += result.processed;
+          newUnresolved += result.unresolved;
+          duplicatesSkipped += result.duplicatesSkipped;
           if (result.newestTimestamp > newestScrobbleTimestamp) {
             newestScrobbleTimestamp = result.newestTimestamp;
           }
           hasMore = false;
         } else {
-          const result = this.processScrobbles(pageData.tracks, existingIndex);
+          const result = this.processScrobbles(
+            pageData.tracks,
+            existingIndex,
+            identities
+          );
           newScrobbles += result.processed;
+          newUnresolved += result.unresolved;
+          duplicatesSkipped += result.duplicatesSkipped;
           if (result.newestTimestamp > newestScrobbleTimestamp) {
             newestScrobbleTimestamp = result.newestTimestamp;
           }
@@ -530,8 +705,13 @@ export class ScrobbleHistorySyncService extends EventEmitter {
 
       // Use the newest scrobble timestamp (in ms) for accurate sync tracking
       // This ensures we don't skip scrobbles made after sync started but with timestamps before Date.now()
-      existingIndex.lastSyncTimestamp = newestScrobbleTimestamp * 1000;
-      existingIndex.totalScrobbles += newScrobbles;
+      // Never move the watermark backwards (the overlap window can see only
+      // plays older than it)
+      existingIndex.lastSyncTimestamp = Math.max(
+        existingIndex.lastSyncTimestamp,
+        newestScrobbleTimestamp * 1000
+      );
+      existingIndex.lastSyncCompletedAt = Date.now();
       await this.saveIndex(existingIndex);
 
       this.syncStatus.status = 'completed';
@@ -539,7 +719,7 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       this.emit('statusChange', this.syncStatus);
 
       this.logger.info(
-        `Incremental sync completed: ${newScrobbles} new scrobbles`
+        `Incremental sync completed: ${newScrobbles} new scrobbles (${newUnresolved} without album info, ${duplicatesSkipped} already indexed)`
       );
 
       // Warm stats cache asynchronously — does not block sync completion
@@ -554,6 +734,166 @@ export class ScrobbleHistorySyncService extends EventEmitter {
     } finally {
       this.isSyncing = false;
     }
+  }
+
+  /**
+   * Re-fetch history from Last.fm and add any plays the index is missing,
+   * e.g. albumless scrobbles that syncs before schema v2 dropped, or holes
+   * left by an interrupted full sync. Optionally limited to a Unix-seconds
+   * window.
+   *
+   * Only adds: plays already indexed (by identity) are skipped, so it is
+   * safe to re-run. Works on a copy of the index and saves once at the end,
+   * after backing the file up; a cancel (pause or clear) or a failed page
+   * leaves the index on disk unchanged. A page that fails is retried, then
+   * the backfill stops with an error rather than skipping it.
+   */
+  async startBackfill(
+    window: { from?: number; to?: number } = {}
+  ): Promise<BackfillResult> {
+    // Claim the lock before any await, so two backfills can't both start
+    if (this.isSyncing) {
+      throw new Error('A sync is already in progress');
+    }
+    this.isSyncing = true;
+    this.isPaused = false;
+    this.syncAbortController = new AbortController();
+    const abort = this.syncAbortController;
+    const fullRange = window.from === undefined && window.to === undefined;
+    const cancelled = (): boolean => this.isPaused || abort.signal.aborted;
+    const result: BackfillResult = {
+      added: 0,
+      addedUnresolved: 0,
+      alreadyIndexed: 0,
+      pages: 0,
+    };
+
+    try {
+      if (!(await this.getHistoryIndex())) {
+        throw new Error('No history index yet; run a sync first');
+      }
+      this.logger.info(
+        `Starting history backfill${fullRange ? ' (full range)' : ` (from=${window.from ?? '-'} to=${window.to ?? '-'})`}`
+      );
+
+      // Fetch everything first; nothing is written until the end
+      const fetched: LastFmTrack[] = [];
+      const firstPage = await this.fetchPageWithRetry(1, window);
+      const totalPages = Math.max(1, firstPage.totalPages);
+      this.syncStatus = {
+        status: 'syncing',
+        progress: 0,
+        currentPage: 1,
+        totalPages,
+        scrobblesFetched: 0,
+        totalScrobbles: firstPage.totalScrobbles,
+      };
+      this.emit('statusChange', this.syncStatus);
+
+      let pageData = firstPage;
+      for (let page = 1; page <= totalPages; page++) {
+        if (page > 1) {
+          if (cancelled()) return this.cancelBackfill(result);
+          await new Promise(resolve =>
+            setTimeout(resolve, this.getRequestDelay())
+          );
+          pageData = await this.fetchPageWithRetry(page, window);
+        }
+        fetched.push(...pageData.tracks);
+        result.pages = page;
+        this.syncStatus.currentPage = page;
+        this.syncStatus.scrobblesFetched = fetched.length;
+        this.syncStatus.progress = Math.round((page / totalPages) * 100);
+        this.emit('statusChange', this.syncStatus);
+      }
+      // A pause or clear during the last fetch still cancels
+      if (cancelled()) return this.cancelBackfill(result);
+
+      // Merge into a fresh read, so changes made meanwhile (a lowered
+      // watermark after a backdated scrobble, an index merge) are kept
+      const index = await this.getHistoryIndex();
+      if (!index) return this.cancelBackfill(result);
+      index.unresolved ??= {};
+      const merged = this.processScrobbles(
+        fetched,
+        index,
+        buildIdentitySets(index)
+      );
+      result.added = merged.processed;
+      result.addedUnresolved = merged.unresolved;
+      result.alreadyIndexed = merged.duplicatesSkipped;
+      if (fullRange) {
+        this.recordLastfmTotal(index, firstPage.totalScrobbles);
+        index.lastFullBackfillAt = Date.now();
+      }
+
+      // Back up the current file, then save once
+      await this.fileStorage.createBackup(HISTORY_INDEX_FILE);
+      await this.saveIndex(index);
+
+      this.syncStatus.status = 'completed';
+      this.syncStatus.progress = 100;
+      this.syncStatus.scrobblesFetched = result.added;
+      this.emit('statusChange', this.syncStatus);
+      this.logger.info(
+        `History backfill completed: ${result.added} plays added (${result.addedUnresolved} without album info), ${result.alreadyIndexed} already indexed, ${result.pages} pages`
+      );
+
+      if (result.added > 0 && this.statsWarmer) {
+        await this.statsWarmer.invalidateStatsCache();
+        this.triggerCacheWarm();
+      }
+      return result;
+    } catch (error) {
+      this.logger.error('History backfill failed; index unchanged', error);
+      this.syncStatus.status = 'error';
+      this.syncStatus.error =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.emit('statusChange', this.syncStatus);
+      throw error;
+    } finally {
+      // clearIndex() may have released the lock and started over
+      if (this.syncAbortController === abort) {
+        this.isSyncing = false;
+        this.isPaused = false;
+        this.syncAbortController = null;
+      }
+    }
+  }
+
+  private cancelBackfill(result: BackfillResult): BackfillResult {
+    this.logger.info('History backfill cancelled; index unchanged');
+    this.syncStatus.status = 'idle';
+    this.emit('statusChange', this.syncStatus);
+    return { ...result, cancelled: true };
+  }
+
+  /** Fetch a page, retrying failures with a growing delay. */
+  private async fetchPageWithRetry(
+    page: number,
+    window: { from?: number; to?: number },
+    attempts = 3
+  ): ReturnType<ScrobbleHistorySyncService['fetchScrobblePage']> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        return await this.fetchScrobblePage(page, window);
+      } catch (error) {
+        lastError = error;
+        this.logger.warn(
+          `Backfill page ${page} failed (attempt ${attempt}/${attempts})`,
+          error
+        );
+        if (attempt < attempts) {
+          await new Promise(resolve =>
+            setTimeout(resolve, this.getRequestDelay() * attempt * 2)
+          );
+        }
+      }
+    }
+    throw new Error(
+      `Backfill stopped: page ${page} could not be fetched (${lastError instanceof Error ? lastError.message : String(lastError)})`
+    );
   }
 
   /**

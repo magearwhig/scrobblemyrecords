@@ -446,4 +446,100 @@ describe('RankingsService', () => {
       expect(result.snapshots[2].rankings[0].count).toBe(3);
     });
   });
+
+  describe('unresolved (albumless) plays', () => {
+    const albums = {
+      'artist 1|album 1': {
+        playCount: 2,
+        lastPlayed: 1705406400,
+        plays: [
+          { timestamp: 1705320000, track: 'Track 1' },
+          { timestamp: 1705406400, track: 'Track 1' },
+        ],
+      },
+      'artist 2|album 2': {
+        playCount: 2,
+        lastPlayed: 1705406400,
+        plays: [
+          { timestamp: 1705320000, track: 'Track 2' },
+          { timestamp: 1705406400, track: 'Track 2' },
+        ],
+      },
+    };
+    const unresolved = {
+      'artist 1': {
+        playCount: 1,
+        lastPlayed: 1705500000,
+        plays: [{ timestamp: 1705500000, track: 'Track 1' }],
+      },
+      'artist 3': {
+        playCount: 3,
+        lastPlayed: 1705500000,
+        plays: [
+          { timestamp: 1705400000, track: 'Single' },
+          { timestamp: 1705450000, track: 'Single' },
+          { timestamp: 1705500000, track: 'Single' },
+        ],
+      },
+      // A month with only unresolved plays must not add an album snapshot
+      'artist 4': {
+        playCount: 1,
+        lastPlayed: 1709290800,
+        plays: [{ timestamp: 1709290800, track: 'March Single' }], // 2024-03-01
+      },
+    };
+
+    it('includes unresolved plays in artist rankings', async () => {
+      mockHistoryStorage.getIndex = jest
+        .fn()
+        .mockResolvedValue({ albums, unresolved });
+
+      const result = await service.getRankingsOverTime('artists', 10);
+
+      const rankings = result.snapshots[0].rankings;
+      expect(rankings.map(r => [r.name, r.count])).toEqual([
+        ['artist 1', 3],
+        ['artist 3', 3],
+        ['artist 2', 2],
+      ]);
+      // The unresolved-only month still produces an artist snapshot
+      expect(result.snapshots.map(s => s.period)).toContain('2024-03');
+    });
+
+    it('merges unresolved plays into the same artist|track ranking', async () => {
+      mockHistoryStorage.getIndex = jest
+        .fn()
+        .mockResolvedValue({ albums, unresolved });
+
+      const result = await service.getRankingsOverTime('tracks', 10);
+
+      const rankings = result.snapshots[0].rankings;
+      expect(rankings).toHaveLength(3); // January only
+      expect(rankings.find(r => r.name === 'Track 1')).toMatchObject({
+        artist: 'artist 1',
+        count: 3,
+      });
+      expect(rankings.find(r => r.name === 'Single')).toMatchObject({
+        artist: 'artist 3',
+        count: 3,
+      });
+    });
+
+    it('album rankings are identical with and without unresolved plays', async () => {
+      mockHistoryStorage.getIndex = jest.fn().mockResolvedValue({ albums });
+      const without = await service.getRankingsOverTime('albums', 10);
+
+      mockHistoryStorage.getIndex = jest
+        .fn()
+        .mockResolvedValue({ albums, unresolved });
+      const withUnresolved = await service.getRankingsOverTime('albums', 10);
+
+      expect(withUnresolved).toEqual(without);
+      for (const snapshot of withUnresolved.snapshots) {
+        expect(snapshot.rankings.map(r => r.name)).not.toContain(
+          'Unknown album'
+        );
+      }
+    });
+  });
 });

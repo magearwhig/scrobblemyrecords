@@ -676,6 +676,365 @@ describe('ScrobbleHistorySyncService', () => {
     // The core functionality is tested via startFullSync tests.
   });
 
+  describe('unresolved (albumless) plays and play identity', () => {
+    const page = (
+      tracks: Array<{
+        artist: string;
+        album: string;
+        name: string;
+        uts: number;
+      }>,
+      total = tracks.length
+    ) => ({
+      data: {
+        recenttracks: {
+          '@attr': { totalPages: '1', total: String(total) },
+          track: tracks.map(t => ({
+            artist: { '#text': t.artist },
+            album: { '#text': t.album },
+            name: t.name,
+            date: { uts: String(t.uts) },
+          })),
+        },
+      },
+    });
+
+    const writeIndex = (index: ScrobbleHistoryIndex) =>
+      fileStorage.writeJSON('history/scrobble-history-index.json', index);
+
+    it('keeps albumless scrobbles as unresolved plays and records the Last.fm total', async () => {
+      mockAxiosInstance.get.mockResolvedValueOnce(
+        page(
+          [
+            { artist: 'A', album: 'Album', name: 'One', uts: 1000 },
+            { artist: 'A', album: '', name: 'Single', uts: 1100 },
+            { artist: 'B', album: '', name: 'Radio', uts: 1200 },
+            // Same second as "One", different track: both kept
+            { artist: 'A', album: 'Album', name: 'Two', uts: 1000 },
+            // Exact repeat of an event: kept once
+            { artist: 'A', album: '', name: 'Single', uts: 1100 },
+          ],
+          6000
+        )
+      );
+
+      await service.startFullSync();
+
+      const index = (await service.getHistoryIndex())!;
+      expect(index.albums['a|album'].plays).toHaveLength(2);
+      expect(index.unresolved).toEqual({
+        a: {
+          lastPlayed: 1100,
+          playCount: 1,
+          plays: [{ timestamp: 1100, track: 'Single' }],
+        },
+        b: {
+          lastPlayed: 1200,
+          playCount: 1,
+          plays: [{ timestamp: 1200, track: 'Radio' }],
+        },
+      });
+      expect(index.totalScrobbles).toBe(4);
+      expect(index.lastfmTotal).toBe(6000);
+      expect(index.lastSyncCompletedAt).toEqual(expect.any(Number));
+      expect(index.schemaVersion).toBe(2);
+    });
+
+    it('adds nothing when a backdated scrobble makes incremental sync re-read plays it has', async () => {
+      await service.saveSyncSettings({ syncPace: 'fast' });
+      await writeIndex({
+        lastSyncTimestamp: 5000 * 1000,
+        totalScrobbles: 2,
+        oldestScrobbleDate: 4000,
+        albums: {
+          'a|album': {
+            lastPlayed: 4000,
+            playCount: 1,
+            plays: [{ timestamp: 4000, track: 'One' }],
+          },
+        },
+        unresolved: {
+          a: {
+            lastPlayed: 5000,
+            playCount: 1,
+            plays: [{ timestamp: 5000, track: 'Single' }],
+          },
+        },
+        schemaVersion: 2,
+      });
+      // A memory scrobble at 4500 lowers the watermark below both plays
+      await service.adjustSyncTimestampForBackdatedScrobbles(3900);
+      const window = page([
+        { artist: 'A', album: '', name: 'New', uts: 6000 },
+        { artist: 'A', album: '', name: 'Single', uts: 5000 },
+        { artist: 'A', album: 'Album', name: 'Memory', uts: 4500 },
+        { artist: 'A', album: 'Album', name: 'One', uts: 4000 },
+        { artist: 'Z', album: 'Old', name: 'Before window', uts: 3000 },
+      ]);
+      mockAxiosInstance.get.mockResolvedValue(window);
+
+      await service.startIncrementalSync();
+      const afterFirst = (await service.getHistoryIndex())!;
+      await service.startIncrementalSync();
+      const afterSecond = (await service.getHistoryIndex())!;
+
+      // "New" and "Memory" are added once; nothing is duplicated
+      expect(afterFirst.totalScrobbles).toBe(4);
+      expect(afterFirst.albums['a|album'].plays).toHaveLength(2);
+      expect(afterFirst.unresolved!.a.plays).toHaveLength(2);
+      expect(afterSecond.albums).toEqual(afterFirst.albums);
+      expect(afterSecond.unresolved).toEqual(afterFirst.unresolved);
+      expect(afterSecond.totalScrobbles).toBe(4);
+      expect(afterSecond.lastSyncTimestamp).toBe(6000 * 1000);
+    });
+
+    it('moves an unresolved play to its album when Last.fm later has the album', async () => {
+      await service.saveSyncSettings({ syncPace: 'fast' });
+      await writeIndex({
+        lastSyncTimestamp: 5000 * 1000,
+        totalScrobbles: 1,
+        oldestScrobbleDate: 5000,
+        albums: {},
+        unresolved: {
+          a: {
+            lastPlayed: 5000,
+            playCount: 1,
+            plays: [{ timestamp: 5000, track: 'Single' }],
+          },
+        },
+        schemaVersion: 2,
+      });
+      mockAxiosInstance.get.mockResolvedValue(
+        page([
+          { artist: 'A', album: 'Singles', name: 'Single', uts: 5000 },
+          // Older than the sync window, so the sync stops after this page
+          { artist: 'Z', album: 'Old', name: 'Before window', uts: 3000 },
+        ])
+      );
+
+      await service.startIncrementalSync();
+
+      const index = (await service.getHistoryIndex())!;
+      expect(index.unresolved).toEqual({});
+      expect(index.albums['a|singles'].plays).toEqual([
+        { timestamp: 5000, track: 'Single' },
+      ]);
+      expect(index.totalScrobbles).toBe(1);
+    });
+  });
+
+  describe('startBackfill', () => {
+    const track = (
+      artist: string,
+      album: string,
+      name: string,
+      uts: number
+    ) => ({
+      artist: { '#text': artist },
+      album: { '#text': album },
+      name,
+      date: { uts: String(uts) },
+    });
+    const pageOf = (
+      tracks: ReturnType<typeof track>[],
+      totalPages = 1,
+      total = tracks.length
+    ) => ({
+      data: {
+        recenttracks: {
+          '@attr': { totalPages: String(totalPages), total: String(total) },
+          track: tracks,
+        },
+      },
+    });
+    const indexFile = 'history/scrobble-history-index.json';
+    const seed: ScrobbleHistoryIndex = {
+      lastSyncTimestamp: 9000 * 1000,
+      totalScrobbles: 1,
+      oldestScrobbleDate: 1000,
+      albums: {
+        'a|album': {
+          lastPlayed: 1000,
+          playCount: 1,
+          plays: [{ timestamp: 1000, track: 'One' }],
+        },
+      },
+      unresolved: {},
+      schemaVersion: 2,
+    };
+
+    beforeEach(async () => {
+      await service.saveSyncSettings({ syncPace: 'fast' });
+      await fileStorage.writeJSON(indexFile, seed);
+    });
+
+    it('adds only the plays the index is missing, and a re-run adds none', async () => {
+      const history = pageOf(
+        [
+          track('A', '', 'Single', 3000),
+          track('A', 'Album', 'Two', 2000),
+          track('A', 'Album', 'One', 1000), // already indexed
+        ],
+        1,
+        3
+      );
+      mockAxiosInstance.get.mockResolvedValue(history);
+
+      const first = await service.startBackfill();
+      const afterFirst = (await service.getHistoryIndex())!;
+      const second = await service.startBackfill();
+      const afterSecond = (await service.getHistoryIndex())!;
+
+      expect(first).toEqual({
+        added: 2,
+        addedUnresolved: 1,
+        alreadyIndexed: 1,
+        pages: 1,
+      });
+      expect(afterFirst.totalScrobbles).toBe(3);
+      expect(afterFirst.unresolved!.a.plays).toEqual([
+        { timestamp: 3000, track: 'Single' },
+      ]);
+      expect(afterFirst.lastFullBackfillAt).toEqual(expect.any(Number));
+      expect(afterFirst.lastfmTotal).toBe(3);
+      expect(second.added).toBe(0);
+      expect(afterSecond.albums).toEqual(afterFirst.albums);
+      expect(afterSecond.unresolved).toEqual(afterFirst.unresolved);
+      // The watermark is left alone
+      expect(afterSecond.lastSyncTimestamp).toBe(seed.lastSyncTimestamp);
+    });
+
+    it('passes a window to Last.fm and does not mark a full backfill', async () => {
+      mockAxiosInstance.get.mockResolvedValue(
+        pageOf([track('A', '', 'Single', 3000)])
+      );
+
+      await service.startBackfill({ from: 2500, to: 3500 });
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+        '',
+        expect.objectContaining({
+          params: expect.objectContaining({ from: 2500, to: 3500 }),
+        })
+      );
+      const index = (await service.getHistoryIndex())!;
+      expect(index.lastFullBackfillAt).toBeUndefined();
+      expect(index.unresolved!.a.plays).toHaveLength(1);
+    });
+
+    it('leaves the index unchanged when a page keeps failing', async () => {
+      const before = JSON.stringify(await fileStorage.readJSON(indexFile));
+      mockAxiosInstance.get
+        .mockResolvedValueOnce(pageOf([track('A', '', 'Single', 3000)], 2, 2))
+        .mockRejectedValue(new Error('Last.fm 500'));
+
+      await expect(service.startBackfill()).rejects.toThrow(
+        'Backfill stopped: page 2 could not be fetched'
+      );
+
+      expect(JSON.stringify(await fileStorage.readJSON(indexFile))).toBe(
+        before
+      );
+      // 1 + 3 attempts at page 2
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(4);
+    }, 15000);
+
+    it('discards its work when paused before finishing', async () => {
+      const before = JSON.stringify(await fileStorage.readJSON(indexFile));
+      mockAxiosInstance.get.mockImplementationOnce(async () => {
+        service.pauseSync();
+        return pageOf([track('A', '', 'Single', 3000)], 2, 2);
+      });
+
+      const result = await service.startBackfill();
+
+      expect(result.cancelled).toBe(true);
+      expect(JSON.stringify(await fileStorage.readJSON(indexFile))).toBe(
+        before
+      );
+    });
+
+    it('does not re-add plays an index merge moved to another artist spelling', async () => {
+      // "afghan whigs|1965" was merged into "the afghan whigs|1965"
+      await fileStorage.writeJSON(indexFile, {
+        ...seed,
+        albums: {
+          'the afghan whigs|1965': {
+            lastPlayed: 1000,
+            playCount: 1,
+            plays: [{ timestamp: 1000, track: 'Somethin Hot' }],
+          },
+        },
+      });
+      mockAxiosInstance.get.mockResolvedValue(
+        pageOf([track('Afghan Whigs', '1965', 'Somethin Hot', 1000)])
+      );
+
+      const result = await service.startBackfill();
+
+      expect(result.added).toBe(0);
+      expect(result.alreadyIndexed).toBe(1);
+    });
+
+    it('keeps changes made to the index while it runs', async () => {
+      mockAxiosInstance.get.mockImplementationOnce(async () => {
+        // A backdated scrobble lowers the watermark mid-backfill
+        await service.adjustSyncTimestampForBackdatedScrobbles(500);
+        return pageOf([track('A', '', 'Single', 3000)]);
+      });
+
+      await service.startBackfill();
+
+      const index = (await service.getHistoryIndex())!;
+      expect(index.lastSyncTimestamp).toBe((500 - 60) * 1000);
+      expect(index.unresolved!.a.plays).toHaveLength(1);
+    });
+
+    it('cancels when paused during the last page fetch', async () => {
+      const before = JSON.stringify(await fileStorage.readJSON(indexFile));
+      mockAxiosInstance.get.mockImplementationOnce(async () => {
+        service.pauseSync();
+        return pageOf([track('A', '', 'Single', 3000)]);
+      });
+
+      const result = await service.startBackfill();
+
+      expect(result.cancelled).toBe(true);
+      expect(JSON.stringify(await fileStorage.readJSON(indexFile))).toBe(
+        before
+      );
+    });
+
+    it('rejects a second backfill while one runs', async () => {
+      let release!: () => void;
+      mockAxiosInstance.get.mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            release = () => resolve(pageOf([track('A', '', 'Single', 3000)]));
+          })
+      );
+
+      const first = service.startBackfill();
+      await expect(service.startBackfill()).rejects.toThrow(
+        'A sync is already in progress'
+      );
+      // Wait for the page fetch to start: the index read before it is real
+      // disk I/O, which can take several ticks (e.g. under coverage on CI)
+      for (let i = 0; !release && i < 200; i++) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      release();
+      await expect(first).resolves.toMatchObject({ added: 1 });
+    });
+
+    it('refuses to start while another sync runs, or with no index', async () => {
+      await fileStorage.delete(indexFile);
+      await expect(service.startBackfill()).rejects.toThrow(
+        'No history index yet'
+      );
+    });
+  });
+
   describe('resumeSync', () => {
     it('should do nothing when not paused', async () => {
       // Arrange
@@ -800,9 +1159,17 @@ describe('ScrobbleHistorySyncService', () => {
       // Act
       await service.startFullSync();
 
-      // Assert
+      // Assert - kept as an unresolved (albumless) play, not an album play
       const index = await service.getHistoryIndex();
-      expect(index!.totalScrobbles).toBe(0); // Should skip empty album
+      expect(index!.totalScrobbles).toBe(1);
+      expect(index!.albums).toEqual({});
+      expect(index!.unresolved).toEqual({
+        artist: {
+          lastPlayed: 1609459200,
+          playCount: 1,
+          plays: [{ timestamp: 1609459200, track: 'Track' }],
+        },
+      });
     });
   });
 });

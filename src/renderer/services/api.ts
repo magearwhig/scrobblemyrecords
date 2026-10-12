@@ -6,6 +6,7 @@ import {
   AlbumMapping,
   AlbumMergeSuggestion,
   AlbumPlayCountResponse,
+  AlbumTracklistMatch,
   ApiResponse,
   ArtistDisambiguationStatus,
   ArtistMapping,
@@ -32,6 +33,8 @@ import {
   EnrichedWishlistItem,
   EntireCollectionResponse,
   ExcludedArtistResponse,
+  ExcludedHistoryArtist,
+  ExclusionSuggestion,
   ForgottenTrack,
   HiddenAlbum,
   HiddenArtist,
@@ -75,6 +78,11 @@ import {
   TrackedRelease,
   TrackMapping,
   TrackSearchResult,
+  UnresolvedAlbumLookup,
+  UnresolvedArtistAlbumSuggestions,
+  UnresolvedHistoryPage,
+  UnresolvedHistorySummary,
+  UnresolvedTrackResolution,
   UpdateDiscardPileItemRequest,
   WebsiteItem,
   WebsiteMonitoringSettings,
@@ -739,6 +747,191 @@ class ApiService {
     const response = await this.api.post(
       '/suggestions/history/sync/settings',
       settings
+    );
+    return response.data.data;
+  }
+
+  /**
+   * Start a background backfill that re-reads Last.fm history and adds plays
+   * the index is missing. Omit from/to (Unix seconds) for a full-range run.
+   * Progress is reported by getHistorySyncStatus(). Rejects with 409 when a
+   * sync is already running.
+   */
+  async startHistoryBackfill(
+    range: { from?: number; to?: number } = {}
+  ): Promise<{ message: string }> {
+    const response = await this.api.post(
+      '/suggestions/history/sync/backfill',
+      range
+    );
+    return response.data.data;
+  }
+
+  // ============================================
+  // Unresolved listening history (albumless plays)
+  // ============================================
+
+  async getUnresolvedHistory(
+    options: {
+      search?: string;
+      sort?: 'plays' | 'artist' | 'recent';
+      page?: number;
+      limit?: number;
+      includeHidden?: boolean;
+    } = {}
+  ): Promise<UnresolvedHistoryPage> {
+    const params: Record<string, string | number | boolean> = {};
+    if (options.search) params.search = options.search;
+    if (options.sort) params.sort = options.sort;
+    if (options.page !== undefined) params.page = options.page;
+    if (options.limit !== undefined) params.limit = options.limit;
+    if (options.includeHidden !== undefined) {
+      params.includeHidden = options.includeHidden;
+    }
+    const response = await this.api.get('/stats/unresolved-history', {
+      params,
+    });
+    return response.data.data;
+  }
+
+  async getUnresolvedHistorySummary(): Promise<UnresolvedHistorySummary> {
+    const response = await this.api.get('/stats/unresolved-history/summary');
+    return response.data.data;
+  }
+
+  /**
+   * Last.fm's album for a track, with a check of that album's tracklist
+   * (verification) when the backend could look the album up.
+   */
+  async lookupUnresolvedAlbum(
+    artist: string,
+    track: string
+  ): Promise<UnresolvedAlbumLookup> {
+    const response = await this.api.post('/stats/unresolved-history/lookup', {
+      artist,
+      track,
+    });
+    return response.data.data;
+  }
+
+  /**
+   * Suggested albums for each of an artist's unresolved tracks, from albums
+   * in the listening history that have the track and the user's collection.
+   * @param artist Normalized artist key (UnresolvedHistoryGroup.artist)
+   */
+  async getUnresolvedAlbumSuggestions(
+    artist: string,
+    options: { includeHidden?: boolean } = {}
+  ): Promise<UnresolvedArtistAlbumSuggestions> {
+    const params: Record<string, string | boolean> = { artist };
+    if (options.includeHidden !== undefined) {
+      params.includeHidden = options.includeHidden;
+    }
+    const response = await this.api.get(
+      '/stats/unresolved-history/album-suggestions',
+      { params }
+    );
+    return response.data.data;
+  }
+
+  /**
+   * Match an artist's unresolved tracks against the tracklist of a Discogs
+   * master or release the user points at.
+   * @param artist Normalized artist key (UnresolvedHistoryGroup.artist)
+   * @param url Discogs master/release link, or a short id like "m123"/"r456"
+   */
+  async matchUnresolvedFromDiscogsAlbum(
+    artist: string,
+    url: string,
+    options: { includeHidden?: boolean } = {}
+  ): Promise<AlbumTracklistMatch> {
+    const body: { artist: string; url: string; includeHidden?: boolean } = {
+      artist,
+      url,
+    };
+    if (options.includeHidden !== undefined) {
+      body.includeHidden = options.includeHidden;
+    }
+    const response = await this.api.post(
+      '/stats/unresolved-history/discogs-album-match',
+      body
+    );
+    return response.data.data;
+  }
+
+  async getUnresolvedResolutions(): Promise<UnresolvedTrackResolution[]> {
+    const response = await this.api.get(
+      '/stats/unresolved-history/resolutions'
+    );
+    return response.data.data;
+  }
+
+  async saveUnresolvedResolutions(
+    resolutions: Array<{
+      artist: string;
+      track: string;
+      album: string;
+      source?: UnresolvedTrackResolution['source'];
+    }>
+  ): Promise<{ saved: UnresolvedTrackResolution[] }> {
+    const response = await this.api.post(
+      '/stats/unresolved-history/resolutions',
+      { resolutions }
+    );
+    return response.data.data;
+  }
+
+  async deleteUnresolvedResolution(id: string): Promise<{ removed: boolean }> {
+    const response = await this.api.delete(
+      `/stats/unresolved-history/resolutions/${encodeURIComponent(id)}`
+    );
+    return response.data.data;
+  }
+
+  async hideUnresolvedTracks(keys: string[]): Promise<{ changed: number }> {
+    const response = await this.api.post('/stats/unresolved-history/hide', {
+      keys,
+    });
+    return response.data.data;
+  }
+
+  async unhideUnresolvedTracks(keys: string[]): Promise<{ changed: number }> {
+    const response = await this.api.post('/stats/unresolved-history/unhide', {
+      keys,
+    });
+    return response.data.data;
+  }
+
+  /** Artists left out of all listening stats (e.g. podcasts). */
+  async getExcludedHistoryArtists(): Promise<ExcludedHistoryArtist[]> {
+    const response = await this.api.get(
+      '/stats/unresolved-history/excluded-artists'
+    );
+    return response.data.data;
+  }
+
+  /** Exclude artists (normalized keys) from all listening stats. */
+  async excludeHistoryArtists(artists: string[]): Promise<{ changed: number }> {
+    const response = await this.api.post(
+      '/stats/unresolved-history/excluded-artists',
+      { artists }
+    );
+    return response.data.data;
+  }
+
+  /** Count excluded artists (normalized keys) in listening stats again. */
+  async includeHistoryArtists(artists: string[]): Promise<{ changed: number }> {
+    const response = await this.api.post(
+      '/stats/unresolved-history/excluded-artists/remove',
+      { artists }
+    );
+    return response.data.data;
+  }
+
+  /** Artists whose plays look like podcast episodes. */
+  async getHistoryExclusionSuggestions(): Promise<ExclusionSuggestion[]> {
+    const response = await this.api.get(
+      '/stats/unresolved-history/exclusion-suggestions'
     );
     return response.data.data;
   }

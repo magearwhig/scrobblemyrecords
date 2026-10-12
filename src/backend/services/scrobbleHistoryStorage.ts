@@ -1,5 +1,15 @@
+import { createHash } from 'crypto';
+
 import { ScrobbleHistoryIndex, AlbumHistoryEntry } from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
+import {
+  applyUnresolvedResolutions,
+  creditedArtists,
+  excludeArtists,
+  forEachListeningPlay,
+  UNKNOWN_ALBUM_LABEL,
+  UnresolvedResolutionRule,
+} from '../utils/historyPlays';
 import { createLogger } from '../utils/logger';
 
 import { ArtistNameResolver } from './artistNameResolver';
@@ -27,8 +37,36 @@ export class ScrobbleHistoryStorage {
 
   private artistNameResolver: ArtistNameResolver | null = null;
 
+  /** Rules that attribute unresolved (albumless) plays to albums */
+  private resolutionRules: (() => Promise<UnresolvedResolutionRule[]>) | null =
+    null;
+
+  /** Artists left out of listening stats entirely (e.g. podcasts) */
+  private excludedArtists: (() => Promise<string[]>) | null = null;
+
   constructor(fileStorage: FileStorage) {
     this.fileStorage = fileStorage;
+  }
+
+  /**
+   * Supply the Unresolved Listening History rules. getIndex() then returns
+   * the index with them applied (resolved plays counted under their album).
+   * Call invalidateCache() after the rules change.
+   */
+  setResolutionRulesProvider(
+    provider: () => Promise<UnresolvedResolutionRule[]>
+  ): void {
+    this.resolutionRules = provider;
+    this.invalidateCache();
+  }
+
+  /**
+   * Supply the excluded artists. getIndex() then leaves their plays out
+   * entirely. Call invalidateCache() after the list changes.
+   */
+  setExcludedArtistsProvider(provider: () => Promise<string[]>): void {
+    this.excludedArtists = provider;
+    this.invalidateCache();
   }
 
   setArtistNameResolver(resolver: ArtistNameResolver): void {
@@ -143,6 +181,7 @@ export class ScrobbleHistoryStorage {
   /**
    * Build hourly and day-of-week distribution caches in a single pass.
    * Called on index load to avoid recomputing distributions on every access.
+   * Counts every listening event, including unresolved (albumless) plays.
    */
   private buildDistributionCaches(): void {
     this.cachedHourlyDist = new Map();
@@ -152,21 +191,15 @@ export class ScrobbleHistoryStorage {
       return;
     }
 
-    for (const history of Object.values(this.cachedIndex.albums)) {
-      for (const play of history.plays) {
-        const date = new Date(play.timestamp * 1000);
-        const hour = date.getHours();
-        const day = date.getDay();
-        this.cachedHourlyDist.set(
-          hour,
-          (this.cachedHourlyDist.get(hour) || 0) + 1
-        );
-        this.cachedDayOfWeekDist.set(
-          day,
-          (this.cachedDayOfWeekDist.get(day) || 0) + 1
-        );
-      }
-    }
+    const hourly = this.cachedHourlyDist;
+    const daily = this.cachedDayOfWeekDist;
+    forEachListeningPlay(this.cachedIndex, play => {
+      const date = new Date(play.timestamp * 1000);
+      const hour = date.getHours();
+      const day = date.getDay();
+      hourly.set(hour, (hourly.get(hour) || 0) + 1);
+      daily.set(day, (daily.get(day) || 0) + 1);
+    });
 
     this.logger.debug(
       `Built distribution caches from ${this.cachedIndex.totalScrobbles} scrobbles`
@@ -174,7 +207,10 @@ export class ScrobbleHistoryStorage {
   }
 
   /**
-   * Get the full history index (with caching)
+   * Get the history index (with caching), with Unresolved Listening History
+   * rules applied: unresolved plays a rule attributes to an album appear
+   * under that album. This is a derived view; it is never written back, so
+   * writers (sync, merge) read the raw file via getRawIndex()/FileStorage.
    */
   async getIndex(): Promise<ScrobbleHistoryIndex | null> {
     const now = Date.now();
@@ -183,10 +219,16 @@ export class ScrobbleHistoryStorage {
     }
 
     try {
+      const raw = await this.getRawIndex();
+      // Leave excluded artists out first, then apply resolution rules
+      const withoutExcluded = await this.applyExclusions(raw);
       const index =
-        await this.fileStorage.readJSON<ScrobbleHistoryIndex>(
-          HISTORY_INDEX_FILE
-        );
+        withoutExcluded && this.resolutionRules
+          ? applyUnresolvedResolutions(
+              withoutExcluded,
+              await this.resolutionRules()
+            ).index
+          : withoutExcluded;
       if (index) {
         this.cachedIndex = index;
         this.cacheTimestamp = now;
@@ -198,6 +240,95 @@ export class ScrobbleHistoryStorage {
       return index;
     } catch {
       this.logger.debug('History index not found');
+      return null;
+    }
+  }
+
+  /**
+   * Hash of the current resolution rules and excluded artists; '' when there
+   * are none. Both change what getIndex() returns.
+   */
+  async getResolutionRulesFingerprint(): Promise<string> {
+    const rules = this.resolutionRules ? await this.resolutionRules() : [];
+    const excluded = this.excludedArtists ? await this.excludedArtists() : [];
+    if (rules.length === 0 && excluded.length === 0) return '';
+    const lines = [
+      ...rules.map(rule =>
+        JSON.stringify([rule.artist, rule.track, rule.album])
+      ),
+      ...excluded.map(artist => JSON.stringify(['excluded', artist])),
+    ].sort();
+    return createHash('sha1').update(lines.join('\n')).digest('hex');
+  }
+
+  /**
+   * Which excluded artist (if any) an index artist key belongs to: the exact
+   * name, an alias the artist resolver links to it, or a credit naming it
+   * ("doug benson, guest", "x feat. doug benson"). Null when nothing is
+   * excluded.
+   */
+  async getExclusionMatcher(): Promise<
+    ((artistKey: string) => string | null) | null
+  > {
+    const excluded = this.excludedArtists ? await this.excludedArtists() : [];
+    if (excluded.length === 0) return null;
+
+    const byName = new Map<string, string>();
+    for (const name of excluded) {
+      const key = name.toLowerCase().trim();
+      byName.set(key, key);
+      const canonical = this.artistNameResolver?.resolveArtist(key);
+      if (canonical && !byName.has(canonical)) byName.set(canonical, key);
+    }
+    const lookup = (name: string): string | null => {
+      const direct = byName.get(name);
+      if (direct) return direct;
+      const canonical = this.artistNameResolver?.resolveArtist(name);
+      return (canonical && byName.get(canonical)) || null;
+    };
+
+    const memo = new Map<string, string | null>();
+    return (artistKey: string) => {
+      const cached = memo.get(artistKey);
+      if (cached !== undefined) return cached;
+      let match = lookup(artistKey);
+      if (!match) {
+        const parts = [
+          ...creditedArtists(artistKey),
+          ...(this.artistNameResolver?.resolveArtistMulti(artistKey) ?? []),
+        ];
+        for (const part of parts) {
+          match = lookup(part);
+          if (match) break;
+        }
+      }
+      memo.set(artistKey, match);
+      return match;
+    };
+  }
+
+  /** The stored index with excluded artists left out (no resolution rules). */
+  async getExclusionView(): Promise<ScrobbleHistoryIndex | null> {
+    return this.applyExclusions(await this.getRawIndex());
+  }
+
+  private async applyExclusions(
+    raw: ScrobbleHistoryIndex | null
+  ): Promise<ScrobbleHistoryIndex | null> {
+    if (!raw) return raw;
+    const matcher = await this.getExclusionMatcher();
+    return matcher
+      ? excludeArtists(raw, key => matcher(key) !== null).index
+      : raw;
+  }
+
+  /** The index exactly as stored, without resolution rules applied. */
+  async getRawIndex(): Promise<ScrobbleHistoryIndex | null> {
+    try {
+      return await this.fileStorage.readJSON<ScrobbleHistoryIndex>(
+        HISTORY_INDEX_FILE
+      );
+    } catch {
       return null;
     }
   }
@@ -618,7 +749,24 @@ export class ScrobbleHistoryStorage {
   }
 
   /**
-   * Get unique artists from the index
+   * Unresolved (albumless) entries, keyed by normalized artist.
+   * Album-level callers never use this; listening-level artist and track
+   * lists add these plays on top of the album entries.
+   */
+  private async getUnresolvedEntries(): Promise<
+    Array<{ artist: string; history: AlbumHistoryEntry }>
+  > {
+    const index = await this.getIndex();
+    return Object.entries(index?.unresolved ?? {}).map(([artist, history]) => ({
+      artist,
+      history,
+    }));
+  }
+
+  /**
+   * Get unique artists from the index.
+   * playCount and lastPlayed include unresolved (albumless) plays;
+   * albumCount counts album entries only.
    */
   async getUniqueArtists(): Promise<
     Map<string, { playCount: number; albumCount: number; lastPlayed: number }>
@@ -649,6 +797,24 @@ export class ScrobbleHistoryStorage {
       }
     }
 
+    for (const { artist, history } of await this.getUnresolvedEntries()) {
+      for (const key of this.resolveArtistNames(artist)) {
+        const existing = artists.get(key);
+        if (existing) {
+          existing.playCount += history.playCount;
+          if (history.lastPlayed > existing.lastPlayed) {
+            existing.lastPlayed = history.lastPlayed;
+          }
+        } else {
+          artists.set(key, {
+            playCount: history.playCount,
+            albumCount: 0,
+            lastPlayed: history.lastPlayed,
+          });
+        }
+      }
+    }
+
     return artists;
   }
 
@@ -663,16 +829,14 @@ export class ScrobbleHistoryStorage {
 
     const decades = new Map<number, number>();
 
-    for (const history of Object.values(index.albums)) {
-      // We don't have year data in the scrobble history
-      // This would need to be cross-referenced with collection data
-      // For now, we'll track by listening time decades
-      for (const play of history.plays) {
-        const year = new Date(play.timestamp * 1000).getFullYear();
-        const decade = Math.floor(year / 10) * 10;
-        decades.set(decade, (decades.get(decade) || 0) + 1);
-      }
-    }
+    // We don't have year data in the scrobble history
+    // This would need to be cross-referenced with collection data
+    // For now, we'll track by listening time decades (all listening events)
+    forEachListeningPlay(index, play => {
+      const year = new Date(play.timestamp * 1000).getFullYear();
+      const decade = Math.floor(year / 10) * 10;
+      decades.set(decade, (decades.get(decade) || 0) + 1);
+    });
 
     return decades;
   }
@@ -707,12 +871,10 @@ export class ScrobbleHistoryStorage {
 
     // Manual computation for edge cases where index exists but cache wasn't built
     const hours = new Map<number, number>();
-    for (const history of Object.values(index.albums)) {
-      for (const play of history.plays) {
-        const hour = new Date(play.timestamp * 1000).getHours();
-        hours.set(hour, (hours.get(hour) || 0) + 1);
-      }
-    }
+    forEachListeningPlay(index, play => {
+      const hour = new Date(play.timestamp * 1000).getHours();
+      hours.set(hour, (hours.get(hour) || 0) + 1);
+    });
 
     return hours;
   }
@@ -744,12 +906,10 @@ export class ScrobbleHistoryStorage {
 
     // Manual computation for edge cases where index exists but cache wasn't built
     const days = new Map<number, number>();
-    for (const history of Object.values(index.albums)) {
-      for (const play of history.plays) {
-        const day = new Date(play.timestamp * 1000).getDay();
-        days.set(day, (days.get(day) || 0) + 1);
-      }
-    }
+    forEachListeningPlay(index, play => {
+      const day = new Date(play.timestamp * 1000).getDay();
+      days.set(day, (days.get(day) || 0) + 1);
+    });
 
     return days;
   }
@@ -829,7 +989,8 @@ export class ScrobbleHistoryStorage {
 
   /**
    * Get paginated artists with sorting and search
-   * Aggregates play counts across all albums per artist
+   * Aggregates play counts across all albums per artist, plus unresolved
+   * (albumless) plays; albumCount counts album entries only.
    */
   async getArtistsPaginated(
     page: number = 1,
@@ -885,6 +1046,28 @@ export class ScrobbleHistoryStorage {
       }
     }
 
+    for (const { artist, history } of await this.getUnresolvedEntries()) {
+      for (const key of this.resolveArtistNames(artist)) {
+        const existing = artistMap.get(key);
+        if (existing) {
+          existing.playCount += history.playCount;
+          if (history.lastPlayed > existing.lastPlayed) {
+            existing.lastPlayed = history.lastPlayed;
+          }
+        } else {
+          const displayName = this.artistNameResolver
+            ? this.artistNameResolver.getDisplayName(key)
+            : artist;
+          artistMap.set(key, {
+            artist: displayName,
+            playCount: history.playCount,
+            albumCount: 0,
+            lastPlayed: history.lastPlayed,
+          });
+        }
+      }
+    }
+
     let artists = Array.from(artistMap.values());
 
     // Filter by search query if provided
@@ -932,7 +1115,9 @@ export class ScrobbleHistoryStorage {
 
   /**
    * Get paginated tracks with sorting and search
-   * Aggregates all plays from all albums into individual track entries
+   * Aggregates all plays from all albums into individual track entries.
+   * Unresolved (albumless) plays form their own rows with album
+   * UNKNOWN_ALBUM_LABEL, separate from any album row for the same track.
    */
   async getTracksPaginated(
     page: number = 1,
@@ -974,32 +1159,32 @@ export class ScrobbleHistoryStorage {
       }
     >();
 
-    for (const [key, history] of Object.entries(index.albums)) {
-      const [artist, album] = key.split('|');
+    forEachListeningPlay(index, (play, artist, albumOrNull) => {
+      if (!play.track) return;
+      const album = albumOrNull ?? UNKNOWN_ALBUM_LABEL;
 
-      for (const play of history.plays) {
-        if (!play.track) continue;
+      // Unique key for this track (artist|album|track). Unresolved plays use
+      // a marker that no album key can contain, so they never merge with a
+      // real album that happens to be named "Unknown album".
+      const albumPart = albumOrNull ?? '\u0000unresolved';
+      const trackKey = `${artist}|${albumPart}|${play.track.toLowerCase()}`;
+      const existing = trackMap.get(trackKey);
 
-        // Create a unique key for this track (artist|album|track)
-        const trackKey = `${artist}|${album}|${play.track.toLowerCase()}`;
-        const existing = trackMap.get(trackKey);
-
-        if (existing) {
-          existing.playCount++;
-          if (play.timestamp > existing.lastPlayed) {
-            existing.lastPlayed = play.timestamp;
-          }
-        } else {
-          trackMap.set(trackKey, {
-            artist,
-            album,
-            track: play.track,
-            playCount: 1,
-            lastPlayed: play.timestamp,
-          });
+      if (existing) {
+        existing.playCount++;
+        if (play.timestamp > existing.lastPlayed) {
+          existing.lastPlayed = play.timestamp;
         }
+      } else {
+        trackMap.set(trackKey, {
+          artist,
+          album,
+          track: play.track,
+          playCount: 1,
+          lastPlayed: play.timestamp,
+        });
       }
-    }
+    });
 
     let tracks = Array.from(trackMap.values());
 
@@ -1076,8 +1261,13 @@ export class ScrobbleHistoryStorage {
       };
     }
 
+    // Newest listening event, including unresolved (albumless) plays.
+    // totalScrobbles already counts both stores; totalAlbums counts albums only.
     let newestTimestamp = 0;
-    for (const history of Object.values(index.albums)) {
+    for (const history of [
+      ...Object.values(index.albums),
+      ...Object.values(index.unresolved ?? {}),
+    ]) {
       if (history.lastPlayed > newestTimestamp) {
         newestTimestamp = history.lastPlayed;
       }
