@@ -35,8 +35,22 @@
 > 3. "All tracks" creates one rule per listed track.
 > 4. Backfill runs from the banner only.
 > 5. The 5-minute incremental overlap was adopted.
-> 6. No exclude-from-stats option yet. Podcasts (e.g. 425 plays of The Onion)
->    still count; revisit if wanted.
+>
+> **Added after the plan (user request: "I don't want to track podcasts at
+> all"): artist exclusion.** It answers open decision 6.
+> - Excluded artists are removed from the derived index before rules apply
+>   (`excludeArtists()` with a matcher from
+>   `ScrobbleHistoryStorage.getExclusionMatcher()`). The matcher covers the
+>   exact name, resolver aliases and credits that name the artist ("x, guest",
+>   "x feat. y"), so every listening and album stat drops them.
+> - Analytics top artists and website-monitoring matches are filtered too.
+> - Plays stay in the stored history, so "Track again" is instant and the
+>   Last.fm gap stays 0.
+> - `findExclusionCandidates()` suggests podcast-like artists: many distinct
+>   tracks played about once, plus mostly no album info or episode-like titles.
+>   On real data it flags Doug Benson and The Onion and no music artists.
+> - Milestones above the new total are dropped, and the earliest play date is
+>   recomputed.
 >
 > **Known limits:** the incremental sync's 50-page cap can still skip history
 > after a very long gap; backfill repairs it. The saved default-tab preference
