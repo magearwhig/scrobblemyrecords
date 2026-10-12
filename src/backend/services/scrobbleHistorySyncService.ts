@@ -55,6 +55,19 @@ interface IdentitySets {
   unresolved: Set<string>;
 }
 
+/** Result of a history backfill */
+export interface BackfillResult {
+  /** Listening events added */
+  added: number;
+  /** Of those, how many have no album */
+  addedUnresolved: number;
+  /** Events fetched that the index already had */
+  alreadyIndexed: number;
+  pages: number;
+  /** True when cancelled before finishing (nothing was saved) */
+  cancelled?: boolean;
+}
+
 /** Result of processing one batch of scrobbles */
 interface ProcessResult {
   /** New listening events added (album or unresolved) */
@@ -219,7 +232,10 @@ export class ScrobbleHistorySyncService extends EventEmitter {
   /**
    * Fetch a single page of scrobbles from Last.fm
    */
-  private async fetchScrobblePage(page: number): Promise<{
+  private async fetchScrobblePage(
+    page: number,
+    window: { from?: number; to?: number } = {}
+  ): Promise<{
     tracks: LastFmTrack[];
     totalPages: number;
     totalScrobbles: number;
@@ -238,6 +254,9 @@ export class ScrobbleHistorySyncService extends EventEmitter {
         page,
         format: 'json',
         extended: 0,
+        // Optional Unix-seconds window (user.getRecentTracks from/to)
+        ...(window.from !== undefined ? { from: window.from } : {}),
+        ...(window.to !== undefined ? { to: window.to } : {}),
       },
     });
 
@@ -703,6 +722,153 @@ export class ScrobbleHistorySyncService extends EventEmitter {
     } finally {
       this.isSyncing = false;
     }
+  }
+
+  /**
+   * Re-fetch history from Last.fm and add any plays the index is missing,
+   * e.g. albumless scrobbles that syncs before schema v2 dropped, or holes
+   * left by an interrupted full sync. Optionally limited to a Unix-seconds
+   * window.
+   *
+   * Only adds: plays already indexed (by identity) are skipped, so it is
+   * safe to re-run. Works on a copy of the index and saves once at the end,
+   * after backing the file up; a cancel (pause or clear) or a failed page
+   * leaves the index on disk unchanged. A page that fails is retried, then
+   * the backfill stops with an error rather than skipping it.
+   */
+  async startBackfill(
+    window: { from?: number; to?: number } = {}
+  ): Promise<BackfillResult> {
+    if (this.isSyncing) {
+      throw new Error('A sync is already in progress');
+    }
+    const existing = await this.getHistoryIndex();
+    if (!existing) {
+      throw new Error('No history index yet; run a sync first');
+    }
+
+    this.isSyncing = true;
+    this.isPaused = false;
+    this.syncAbortController = new AbortController();
+    const fullRange = window.from === undefined && window.to === undefined;
+    this.logger.info(
+      `Starting history backfill${fullRange ? ' (full range)' : ` (from=${window.from ?? '-'} to=${window.to ?? '-'})`}`
+    );
+
+    // Work on a copy; the stored index only changes on success
+    const working: ScrobbleHistoryIndex = JSON.parse(JSON.stringify(existing));
+    working.unresolved ??= {};
+    const identities = buildIdentitySets(working);
+    const result: BackfillResult = {
+      added: 0,
+      addedUnresolved: 0,
+      alreadyIndexed: 0,
+      pages: 0,
+    };
+
+    try {
+      const firstPage = await this.fetchPageWithRetry(1, window);
+      const totalPages = Math.max(1, firstPage.totalPages);
+      if (fullRange) this.recordLastfmTotal(working, firstPage.totalScrobbles);
+
+      this.syncStatus = {
+        status: 'syncing',
+        progress: 0,
+        currentPage: 1,
+        totalPages,
+        scrobblesFetched: 0,
+        totalScrobbles: firstPage.totalScrobbles,
+      };
+      this.emit('statusChange', this.syncStatus);
+
+      let pageData = firstPage;
+      for (let page = 1; page <= totalPages; page++) {
+        if (page > 1) {
+          if (this.isPaused || this.syncAbortController?.signal.aborted) {
+            this.logger.info('History backfill cancelled; index unchanged');
+            this.syncStatus.status = 'idle';
+            this.emit('statusChange', this.syncStatus);
+            return { ...result, cancelled: true };
+          }
+          await new Promise(resolve =>
+            setTimeout(resolve, this.getRequestDelay())
+          );
+          pageData = await this.fetchPageWithRetry(page, window);
+        }
+
+        const pageResult = this.processScrobbles(
+          pageData.tracks,
+          working,
+          identities
+        );
+        result.added += pageResult.processed;
+        result.addedUnresolved += pageResult.unresolved;
+        result.alreadyIndexed += pageResult.duplicatesSkipped;
+        result.pages = page;
+
+        this.syncStatus.currentPage = page;
+        this.syncStatus.scrobblesFetched = result.added;
+        this.syncStatus.progress = Math.round((page / totalPages) * 100);
+        this.emit('statusChange', this.syncStatus);
+      }
+
+      if (fullRange) working.lastFullBackfillAt = Date.now();
+      // Back up the current file, then save once
+      await this.fileStorage.createBackup(HISTORY_INDEX_FILE);
+      await this.saveIndex(working);
+
+      this.syncStatus.status = 'completed';
+      this.syncStatus.progress = 100;
+      this.emit('statusChange', this.syncStatus);
+      this.logger.info(
+        `History backfill completed: ${result.added} plays added (${result.addedUnresolved} without album info), ${result.alreadyIndexed} already indexed, ${result.pages} pages`
+      );
+
+      if (result.added > 0 && this.statsWarmer) {
+        await this.statsWarmer.invalidateStatsCache();
+        this.triggerCacheWarm();
+      }
+      return result;
+    } catch (error) {
+      this.logger.error('History backfill failed; index unchanged', error);
+      this.syncStatus.status = 'error';
+      this.syncStatus.error =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.emit('statusChange', this.syncStatus);
+      throw error;
+    } finally {
+      this.isSyncing = false;
+      this.isPaused = false;
+      this.syncAbortController = null;
+    }
+  }
+
+  /** Fetch a page, retrying failures with a growing delay. */
+  private async fetchPageWithRetry(
+    page: number,
+    window: { from?: number; to?: number },
+    attempts = 3
+  ): ReturnType<ScrobbleHistorySyncService['fetchScrobblePage']> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        return await this.fetchScrobblePage(page, window);
+      } catch (error) {
+        lastError = error;
+        this.logger.warn(
+          `Backfill page ${page} failed (attempt ${attempt}/${attempts})`,
+          error
+        );
+        if (attempt < attempts) {
+          await new Promise(resolve =>
+            setTimeout(resolve, this.getRequestDelay() * attempt * 2)
+          );
+        }
+      }
+    }
+    throw new Error(
+      `Backfill stopped: page ${page} could not be fetched (${lastError instanceof Error ? lastError.message : String(lastError)})`
+    );
   }
 
   /**

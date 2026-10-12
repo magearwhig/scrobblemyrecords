@@ -1120,6 +1120,61 @@ describe('Suggestions Routes', () => {
     });
   });
 
+  describe('POST /api/v1/suggestions/history/sync/backfill', () => {
+    it('starts a backfill with an optional window', async () => {
+      mockSyncService.startBackfill = jest.fn().mockResolvedValue({
+        added: 3,
+        addedUnresolved: 2,
+        alreadyIndexed: 10,
+        pages: 1,
+      });
+
+      const response = await request(app)
+        .post('/api/v1/suggestions/history/sync/backfill')
+        .send({ from: 1000, to: 2000 });
+
+      expect(response.status).toBe(200);
+      expect(mockSyncService.startBackfill).toHaveBeenCalledWith({
+        from: 1000,
+        to: 2000,
+      });
+    });
+
+    it.each([
+      [{ from: 'yesterday' }],
+      [{ from: -5 }],
+      [{ from: 2000, to: 1000 }],
+    ])('rejects an invalid window %j', async body => {
+      mockSyncService.startBackfill = jest.fn();
+
+      const response = await request(app)
+        .post('/api/v1/suggestions/history/sync/backfill')
+        .send(body);
+
+      expect(response.status).toBe(400);
+      expect(mockSyncService.startBackfill).not.toHaveBeenCalled();
+    });
+
+    it('refuses while a sync is running', async () => {
+      mockSyncService.startBackfill = jest.fn();
+      mockSyncService.getSyncStatus = jest.fn().mockReturnValue({
+        status: 'syncing',
+        progress: 10,
+        currentPage: 1,
+        totalPages: 10,
+        scrobblesFetched: 0,
+        totalScrobbles: 0,
+      });
+
+      const response = await request(app)
+        .post('/api/v1/suggestions/history/sync/backfill')
+        .send({});
+
+      expect(response.status).toBe(409);
+      expect(mockSyncService.startBackfill).not.toHaveBeenCalled();
+    });
+  });
+
   describe('album merge suggestions', () => {
     const noDiscogsUser = {
       discogs: { username: '' },
