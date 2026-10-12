@@ -130,13 +130,17 @@ function listeningEntries(
  * a resolution-rules hash) without changing how existing parts read.
  */
 export function computeHistoryFingerprint(
-  index: Pick<ScrobbleHistoryIndex, 'totalScrobbles' | 'unresolved'> | null
+  index: Pick<ScrobbleHistoryIndex, 'totalScrobbles' | 'unresolved'> | null,
+  rulesFingerprint = ''
 ): string {
   if (!index) return '';
-  return [
+  const parts = [
     `scrobbles:${index.totalScrobbles}`,
     `unresolved:${countUnresolvedPlays(index)}`,
-  ].join(';');
+  ];
+  // Re-pointing a rule to another album changes neither count above
+  if (rulesFingerprint) parts.push(`rules:${rulesFingerprint}`);
+  return parts.join(';');
 }
 
 /**
@@ -438,9 +442,7 @@ export class StatsService {
       // invalidates the result
       const artistAliasFingerprint = this.artistAliasFingerprint();
       const albumMappingFingerprint = await this.albumMappingFingerprint();
-      const historyFingerprint = computeHistoryFingerprint(
-        await this.historyStorage.getIndex()
-      );
+      const historyFingerprint = await this.historyFingerprint();
 
       const WARM_PERIODS = ['month', 'year', 'all'] as const;
       const TOP_LIMIT = 10;
@@ -559,13 +561,20 @@ export class StatsService {
     }
     // Plays added below the newest timestamp (backfill) or moved between
     // albums and unresolved leave syncTimestamp unchanged
-    if (
-      cache.warm.historyFingerprint !==
-      computeHistoryFingerprint(await this.historyStorage.getIndex())
-    ) {
+    if (cache.warm.historyFingerprint !== (await this.historyFingerprint())) {
       return null;
     }
     return cache.warm;
+  }
+
+  /** History contents plus Unresolved Listening History rules */
+  private async historyFingerprint(): Promise<string> {
+    const index = await this.historyStorage.getIndex();
+    const rules =
+      typeof this.historyStorage.getResolutionRulesFingerprint === 'function'
+        ? await this.historyStorage.getResolutionRulesFingerprint()
+        : '';
+    return computeHistoryFingerprint(index, rules);
   }
 
   private artistAliasFingerprint(): string {

@@ -646,6 +646,13 @@ export class MigrationService {
             log.info(
               `Wrapped array in ${key} with key '${meta.arrayWrapperKey}' and schemaVersion: 1`
             );
+          } else if (meta.currentVersion > 1) {
+            // Unversioned data is v1; run the chain to the current version
+            // now rather than only stamping it until the next startup
+            migratedData = this.applyMigrations(data, 0, meta);
+            log.info(
+              `Migrated unversioned ${key} to schemaVersion: ${meta.currentVersion}`
+            );
           } else {
             // Just add schemaVersion to existing object
             data.schemaVersion = 1;

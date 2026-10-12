@@ -13,19 +13,21 @@ export function normalizeHistoryName(name: string): string {
 }
 
 /**
- * Identity of one listening event: timestamp + artist + track, using the
- * raw scrobbled names. Each identity appears at most once across
- * `index.albums` and `index.unresolved` together.
+ * Identity of one listening event: timestamp + track (raw scrobbled name,
+ * normalized). Each identity appears at most once across `index.albums` and
+ * `index.unresolved` together.
  *
- * Artist is included because consecutive tracks (and different artists) can
- * share a scrobble timestamp.
+ * The track is included because consecutive tracks can share a scrobble
+ * timestamp. The artist is deliberately left out: HistoryIndexMergeService
+ * moves plays between artist spellings, so a play's artist key can differ
+ * from the name Last.fm returns; the same key is used by that merge.
+ * Encoded as JSON so names containing "|" can't collide.
  */
 export function playIdentity(
   timestamp: number,
-  artist: string,
   track: string | undefined
 ): string {
-  return `${timestamp}|${normalizeHistoryName(artist)}|${normalizeHistoryName(track ?? '')}`;
+  return JSON.stringify([timestamp, normalizeHistoryName(track ?? '')]);
 }
 
 /** Artist part of an `index.albums` key ("artist|album"). */
@@ -114,15 +116,14 @@ export function buildIdentitySets(
 ): { withAlbum: Set<string>; unresolved: Set<string> } {
   const withAlbum = new Set<string>();
   const unresolved = new Set<string>();
-  for (const [key, entry] of Object.entries(index.albums)) {
-    const artist = artistFromAlbumKey(key);
+  for (const entry of Object.values(index.albums)) {
     for (const play of entry.plays) {
-      withAlbum.add(playIdentity(play.timestamp, artist, play.track));
+      withAlbum.add(playIdentity(play.timestamp, play.track));
     }
   }
-  for (const [artist, entry] of Object.entries(index.unresolved ?? {})) {
+  for (const entry of Object.values(index.unresolved ?? {})) {
     for (const play of entry.plays) {
-      unresolved.add(playIdentity(play.timestamp, artist, play.track));
+      unresolved.add(playIdentity(play.timestamp, play.track));
     }
   }
   return { withAlbum, unresolved };
@@ -132,7 +133,8 @@ export function buildIdentitySets(
  * One-time cleanup: keep each identity once. A play with an album wins over
  * an unresolved copy; within a store the first copy wins. Entries that lose
  * plays get playCount/lastPlayed recomputed (and are removed if emptied), and
- * totalScrobbles is reset to the real count. Mutates and returns the index, plus how many plays it removed.
+ * totalScrobbles is reset to the real count. Mutates and returns the index,
+ * plus how many plays it removed.
  */
 export function dedupeHistoryIndex<T extends ScrobbleHistoryIndex>(
   index: T
@@ -141,10 +143,9 @@ export function dedupeHistoryIndex<T extends ScrobbleHistoryIndex>(
   const seen = new Set<string>();
 
   for (const [key, entry] of Object.entries(index.albums)) {
-    const artist = artistFromAlbumKey(key);
     const before = entry.plays.length;
     entry.plays = entry.plays.filter(play => {
-      const id = playIdentity(play.timestamp, artist, play.track);
+      const id = playIdentity(play.timestamp, play.track);
       if (seen.has(id)) return false;
       seen.add(id);
       return true;
@@ -163,7 +164,7 @@ export function dedupeHistoryIndex<T extends ScrobbleHistoryIndex>(
   for (const [artist, entry] of Object.entries(unresolved)) {
     const before = entry.plays.length;
     entry.plays = entry.plays.filter(play => {
-      const id = playIdentity(play.timestamp, artist, play.track);
+      const id = playIdentity(play.timestamp, play.track);
       if (seen.has(id)) return false;
       seen.add(id);
       return true;
@@ -210,7 +211,10 @@ export function applyUnresolvedResolutions<T extends ScrobbleHistoryIndex>(
   const albumByArtistTrack = new Map<string, string>();
   for (const rule of rules) {
     albumByArtistTrack.set(
-      `${normalizeHistoryName(rule.artist)}|${normalizeHistoryName(rule.track)}`,
+      JSON.stringify([
+        normalizeHistoryName(rule.artist),
+        normalizeHistoryName(rule.track),
+      ]),
       rule.album
     );
   }
@@ -226,7 +230,7 @@ export function applyUnresolvedResolutions<T extends ScrobbleHistoryIndex>(
     const keep: ScrobbleHistoryEntry[] = [];
     for (const play of entry.plays) {
       const album = albumByArtistTrack.get(
-        `${artist}|${normalizeHistoryName(play.track ?? '')}`
+        JSON.stringify([artist, normalizeHistoryName(play.track ?? '')])
       );
       if (!album) {
         keep.push(play);
@@ -242,14 +246,12 @@ export function applyUnresolvedResolutions<T extends ScrobbleHistoryIndex>(
         albumIdentities.set(
           key,
           new Set(
-            albums[key].plays.map(p =>
-              playIdentity(p.timestamp, artist, p.track)
-            )
+            albums[key].plays.map(p => playIdentity(p.timestamp, p.track))
           )
         );
       }
       const identities = albumIdentities.get(key)!;
-      const id = playIdentity(play.timestamp, artist, play.track);
+      const id = playIdentity(play.timestamp, play.track);
       resolvedPlays++;
       if (identities.has(id)) continue;
       identities.add(id);

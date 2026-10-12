@@ -409,6 +409,44 @@ describe('MigrationService', () => {
     });
   });
 
+  describe('scrobble history index v2', () => {
+    it('migrates an unversioned index all the way on first startup', async () => {
+      await fs.mkdir(`${testDataDir}/history`, { recursive: true });
+      await fs.writeFile(
+        `${testDataDir}/history/scrobble-history-index.json`,
+        JSON.stringify({
+          lastSyncTimestamp: 1,
+          totalScrobbles: 99,
+          oldestScrobbleDate: 1,
+          albums: {
+            'a|b': {
+              lastPlayed: 2,
+              playCount: 3,
+              plays: [
+                { timestamp: 1, track: 'x' },
+                { timestamp: 1, track: 'x' },
+                { timestamp: 2, track: 'y' },
+              ],
+            },
+          },
+        })
+      );
+
+      await migrationService.migrateAllOnStartup();
+
+      const saved = JSON.parse(
+        await fs.readFile(
+          `${testDataDir}/history/scrobble-history-index.json`,
+          'utf8'
+        )
+      );
+      expect(saved.schemaVersion).toBe(2);
+      expect(saved.unresolved).toEqual({});
+      expect(saved.albums['a|b'].plays).toHaveLength(2);
+      expect(saved.totalScrobbles).toBe(2);
+    });
+  });
+
   describe('data preservation', () => {
     it('should preserve complex nested data structures', async () => {
       // Arrange - Create file with complex nested data

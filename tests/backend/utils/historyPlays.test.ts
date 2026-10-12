@@ -19,12 +19,11 @@ const index = (
 });
 
 describe('historyPlays', () => {
-  it('playIdentity normalizes artist and track and includes both', () => {
-    expect(playIdentity(100, ' The Cure ', 'Lullaby')).toBe(
-      playIdentity(100, 'the cure', 'LULLABY')
-    );
-    expect(playIdentity(100, 'a', 'x')).not.toBe(playIdentity(100, 'a', 'y'));
-    expect(playIdentity(100, 'a', 'x')).not.toBe(playIdentity(100, 'b', 'x'));
+  it('playIdentity is timestamp + normalized track, unambiguous with "|"', () => {
+    expect(playIdentity(100, ' Lullaby ')).toBe(playIdentity(100, 'LULLABY'));
+    expect(playIdentity(100, 'x')).not.toBe(playIdentity(100, 'y'));
+    expect(playIdentity(100, 'x')).not.toBe(playIdentity(101, 'x'));
+    expect(playIdentity(100, 'a|b')).not.toBe(playIdentity(1001, 'b'));
   });
 
   it('forEachListeningPlay visits album and unresolved plays', () => {
@@ -95,8 +94,8 @@ describe('historyPlays', () => {
         },
       })
     );
-    expect(sets.withAlbum.has(playIdentity(1, 'a', 'x'))).toBe(true);
-    expect(sets.unresolved.has(playIdentity(2, 'a', 'y'))).toBe(true);
+    expect(sets.withAlbum.has(playIdentity(1, 'x'))).toBe(true);
+    expect(sets.unresolved.has(playIdentity(2, 'y'))).toBe(true);
   });
 
   describe('dedupeHistoryIndex', () => {
@@ -218,6 +217,31 @@ describe('historyPlays', () => {
         { timestamp: 5, track: 'Other' },
       ]);
       expect(view.unresolved).toEqual({});
+    });
+
+    it('keeps artist and track apart in rule keys (names with "|")', () => {
+      const { index: view } = applyUnresolvedResolutions(
+        index({
+          unresolved: {
+            'a|b': {
+              lastPlayed: 1,
+              playCount: 1,
+              plays: [{ timestamp: 1, track: 'c' }],
+            },
+            a: {
+              lastPlayed: 2,
+              playCount: 1,
+              plays: [{ timestamp: 2, track: 'b|c' }],
+            },
+          },
+        }),
+        [{ artist: 'a', track: 'b|c', album: 'Right' }]
+      );
+
+      expect(view.albums['a|right'].plays).toEqual([
+        { timestamp: 2, track: 'b|c' },
+      ]);
+      expect(view.unresolved!['a|b'].plays).toHaveLength(1);
     });
 
     it('returns the same index when there is nothing to apply', () => {

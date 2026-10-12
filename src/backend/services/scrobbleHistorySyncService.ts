@@ -324,7 +324,7 @@ export class ScrobbleHistorySyncService extends EventEmitter {
         result.newestTimestamp = timestamp;
       }
 
-      const id = playIdentity(timestamp, artist, trackName);
+      const id = playIdentity(timestamp, trackName);
       if (identities.withAlbum.has(id)) {
         result.duplicatesSkipped++;
         continue;
@@ -393,17 +393,29 @@ export class ScrobbleHistorySyncService extends EventEmitter {
     timestamp: number,
     trackName: string
   ): void {
+    const unresolved = index.unresolved ?? {};
+    const id = playIdentity(timestamp, trackName);
+    // Usually under this artist, but a merge may have moved it to another
+    // spelling of the artist, so fall back to every artist
     const artistKey = normalizeHistoryName(artist);
-    const entry = index.unresolved?.[artistKey];
-    if (!entry) return;
-    const id = playIdentity(timestamp, artist, trackName);
-    entry.plays = entry.plays.filter(
-      play => playIdentity(play.timestamp, artistKey, play.track) !== id
-    );
-    if (entry.plays.length === 0) {
-      delete index.unresolved![artistKey];
-    } else {
-      refreshEntryStats(entry);
+    const candidates = [
+      artistKey,
+      ...Object.keys(unresolved).filter(key => key !== artistKey),
+    ];
+    for (const key of candidates) {
+      const entry = unresolved[key];
+      if (!entry) continue;
+      const before = entry.plays.length;
+      entry.plays = entry.plays.filter(
+        play => playIdentity(play.timestamp, play.track) !== id
+      );
+      if (entry.plays.length === before) continue;
+      if (entry.plays.length === 0) {
+        delete unresolved[key];
+      } else {
+        refreshEntryStats(entry);
+      }
+      return;
     }
   }
 
@@ -739,26 +751,16 @@ export class ScrobbleHistorySyncService extends EventEmitter {
   async startBackfill(
     window: { from?: number; to?: number } = {}
   ): Promise<BackfillResult> {
+    // Claim the lock before any await, so two backfills can't both start
     if (this.isSyncing) {
       throw new Error('A sync is already in progress');
     }
-    const existing = await this.getHistoryIndex();
-    if (!existing) {
-      throw new Error('No history index yet; run a sync first');
-    }
-
     this.isSyncing = true;
     this.isPaused = false;
     this.syncAbortController = new AbortController();
+    const abort = this.syncAbortController;
     const fullRange = window.from === undefined && window.to === undefined;
-    this.logger.info(
-      `Starting history backfill${fullRange ? ' (full range)' : ` (from=${window.from ?? '-'} to=${window.to ?? '-'})`}`
-    );
-
-    // Work on a copy; the stored index only changes on success
-    const working: ScrobbleHistoryIndex = JSON.parse(JSON.stringify(existing));
-    working.unresolved ??= {};
-    const identities = buildIdentitySets(working);
+    const cancelled = (): boolean => this.isPaused || abort.signal.aborted;
     const result: BackfillResult = {
       added: 0,
       addedUnresolved: 0,
@@ -767,10 +769,17 @@ export class ScrobbleHistorySyncService extends EventEmitter {
     };
 
     try {
+      if (!(await this.getHistoryIndex())) {
+        throw new Error('No history index yet; run a sync first');
+      }
+      this.logger.info(
+        `Starting history backfill${fullRange ? ' (full range)' : ` (from=${window.from ?? '-'} to=${window.to ?? '-'})`}`
+      );
+
+      // Fetch everything first; nothing is written until the end
+      const fetched: LastFmTrack[] = [];
       const firstPage = await this.fetchPageWithRetry(1, window);
       const totalPages = Math.max(1, firstPage.totalPages);
-      if (fullRange) this.recordLastfmTotal(working, firstPage.totalScrobbles);
-
       this.syncStatus = {
         status: 'syncing',
         progress: 0,
@@ -784,41 +793,47 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       let pageData = firstPage;
       for (let page = 1; page <= totalPages; page++) {
         if (page > 1) {
-          if (this.isPaused || this.syncAbortController?.signal.aborted) {
-            this.logger.info('History backfill cancelled; index unchanged');
-            this.syncStatus.status = 'idle';
-            this.emit('statusChange', this.syncStatus);
-            return { ...result, cancelled: true };
-          }
+          if (cancelled()) return this.cancelBackfill(result);
           await new Promise(resolve =>
             setTimeout(resolve, this.getRequestDelay())
           );
           pageData = await this.fetchPageWithRetry(page, window);
         }
-
-        const pageResult = this.processScrobbles(
-          pageData.tracks,
-          working,
-          identities
-        );
-        result.added += pageResult.processed;
-        result.addedUnresolved += pageResult.unresolved;
-        result.alreadyIndexed += pageResult.duplicatesSkipped;
+        fetched.push(...pageData.tracks);
         result.pages = page;
-
         this.syncStatus.currentPage = page;
-        this.syncStatus.scrobblesFetched = result.added;
+        this.syncStatus.scrobblesFetched = fetched.length;
         this.syncStatus.progress = Math.round((page / totalPages) * 100);
         this.emit('statusChange', this.syncStatus);
       }
+      // A pause or clear during the last fetch still cancels
+      if (cancelled()) return this.cancelBackfill(result);
 
-      if (fullRange) working.lastFullBackfillAt = Date.now();
+      // Merge into a fresh read, so changes made meanwhile (a lowered
+      // watermark after a backdated scrobble, an index merge) are kept
+      const index = await this.getHistoryIndex();
+      if (!index) return this.cancelBackfill(result);
+      index.unresolved ??= {};
+      const merged = this.processScrobbles(
+        fetched,
+        index,
+        buildIdentitySets(index)
+      );
+      result.added = merged.processed;
+      result.addedUnresolved = merged.unresolved;
+      result.alreadyIndexed = merged.duplicatesSkipped;
+      if (fullRange) {
+        this.recordLastfmTotal(index, firstPage.totalScrobbles);
+        index.lastFullBackfillAt = Date.now();
+      }
+
       // Back up the current file, then save once
       await this.fileStorage.createBackup(HISTORY_INDEX_FILE);
-      await this.saveIndex(working);
+      await this.saveIndex(index);
 
       this.syncStatus.status = 'completed';
       this.syncStatus.progress = 100;
+      this.syncStatus.scrobblesFetched = result.added;
       this.emit('statusChange', this.syncStatus);
       this.logger.info(
         `History backfill completed: ${result.added} plays added (${result.addedUnresolved} without album info), ${result.alreadyIndexed} already indexed, ${result.pages} pages`
@@ -837,10 +852,20 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       this.emit('statusChange', this.syncStatus);
       throw error;
     } finally {
-      this.isSyncing = false;
-      this.isPaused = false;
-      this.syncAbortController = null;
+      // clearIndex() may have released the lock and started over
+      if (this.syncAbortController === abort) {
+        this.isSyncing = false;
+        this.isPaused = false;
+        this.syncAbortController = null;
+      }
     }
+  }
+
+  private cancelBackfill(result: BackfillResult): BackfillResult {
+    this.logger.info('History backfill cancelled; index unchanged');
+    this.syncStatus.status = 'idle';
+    this.emit('statusChange', this.syncStatus);
+    return { ...result, cancelled: true };
   }
 
   /** Fetch a page, retrying failures with a growing delay. */

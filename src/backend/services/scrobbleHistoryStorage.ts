@@ -1,3 +1,5 @@
+import { createHash } from 'crypto';
+
 import { ScrobbleHistoryIndex, AlbumHistoryEntry } from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
 import {
@@ -221,6 +223,16 @@ export class ScrobbleHistoryStorage {
       this.logger.debug('History index not found');
       return null;
     }
+  }
+
+  /** Hash of the current resolution rules; '' when there are none. */
+  async getResolutionRulesFingerprint(): Promise<string> {
+    const rules = this.resolutionRules ? await this.resolutionRules() : [];
+    if (rules.length === 0) return '';
+    const lines = rules
+      .map(rule => JSON.stringify([rule.artist, rule.track, rule.album]))
+      .sort();
+    return createHash('sha1').update(lines.join('\n')).digest('hex');
   }
 
   /** The index exactly as stored, without resolution rules applied. */

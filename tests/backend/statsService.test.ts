@@ -1230,6 +1230,40 @@ describe('StatsService', () => {
       expect(mockHistoryStorage.getIndex).toHaveBeenCalled();
     });
 
+    it('should ignore a warm cache built before a resolution rule changed', async () => {
+      const syncTimestamp = 1700000000000;
+      mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(syncTimestamp);
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
+      (
+        mockHistoryStorage as unknown as {
+          getResolutionRulesFingerprint: jest.Mock;
+        }
+      ).getResolutionRulesFingerprint = jest.fn().mockResolvedValue('rules-v2');
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        lastUpdated: 0,
+        streaks: { currentStreak: 0, longestStreak: 0 },
+        milestoneHistory: [],
+        warm: {
+          warmedAt: 0,
+          syncTimestamp,
+          version: 3,
+          artistAliasFingerprint: '',
+          // Built when a rule pointed somewhere else (same counts)
+          historyFingerprint: computeHistoryFingerprint(
+            createMockIndex({}),
+            'rules-v1'
+          ),
+          topAlbums: { all: [{ artist: 'cached', album: 'cached' }] },
+        },
+      });
+
+      await expect(statsService.getTopAlbums('all', 10)).resolves.toEqual([]);
+      expect(computeHistoryFingerprint(createMockIndex({}), 'x')).toContain(
+        ';rules:x'
+      );
+    });
+
     it('should ignore a warm cache built before an album mapping change, and serve it once warmed again', async () => {
       // Arrange
       const syncTimestamp = 1700000000000;

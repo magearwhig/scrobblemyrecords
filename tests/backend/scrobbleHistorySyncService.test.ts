@@ -954,6 +954,75 @@ describe('ScrobbleHistorySyncService', () => {
       );
     });
 
+    it('does not re-add plays an index merge moved to another artist spelling', async () => {
+      // "afghan whigs|1965" was merged into "the afghan whigs|1965"
+      await fileStorage.writeJSON(indexFile, {
+        ...seed,
+        albums: {
+          'the afghan whigs|1965': {
+            lastPlayed: 1000,
+            playCount: 1,
+            plays: [{ timestamp: 1000, track: 'Somethin Hot' }],
+          },
+        },
+      });
+      mockAxiosInstance.get.mockResolvedValue(
+        pageOf([track('Afghan Whigs', '1965', 'Somethin Hot', 1000)])
+      );
+
+      const result = await service.startBackfill();
+
+      expect(result.added).toBe(0);
+      expect(result.alreadyIndexed).toBe(1);
+    });
+
+    it('keeps changes made to the index while it runs', async () => {
+      mockAxiosInstance.get.mockImplementationOnce(async () => {
+        // A backdated scrobble lowers the watermark mid-backfill
+        await service.adjustSyncTimestampForBackdatedScrobbles(500);
+        return pageOf([track('A', '', 'Single', 3000)]);
+      });
+
+      await service.startBackfill();
+
+      const index = (await service.getHistoryIndex())!;
+      expect(index.lastSyncTimestamp).toBe((500 - 60) * 1000);
+      expect(index.unresolved!.a.plays).toHaveLength(1);
+    });
+
+    it('cancels when paused during the last page fetch', async () => {
+      const before = JSON.stringify(await fileStorage.readJSON(indexFile));
+      mockAxiosInstance.get.mockImplementationOnce(async () => {
+        service.pauseSync();
+        return pageOf([track('A', '', 'Single', 3000)]);
+      });
+
+      const result = await service.startBackfill();
+
+      expect(result.cancelled).toBe(true);
+      expect(JSON.stringify(await fileStorage.readJSON(indexFile))).toBe(
+        before
+      );
+    });
+
+    it('rejects a second backfill while one runs', async () => {
+      let release!: () => void;
+      mockAxiosInstance.get.mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            release = () => resolve(pageOf([track('A', '', 'Single', 3000)]));
+          })
+      );
+
+      const first = service.startBackfill();
+      await expect(service.startBackfill()).rejects.toThrow(
+        'A sync is already in progress'
+      );
+      await new Promise(resolve => setTimeout(resolve, 0));
+      release();
+      await expect(first).resolves.toMatchObject({ added: 1 });
+    });
+
     it('refuses to start while another sync runs, or with no index', async () => {
       await fileStorage.delete(indexFile);
       await expect(service.startBackfill()).rejects.toThrow(
