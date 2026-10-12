@@ -130,3 +130,34 @@
   font-weight: 700;
   color: var(--text-primary);
 }
+
+/* Note under the top lists about plays without album info */
+.stats-unresolved-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: calc(-1 * var(--space-3)) 0 var(--space-6) 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.stats-unresolved-note-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-accent);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.stats-unresolved-note-link:hover {
+  color: var(--accent-primary-hover);
+}
+
+.stats-unresolved-note-link:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}

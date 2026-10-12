@@ -39,6 +39,9 @@ const createMockApiInstance = () => ({
   startHistorySync: jest.fn(),
   pauseHistorySync: jest.fn(),
   resumeHistorySync: jest.fn(),
+  getUnresolvedHistorySummary: jest
+    .fn()
+    .mockResolvedValue({ unresolvedCount: 0 }),
 });
 
 const createMockAlbumHistory = (count: number) => ({
@@ -76,6 +79,39 @@ const createMockArtistHistory = (count: number) => ({
   total: count,
   totalPages: Math.ceil(count / 50),
   page: 1,
+});
+
+describe('LastFmHistoryTab unresolved note', () => {
+  it('points to plays without album info from the Albums view', async () => {
+    const api = createMockApiInstance();
+    api.getAlbumHistoryPaginated.mockResolvedValue(createMockAlbumHistory(1));
+    api.getUnresolvedHistorySummary.mockResolvedValue({
+      unresolvedCount: 6947,
+    });
+    mockApiService.getApiService.mockReturnValue(api as any);
+
+    render(<LastFmHistoryTab />);
+
+    expect(
+      await screen.findByText(/6,947 plays without album info/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Review them' })
+    ).toBeInTheDocument();
+  });
+
+  it('shows nothing when every play has album info', async () => {
+    const api = createMockApiInstance();
+    api.getAlbumHistoryPaginated.mockResolvedValue(createMockAlbumHistory(1));
+    mockApiService.getApiService.mockReturnValue(api as any);
+
+    render(<LastFmHistoryTab />);
+
+    await waitFor(() =>
+      expect(api.getUnresolvedHistorySummary).toHaveBeenCalled()
+    );
+    expect(screen.queryByText(/without album info/)).not.toBeInTheDocument();
+  });
 });
 
 describe('LastFmHistoryTab', () => {

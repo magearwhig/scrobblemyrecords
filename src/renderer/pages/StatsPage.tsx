@@ -1,4 +1,4 @@
-import { BarChart3, Disc3, Music, PlusCircle } from 'lucide-react';
+import { BarChart3, Disc3, Info, Music, PlusCircle } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import './StatsPage.page.css';
@@ -44,7 +44,8 @@ import { TopList } from '../components/stats/TopList';
 import { Button } from '../components/ui/Button';
 import { StatsPageSkeleton } from '../components/ui/Skeleton';
 import { useCollectionLookup } from '../hooks/useCollectionLookup';
-import { navigate } from '../routes';
+import { navigate, ROUTES } from '../routes';
+import { getApiService } from '../services/api';
 import { imagesApi, statsApi } from '../services/statsApi';
 import { createLogger } from '../utils/logger';
 
@@ -97,6 +98,8 @@ export const StatsPage: React.FC = () => {
   const [topArtists, setTopArtists] = useState<ArtistPlayCount[]>([]);
   const [topAlbums, setTopAlbums] = useState<AlbumPlayCount[]>([]);
   const [topTracks, setTopTracks] = useState<TrackPlayCount[]>([]);
+  // Plays without album info (excluded from album stats)
+  const [unresolvedCount, setUnresolvedCount] = useState(0);
   const [artistPeriod, setArtistPeriod] = useState<Period>('month');
   const [albumPeriod, setAlbumPeriod] = useState<Period>('month');
   const [trackPeriod, setTrackPeriod] = useState<Period>('month');
@@ -280,6 +283,16 @@ export const StatsPage: React.FC = () => {
 
     loadInitialData();
   }, [enrichAlbumsWithImages, enrichArtistsWithImages]);
+
+  // Count of plays without album info, for the note under Top Albums
+  useEffect(() => {
+    Promise.resolve()
+      .then(() => getApiService().getUnresolvedHistorySummary())
+      .then(summary => setUnresolvedCount(summary?.unresolvedCount ?? 0))
+      .catch((err: unknown) => {
+        logger.warn('Failed to load unresolved history summary', err);
+      });
+  }, []);
 
   // Lazy load listening patterns when section scrolls into view
   useEffect(() => {
@@ -740,6 +753,23 @@ export const StatsPage: React.FC = () => {
           customDateRange={trackDateRange}
         />
       </section>
+      {unresolvedCount > 0 && (
+        <p className='stats-unresolved-note'>
+          <Info size={16} aria-hidden='true' />
+          <span>
+            {unresolvedCount.toLocaleString()}{' '}
+            {unresolvedCount === 1 ? 'play' : 'plays'} without album info{' '}
+            {unresolvedCount === 1 ? 'is' : 'are'} excluded from album stats.
+          </span>
+          <button
+            type='button'
+            className='stats-unresolved-note-link'
+            onClick={() => navigate(ROUTES.HISTORY, { tab: 'unresolved' })}
+          >
+            Review them
+          </button>
+        </p>
+      )}
 
       {/* Milestone progress */}
       {milestones && (

@@ -564,3 +564,20 @@
   color: var(--text-secondary);
   text-align: right;
 }
+
+/* Albums view: pointer to plays without album info */
+.lastfm-history-unresolved-note {
+  margin: 0 0 var(--space-3) 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.lastfm-history-unresolved-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-accent);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  cursor: pointer;
+}

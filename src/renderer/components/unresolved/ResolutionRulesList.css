@@ -1,0 +1,67 @@
+/* Album rules list for the Unresolved history tab */
+
+.unresolved-rules {
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.unresolved-rules-title {
+  margin: 0 0 var(--space-1) 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.unresolved-rules-description,
+.unresolved-rules-empty {
+  margin: 0 0 var(--space-3) 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.unresolved-rules-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.unresolved-rules-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.unresolved-rules-item:last-child {
+  border-bottom: none;
+}
+
+.unresolved-rules-item-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+
+.unresolved-rules-item-source {
+  color: var(--text-secondary);
+}
+
+.unresolved-rules-item-arrow {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.unresolved-rules-item-album {
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+}
+
+.unresolved-rules-item-date {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}

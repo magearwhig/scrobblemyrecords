@@ -75,6 +75,9 @@ import {
   TrackedRelease,
   TrackMapping,
   TrackSearchResult,
+  UnresolvedHistoryPage,
+  UnresolvedHistorySummary,
+  UnresolvedTrackResolution,
   UpdateDiscardPileItemRequest,
   WebsiteItem,
   WebsiteMonitoringSettings,
@@ -740,6 +743,108 @@ class ApiService {
       '/suggestions/history/sync/settings',
       settings
     );
+    return response.data.data;
+  }
+
+  /**
+   * Start a background backfill that re-reads Last.fm history and adds plays
+   * the index is missing. Omit from/to (Unix seconds) for a full-range run.
+   * Progress is reported by getHistorySyncStatus(). Rejects with 409 when a
+   * sync is already running.
+   */
+  async startHistoryBackfill(
+    range: { from?: number; to?: number } = {}
+  ): Promise<{ message: string }> {
+    const response = await this.api.post(
+      '/suggestions/history/sync/backfill',
+      range
+    );
+    return response.data.data;
+  }
+
+  // ============================================
+  // Unresolved listening history (albumless plays)
+  // ============================================
+
+  async getUnresolvedHistory(
+    options: {
+      search?: string;
+      sort?: 'plays' | 'artist' | 'recent';
+      page?: number;
+      limit?: number;
+      includeHidden?: boolean;
+    } = {}
+  ): Promise<UnresolvedHistoryPage> {
+    const params: Record<string, string | number | boolean> = {};
+    if (options.search) params.search = options.search;
+    if (options.sort) params.sort = options.sort;
+    if (options.page !== undefined) params.page = options.page;
+    if (options.limit !== undefined) params.limit = options.limit;
+    if (options.includeHidden !== undefined) {
+      params.includeHidden = options.includeHidden;
+    }
+    const response = await this.api.get('/stats/unresolved-history', {
+      params,
+    });
+    return response.data.data;
+  }
+
+  async getUnresolvedHistorySummary(): Promise<UnresolvedHistorySummary> {
+    const response = await this.api.get('/stats/unresolved-history/summary');
+    return response.data.data;
+  }
+
+  async lookupUnresolvedAlbum(
+    artist: string,
+    track: string
+  ): Promise<{ album: string | null }> {
+    const response = await this.api.post('/stats/unresolved-history/lookup', {
+      artist,
+      track,
+    });
+    return response.data.data;
+  }
+
+  async getUnresolvedResolutions(): Promise<UnresolvedTrackResolution[]> {
+    const response = await this.api.get(
+      '/stats/unresolved-history/resolutions'
+    );
+    return response.data.data;
+  }
+
+  async saveUnresolvedResolutions(
+    resolutions: Array<{
+      artist: string;
+      track: string;
+      album: string;
+      source?: UnresolvedTrackResolution['source'];
+    }>
+  ): Promise<{ saved: UnresolvedTrackResolution[] }> {
+    const response = await this.api.post(
+      '/stats/unresolved-history/resolutions',
+      { resolutions }
+    );
+    return response.data.data;
+  }
+
+  async deleteUnresolvedResolution(id: string): Promise<{ removed: boolean }> {
+    const response = await this.api.delete(
+      `/stats/unresolved-history/resolutions/${encodeURIComponent(id)}`
+    );
+    return response.data.data;
+  }
+
+  async hideUnresolvedTracks(keys: string[]): Promise<{ changed: number }> {
+    const response = await this.api.post('/stats/unresolved-history/hide', {
+      keys,
+    });
+    return response.data.data;
+  }
+
+  async unhideUnresolvedTracks(keys: string[]): Promise<{ changed: number }> {
+    const response = await this.api.post('/stats/unresolved-history/unhide', {
+      keys,
+    });
     return response.data.data;
   }
 

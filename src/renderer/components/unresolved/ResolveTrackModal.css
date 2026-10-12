@@ -1,0 +1,131 @@
+/* Resolve modal for unresolved (albumless) tracks */
+
+.resolve-modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  color: var(--text-primary);
+}
+
+.resolve-modal-subject {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.resolve-modal-track {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.resolve-modal-artist {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.resolve-modal-fieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.resolve-modal-legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+
+.resolve-modal-known-albums {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.resolve-modal-album-option {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  background-color: var(--surface-sunken);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.resolve-modal-album-option:hover {
+  border-color: var(--border-accent);
+}
+
+.resolve-modal-album-option:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.resolve-modal-album-option[aria-pressed='true'] {
+  border-color: var(--accent-primary);
+  background-color: var(--accent-primary-muted);
+  color: var(--text-primary);
+}
+
+.resolve-modal-lookup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.resolve-modal-lookup-result {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.resolve-modal-suggestion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+}
+
+.resolve-modal-suggestion-album {
+  color: var(--text-primary);
+}
+
+.resolve-modal-hint {
+  color: var(--text-muted);
+}
+
+.resolve-modal-error {
+  color: var(--status-error);
+}
+
+.resolve-modal-scope-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.resolve-modal-preview {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
