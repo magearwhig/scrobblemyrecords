@@ -1018,7 +1018,11 @@ describe('ScrobbleHistorySyncService', () => {
       await expect(service.startBackfill()).rejects.toThrow(
         'A sync is already in progress'
       );
-      await new Promise(resolve => setTimeout(resolve, 0));
+      // Wait for the page fetch to start: the index read before it is real
+      // disk I/O, which can take several ticks (e.g. under coverage on CI)
+      for (let i = 0; !release && i < 200; i++) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
       release();
       await expect(first).resolves.toMatchObject({ added: 1 });
     });
