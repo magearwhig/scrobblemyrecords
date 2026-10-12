@@ -200,7 +200,7 @@ without a `duration` field.
 
 ### Core Features
 - **Home Dashboard**: Engaging dashboard with quick stats, quick actions, recent albums, and monthly highlights
-- **Collection Browser**: Search and filter your Discogs collection
+- **Collection Browser**: Search and filter your Discogs collection; your search, filters and scroll position come back when you return from an album
 - **Release Details**: Side/disc track selection and per-album scrobble history
 - **Track Selection**: Choose individual tracks or entire albums
 - **Batch Scrobbling**: Scrobble multiple items with progress tracking
@@ -230,6 +230,9 @@ without a `duration` field.
 - **Disambiguation Warnings**: Alerts when scrobbling artists with Discogs disambiguation suffixes (e.g., "Ghost (32)")
 - **Possible Mappings**: Automatically suggests artists in your collection that may need name mappings
 - **Split Entry Detection**: Detects and merges duplicate history entries caused by artist name variants
+- **Album Version Merging**: Count deluxe editions, remasters, live versions and spelling variants as one album everywhere, with suggested merges in Settings → Mappings
+- **Unresolved Listening History**: Find plays Last.fm recorded without an album, recover missing history, and assign albums one track or a whole artist at a time
+- **Excluded Artists**: Stop tracking podcasts and other non-music artists so they never count in stats
 
 ### 🏠 Home Dashboard
 Your personalized dashboard showing key metrics and insights at a glance:
@@ -270,9 +273,10 @@ Comprehensive listening statistics and visualizations:
 - **Listening Patterns**: Hourly polar chart (24-hour radar) and day-of-week bar chart with personalized insights ("You're an evening listener")
 - **On This Day**: See what you were listening to on this date 1, 2, and 3 years ago
 - **Your Music DNA**: Genre treemap powered by Last.fm artist tags, showing your top genres weighted by listening habits
-- **Top Artists & Albums**: Leaderboards with period selection (week/month/year/all-time/custom) with Spotify play buttons
+- **Top Artists, Albums & Tracks**: Leaderboards with period selection (week/month/year/all-time/custom) with Spotify play buttons. **View All** links open the full list on the History page
 - **Custom Date Range**: Pick specific months or custom date ranges for all stats
 - **Milestone Progress**: Track progress toward scrobble milestones (1K, 5K, 10K, etc.)
+- **Plays Without Album Info**: When some plays have no album, a link to the Unresolved tab shows how many and lets you fix them
 - **Dusty Corners**: Albums in your collection you haven't played in 6+ months, with Spotify play buttons
 - **Collection ROI Score**: "Bang for your buck" leaderboard showing plays-per-dollar for albums in your collection with marketplace value data
 - **Album Listening Arc**: Monthly play count chart for any album, revealing honeymoon phases, plateaus, and rediscovery
@@ -299,6 +303,7 @@ Click any artist or track name throughout the app to navigate to a dedicated det
 - Period stats: this week, this month, this year, all-time
 - Top tracks by play count
 - Albums list with "In Collection" badges and cover art
+- Merge action on each album row to fold one version of an album into another (e.g. a live or deluxe edition)
 - First/last played dates
 - External links to Last.fm and Spotify
 
@@ -379,6 +384,7 @@ Sync your complete Last.fm history for smarter suggestions:
 - **Auto-Sync**: Automatically updates on startup (configurable)
 - **Storage Efficient**: ~5-10 MB for 50,000+ scrobbles
 - **Source Agnostic**: Captures plays from Spotify, Apple Music, or any Last.fm source
+- **Complete Count**: Plays without album info are kept too, and the stored total is checked against Last.fm's. If plays are missing, **Recover missing history** (History → Unresolved) refetches the full history and adds only what's missing, with a backup taken first
 
 **Sync Controls** (Settings → Scrobble History):
 - Manual "Sync Now" button
@@ -387,7 +393,7 @@ Sync your complete Last.fm history for smarter suggestions:
 - Toggle auto-sync on startup
 
 ### 📜 History Page
-Two-tab view of your listening activity:
+Three-tab view of your listening activity:
 
 **App Scrobble Sessions Tab:**
 - Sessions scrobbled from this app to Last.fm
@@ -405,6 +411,18 @@ Two-tab view of your listening activity:
 - Play count and last played date for each album
 - **Spotify Integration**: Play button for each track to instantly search and play on Spotify
 - Sync controls to update the history index
+- Full top artists, albums and tracks lists (opened from the Stats page **View All** links)
+
+**Unresolved Tab** (plays Last.fm recorded without an album):
+- **Summary**: How many plays have no album, how the stored total compares with Last.fm's, and **Recover missing history** when they differ
+- **Grouped by Artist**: Search, sort, page through, and hide tracks you don't care about (hiding only removes them from the list; the plays still count)
+- **Add Album**: Pick an album for one track, with a **Suggest from Last.fm** lookup. The choice is saved as a rule, so the plays count toward that album in stats and future plays of the same track are covered too
+- **Add Albums for All Tracks**: Fills in every track by an artist at once, then lets you edit before saving:
+  - First choice is the album the song was played on most in your history, then an owned Discogs release whose tracklist has it
+  - **Look up missing on Last.fm** fills the rest, and checks each suggestion against the album's Last.fm tracklist so you can see whether the song is actually on it (with its track number and cover)
+  - **Match from a Discogs album**: paste a Discogs master or release link (e.g. a live album) to match tracks against its tracklist. Exact, tag-only (e.g. "(Live)") and near matches are shown separately, live/studio mismatches are flagged, and each album you apply can be undone
+- **Manage Rules**: Review and undo saved album assignments
+- **Don't Track an Artist**: Exclude podcasts and other non-music artists. Their plays stay on disk but are left out of every stat, chart, suggestion and the Unresolved list. Podcast-like artists (many one-off episodes, mostly without albums) are suggested automatically. **Manage not tracked** brings an artist back
 
 ### 🔍 Discovery Page
 Find albums and artists you listen to but don't own on vinyl:
@@ -436,6 +454,7 @@ Sync and manage your Discogs wantlist with vinyl availability tracking:
 - **Refresh All**: Force re-check vinyl status for all items
 
 **Filtering & Sorting:**
+- **Search**: Filter by artist or album (partial, case-insensitive); works with every tab except New Releases
 - **Tabs**: All Items, Has Vinyl, CD Only, Affordable, Monitoring, New Releases
 - **Sort Options**: Date Added, Price, Artist, Album, Scrobbles (Most Played)
 - **Include Monitored Toggle**: Merge locally monitored albums into main wishlist view
@@ -488,6 +507,7 @@ Track Discogs inventories of your favorite local record shops to find wishlist i
 - **Quick Check**: Daily check for newest listings
 - Progressive pagination handles large inventories (10,000+ items)
 - Intelligent caching reduces API calls
+- **Build/Refresh Cache** runs in the background with a real progress bar (masters processed, failures), survives a page reload, and can't run at the same time as a scan
 
 **Match Detection:**
 - Automatically matches seller inventory against your Discogs wishlist
@@ -515,6 +535,7 @@ Track new and upcoming releases from artists in your collection using MusicBrain
 - **Upcoming Releases**: See what's coming before release dates
 - **Recent Releases**: Discover albums released in the past 3 months
 - **Release Types**: Albums, EPs, singles, compilations - filter by type
+- **Reissues**: Later represses of older albums are flagged as reissues (when "include reissues" is on); pressings released within about six months of the original count as the original, not a reissue
 
 **Artist Disambiguation:**
 - **Smart Matching**: Auto-matches artists with high confidence (score >= 95%)
@@ -524,7 +545,7 @@ Track new and upcoming releases from artists in your collection using MusicBrain
 **Vinyl Integration:**
 - **Availability Check**: On-demand Discogs search for vinyl pressings
 - **Price Range**: See marketplace pricing when vinyl is available
-- **Wishlist Integration**: One-click add to your Discogs wishlist
+- **Wishlist Integration**: One-click add to your Discogs wishlist (adds the album's main release, as Discogs wantlists hold releases, not masters)
 - **Status Badges**: Vinyl Available, CD Only, or Not Found
 
 **Cover Art:**
@@ -755,13 +776,23 @@ View detailed listening history for any album:
 - **Track Mapping Support**: Manual track-level mappings for naming variants
 - Visible on the Release Details page
 
+**Album Version Merging:**
+- An album mapping says "this Last.fm album counts as that album". Mapping to a collection item marks it owned; merging into another history album combines play counts without implying ownership
+- Merged versions count as one album in top albums, rankings, track appearances, ROI, Wrapped, missing albums and collection features
+- The album page shows totals across all versions, with a **Merged Versions** card to unmerge
+- Mappings stay one hop deep: chains are flattened, and merging back reverses an earlier merge
+- **Suggested Album Merges** (Settings → Mappings) lists albums that look like versions of each other (spelling, punctuation, "Deluxe"/"Remastered" tags, artist aliases) with their play counts; merge or dismiss each one
+
 ### 💾 Backup & Restore
 Protect your user-generated data with manual and automatic backups:
 
 **What's Backed Up:**
 - All settings (user, suggestions, AI, wishlist, sellers, releases, sync)
-- Album mappings (Last.fm → Discogs collection)
+- Album mappings (Last.fm → Discogs collection, and merged album versions)
+- Dismissed album merge suggestions
 - Track mappings (Last.fm → normalized cache)
+- Compound-artist mappings
+- Unresolved history: album assignments for albumless plays, hidden tracks, and excluded artists
 - Artist name mappings (scrobbling and discovery)
 - Hidden albums and artists (Discovery page)
 - Local want list and vinyl watch list
@@ -779,6 +810,7 @@ Protect your user-generated data with manual and automatic backups:
 - **Merge Mode**: Add new items, update existing (keeps local-only data)
 - **Replace Mode**: Overwrite all data with backup contents
 - **Checksum Verification**: Ensures backup integrity
+- Restored mappings and stats take effect immediately, without a restart
 
 **Auto-Backup (Optional):**
 - Disabled by default for privacy
@@ -813,6 +845,7 @@ src/
 │   │   ├── collection.ts          # Discogs collection sync & browsing
 │   │   ├── scrobble.ts            # Scrobbling to Last.fm
 │   │   ├── stats.ts               # Stats dashboard & rankings
+│   │   ├── unresolvedHistory.ts   # Plays without album info, exclusions
 │   │   ├── images.ts              # Album/artist image fetching
 │   │   ├── suggestions.ts         # Suggestions, discovery, AI
 │   │   ├── artistMapping.ts       # Artist name mapping CRUD
@@ -932,6 +965,7 @@ src/
 - **Automatic Backups**: `data/settings/user-settings.json` is backed up before changes (keeps 3 most recent)
 - **No Cloud Dependencies**: Everything runs on your computer
 - **CORS Protected**: Only allows localhost connections by default (with a strict allowlist)
+- **Log Redaction**: Tokens, API keys and OAuth parameters are redacted from both server and browser logs
 
 ## 🐛 Troubleshooting
 

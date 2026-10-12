@@ -23,7 +23,7 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | done/album-detail-page-plan.md | Complete -- shipped 2026-05-09, Feature 17 backend endpoint, AlbumDetailPage, AlbumLink integrations across Stats/History/Collection |
 | done/album-name-aliasing-plan.md | Complete -- via album mappings (merge into history album or collection item) plus Suggested Album Merges in Settings; history-index rewrite intentionally skipped |
 | done/traded-in-archive-plan.md | Complete -- Feature 7 extension, all 3 phases implemented |
-| done/unresolved-listening-history-plan.md | Complete -- 2026-10-11; albumless scrobbles kept and counted in listening stats, backfill (index now matches Last.fm), resolution rules, Unresolved tab |
+| done/unresolved-listening-history-plan.md | Complete -- 2026-10-11; albumless scrobbles kept and counted in listening stats, backfill (index now matches Last.fm), resolution rules, Unresolved tab, artist exclusion, bulk album fill with Last.fm and Discogs tracklist checks |
 | context-tags-plan.md | Backlog -- Effort F (#18); revised 2026-10-11, nothing implemented; stable tag IDs, multiple tags per session |
 | marketplace-upgrade-plan.md | Backlog -- Effort C (#19 + #20); re-planned 2026-10-11 against the code; not started (Phase 0 API check first) |
 | reissue-label-discovery-plan.md | Mostly shipped (`6be3c73`); reissue dedupe and settings defaults fixed 2026-10-11 -- remaining: label/website auto-scan, new-item notifications |

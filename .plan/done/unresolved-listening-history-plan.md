@@ -52,6 +52,25 @@
 > - Milestones above the new total are dropped, and the earliest play date is
 >   recomputed.
 >
+> **Added after the plan: bulk album fill per artist** (user request: Guided By
+> Voices had too many tracks to resolve one at a time). Open decision 2 still
+> holds: nothing is saved until the user reviews the filled-in list.
+> - `UnresolvedHistoryService.suggestAlbums()` fills each track with the
+>   history album it was played on most, then an owned Discogs release whose
+>   tracklist has it. Titles are compared with `trackMatchKey()`, which ignores
+>   remaster/explicit/feat. tags but keeps live, demo and part numbers apart.
+>   On real data this filled 76 of 135 GBV tracks and 59 of 68 Robert Pollard
+>   tracks.
+> - Last.fm lookups are checked against the album's Last.fm tracklist
+>   (`album.getInfo`, cached an hour; failures retried after 2 minutes), so the
+>   modal shows whether the song is on the suggested album, its track number
+>   and the cover.
+> - `POST /discogs-album-match` matches an artist's plays against a pasted
+>   Discogs master or release link (`matchAlbumTracklist()`): exact, tag-only
+>   and near matches, with live/studio mismatches flagged. Discogs errors other
+>   than not-found return 502 with the reason. On real data, John Vanderslice
+>   "Live at The Casbah" matched 10 of 27 tracks.
+>
 > **Known limits:** the incremental sync's 50-page cap can still skip history
 > after a very long gap; backfill repairs it. The saved default-tab preference
 > can't select Unresolved yet.
