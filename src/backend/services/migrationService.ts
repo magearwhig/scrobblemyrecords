@@ -12,8 +12,10 @@ import {
   VersionedStore,
   DataFileMeta,
   MigrationReport,
+  ScrobbleHistoryIndex,
 } from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
+import { dedupeHistoryIndex } from '../utils/historyPlays';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('MigrationService');
@@ -37,8 +39,27 @@ export class MigrationService {
     // ============================================
     this.register('scrobble-history-index', {
       path: 'history/scrobble-history-index.json',
-      currentVersion: 1,
-      migrations: [],
+      currentVersion: 2,
+      migrations: [
+        {
+          // Unversioned files are v1 data; keeps the chain to v2 intact
+          fromVersion: 0,
+          toVersion: 1,
+          migrate: data => data,
+        },
+        {
+          fromVersion: 1,
+          toVersion: 2,
+          description:
+            'Add unresolved (albumless) plays store; drop duplicate plays; recompute totalScrobbles',
+          migrate: data =>
+            dedupeHistoryIndex({
+              ...(data as unknown as ScrobbleHistoryIndex),
+              unresolved:
+                (data as unknown as ScrobbleHistoryIndex).unresolved ?? {},
+            }).index,
+        },
+      ],
     });
 
     // ============================================

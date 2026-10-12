@@ -5,6 +5,7 @@ import {
   ScrobbleHistoryEntry,
 } from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
+import { countListeningPlays } from '../utils/historyPlays';
 import { createLogger } from '../utils/logger';
 
 import { ArtistNameResolver } from './artistNameResolver';
@@ -152,6 +153,10 @@ export class HistoryIndexMergeService {
       delete index.albums[proposal.sourceKey];
       mergedCount++;
     }
+
+    // Merging can drop duplicate plays; keep the total in step. The raw file
+    // is read and written whole, so unresolved plays are preserved.
+    index.totalScrobbles = countListeningPlays(index);
 
     // Write the merged index (backup already created above)
     await this.fileStorage.writeJSON(HISTORY_INDEX_FILE, index);

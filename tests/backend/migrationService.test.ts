@@ -443,9 +443,11 @@ describe('MigrationService', () => {
         'scrobble-history-index'
       );
 
-      // Assert - All nested data preserved
-      expect(result?.schemaVersion).toBe(1);
-      expect(result).toMatchObject(complexData);
+      // Assert - All nested data preserved. v2 adds an empty unresolved store
+      // and recomputes totalScrobbles from the stored plays.
+      expect(result?.schemaVersion).toBe(2);
+      expect(result).toMatchObject({ ...complexData, totalScrobbles: 2 });
+      expect(result).toHaveProperty('unresolved', {});
     });
 
     it('should preserve array data', async () => {

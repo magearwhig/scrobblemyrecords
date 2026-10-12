@@ -239,10 +239,27 @@ export interface AlbumHistoryEntry {
 }
 
 export interface ScrobbleHistoryIndex {
+  /** Newest scrobble timestamp (ms) seen by a sync; the incremental watermark */
   lastSyncTimestamp: number;
+  /** Listening events in the index: album plays + unresolved plays */
   totalScrobbles: number;
   oldestScrobbleDate: number;
   albums: Record<string, AlbumHistoryEntry>; // key: normalized "artist|album"
+  /**
+   * Scrobbles with artist, track and timestamp but no album, keyed by
+   * normalized artist. Counted in listening stats, not album stats.
+   * Missing in files written before schema v2.
+   */
+  unresolved?: Record<string, AlbumHistoryEntry>;
+  /** Scrobble total Last.fm reported on the last sync */
+  lastfmTotal?: number;
+  /** When lastfmTotal was read (ms) */
+  lastfmTotalCheckedAt?: number;
+  /** When the last sync finished successfully (ms) */
+  lastSyncCompletedAt?: number;
+  /** When a full-range backfill last finished (ms) */
+  lastFullBackfillAt?: number;
+  schemaVersion?: number;
 }
 
 export interface SyncStatus {
