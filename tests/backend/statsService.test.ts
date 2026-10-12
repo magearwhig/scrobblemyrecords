@@ -14,6 +14,11 @@ jest.mock('../../src/backend/services/mappingService');
 jest.mock('../../src/backend/services/artistNameResolver');
 
 describe('StatsService', () => {
+  // Some tests pin the clock; always restore it, even if an assertion fails
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   let statsService: StatsService;
   let mockFileStorage: jest.Mocked<FileStorage>;
   let mockHistoryStorage: jest.Mocked<ScrobbleHistoryStorage>;
@@ -306,7 +311,9 @@ describe('StatsService', () => {
     });
 
     it('should estimate listening hours based on track counts', async () => {
-      // Arrange
+      // Arrange — fixed midday clock, so "today" can hold all 10 plays
+      // (just after midnight, most of them would fall on yesterday)
+      jest.useFakeTimers({ now: new Date(2026, 5, 15, 12, 0, 0) });
       const now = new Date();
       const todayTimestamp = Math.floor(now.getTime() / 1000);
 
@@ -330,6 +337,7 @@ describe('StatsService', () => {
 
       // Assert
       expect(hours.today).toBeCloseTo(0.6, 1); // 10 * 210 sec / 3600 = 0.58
+      jest.useRealTimers();
     });
   });
 
@@ -2785,7 +2793,9 @@ describe('StatsService', () => {
     });
 
     it('should aggregate scrobbles by day', async () => {
-      // Arrange
+      // Arrange — fixed midday clock, so the plays at midnight + 2000s are not
+      // in the future
+      jest.useFakeTimers({ now: new Date(2026, 5, 15, 12, 0, 0) });
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const yesterday = new Date(today);
@@ -2818,6 +2828,7 @@ describe('StatsService', () => {
           `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
       );
       expect(todayData?.count).toBe(3);
+      jest.useRealTimers();
     });
 
     it('should aggregate scrobbles by week', async () => {
