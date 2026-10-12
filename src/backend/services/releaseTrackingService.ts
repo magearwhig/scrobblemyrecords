@@ -30,6 +30,9 @@ const COLLECTION_ARTISTS_CACHE_HOURS = 24;
 const TRACKED_RELEASES_CACHE_DAYS = 7;
 const DISAMBIGUATION_CLEANUP_DAYS = 30;
 const AUTO_MATCH_THRESHOLD = 95; // Score threshold for auto-matching artists
+// Pressings of a tracked new album dated within this many days of its
+// release date are treated as original-era pressings, not reissues.
+const ORIGINAL_ERA_WINDOW_DAYS = 180;
 
 // File paths
 const ARTIST_MAPPINGS_FILE = 'releases/artist-mbid-map.json';
@@ -150,18 +153,38 @@ export class ReleaseTrackingService {
    * Get release tracking settings with defaults
    */
   async getSettings(): Promise<ReleaseTrackingSettings> {
+    const defaults = this.getDefaultSettings();
     try {
       const settings =
-        await this.fileStorage.readJSON<ReleaseTrackingSettings>(SETTINGS_FILE);
+        await this.fileStorage.readJSON<Partial<ReleaseTrackingSettings>>(
+          SETTINGS_FILE
+        );
 
       if (settings && settings.schemaVersion === 1) {
-        return settings;
+        // Merge stored values over defaults so settings added after the file
+        // was first written (e.g. includeReissues) get their default instead
+        // of reading as undefined. Explicit stored values (including false)
+        // win; undefined entries fall back to the default.
+        const merged: ReleaseTrackingSettings = { ...defaults };
+        for (const [key, value] of Object.entries(settings)) {
+          if (value !== undefined) {
+            (merged as unknown as Record<string, unknown>)[key] = value;
+          }
+        }
+        merged.schemaVersion = 1;
+        return merged;
       }
     } catch {
       this.logger.debug('No settings file found, using defaults');
     }
 
-    // Return defaults
+    return defaults;
+  }
+
+  /**
+   * Default release tracking settings (fresh object each call).
+   */
+  private getDefaultSettings(): ReleaseTrackingSettings {
     return {
       schemaVersion: 1,
       autoCheckOnStartup: false,
@@ -752,6 +775,54 @@ export class ReleaseTrackingService {
   }
 
   /**
+   * Parse a MusicBrainz-style date ('YYYY', 'YYYY-MM' or 'YYYY-MM-DD') as a
+   * UTC timestamp. A partial date covers a period: `edge` picks its earliest
+   * ('start') or latest ('end') day. Returns null when missing or unparseable.
+   */
+  private parsePartialDate(
+    date: string | null | undefined,
+    edge: 'start' | 'end' = 'start'
+  ): number | null {
+    if (!date) return null;
+    const match = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$/.exec(date.trim());
+    if (!match) return null;
+    const year = Number(match[1]);
+    const month = match[2] ? Number(match[2]) : undefined;
+    const day = match[3] ? Number(match[3]) : undefined;
+    if (month !== undefined && (month < 1 || month > 12)) return null;
+    if (day !== undefined && (day < 1 || day > 31)) return null;
+    if (edge === 'start' || day !== undefined) {
+      return Date.UTC(year, (month ?? 1) - 1, day ?? 1);
+    }
+    // Last day of the month or year: day 0 of the following month
+    return Date.UTC(year, month ?? 12, 0);
+  }
+
+  /**
+   * Whether a pressing dated `pressingDate` belongs to the original release
+   * of an album tracked with `releaseGroupDate`: any time before it, or
+   * within ORIGINAL_ERA_WINDOW_DAYS after it.
+   *
+   * If either date is missing or unparseable we cannot tell an original
+   * pressing from a repress, so this returns true (the caller skips the
+   * candidate). Being conservative avoids re-listing a new album as its own
+   * reissue, at the cost of possibly missing an undated repress.
+   */
+  private isOriginalEraPressing(
+    pressingDate: string | null | undefined,
+    releaseGroupDate: string | null | undefined
+  ): boolean {
+    // Compare conservatively: the earliest the pressing could be against the
+    // latest the original could be, so a "2026" album with a September 2026
+    // first pressing is not taken for a reissue
+    const pressing = this.parsePartialDate(pressingDate, 'start');
+    const original = this.parsePartialDate(releaseGroupDate, 'end');
+    if (pressing === null || original === null) return true;
+    const windowMs = ORIGINAL_ERA_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    return pressing <= original + windowMs;
+  }
+
+  /**
    * Convert a MusicBrainz `/release` entry (individual pressing) to a
    * TrackedRelease flagged as a reissue.
    *
@@ -861,6 +932,20 @@ export class ReleaseTrackingService {
       // Load existing tracked releases and mappings
       const existingReleases = await this.getTrackedReleases();
       const existingMbids = new Set(existingReleases.map(r => r.mbid));
+      // Release-group MBID -> tracked release date for albums tracked as new
+      // (non-reissue entries store the release-group MBID in `mbid`). Used by
+      // the reissue branch to skip original-era pressings of those albums —
+      // e.g. the first pressing of an album released this month is not a
+      // reissue. Grows as new release-groups are found during this sync.
+      const nonReissueReleaseGroupDates = new Map<string, string | null>();
+      for (const r of existingReleases) {
+        if (!r.isReissue) {
+          nonReissueReleaseGroupDates.set(
+            r.releaseGroupMbid ?? r.mbid,
+            r.releaseDate ?? null
+          );
+        }
+      }
       const mappings = await this.getArtistMappings();
       const mappingsByNormalized = new Map(
         mappings.map(m => [m.normalizedName, m])
@@ -1004,6 +1089,10 @@ export class ReleaseTrackingService {
             const tracked = this.toTrackedRelease(release);
             newReleases.push(tracked);
             existingMbids.add(release.mbid);
+            nonReissueReleaseGroupDates.set(
+              release.mbid,
+              tracked.releaseDate ?? null
+            );
           }
 
           // ---- Reissue Detection (MusicBrainz /release endpoint) ----
@@ -1037,6 +1126,21 @@ export class ReleaseTrackingService {
                 // collide with an existing tracked release-group, which is
                 // also a no-op we want)
                 if (existingMbids.has(r.mbid)) {
+                  continue;
+                }
+
+                // Skip original-era pressings of a release-group already
+                // tracked as a new album (found earlier in this sync or a
+                // previous one): that pressing is the album itself, not a
+                // reissue. Later represses of such albums still count.
+                if (
+                  r.releaseGroupMbid &&
+                  nonReissueReleaseGroupDates.has(r.releaseGroupMbid) &&
+                  this.isOriginalEraPressing(
+                    r.date,
+                    nonReissueReleaseGroupDates.get(r.releaseGroupMbid)
+                  )
+                ) {
                   continue;
                 }
 
