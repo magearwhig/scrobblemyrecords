@@ -973,6 +973,8 @@ export interface StatsCache {
     artistAliasFingerprint?: string;
     /** Album mappings fingerprint at warm time; mapping changes invalidate */
     albumMappingFingerprint?: string;
+    /** History contents at warm time (play totals); backfills and moves invalidate */
+    historyFingerprint?: string;
     streaks: StreakInfo;
     counts: ScrobbleCounts;
     listeningHours: ListeningHours;
@@ -1925,6 +1927,8 @@ export interface BackupData {
   trackMappings?: TrackMapping[];
   compoundArtistMappings?: CompoundArtistMapping[];
   dismissedAlbumMerges?: DismissedAlbumMergesStore['items'];
+  /** Unresolved Listening History rules and hidden list (added 2026-10) */
+  unresolvedHistory?: Pick<UnresolvedHistoryStore, 'resolutions' | 'hidden'>;
 
   // Discovery
   hiddenAlbums: HiddenAlbum[];
@@ -1990,6 +1994,7 @@ export interface BackupPreview {
   trackMappingsCount?: number;
   compoundArtistMappingsCount?: number;
   dismissedAlbumMergesCount?: number;
+  unresolvedResolutionsCount?: number;
   hiddenAlbumsCount: number;
   hiddenArtistsCount: number;
   localWantListCount: number;
@@ -2028,6 +2033,7 @@ export interface BackupImportPreview {
     trackMappings?: ImportCategorySummary;
     compoundArtistMappings?: ImportCategorySummary;
     dismissedAlbumMerges?: ImportCategorySummary;
+    unresolvedResolutions?: ImportCategorySummary;
     hiddenAlbums: ImportCategorySummary;
     hiddenArtists: ImportCategorySummary;
     localWantList: ImportCategorySummary;
@@ -3124,4 +3130,77 @@ export interface DurationLookupResult {
   track: string;
   duration: number | null; // seconds, null if not found
   source: 'discogs_collection' | 'lastfm' | 'discogs_search' | 'not_found';
+}
+
+// ============================================
+// Unresolved Listening History (albumless scrobbles)
+// ============================================
+
+/** A rule attributing an unresolved artist + track to an album. */
+export interface UnresolvedTrackResolution {
+  id: string;
+  /** Normalized scrobbled artist */
+  artist: string;
+  /** Normalized scrobbled track */
+  track: string;
+  /** Album to attribute (display name) */
+  album: string;
+  source: 'user' | 'lastfm-track-info';
+  createdAt: number;
+}
+
+/** Stored at mappings/unresolved-track-resolutions.json */
+export interface UnresolvedHistoryStore extends VersionedStore {
+  schemaVersion: 1;
+  resolutions: UnresolvedTrackResolution[];
+  /** "artist|track" keys hidden from the list (still counted in stats) */
+  hidden: string[];
+}
+
+/** One unresolved track of an artist, as listed in the Unresolved tab. */
+export interface UnresolvedHistoryTrack {
+  /** "artist|track" (normalized), used to hide and resolve */
+  key: string;
+  track: string;
+  playCount: number;
+  firstPlayed: number;
+  lastPlayed: number;
+  hidden: boolean;
+}
+
+/** An artist's unresolved tracks. */
+export interface UnresolvedHistoryGroup {
+  /** Normalized artist */
+  artist: string;
+  /** Display name */
+  artistName: string;
+  playCount: number;
+  lastPlayed: number;
+  tracks: UnresolvedHistoryTrack[];
+  /** Albums this artist already has in the history index (for resolving) */
+  knownAlbums: string[];
+}
+
+export interface UnresolvedHistoryPage {
+  groups: UnresolvedHistoryGroup[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface UnresolvedHistorySummary {
+  /** Listening events in the index (album + unresolved) */
+  indexedTotal: number;
+  /** Plays still without an album (after rules) */
+  unresolvedCount: number;
+  /** Plays given an album by a resolution rule */
+  resolvedByRuleCount: number;
+  /** Unresolved plays hidden from the list */
+  hiddenCount: number;
+  resolutionCount: number;
+  lastfmTotal: number | null;
+  lastfmTotalCheckedAt: number | null;
+  /** lastfmTotal - indexedTotal, when known */
+  gap: number | null;
+  lastFullBackfillAt: number | null;
 }

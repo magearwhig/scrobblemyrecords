@@ -330,4 +330,49 @@ describe('GenreAnalysisService', () => {
     // Assert
     expect(result.genres.length).toBeLessThanOrEqual(5);
   });
+
+  it('should weight artists by unresolved (albumless) plays too', async () => {
+    // Arrange: pink floyd has fewer album plays but more plays overall
+    mockHistoryStorage.getIndex = jest.fn().mockResolvedValue({
+      ...createMockIndex({
+        'radiohead|ok computer': { playCount: 10 },
+        'pink floyd|the wall': { playCount: 5 },
+      }),
+      unresolved: {
+        'pink floyd': {
+          playCount: 20,
+          lastPlayed: 1700000019,
+          plays: Array.from({ length: 20 }, (_, i) => ({
+            timestamp: 1700000000 + i,
+          })),
+        },
+        // Artist with only unresolved plays
+        'singles act': {
+          playCount: 1,
+          lastPlayed: 1700000000,
+          plays: [{ timestamp: 1700000000 }],
+        },
+      },
+    });
+    mockLastFmService.getArtistTopTags = jest
+      .fn()
+      .mockResolvedValue([{ name: 'rock', count: 100 }]);
+
+    // Act: analyse only the single top artist
+    const top1 = await service.getGenreDistribution(1, 10);
+
+    // Assert
+    expect(top1.totalArtistsAnalyzed).toBe(1);
+    expect(mockLastFmService.getArtistTopTags).toHaveBeenCalledTimes(1);
+    expect(mockLastFmService.getArtistTopTags).toHaveBeenCalledWith(
+      'pink floyd'
+    );
+
+    // An artist with only unresolved plays is still analysed
+    const all = await service.getGenreDistribution(10, 10);
+    expect(all.totalArtistsAnalyzed).toBe(3);
+    expect(mockLastFmService.getArtistTopTags).toHaveBeenCalledWith(
+      'singles act'
+    );
+  });
 });

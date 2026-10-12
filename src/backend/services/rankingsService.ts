@@ -3,6 +3,11 @@ import {
   createAlbumCanonicalizer,
   stripDiscogsSuffix,
 } from '../../shared/utils/albumMapping';
+import {
+  albumFromAlbumKey,
+  artistFromAlbumKey,
+  UNKNOWN_ALBUM_LABEL,
+} from '../utils/historyPlays';
 import { createLogger } from '../utils/logger';
 
 import { ArtistNameResolver } from './artistNameResolver';
@@ -89,7 +94,8 @@ export class RankingsService {
       artist: string;
       album: string;
       albumArtist: string;
-      albumKey: string;
+      /** null for unresolved (albumless) plays: never ranked as an album */
+      albumKey: string | null;
       track?: string;
     }> = [];
 
@@ -100,7 +106,8 @@ export class RankingsService {
     );
 
     for (const [albumKey, albumEntry] of Object.entries(index.albums)) {
-      const [artist, historyAlbum] = albumKey.split('|');
+      const artist = artistFromAlbumKey(albumKey);
+      const historyAlbum = albumFromAlbumKey(albumKey);
       // Merged versions share the canonical album and its artist (index keys
       // are lowercase); artist rankings still use the scrobble's own artist
       const canonical = canonicalize(artist, historyAlbum);
@@ -122,6 +129,28 @@ export class RankingsService {
             album,
             albumArtist,
             albumKey: canonical.key,
+            track: play.track,
+          });
+        }
+      }
+    }
+
+    // Unresolved plays count for artist and track rankings. Track rankings
+    // key on artist|track, so they merge with album plays of the same track.
+    // Album rankings leave them out entirely, so they cannot even add a
+    // snapshot month (calculateRankings also skips a null albumKey).
+    const unresolvedEntries =
+      type === 'albums' ? [] : Object.entries(index.unresolved ?? {});
+    for (const [artist, entry] of unresolvedEntries) {
+      for (const play of entry.plays) {
+        const timestampMs = play.timestamp * 1000;
+        if (!useFilter || (timestampMs >= start && timestampMs <= end)) {
+          scrobbles.push({
+            timestamp: timestampMs,
+            artist,
+            album: UNKNOWN_ALBUM_LABEL,
+            albumArtist: artist,
+            albumKey: null,
             track: play.track,
           });
         }
@@ -199,7 +228,7 @@ export class RankingsService {
       artist: string;
       album: string;
       albumArtist: string;
-      albumKey: string;
+      albumKey: string | null;
       track?: string;
     }>,
     type: RankingType,
@@ -227,6 +256,8 @@ export class RankingsService {
           name = scrobble.artist;
           break;
         case 'albums':
+          // Unresolved plays have no album to rank
+          if (scrobble.albumKey === null) continue;
           // Group spelling variants together; show the first name seen
           key = scrobble.albumKey;
           name = scrobble.album;

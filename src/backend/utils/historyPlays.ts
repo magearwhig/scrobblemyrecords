@@ -4,6 +4,9 @@ import {
   ScrobbleHistoryIndex,
 } from '../../shared/types';
 
+/** Album label shown for unresolved (albumless) plays in listening stats */
+export const UNKNOWN_ALBUM_LABEL = 'Unknown album';
+
 /** Lowercase + trim, the normalisation used by history index keys. */
 export function normalizeHistoryName(name: string): string {
   return name.toLowerCase().trim();
@@ -176,4 +179,96 @@ export function dedupeHistoryIndex<T extends ScrobbleHistoryIndex>(
   index.unresolved = unresolved;
   index.totalScrobbles = countListeningPlays(index);
   return { index, removed };
+}
+
+/** A saved rule attributing an unresolved artist + track to an album. */
+export interface UnresolvedResolutionRule {
+  /** Normalized scrobbled artist */
+  artist: string;
+  /** Normalized scrobbled track */
+  track: string;
+  /** Album to attribute (display name) */
+  album: string;
+}
+
+/**
+ * Derived view of the index with resolution rules applied: unresolved plays
+ * matching a rule move to `albums[artist|album]` (skipping identities already
+ * there), the rest stay unresolved. Returns a new index; the input is not
+ * modified, so the raw file is never rewritten with resolved plays and
+ * deleting a rule simply restores the previous view.
+ */
+export function applyUnresolvedResolutions<T extends ScrobbleHistoryIndex>(
+  index: T,
+  rules: UnresolvedResolutionRule[]
+): { index: T; resolvedPlays: number } {
+  const unresolved = index.unresolved ?? {};
+  if (rules.length === 0 || Object.keys(unresolved).length === 0) {
+    return { index, resolvedPlays: 0 };
+  }
+
+  const albumByArtistTrack = new Map<string, string>();
+  for (const rule of rules) {
+    albumByArtistTrack.set(
+      `${normalizeHistoryName(rule.artist)}|${normalizeHistoryName(rule.track)}`,
+      rule.album
+    );
+  }
+
+  // Copy only what changes: albums map, touched album entries, unresolved
+  const albums: Record<string, AlbumHistoryEntry> = { ...index.albums };
+  const copiedAlbumKeys = new Set<string>();
+  const nextUnresolved: Record<string, AlbumHistoryEntry> = {};
+  const albumIdentities = new Map<string, Set<string>>();
+  let resolvedPlays = 0;
+
+  for (const [artist, entry] of Object.entries(unresolved)) {
+    const keep: ScrobbleHistoryEntry[] = [];
+    for (const play of entry.plays) {
+      const album = albumByArtistTrack.get(
+        `${artist}|${normalizeHistoryName(play.track ?? '')}`
+      );
+      if (!album) {
+        keep.push(play);
+        continue;
+      }
+      const key = `${artist}|${normalizeHistoryName(album)}`;
+      if (!copiedAlbumKeys.has(key)) {
+        const existing = albums[key];
+        albums[key] = existing
+          ? { ...existing, plays: [...existing.plays] }
+          : { lastPlayed: 0, playCount: 0, plays: [] };
+        copiedAlbumKeys.add(key);
+        albumIdentities.set(
+          key,
+          new Set(
+            albums[key].plays.map(p =>
+              playIdentity(p.timestamp, artist, p.track)
+            )
+          )
+        );
+      }
+      const identities = albumIdentities.get(key)!;
+      const id = playIdentity(play.timestamp, artist, play.track);
+      resolvedPlays++;
+      if (identities.has(id)) continue;
+      identities.add(id);
+      albums[key].plays.push(play);
+    }
+    if (keep.length === entry.plays.length) {
+      nextUnresolved[artist] = entry;
+    } else if (keep.length > 0) {
+      const remaining = { ...entry, plays: keep };
+      refreshEntryStats(remaining);
+      nextUnresolved[artist] = remaining;
+    }
+  }
+  for (const key of copiedAlbumKeys) {
+    refreshEntryStats(albums[key]);
+  }
+
+  return {
+    index: { ...index, albums, unresolved: nextUnresolved },
+    resolvedPlays,
+  };
 }

@@ -145,6 +145,13 @@ export class MigrationService {
       optional: true,
     });
 
+    this.register('unresolved-track-resolutions', {
+      path: 'mappings/unresolved-track-resolutions.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
     this.register('dismissed-album-merges', {
       path: 'mappings/dismissed-album-merges.json',
       currentVersion: 1,

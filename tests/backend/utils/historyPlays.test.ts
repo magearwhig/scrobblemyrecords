@@ -1,4 +1,5 @@
 import {
+  applyUnresolvedResolutions,
   buildIdentitySets,
   countListeningPlays,
   dedupeHistoryIndex,
@@ -159,6 +160,69 @@ describe('historyPlays', () => {
       });
       expect(result.albums['a|b'].playCount).toBe(18);
       expect(result.unresolved).toEqual({});
+    });
+  });
+
+  describe('applyUnresolvedResolutions', () => {
+    const raw = (): ScrobbleHistoryIndex =>
+      index({
+        albums: {
+          'a|album': {
+            lastPlayed: 1,
+            playCount: 1,
+            plays: [{ timestamp: 1, track: 'Song' }],
+          },
+        },
+        unresolved: {
+          a: {
+            lastPlayed: 5,
+            playCount: 3,
+            plays: [
+              { timestamp: 1, track: 'Song' }, // same event as the album play
+              { timestamp: 4, track: 'Song' },
+              { timestamp: 5, track: 'Other' },
+            ],
+          },
+        },
+      });
+
+    it('moves matching plays to the album without duplicating events', () => {
+      const input = raw();
+      const snapshot = JSON.stringify(input);
+
+      const { index: view, resolvedPlays } = applyUnresolvedResolutions(input, [
+        { artist: 'A', track: 'SONG', album: 'Album' },
+      ]);
+
+      expect(resolvedPlays).toBe(2);
+      expect(view.albums['a|album'].plays).toEqual([
+        { timestamp: 1, track: 'Song' },
+        { timestamp: 4, track: 'Song' },
+      ]);
+      expect(view.albums['a|album'].playCount).toBe(2);
+      expect(view.unresolved!.a.plays).toEqual([
+        { timestamp: 5, track: 'Other' },
+      ]);
+      expect(countListeningPlays(view)).toBe(3);
+      // The raw index is untouched
+      expect(JSON.stringify(input)).toBe(snapshot);
+    });
+
+    it('creates the album entry when needed and drops emptied artists', () => {
+      const { index: view } = applyUnresolvedResolutions(raw(), [
+        { artist: 'a', track: 'song', album: 'Album' },
+        { artist: 'a', track: 'other', album: 'Singles' },
+      ]);
+
+      expect(view.albums['a|singles'].plays).toEqual([
+        { timestamp: 5, track: 'Other' },
+      ]);
+      expect(view.unresolved).toEqual({});
+    });
+
+    it('returns the same index when there is nothing to apply', () => {
+      const input = raw();
+      expect(applyUnresolvedResolutions(input, []).index).toBe(input);
     });
   });
 });

@@ -1,6 +1,7 @@
 import {
   AlbumMapping,
   CollectionItem,
+  ScrobbleHistoryEntry,
   ScrobbleSession,
   WrappedCollectionItem,
   WrappedCollectionStats,
@@ -16,6 +17,11 @@ import {
 } from '../../shared/utils/albumMapping';
 import { getAllCachedCollectionItems } from '../utils/collectionCache';
 import { FileStorage } from '../utils/fileStorage';
+import {
+  albumFromAlbumKey,
+  artistFromAlbumKey,
+  forEachListeningPlay,
+} from '../utils/historyPlays';
 import { createLogger } from '../utils/logger';
 
 import { ArtistNameResolver } from './artistNameResolver';
@@ -159,47 +165,69 @@ export class WrappedService {
       resolver ? name => resolver.resolveArtist(name) : undefined
     );
 
+    /**
+     * Count one listening event toward totals, artists, days and hours.
+     * Returns whether it fell inside the range. Album counting is left to
+     * the caller so unresolved (albumless) plays never add an album.
+     */
+    const countPlay = (
+      normalizedArtist: string,
+      play: ScrobbleHistoryEntry
+    ): boolean => {
+      // Track first-ever play for each artist (across all history)
+      const existing = artistFirstEverPlay.get(normalizedArtist);
+      if (!existing || play.timestamp < existing) {
+        artistFirstEverPlay.set(normalizedArtist, play.timestamp);
+      }
+
+      if (play.timestamp < startSec || play.timestamp > endSec) {
+        return false;
+      }
+      totalScrobbles++;
+
+      // Artist counts
+      artistCounts.set(
+        normalizedArtist,
+        (artistCounts.get(normalizedArtist) || 0) + 1
+      );
+
+      // Artist range plays
+      artistRangePlays.set(
+        normalizedArtist,
+        (artistRangePlays.get(normalizedArtist) || 0) + 1
+      );
+
+      // Day counts for peak day and heatmap
+      const date = new Date(play.timestamp * 1000);
+      const dayKey = this.formatDateKey(date);
+      dayCounts.set(dayKey, (dayCounts.get(dayKey) || 0) + 1);
+
+      // Hour counts for peak hour
+      const hour = date.getHours();
+      hourCounts.set(hour, (hourCounts.get(hour) || 0) + 1);
+      return true;
+    };
+
     for (const [key, albumHistory] of Object.entries(index.albums)) {
-      const [artist, album] = key.split('|');
+      const artist = artistFromAlbumKey(key);
+      const album = albumFromAlbumKey(key);
       const normalizedArtist = this.resolveArtistName(artist);
       // Merged versions count as one unique album
       const albumKey = canonicalize(artist, album).key;
 
       for (const play of albumHistory.plays) {
-        // Track first-ever play for each artist (across all history)
-        const existing = artistFirstEverPlay.get(normalizedArtist);
-        if (!existing || play.timestamp < existing) {
-          artistFirstEverPlay.set(normalizedArtist, play.timestamp);
-        }
-
-        // Filter to range
-        if (play.timestamp >= startSec && play.timestamp <= endSec) {
-          totalScrobbles++;
-
-          // Artist counts
-          artistCounts.set(
-            normalizedArtist,
-            (artistCounts.get(normalizedArtist) || 0) + 1
-          );
-
-          // Unique albums
+        if (countPlay(normalizedArtist, play)) {
+          // Unique albums: only plays that have an album
           albumSet.add(albumKey);
-
-          // Artist range plays
-          artistRangePlays.set(
-            normalizedArtist,
-            (artistRangePlays.get(normalizedArtist) || 0) + 1
-          );
-
-          // Day counts for peak day and heatmap
-          const date = new Date(play.timestamp * 1000);
-          const dayKey = this.formatDateKey(date);
-          dayCounts.set(dayKey, (dayCounts.get(dayKey) || 0) + 1);
-
-          // Hour counts for peak hour
-          const hour = date.getHours();
-          hourCounts.set(hour, (hourCounts.get(hour) || 0) + 1);
         }
+      }
+    }
+
+    // Unresolved plays count as listening but never as an album
+    for (const [artist, entry] of Object.entries(index.unresolved ?? {})) {
+      const normalizedArtist = this.resolveArtistName(artist);
+      for (const play of entry.plays) {
+        countPlay(normalizedArtist, play);
       }
     }
 
@@ -502,17 +530,16 @@ export class WrappedService {
     let vinyl = 0;
     let other = 0;
 
-    for (const albumHistory of Object.values(index.albums)) {
-      for (const play of albumHistory.plays) {
-        if (play.timestamp >= startSec && play.timestamp <= endSec) {
-          if (this.isOurScrobble(play.timestamp, sortedTimestamps)) {
-            vinyl++;
-          } else {
-            other++;
-          }
+    // All listening events, including unresolved plays
+    forEachListeningPlay(index, play => {
+      if (play.timestamp >= startSec && play.timestamp <= endSec) {
+        if (this.isOurScrobble(play.timestamp, sortedTimestamps)) {
+          vinyl++;
+        } else {
+          other++;
         }
       }
-    }
+    });
 
     const total = vinyl + other;
     const vinylPercentage = total > 0 ? Math.round((vinyl / total) * 100) : 0;

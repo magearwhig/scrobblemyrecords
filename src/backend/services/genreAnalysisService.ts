@@ -6,6 +6,7 @@ import {
   TasteDriftSnapshot,
 } from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
+import { forEachListeningPlay } from '../utils/historyPlays';
 import { createLogger } from '../utils/logger';
 
 import { LastFmService } from './lastfmService';
@@ -145,6 +146,15 @@ export class GenreAnalysisService {
       );
       totalPlays += albumHistory.playCount;
     }
+    // Unresolved (albumless) plays still weight their artist
+    for (const [artist, entry] of Object.entries(index.unresolved ?? {})) {
+      const normalizedArtist = artist.toLowerCase();
+      artistPlays.set(
+        normalizedArtist,
+        (artistPlays.get(normalizedArtist) || 0) + entry.plays.length
+      );
+      totalPlays += entry.plays.length;
+    }
 
     if (totalPlays === 0) {
       return {
@@ -276,30 +286,27 @@ export class GenreAnalysisService {
     // Each quarter bucket maps artist -> play count
     const quarterArtistPlays = new Map<string, Map<string, number>>();
 
-    for (const [key, albumHistory] of Object.entries(index.albums)) {
-      const [artist] = key.split('|');
+    // All listening events, including unresolved (albumless) plays
+    forEachListeningPlay(index, (play, artist) => {
+      if (play.timestamp < cutoffSeconds) return;
       const normalizedArtist = artist.toLowerCase();
 
-      for (const play of albumHistory.plays) {
-        if (play.timestamp < cutoffSeconds) continue;
+      const date = new Date(play.timestamp * 1000);
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1; // 1-12
+      const quarter = Math.ceil(month / 3);
+      const period = `${year}-Q${quarter}`;
 
-        const date = new Date(play.timestamp * 1000);
-        const year = date.getFullYear();
-        const month = date.getMonth() + 1; // 1-12
-        const quarter = Math.ceil(month / 3);
-        const period = `${year}-Q${quarter}`;
-
-        let artistMap = quarterArtistPlays.get(period);
-        if (!artistMap) {
-          artistMap = new Map<string, number>();
-          quarterArtistPlays.set(period, artistMap);
-        }
-        artistMap.set(
-          normalizedArtist,
-          (artistMap.get(normalizedArtist) || 0) + 1
-        );
+      let artistMap = quarterArtistPlays.get(period);
+      if (!artistMap) {
+        artistMap = new Map<string, number>();
+        quarterArtistPlays.set(period, artistMap);
       }
-    }
+      artistMap.set(
+        normalizedArtist,
+        (artistMap.get(normalizedArtist) || 0) + 1
+      );
+    });
 
     if (quarterArtistPlays.size === 0) {
       return { snapshots: [], totalQuarters: 0, topGenresOverall: [] };

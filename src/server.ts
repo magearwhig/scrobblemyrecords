@@ -30,6 +30,7 @@ import createScrobbleRouter from './backend/routes/scrobble';
 import createSellersRouter from './backend/routes/sellers';
 import createStatsRouter from './backend/routes/stats';
 import createSuggestionsRouter from './backend/routes/suggestions';
+import createUnresolvedHistoryRouter from './backend/routes/unresolvedHistory';
 import createWebsitesRouter from './backend/routes/websites';
 import createWishlistRouter from './backend/routes/wishlist';
 import createWrappedRouter from './backend/routes/wrapped';
@@ -78,6 +79,7 @@ import { StatsService } from './backend/services/statsService';
 import { SuggestionService } from './backend/services/suggestionService';
 import { TagEnricherService } from './backend/services/tagEnricherService';
 import { TrackMappingService } from './backend/services/trackMappingService';
+import { UnresolvedHistoryService } from './backend/services/unresolvedHistoryService';
 import { WebsiteMonitoringService } from './backend/services/websiteMonitoringService';
 import { WishlistService } from './backend/services/wishlistService';
 import { WrappedService } from './backend/services/wrappedService';
@@ -345,6 +347,14 @@ const discogsService = new DiscogsService(fileStorage, authService);
 
 // Initialize suggestion-related services
 const historyStorage = new ScrobbleHistoryStorage(fileStorage);
+// Unresolved Listening History rules are applied whenever the index is read
+const unresolvedHistoryService = new UnresolvedHistoryService(
+  fileStorage,
+  lastfmService
+);
+historyStorage.setResolutionRulesProvider(() =>
+  unresolvedHistoryService.getRules()
+);
 const syncService = new ScrobbleHistorySyncService(
   fileStorage,
   authService,
@@ -677,6 +687,8 @@ async function startServer() {
       trackMappingService.clearCache();
       compoundMappingService.clearCache();
       artistMappingService.reload();
+      // Restored unresolved-history rules change the derived index
+      historyStorage.invalidateCache();
       await artistNameResolver.rebuild();
       await statsService.invalidateStatsCache();
     });
@@ -694,6 +706,17 @@ async function startServer() {
         `Found ${splitEntries.length} split history index entries that can be merged via /api/v1/stats/merge-split-entries`
       );
     }
+
+    // Unresolved Listening History (mounted before the stats router)
+    app.use(
+      '/api/v1/stats/unresolved-history',
+      createUnresolvedHistoryRouter(
+        unresolvedHistoryService,
+        historyStorage,
+        statsService,
+        () => artist => artistNameResolver.getDisplayName(artist)
+      )
+    );
 
     // Mount stats routes now that historyIndexMergeService is available
     app.use(

@@ -39,6 +39,8 @@ import {
   DiscardPileItem,
   DiscardPileStore,
   DismissedAlbumMergesStore,
+  UnresolvedHistoryStore,
+  UnresolvedTrackResolution,
   ExcludedArtist,
   ExcludedArtistsStore,
   HiddenAlbum,
@@ -93,6 +95,7 @@ const FILE_PATHS = {
   trackMappings: 'mappings/track-mappings.json',
   compoundArtistMappings: 'mappings/compound-artist-mappings.json',
   dismissedAlbumMerges: 'mappings/dismissed-album-merges.json',
+  unresolvedHistory: 'mappings/unresolved-track-resolutions.json',
   hiddenAlbums: 'discovery/hidden-albums.json',
   hiddenArtists: 'discovery/hidden-artists.json',
   localWantList: 'wishlist/local-want-list.json',
@@ -118,6 +121,9 @@ const trackMappingKey = (m: TrackMapping): string =>
 const compoundArtistMappingKey = (m: CompoundArtistMapping): string =>
   m.compoundName.toLowerCase().trim();
 const dismissedAlbumMergeKey = (d: DismissedAlbumMerge): string => d.id;
+const unresolvedResolutionKey = (r: UnresolvedTrackResolution): string =>
+  `${r.artist}|${r.track}`;
+type UnresolvedHistoryBackup = NonNullable<BackupData['unresolvedHistory']>;
 
 // Read version from package.json
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -377,6 +383,59 @@ export class BackupService {
     return store?.items ?? [];
   }
 
+  private async loadUnresolvedHistory(): Promise<UnresolvedHistoryBackup> {
+    const store = await this.fileStorage.readJSON<UnresolvedHistoryStore>(
+      FILE_PATHS.unresolvedHistory
+    );
+    return {
+      resolutions: store?.resolutions ?? [],
+      hidden: store?.hidden ?? [],
+    };
+  }
+
+  /**
+   * Import Unresolved Listening History rules and hidden keys. The store has
+   * two lists, so it can't use mergeAndSave (which keeps one array key).
+   * Merge: union by artist|track (newer rule wins) and union of hidden keys.
+   * Replace: the backup's store replaces the current one.
+   */
+  private async importUnresolvedHistory(
+    backup: UnresolvedHistoryBackup,
+    merge: boolean
+  ): Promise<{ added: number; updated: number }> {
+    const current = await this.loadUnresolvedHistory();
+    let added = 0;
+    let updated = 0;
+    let resolutions = backup.resolutions;
+    let hidden = backup.hidden;
+    if (merge) {
+      const byKey = new Map(
+        current.resolutions.map(r => [unresolvedResolutionKey(r), r])
+      );
+      for (const rule of backup.resolutions) {
+        const key = unresolvedResolutionKey(rule);
+        const existing = byKey.get(key);
+        if (!existing) {
+          byKey.set(key, rule);
+          added++;
+        } else if (rule.createdAt > existing.createdAt) {
+          byKey.set(key, rule);
+          updated++;
+        }
+      }
+      resolutions = [...byKey.values()];
+      hidden = [...new Set([...current.hidden, ...backup.hidden])];
+    } else {
+      added = backup.resolutions.length;
+    }
+    await this.fileStorage.writeJSONWithBackup(FILE_PATHS.unresolvedHistory, {
+      schemaVersion: 1,
+      resolutions,
+      hidden,
+    });
+    return { added, updated };
+  }
+
   private async loadHiddenAlbums(): Promise<HiddenAlbum[]> {
     const store = await this.fileStorage.readJSON<HiddenAlbumsStore>(
       FILE_PATHS.hiddenAlbums
@@ -517,6 +576,7 @@ export class BackupService {
       this.loadDiscardPile(),
       this.loadSavedCollections(),
     ]);
+    const unresolvedHistory = await this.loadUnresolvedHistory();
 
     return {
       hasUserSettings: userSettings !== null,
@@ -534,6 +594,7 @@ export class BackupService {
       trackMappingsCount: trackMappings.length,
       compoundArtistMappingsCount: compoundArtistMappings.length,
       dismissedAlbumMergesCount: dismissedAlbumMerges.length,
+      unresolvedResolutionsCount: unresolvedHistory.resolutions.length,
       hiddenAlbumsCount: hiddenAlbums.length,
       hiddenArtistsCount: hiddenArtists.length,
       localWantListCount: localWantList.length,
@@ -621,6 +682,8 @@ export class BackupService {
       this.loadSavedCollections(),
     ]);
 
+    const unresolvedHistory = await this.loadUnresolvedHistory();
+
     // Build backup data
     let backupData: BackupData = {
       userSettings: userSettings as UserSettings,
@@ -638,6 +701,7 @@ export class BackupService {
       trackMappings,
       compoundArtistMappings,
       dismissedAlbumMerges,
+      unresolvedHistory,
       hiddenAlbums,
       hiddenArtists,
       localWantList,
@@ -818,6 +882,11 @@ export class BackupService {
         currentDismissedAlbumMerges,
         dismissedAlbumMergeKey
       ),
+      unresolvedResolutions: this.compareMappings(
+        backup.data.unresolvedHistory?.resolutions ?? [],
+        (await this.loadUnresolvedHistory()).resolutions,
+        unresolvedResolutionKey
+      ),
       hiddenAlbums: this.compareMappings(
         backup.data.hiddenAlbums,
         currentHiddenAlbums,
@@ -894,6 +963,7 @@ export class BackupService {
       trackMappings: { new: 0, existing: 0 },
       compoundArtistMappings: { new: 0, existing: 0 },
       dismissedAlbumMerges: { new: 0, existing: 0 },
+      unresolvedResolutions: { new: 0, existing: 0 },
       hiddenAlbums: { new: 0, existing: 0 },
       hiddenArtists: { new: 0, existing: 0 },
       localWantList: { new: 0, existing: 0 },
@@ -1282,6 +1352,22 @@ export class BackupService {
       } catch (e) {
         errors.push(
           `Dismissed album merges: ${e instanceof Error ? e.message : e}`
+        );
+      }
+    }
+
+    // Import unresolved history rules (optional: older backups lack it)
+    if (data.unresolvedHistory) {
+      try {
+        const result = await this.importUnresolvedHistory(
+          data.unresolvedHistory,
+          merge
+        );
+        added += result.added;
+        updated += result.updated;
+      } catch (e) {
+        errors.push(
+          `Unresolved history rules: ${e instanceof Error ? e.message : e}`
         );
       }
     }
