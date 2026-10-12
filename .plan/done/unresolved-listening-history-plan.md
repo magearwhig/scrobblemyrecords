@@ -1,5 +1,47 @@
 # Unresolved Listening History - Implementation Plan
 
+> **Status: Complete (2026-10-11), branch `feat/unresolved-listening-history`.**
+>
+> **Shipped:** all five phases. Sync keeps albumless scrobbles in
+> `index.unresolved` (schema v2, migration with backup). Listening stats count
+> them and album stats don't. Backfill is at
+> `POST /suggestions/history/sync/backfill`. Resolution rules are applied as a
+> derived view in `ScrobbleHistoryStorage.getIndex()` and backed up. Routes are
+> under `/stats/unresolved-history`, and History has an **Unresolved** tab,
+> plus notes on the Stats page and the Last.fm Albums view.
+>
+> **Verified on a copy of real data:** backfill added 10,707 plays (6,947
+> without album info, 3,760 album plays missing from earlier syncs). The index
+> went from 55,164 to 65,871 plays, equal to Last.fm's total. Resolving a
+> 28-play track moved it into Top Albums with the total unchanged, and undo
+> restored it.
+>
+> **Deviations from this plan (from peer review):**
+> - Play identity is **timestamp + track**, not timestamp + artist + track.
+>   `HistoryIndexMergeService` moves plays between artist spellings, so the
+>   artist part let a backfill re-add merged plays. It is the same key the merge
+>   already uses, JSON-encoded so "|" can't collide.
+> - Backfill collects fetched plays and merges them into a **fresh read** at
+>   the end, instead of saving a working copy, so concurrent changes survive.
+>   It takes the sync lock before reading, and re-checks for cancellation after
+>   the last page. There is no resumable checkpoint; a re-run is safe and costs
+>   about 5 minutes.
+> - The warm-cache fingerprint includes a resolution-rules hash.
+> - "Resolve all" in the modal applies to the tracks currently listed.
+>
+> **Open decisions, as resolved:**
+> 1. Separate "Unknown album" rows.
+> 2. Lookups are suggestions only.
+> 3. "All tracks" creates one rule per listed track.
+> 4. Backfill runs from the banner only.
+> 5. The 5-minute incremental overlap was adopted.
+> 6. No exclude-from-stats option yet. Podcasts (e.g. 425 plays of The Onion)
+>    still count; revisit if wanted.
+>
+> **Known limits:** the incremental sync's 50-page cap can still skip history
+> after a very long gap; backfill repairs it. The saved default-tab preference
+> can't select Unresolved yet.
+
 > Renamed from `missing-albums-page-plan.md` ("Missing Albums Page") on 2026-10-11. The new name keeps this feature apart from the Marketplace **Missing Albums** tab, which lists albums you have listened to but don't own (see [Naming](#naming)).
 
 ## Summary
@@ -321,4 +363,4 @@ Jest mocks CSS, so check the UI manually or with a Playwright smoke test (`tests
 
 ## Status
 
-**Backlog**: plan revised 2026-10-11 against current code; not started.
+**Complete** (2026-10-11). See the status block at the top.
