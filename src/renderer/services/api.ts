@@ -77,6 +77,7 @@ import {
   TrackedRelease,
   TrackMapping,
   TrackSearchResult,
+  UnresolvedArtistAlbumSuggestions,
   UnresolvedHistoryPage,
   UnresolvedHistorySummary,
   UnresolvedTrackResolution,
@@ -804,6 +805,26 @@ class ApiService {
       artist,
       track,
     });
+    return response.data.data;
+  }
+
+  /**
+   * Suggested albums for each of an artist's unresolved tracks, from albums
+   * in the listening history that have the track and the user's collection.
+   * @param artist Normalized artist key (UnresolvedHistoryGroup.artist)
+   */
+  async getUnresolvedAlbumSuggestions(
+    artist: string,
+    options: { includeHidden?: boolean } = {}
+  ): Promise<UnresolvedArtistAlbumSuggestions> {
+    const params: Record<string, string | boolean> = { artist };
+    if (options.includeHidden !== undefined) {
+      params.includeHidden = options.includeHidden;
+    }
+    const response = await this.api.get(
+      '/stats/unresolved-history/album-suggestions',
+      { params }
+    );
     return response.data.data;
   }
 

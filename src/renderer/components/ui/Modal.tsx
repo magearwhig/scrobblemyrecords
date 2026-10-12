@@ -1,5 +1,5 @@
 import FocusTrap from 'focus-trap-react';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 import './Modal.css';
 
@@ -68,6 +68,13 @@ export const Modal: React.FC<ModalProps> = ({
   footer,
   children,
 }) => {
+  // The focus trap keeps the options it was created with; read the latest
+  // values through refs so a modal can, e.g., ignore Escape while saving
+  const closeOnEscapeRef = useRef(closeOnEscape);
+  const onCloseRef = useRef(onClose);
+  closeOnEscapeRef.current = closeOnEscape;
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (isOpen) {
       // Prevent body scroll when modal is open
@@ -101,8 +108,8 @@ export const Modal: React.FC<ModalProps> = ({
   return (
     <FocusTrap
       focusTrapOptions={{
-        escapeDeactivates: closeOnEscape,
-        onDeactivate: onClose,
+        escapeDeactivates: () => closeOnEscapeRef.current,
+        onDeactivate: () => onCloseRef.current(),
         allowOutsideClick: true,
         tabbableOptions: { displayCheck: 'none' },
         fallbackFocus: '[role="dialog"]',

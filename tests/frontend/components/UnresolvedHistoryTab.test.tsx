@@ -19,6 +19,7 @@ import {
   ExcludedHistoryArtist,
   ExclusionSuggestion,
   SyncStatus,
+  UnresolvedArtistAlbumSuggestions,
   UnresolvedHistoryGroup,
   UnresolvedHistoryPage,
   UnresolvedHistorySummary,
@@ -143,6 +144,13 @@ const createMockApi = (summary: UnresolvedHistorySummary = baseSummary) => ({
   getHistoryExclusionSuggestions: jest
     .fn()
     .mockResolvedValue([] as ExclusionSuggestion[]),
+  getUnresolvedAlbumSuggestions: jest.fn().mockImplementation(
+    async (artist: string): Promise<UnresolvedArtistAlbumSuggestions> => ({
+      artist,
+      artistName: artist,
+      tracks: [],
+    })
+  ),
 });
 
 const podcastSuggestion: ExclusionSuggestion = {
@@ -393,6 +401,213 @@ describe('UnresolvedHistoryTab', () => {
     expect(
       await within(dialog).findByText('Last.fm has no album for this track.')
     ).toBeInTheDocument();
+  });
+
+  describe('album suggestions', () => {
+    const artistOneSuggestions: UnresolvedArtistAlbumSuggestions = {
+      artist: 'artist one',
+      artistName: 'Artist One',
+      tracks: [
+        {
+          key: 'artist one|track a',
+          track: 'Track A',
+          playCount: 5,
+          hidden: false,
+          suggestion: { album: 'Best Album', source: 'history', trackPlays: 7 },
+          alternatives: [
+            { album: 'Compilation', source: 'collection', trackPlays: 0 },
+          ],
+        },
+        {
+          key: 'artist one|track b',
+          track: 'Track B',
+          playCount: 2,
+          hidden: false,
+          suggestion: null,
+          alternatives: [],
+        },
+      ],
+    };
+
+    beforeEach(() => {
+      mockApi.getUnresolvedAlbumSuggestions.mockResolvedValue(
+        artistOneSuggestions
+      );
+    });
+
+    it('pre-fills the single-track modal with the suggested album', async () => {
+      renderTab();
+      await waitForList();
+
+      const dialog = await openResolve('Track A', 'Artist One');
+
+      await waitFor(() =>
+        expect(within(dialog).getByLabelText('Album')).toHaveValue('Best Album')
+      );
+      expect(mockApi.getUnresolvedAlbumSuggestions).toHaveBeenCalledWith(
+        'artist one',
+        { includeHidden: false }
+      );
+      expect(
+        within(dialog).getByText(
+          'Suggested from your history · played 7× on this album'
+        )
+      ).toBeInTheDocument();
+
+      // Still editable, and saved as the user's choice
+      const input = within(dialog).getByLabelText('Album');
+      await userEvent.clear(input);
+      await userEvent.type(input, 'Other LP');
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Save album' })
+      );
+      await waitFor(() =>
+        expect(mockApi.saveUnresolvedResolutions).toHaveBeenCalledWith([
+          {
+            artist: 'artist one',
+            track: 'Track A',
+            album: 'Other LP',
+            source: 'user',
+          },
+        ])
+      );
+    });
+
+    it('leaves the album empty when the track has no suggestion', async () => {
+      renderTab();
+      await waitForList();
+
+      const dialog = await openResolve('Track B', 'Artist One');
+
+      await waitFor(() =>
+        expect(mockApi.getUnresolvedAlbumSuggestions).toHaveBeenCalled()
+      );
+      expect(within(dialog).getByLabelText('Album')).toHaveValue('');
+    });
+
+    it('does not overwrite an album the user picked before suggestions load', async () => {
+      let resolveSuggestions: (
+        value: UnresolvedArtistAlbumSuggestions
+      ) => void = () => {};
+      mockApi.getUnresolvedAlbumSuggestions.mockReturnValue(
+        new Promise(resolve => {
+          resolveSuggestions = resolve;
+        })
+      );
+      renderTab();
+      await waitForList();
+
+      const dialog = await openResolve('Track A', 'Artist One');
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Known Album' })
+      );
+      await act(async () => {
+        resolveSuggestions(artistOneSuggestions);
+      });
+
+      expect(within(dialog).getByLabelText('Album')).toHaveValue('Known Album');
+    });
+
+    it('reuses cached suggestions across modals until rules change', async () => {
+      renderTab();
+      await waitForList();
+
+      let dialog = await openResolve('Track A', 'Artist One');
+      await waitFor(() =>
+        expect(within(dialog).getByLabelText('Album')).toHaveValue('Best Album')
+      );
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Cancel' })
+      );
+
+      await userEvent.click(
+        screen.getByRole('button', {
+          name: 'Add albums for all 2 tracks by Artist One',
+        })
+      );
+      dialog = await screen.findByRole('dialog', {
+        name: 'Add albums for Artist One',
+      });
+      expect(
+        await within(dialog).findByLabelText('Album for Track A')
+      ).toHaveValue('Best Album');
+      expect(mockApi.getUnresolvedAlbumSuggestions).toHaveBeenCalledTimes(1);
+
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Save 1 album' })
+      );
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      );
+
+      // Saving cleared the cache, so the next open fetches again
+      await openResolve('Track A', 'Artist One');
+      await waitFor(() =>
+        expect(mockApi.getUnresolvedAlbumSuggestions).toHaveBeenCalledTimes(2)
+      );
+    });
+
+    it('offers bulk resolution only for artists with several tracks', async () => {
+      renderTab();
+      await waitForList();
+
+      expect(
+        screen.getByRole('button', {
+          name: 'Add albums for all 2 tracks by Artist One',
+        })
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', {
+          name: /Add albums for all .* Artist Two/,
+        })
+      ).not.toBeInTheDocument();
+    });
+
+    it('saves bulk albums, toasts the plays, and refreshes', async () => {
+      renderTab();
+      await waitForList();
+      const listCalls = mockApi.getUnresolvedHistory.mock.calls.length;
+
+      await userEvent.click(
+        screen.getByRole('button', {
+          name: 'Add albums for all 2 tracks by Artist One',
+        })
+      );
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.type(
+        await within(dialog).findByLabelText('Album for Track B'),
+        'Typed LP'
+      );
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Save 2 albums' })
+      );
+
+      await waitFor(() =>
+        expect(mockApi.saveUnresolvedResolutions).toHaveBeenCalledWith([
+          {
+            artist: 'artist one',
+            track: 'Track A',
+            album: 'Best Album',
+            source: 'user',
+          },
+          {
+            artist: 'artist one',
+            track: 'Track B',
+            album: 'Typed LP',
+            source: 'user',
+          },
+        ])
+      );
+      expect(
+        await screen.findByText('Attributed 7 plays from 2 tracks to albums')
+      ).toBeInTheDocument();
+      await waitFor(() =>
+        expect(mockApi.getUnresolvedHistory.mock.calls.length).toBe(
+          listCalls + 1
+        )
+      );
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
   });
 
   it('hides a track and says hidden plays still count', async () => {

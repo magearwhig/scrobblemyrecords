@@ -4,6 +4,7 @@ import {
   Eye,
   EyeOff,
   Link2,
+  ListChecks,
   SearchX,
   X,
 } from 'lucide-react';
@@ -27,6 +28,8 @@ import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { EmptyState } from './ui/EmptyState';
 import { ListItemSkeleton } from './ui/Skeleton';
+import { AlbumSuggestionsCache } from './unresolved/albumSuggestionsCache';
+import { BulkResolveModal } from './unresolved/BulkResolveModal';
 import {
   ExcludeArtistsModal,
   ExcludeTarget,
@@ -114,7 +117,20 @@ const UnresolvedHistoryTab: React.FC = () => {
   const [resolveTarget, setResolveTarget] = useState<ResolveTarget | null>(
     null
   );
+  const [bulkGroup, setBulkGroup] = useState<UnresolvedHistoryGroup | null>(
+    null
+  );
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  // Album suggestions per artist, shared by the single and bulk modals
+  const suggestionsCacheRef = useRef<AlbumSuggestionsCache | null>(null);
+  const apiRef = useRef(api);
+  apiRef.current = api;
+  if (!suggestionsCacheRef.current) {
+    suggestionsCacheRef.current = new AlbumSuggestionsCache((artist, options) =>
+      apiRef.current.getUnresolvedAlbumSuggestions(artist, options)
+    );
+  }
+  const suggestionsCache = suggestionsCacheRef.current;
   // Only the latest request of each kind may update state
   const listSeq = useRef(0);
   const summarySeq = useRef(0);
@@ -229,6 +245,8 @@ const UnresolvedHistoryTab: React.FC = () => {
 
   /** Refresh everything that a rule/hide/exclude/backfill change can affect. */
   const refreshAll = useCallback(() => {
+    // New rules change which tracks are unresolved, so suggestions are stale
+    suggestionsCache.clear();
     loadSummary();
     loadList();
     loadSuggestions();
@@ -242,6 +260,7 @@ const UnresolvedHistoryTab: React.FC = () => {
     loadExcluded,
     rulesOpen,
     excludedOpen,
+    suggestionsCache,
   ]);
 
   // Latest refreshAll, for toast actions that outlive the render they came from
@@ -553,6 +572,23 @@ const UnresolvedHistoryTab: React.FC = () => {
                     {pluralize(group.playCount, 'play')} ·{' '}
                     {pluralize(group.tracks.length, 'track')}
                   </span>
+                  {(group.tracks.length > 1 || debouncedSearch) && (
+                    <Button
+                      size='small'
+                      onClick={() => setBulkGroup(group)}
+                      aria-label={
+                        debouncedSearch
+                          ? `Add albums for all tracks by ${group.artistName}`
+                          : `Add albums for all ${formatCount(group.tracks.length)} tracks by ${group.artistName}`
+                      }
+                      title='Fill in each track’s album from your history and collection, then review and save'
+                      iconLeft={<ListChecks size={16} aria-hidden='true' />}
+                    >
+                      {debouncedSearch
+                        ? 'Add albums for all tracks'
+                        : `Add albums for all ${formatCount(group.tracks.length)} tracks`}
+                    </Button>
+                  )}
                   <Button
                     variant='ghost'
                     size='small'
@@ -670,6 +706,16 @@ const UnresolvedHistoryTab: React.FC = () => {
         group={resolveTarget?.group ?? null}
         track={resolveTarget?.track ?? null}
         onClose={() => setResolveTarget(null)}
+        onSaved={refreshAll}
+        suggestionsCache={suggestionsCache}
+        includeHidden={showHidden}
+      />
+
+      <BulkResolveModal
+        group={bulkGroup}
+        includeHidden={showHidden}
+        suggestionsCache={suggestionsCache}
+        onClose={() => setBulkGroup(null)}
         onSaved={refreshAll}
       />
     </div>

@@ -74,6 +74,32 @@ describe('ApiService unresolved history methods', () => {
     });
   });
 
+  it('getUnresolvedAlbumSuggestions GETs suggestions for an artist', async () => {
+    mock
+      .onGet('/stats/unresolved-history/album-suggestions')
+      .reply(200, envelope);
+
+    const result = await api.getUnresolvedAlbumSuggestions('guided by voices', {
+      includeHidden: true,
+    });
+
+    expect(result).toEqual(DATA);
+    expect(lastRequest('get').params).toEqual({
+      artist: 'guided by voices',
+      includeHidden: true,
+    });
+  });
+
+  it('getUnresolvedAlbumSuggestions omits includeHidden when unset', async () => {
+    mock
+      .onGet('/stats/unresolved-history/album-suggestions')
+      .reply(200, envelope);
+
+    await api.getUnresolvedAlbumSuggestions('guided by voices');
+
+    expect(lastRequest('get').params).toEqual({ artist: 'guided by voices' });
+  });
+
   it('getUnresolvedResolutions GETs the rules', async () => {
     mock.onGet('/stats/unresolved-history/resolutions').reply(200, envelope);
 

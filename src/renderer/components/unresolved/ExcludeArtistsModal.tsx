@@ -80,6 +80,7 @@ export const ExcludeArtistsModal: React.FC<ExcludeArtistsModalProps> = ({
     <Modal
       isOpen
       onClose={handleClose}
+      closeOnEscape={!busy}
       title={title}
       size='small'
       footer={footer}

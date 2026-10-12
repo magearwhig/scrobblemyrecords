@@ -1,9 +1,10 @@
-import { Check, Search } from 'lucide-react';
+import { Check, Search, Sparkles } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 import {
   UnresolvedHistoryGroup,
   UnresolvedHistoryTrack,
+  UnresolvedTrackAlbumSuggestion,
   UnresolvedTrackResolution,
 } from '../../../shared/types';
 import { useToast } from '../../context/ToastContext';
@@ -12,6 +13,12 @@ import { createLogger } from '../../utils/logger';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 
+import {
+  albumChoices,
+  AlbumSuggestionsCache,
+  describeSuggestion,
+  findTrackSuggestion,
+} from './albumSuggestionsCache';
 import './ResolveTrackModal.css';
 import { formatCount, pluralize } from './unresolvedFormat';
 
@@ -33,6 +40,10 @@ export interface ResolveTrackModalProps {
   onClose: () => void;
   /** Called after rules were saved, so the caller can refresh. */
   onSaved: () => void;
+  /** Shared album-suggestions cache; fetched directly when omitted. */
+  suggestionsCache?: AlbumSuggestionsCache;
+  /** Whether the list includes hidden tracks (for the suggestions request). */
+  includeHidden?: boolean;
 }
 
 /**
@@ -45,6 +56,8 @@ export const ResolveTrackModal: React.FC<ResolveTrackModalProps> = ({
   track,
   onClose,
   onSaved,
+  suggestionsCache,
+  includeHidden = false,
 }) => {
   const api = getApiService();
   const { showToast } = useToast();
@@ -53,8 +66,14 @@ export const ResolveTrackModal: React.FC<ResolveTrackModalProps> = ({
   const [scope, setScope] = useState<Scope>('track');
   const [lookup, setLookup] = useState<LookupState>({ status: 'idle' });
   const [saving, setSaving] = useState(false);
+  const [suggested, setSuggested] =
+    useState<UnresolvedTrackAlbumSuggestion | null>(null);
   // Ignores lookup responses that arrive after the target track changed
   const lookupSeq = useRef(0);
+  const suggestSeq = useRef(0);
+  // Once the user picks or types an album, a late suggestion must not
+  // overwrite it
+  const touched = useRef(false);
 
   // Reset the form whenever a different track is opened
   useEffect(() => {
@@ -63,8 +82,35 @@ export const ResolveTrackModal: React.FC<ResolveTrackModalProps> = ({
     setScope('track');
     setLookup({ status: 'idle' });
     setSaving(false);
+    setSuggested(null);
+    touched.current = false;
     lookupSeq.current += 1;
   }, [group?.artist, track?.key]);
+
+  // Pre-fill the album with the track's best suggestion, when there is one
+  const artistKey = group?.artist;
+  const trackKey = track?.key;
+  useEffect(() => {
+    const seq = ++suggestSeq.current;
+    if (!artistKey || !trackKey) return;
+    const request = suggestionsCache
+      ? suggestionsCache.get(artistKey, includeHidden)
+      : api.getUnresolvedAlbumSuggestions(artistKey, { includeHidden });
+    request
+      .then(data => {
+        if (seq !== suggestSeq.current) return;
+        const entry = findTrackSuggestion(data, trackKey) ?? null;
+        setSuggested(entry);
+        if (entry?.suggestion && !touched.current) {
+          setAlbum(entry.suggestion.album);
+          setSource('user');
+        }
+      })
+      .catch(err => {
+        // Suggestions are a convenience; the form still works without them
+        logger.warn('Failed to load album suggestions', err);
+      });
+  }, [api, artistKey, trackKey, suggestionsCache, includeHidden]);
 
   const artistTracks = group?.tracks ?? [];
   const artistPlays = artistTracks.reduce((sum, t) => sum + t.playCount, 0);
@@ -74,8 +120,11 @@ export const ResolveTrackModal: React.FC<ResolveTrackModalProps> = ({
   const targets = scope === 'artist' ? artistTracks : [track];
   const playsToAttribute = scope === 'artist' ? artistPlays : track.playCount;
   const trimmedAlbum = album.trim();
+  const suggestedOption = suggested?.suggestion ?? null;
+  const choices = albumChoices(suggested ?? undefined, group.knownAlbums);
 
   const chooseAlbum = (value: string, valueSource: Source) => {
+    touched.current = true;
     setAlbum(value);
     setSource(valueSource);
   };
@@ -238,8 +287,40 @@ export const ResolveTrackModal: React.FC<ResolveTrackModalProps> = ({
             className='form-input'
             value={album}
             placeholder='Album title'
+            list='resolve-modal-album-choices'
+            aria-describedby={
+              suggestedOption ? 'resolve-modal-album-suggestion' : undefined
+            }
             onChange={e => chooseAlbum(e.target.value, 'user')}
           />
+          <datalist id='resolve-modal-album-choices'>
+            {choices.map(name => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+          {suggestedOption && (
+            <p
+              id='resolve-modal-album-suggestion'
+              className='resolve-modal-suggested'
+            >
+              <Sparkles size={16} aria-hidden='true' />
+              {trimmedAlbum === suggestedOption.album ? (
+                <span>Suggested {describeSuggestion(suggestedOption)}</span>
+              ) : (
+                <span>
+                  Suggested:{' '}
+                  <button
+                    type='button'
+                    className='resolve-modal-suggested-use'
+                    onClick={() => chooseAlbum(suggestedOption.album, 'user')}
+                  >
+                    {suggestedOption.album}
+                  </button>{' '}
+                  ({describeSuggestion(suggestedOption)})
+                </span>
+              )}
+            </p>
+          )}
         </div>
 
         {artistTracks.length > 1 && (

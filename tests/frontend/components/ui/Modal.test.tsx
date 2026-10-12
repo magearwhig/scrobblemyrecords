@@ -116,6 +116,24 @@ describe('Modal', () => {
     expect(mockOnClose).toHaveBeenCalledTimes(1);
   });
 
+  it('follows closeOnEscape changes while open (e.g. disabled while saving)', () => {
+    const { rerender } = render(
+      <Modal isOpen={true} onClose={mockOnClose} closeOnEscape={false}>
+        <button>Inside</button>
+      </Modal>
+    );
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(mockOnClose).not.toHaveBeenCalled();
+
+    rerender(
+      <Modal isOpen={true} onClose={mockOnClose} closeOnEscape={true}>
+        <button>Inside</button>
+      </Modal>
+    );
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(mockOnClose).toHaveBeenCalledTimes(1);
+  });
+
   it('does not close on Escape when closeOnEscape is false', () => {
     render(
       <Modal isOpen={true} onClose={mockOnClose} closeOnEscape={false}>
