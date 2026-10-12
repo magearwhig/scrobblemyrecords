@@ -1,6 +1,8 @@
 import {
   Ban,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Eye,
   EyeOff,
   Link2,
@@ -75,6 +77,32 @@ const targetsLabel = (targets: { artistName: string }[]): string =>
     ? targets[0].artistName
     : pluralize(targets.length, 'artist');
 
+/** Artists folded in the list, remembered in this browser only */
+const FOLDED_ARTISTS_KEY = 'unresolvedHistory.foldedArtists';
+
+function loadFoldedArtists(): Set<string> {
+  try {
+    const stored = JSON.parse(
+      localStorage.getItem(FOLDED_ARTISTS_KEY) ?? '[]'
+    ) as unknown;
+    return new Set(
+      Array.isArray(stored)
+        ? stored.filter((a): a is string => typeof a === 'string')
+        : []
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function saveFoldedArtists(artists: Set<string>): void {
+  try {
+    localStorage.setItem(FOLDED_ARTISTS_KEY, JSON.stringify([...artists]));
+  } catch {
+    // Folding still works for this visit without storage
+  }
+}
+
 /**
  * History tab listing plays that have no album info ("unresolved"), with
  * tools to attribute them to albums, hide them, and recover missing history.
@@ -121,6 +149,18 @@ const UnresolvedHistoryTab: React.FC = () => {
     null
   );
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [foldedArtists, setFoldedArtists] =
+    useState<Set<string>>(loadFoldedArtists);
+
+  const toggleFolded = (artist: string) => {
+    setFoldedArtists(prev => {
+      const next = new Set(prev);
+      if (next.has(artist)) next.delete(artist);
+      else next.add(artist);
+      saveFoldedArtists(next);
+      return next;
+    });
+  };
   // Album suggestions per artist, shared by the single and bulk modals
   const suggestionsCacheRef = useRef<AlbumSuggestionsCache | null>(null);
   const apiRef = useRef(api);
@@ -563,105 +603,140 @@ const UnresolvedHistoryTab: React.FC = () => {
           aria-label='Artists with plays without album info'
           aria-busy={loading}
         >
-          {groups.map(group => (
-            <li key={group.artist} className='card unresolved-group'>
-              <div className='unresolved-group-header'>
-                <h3 className='unresolved-group-artist'>{group.artistName}</h3>
-                <div className='unresolved-group-side'>
-                  <span className='unresolved-group-meta'>
-                    {pluralize(group.playCount, 'play')} ·{' '}
-                    {pluralize(group.tracks.length, 'track')}
-                  </span>
-                  {(group.tracks.length > 1 || debouncedSearch) && (
-                    <Button
-                      size='small'
-                      onClick={() => setBulkGroup(group)}
-                      aria-label={
-                        debouncedSearch
-                          ? `Add albums for all tracks by ${group.artistName}`
-                          : `Add albums for all ${formatCount(group.tracks.length)} tracks by ${group.artistName}`
-                      }
-                      title='Fill in each track’s album from your history and collection, then review and save'
-                      iconLeft={<ListChecks size={16} aria-hidden='true' />}
-                    >
-                      {debouncedSearch
-                        ? 'Add albums for all tracks'
-                        : `Add albums for all ${formatCount(group.tracks.length)} tracks`}
-                    </Button>
-                  )}
-                  <Button
-                    variant='ghost'
-                    size='small'
-                    onClick={() => excludeGroup(group)}
-                    disabled={excluding}
-                    aria-label={`Don't track this artist: ${group.artistName}`}
-                    title='Leave all of this artist’s plays out of listening stats (e.g. podcasts)'
-                    iconLeft={<Ban size={16} aria-hidden='true' />}
-                  >
-                    Don&apos;t track this artist
-                  </Button>
-                </div>
-              </div>
-              <ul
-                className='unresolved-tracks'
-                aria-label={`Tracks by ${group.artistName}`}
+          {groups.map(group => {
+            // A search shows matching tracks even for folded artists
+            const folded = !debouncedSearch && foldedArtists.has(group.artist);
+            const tracksId = `unresolved-tracks-${group.artist}`;
+            return (
+              <li
+                key={group.artist}
+                className={`card unresolved-group${folded ? ' unresolved-group--folded' : ''}`}
               >
-                {group.tracks.map(track => (
-                  <li
-                    key={track.key}
-                    className={`unresolved-track${track.hidden ? ' unresolved-track--hidden' : ''}`}
+                <div className='unresolved-group-header'>
+                  <h3 className='unresolved-group-artist'>
+                    <button
+                      type='button'
+                      className='unresolved-group-toggle'
+                      onClick={() => toggleFolded(group.artist)}
+                      disabled={!!debouncedSearch}
+                      aria-expanded={!folded}
+                      aria-controls={folded ? undefined : tracksId}
+                      title={
+                        folded
+                          ? 'Show this artist’s tracks'
+                          : 'Fold this artist’s tracks out of the way. They stay in the list.'
+                      }
+                    >
+                      {folded ? (
+                        <ChevronRight size={18} aria-hidden='true' />
+                      ) : (
+                        <ChevronDown size={18} aria-hidden='true' />
+                      )}
+                      {group.artistName}
+                    </button>
+                  </h3>
+                  <div className='unresolved-group-side'>
+                    <span className='unresolved-group-meta'>
+                      {pluralize(group.playCount, 'play')} ·{' '}
+                      {pluralize(group.tracks.length, 'track')}
+                    </span>
+                    {(group.tracks.length > 1 || debouncedSearch) && (
+                      <Button
+                        size='small'
+                        onClick={() => setBulkGroup(group)}
+                        aria-label={
+                          debouncedSearch
+                            ? `Add albums for all tracks by ${group.artistName}`
+                            : `Add albums for all ${formatCount(group.tracks.length)} tracks by ${group.artistName}`
+                        }
+                        title='Fill in each track’s album from your history and collection, then review and save'
+                        iconLeft={<ListChecks size={16} aria-hidden='true' />}
+                      >
+                        {debouncedSearch
+                          ? 'Add albums for all tracks'
+                          : `Add albums for all ${formatCount(group.tracks.length)} tracks`}
+                      </Button>
+                    )}
+                    <Button
+                      variant='ghost'
+                      size='small'
+                      onClick={() => excludeGroup(group)}
+                      disabled={excluding}
+                      aria-label={`Don't track this artist: ${group.artistName}`}
+                      title='Leave all of this artist’s plays out of listening stats (e.g. podcasts)'
+                      iconLeft={<Ban size={16} aria-hidden='true' />}
+                    >
+                      Don&apos;t track this artist
+                    </Button>
+                  </div>
+                </div>
+                {!folded && (
+                  <ul
+                    id={tracksId}
+                    className='unresolved-tracks'
+                    aria-label={`Tracks by ${group.artistName}`}
                   >
-                    <div className='unresolved-track-info'>
-                      <span className='unresolved-track-name'>
-                        {track.track}
-                        {track.hidden && (
-                          <Badge size='small' variant='secondary'>
-                            Hidden
-                          </Badge>
-                        )}
-                      </span>
-                      <span className='unresolved-track-meta'>
-                        {pluralize(track.playCount, 'play')} ·{' '}
-                        {formatPlayedRange(track.firstPlayed, track.lastPlayed)}
-                      </span>
-                    </div>
-                    <div className='unresolved-track-actions'>
-                      <Button
-                        variant='secondary'
-                        size='small'
-                        onClick={() => setResolveTarget({ group, track })}
-                        aria-label={`Add album for ${track.track} by ${group.artistName}`}
-                        iconLeft={<Link2 size={16} aria-hidden='true' />}
+                    {group.tracks.map(track => (
+                      <li
+                        key={track.key}
+                        className={`unresolved-track${track.hidden ? ' unresolved-track--hidden' : ''}`}
                       >
-                        Add album
-                      </Button>
-                      <Button
-                        variant='ghost'
-                        size='small'
-                        onClick={() => setTrackHidden(track, !track.hidden)}
-                        loading={busyKey === track.key}
-                        aria-label={`${track.hidden ? 'Show' : 'Hide'} ${track.track} by ${group.artistName}`}
-                        title={
-                          track.hidden
-                            ? 'Show this track in the list again'
-                            : 'Hide from this list. Plays still count in totals.'
-                        }
-                        iconLeft={
-                          track.hidden ? (
-                            <Eye size={16} aria-hidden='true' />
-                          ) : (
-                            <EyeOff size={16} aria-hidden='true' />
-                          )
-                        }
-                      >
-                        {track.hidden ? 'Show' : 'Hide'}
-                      </Button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
+                        <div className='unresolved-track-info'>
+                          <span className='unresolved-track-name'>
+                            {track.track}
+                            {track.hidden && (
+                              <Badge size='small' variant='secondary'>
+                                Hidden
+                              </Badge>
+                            )}
+                          </span>
+                          <span className='unresolved-track-meta'>
+                            {pluralize(track.playCount, 'play')} ·{' '}
+                            {formatPlayedRange(
+                              track.firstPlayed,
+                              track.lastPlayed
+                            )}
+                          </span>
+                        </div>
+                        <div className='unresolved-track-actions'>
+                          <Button
+                            variant='secondary'
+                            size='small'
+                            onClick={() => setResolveTarget({ group, track })}
+                            aria-label={`Add album for ${track.track} by ${group.artistName}`}
+                            iconLeft={<Link2 size={16} aria-hidden='true' />}
+                          >
+                            Add album
+                          </Button>
+                          <Button
+                            variant='ghost'
+                            size='small'
+                            onClick={() => setTrackHidden(track, !track.hidden)}
+                            loading={busyKey === track.key}
+                            aria-label={`${track.hidden ? 'Show' : 'Hide'} ${track.track} by ${group.artistName}`}
+                            title={
+                              track.hidden
+                                ? 'Show this track in the list again'
+                                : 'Hide from this list. Plays still count in totals.'
+                            }
+                            iconLeft={
+                              track.hidden ? (
+                                <Eye size={16} aria-hidden='true' />
+                              ) : (
+                                <EyeOff size={16} aria-hidden='true' />
+                              )
+                            }
+                          >
+                            {track.hidden ? 'Show' : 'Hide'}
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 

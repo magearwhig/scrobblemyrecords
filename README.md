@@ -416,6 +416,7 @@ Three-tab view of your listening activity:
 **Unresolved Tab** (plays Last.fm recorded without an album):
 - **Summary**: How many plays have no album, how the stored total compares with Last.fm's, and **Recover missing history** when they differ
 - **Grouped by Artist**: Search, sort, page through, and hide tracks you don't care about (hiding only removes them from the list; the plays still count)
+- **Fold an Artist**: Collapse an artist you can't resolve yet so you don't scroll past their tracks every time. Folding is remembered in your browser; a search still shows their matching tracks
 - **Add Album**: Pick an album for one track, with a **Suggest from Last.fm** lookup. The choice is saved as a rule, so the plays count toward that album in stats and future plays of the same track are covered too
 - **Add Albums for All Tracks**: Fills in every track by an artist at once, then lets you edit before saving:
   - First choice is the album the song was played on most in your history, then an owned Discogs release whose tracklist has it

@@ -116,6 +116,37 @@
   color: var(--text-primary);
 }
 
+.unresolved-group--folded .unresolved-group-header {
+  margin-bottom: 0;
+}
+
+.unresolved-group-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background-color: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.unresolved-group-toggle:hover:not(:disabled) {
+  color: var(--accent-primary);
+}
+
+.unresolved-group-toggle:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.unresolved-group-toggle:disabled {
+  cursor: default;
+}
+
 .unresolved-group-meta {
   font-size: var(--text-sm);
   color: var(--text-secondary);

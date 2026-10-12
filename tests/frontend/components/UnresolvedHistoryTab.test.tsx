@@ -195,8 +195,66 @@ const openResolve = async (trackName: string, artistName: string) => {
 describe('UnresolvedHistoryTab', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // The shared setup stubs localStorage; back it with a real store here
+    const stored = new Map<string, string>();
+    jest
+      .mocked(localStorage.getItem)
+      .mockImplementation(key => stored.get(key) ?? null);
+    jest
+      .mocked(localStorage.setItem)
+      .mockImplementation((key, value) => void stored.set(key, value));
     mockApi = createMockApi();
     mockApiService.getApiService.mockReturnValue(mockApi as any);
+  });
+
+  it('folds an artist, keeps it folded next time, and unfolds it', async () => {
+    const { unmount } = renderTab();
+    await waitForList();
+
+    const toggle = screen.getByRole('button', { name: 'Artist One' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Track A')).not.toBeInTheDocument();
+    // Folding only collapses the list: counts and actions stay
+    expect(screen.getByText(/^7 plays ·/)).toBeInTheDocument();
+    expect(screen.getByText('Solo')).toBeInTheDocument();
+    expect(mockApi.hideUnresolvedTracks).not.toHaveBeenCalled();
+
+    unmount();
+    renderTab();
+    await waitForList();
+    expect(screen.queryByText('Track A')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Artist One' }));
+    expect(screen.getByText('Track A')).toBeInTheDocument();
+    expect(localStorage.getItem('unresolvedHistory.foldedArtists')).toBe('[]');
+  });
+
+  it('shows a folded artist’s tracks while searching', async () => {
+    localStorage.setItem(
+      'unresolvedHistory.foldedArtists',
+      JSON.stringify(['artist one'])
+    );
+    renderTab();
+    await waitForList();
+    expect(screen.queryByText('Track A')).not.toBeInTheDocument();
+
+    await userEvent.type(
+      screen.getByLabelText('Search plays without album info'),
+      'track'
+    );
+
+    expect(await screen.findByText('Track A')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Artist One' })).toBeDisabled();
+  });
+
+  it('ignores unreadable folded-artist storage', async () => {
+    localStorage.setItem('unresolvedHistory.foldedArtists', '{not json');
+    renderTab();
+    await waitForList();
+    expect(screen.getByText('Track A')).toBeInTheDocument();
   });
 
   it('renders the summary banner and grouped tracks', async () => {
