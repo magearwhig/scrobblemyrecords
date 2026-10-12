@@ -165,6 +165,47 @@ describe('ReleaseTrackingService', () => {
       // Assert
       expect(settings.autoCheckOnStartup).toBe(false);
     });
+    it('fills missing keys from defaults for a partial stored file', async () => {
+      // Arrange — mirrors an install whose file predates newer settings
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        includeEps: true,
+      });
+
+      // Act
+      const settings = await service.getSettings();
+
+      // Assert
+      expect(settings).toEqual({
+        schemaVersion: 1,
+        autoCheckOnStartup: false,
+        checkFrequencyDays: 7,
+        notifyOnNewRelease: true,
+        includeEps: true,
+        includeSingles: false,
+        includeCompilations: false,
+        includeReissues: true,
+      });
+    });
+
+    it('preserves explicit false values in a partial stored file', async () => {
+      // Arrange
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        includeEps: false,
+        includeReissues: false,
+        notifyOnNewRelease: false,
+      });
+
+      // Act
+      const settings = await service.getSettings();
+
+      // Assert
+      expect(settings.includeEps).toBe(false);
+      expect(settings.includeReissues).toBe(false);
+      expect(settings.notifyOnNewRelease).toBe(false);
+      expect(settings.checkFrequencyDays).toBe(7);
+    });
   });
 
   describe('saveSettings', () => {
@@ -191,6 +232,34 @@ describe('ReleaseTrackingService', () => {
           schemaVersion: 1,
           autoCheckOnStartup: true,
         })
+      );
+    });
+
+    it('merges a partial update with defaults when the stored file is partial', async () => {
+      // Arrange
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        includeEps: true,
+      });
+
+      // Act
+      const result = await service.saveSettings({ includeSingles: true });
+
+      // Assert — defaults are healed into the written file
+      const expected = {
+        schemaVersion: 1,
+        autoCheckOnStartup: false,
+        checkFrequencyDays: 7,
+        notifyOnNewRelease: true,
+        includeEps: true,
+        includeSingles: true,
+        includeCompilations: false,
+        includeReissues: true,
+      };
+      expect(result).toEqual(expected);
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
+        'releases/settings.json',
+        expected
       );
     });
   });
@@ -3164,6 +3233,256 @@ describe('ReleaseTrackingService', () => {
       // Singles disabled (default), so 'reissue-single' must NOT be saved
       expect(mbids).toContain('reissue-album');
       expect(mbids).not.toContain('reissue-single');
+    });
+
+    const lastTrackedWrite = (): TrackedReleasesStore => {
+      const writes = mockFileStorage.writeJSONWithBackup.mock.calls.filter(
+        c => c[0] === 'releases/tracked-releases.json'
+      );
+      expect(writes.length).toBeGreaterThan(0);
+      return writes[writes.length - 1][1] as TrackedReleasesStore;
+    };
+
+    it('does not store the first pressing of a new album found in the same sync as a reissue', async () => {
+      setupSyncFixture({
+        includeReissues: true,
+        releaseGroupsByArtist: {
+          'mbid-artist-one': [
+            {
+              mbid: 'rg-new-album',
+              title: 'New Album',
+              artistName: 'Artist One',
+              artistMbid: 'mbid-artist-one',
+              releaseDate: '2026-09-15',
+              releaseType: 'album',
+            },
+          ],
+        },
+        reissuesByArtist: {
+          'mbid-artist-one': [
+            {
+              mbid: 'release-new-album-first-pressing',
+              title: 'New Album',
+              date: '2026-09-15',
+              releaseGroupMbid: 'rg-new-album',
+              releaseType: 'album',
+              artistName: 'Artist One',
+              artistMbid: 'mbid-artist-one',
+            },
+          ],
+          'mbid-artist-two': [],
+        },
+      });
+
+      await service.syncReleases('tester');
+
+      const releases = lastTrackedWrite().releases;
+      expect(releases).toHaveLength(1);
+      expect(releases[0].mbid).toBe('rg-new-album');
+      expect(releases[0].isReissue).toBeFalsy();
+    });
+
+    it('does not take a late-year first pressing of an album dated only by year for a reissue', async () => {
+      setupSyncFixture({
+        includeReissues: true,
+        releaseGroupsByArtist: {
+          'mbid-artist-one': [
+            {
+              mbid: 'rg-year-only',
+              title: 'Year Only',
+              artistName: 'Artist One',
+              artistMbid: 'mbid-artist-one',
+              // Only the year is known; the album could be from December
+              releaseDate: '2026',
+              releaseType: 'album',
+            },
+          ],
+        },
+        reissuesByArtist: {
+          'mbid-artist-one': [
+            {
+              mbid: 'release-year-only-september',
+              title: 'Year Only',
+              date: '2026-09-15',
+              releaseGroupMbid: 'rg-year-only',
+              releaseType: 'album',
+              artistName: 'Artist One',
+              artistMbid: 'mbid-artist-one',
+            },
+          ],
+          'mbid-artist-two': [],
+        },
+      });
+
+      await service.syncReleases('tester');
+
+      const releases = lastTrackedWrite().releases;
+      expect(releases.map(r => r.mbid)).toEqual(['rg-year-only']);
+    });
+
+    // Existing tracked entries from setupSyncFixture have releaseDate '2024-01-01'.
+    const pressingOfTracked = (mbid: string, date: string | null): MBLite => ({
+      mbid,
+      title: 'Tracked Album',
+      date,
+      releaseGroupMbid: 'rg-tracked-album',
+      releaseType: 'album',
+      artistName: 'Artist One',
+      artistMbid: 'mbid-artist-one',
+    });
+
+    it('skips original-era pressings (before or within 180 days, partial dates) of an album tracked in a previous sync', async () => {
+      setupSyncFixture({
+        includeReissues: true,
+        existingTrackedMbids: ['rg-tracked-album'],
+        reissuesByArtist: {
+          'mbid-artist-one': [
+            pressingOfTracked('pressing-same-day', '2024-01-01'),
+            pressingOfTracked('pressing-partial-month', '2024-05'),
+            pressingOfTracked('pressing-partial-year', '2024'),
+            pressingOfTracked('pressing-day-180', '2024-06-29'),
+            pressingOfTracked('pressing-before', '2023-12-15'),
+          ],
+          'mbid-artist-two': [],
+        },
+      });
+
+      await service.syncReleases('tester');
+
+      const mbids = lastTrackedWrite().releases.map(r => r.mbid);
+      expect(mbids).toEqual(['rg-tracked-album']);
+    });
+
+    it('stores a repress of a previously tracked album as a reissue when more than 180 days later', async () => {
+      setupSyncFixture({
+        includeReissues: true,
+        existingTrackedMbids: ['rg-tracked-album'],
+        reissuesByArtist: {
+          'mbid-artist-one': [
+            pressingOfTracked('pressing-day-181', '2024-06-30'),
+            pressingOfTracked('repress-2026', '2026-01-15'),
+          ],
+          'mbid-artist-two': [],
+        },
+      });
+
+      await service.syncReleases('tester');
+
+      const releases = lastTrackedWrite().releases;
+      expect(releases.map(r => r.mbid).sort()).toEqual([
+        'pressing-day-181',
+        'repress-2026',
+        'rg-tracked-album',
+      ]);
+      const repress = releases.find(r => r.mbid === 'repress-2026');
+      expect(repress?.isReissue).toBe(true);
+      expect(repress?.releaseGroupMbid).toBe('rg-tracked-album');
+    });
+
+    it('conservatively skips pressings of a tracked album when either date is missing or unparseable', async () => {
+      setupSyncFixture({
+        includeReissues: true,
+        existingTrackedMbids: ['rg-tracked-album'],
+        releaseGroupsByArtist: {
+          'mbid-artist-one': [
+            {
+              mbid: 'rg-undated-album',
+              title: 'Undated Album',
+              artistName: 'Artist One',
+              artistMbid: 'mbid-artist-one',
+              releaseDate: null,
+              releaseType: 'album',
+            },
+          ],
+        },
+        reissuesByArtist: {
+          'mbid-artist-one': [
+            pressingOfTracked('pressing-no-date', null),
+            pressingOfTracked('pressing-bad-date', 'sometime'),
+            {
+              ...pressingOfTracked('pressing-of-undated', '2026-01-01'),
+              releaseGroupMbid: 'rg-undated-album',
+            },
+          ],
+          'mbid-artist-two': [],
+        },
+      });
+
+      await service.syncReleases('tester');
+
+      const mbids = lastTrackedWrite()
+        .releases.map(r => r.mbid)
+        .sort();
+      expect(mbids).toEqual(['rg-tracked-album', 'rg-undated-album']);
+    });
+
+    it('still detects a genuine reissue of an older release-group alongside a new album', async () => {
+      setupSyncFixture({
+        includeReissues: true,
+        releaseGroupsByArtist: {
+          'mbid-artist-one': [
+            {
+              mbid: 'rg-new-album',
+              title: 'New Album',
+              artistName: 'Artist One',
+              artistMbid: 'mbid-artist-one',
+              releaseDate: '2026-09-15',
+              releaseType: 'album',
+            },
+          ],
+        },
+        reissuesByArtist: {
+          'mbid-artist-one': [
+            {
+              mbid: 'release-new-album-first-pressing',
+              title: 'New Album',
+              date: '2026-09-15',
+              releaseGroupMbid: 'rg-new-album',
+              releaseType: 'album',
+              artistName: 'Artist One',
+              artistMbid: 'mbid-artist-one',
+            },
+            {
+              mbid: 'release-2003-repress',
+              title: 'Old Album',
+              date: '2026-06-01',
+              releaseGroupMbid: 'rg-2003',
+              releaseType: 'album',
+              artistName: 'Artist One',
+              artistMbid: 'mbid-artist-one',
+            },
+          ],
+          'mbid-artist-two': [],
+        },
+      });
+
+      await service.syncReleases('tester');
+
+      const releases = lastTrackedWrite().releases;
+      expect(releases.map(r => r.mbid).sort()).toEqual([
+        'release-2003-repress',
+        'rg-new-album',
+      ]);
+      const reissue = releases.find(r => r.mbid === 'release-2003-repress');
+      expect(reissue?.isReissue).toBe(true);
+      expect(reissue?.releaseGroupMbid).toBe('rg-2003');
+      const album = releases.find(r => r.mbid === 'rg-new-album');
+      expect(album?.isReissue).toBeFalsy();
+    });
+
+    it('runs the reissue branch when the stored settings file omits includeReissues', async () => {
+      setupSyncFixture({ includeReissues: true });
+      const routed = mockFileStorage.readJSON.getMockImplementation();
+      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
+        if (path === 'releases/settings.json') {
+          return { schemaVersion: 1, includeEps: true };
+        }
+        return routed ? routed(path) : null;
+      });
+
+      await service.syncReleases('tester');
+
+      expect(mockMusicBrainzService.getRecentReleases).toHaveBeenCalledTimes(2);
     });
   });
 });

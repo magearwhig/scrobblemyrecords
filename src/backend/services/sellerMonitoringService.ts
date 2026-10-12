@@ -274,23 +274,9 @@ export class SellerMonitoringService {
   // ============================================
 
   /**
-   * Get seller monitoring settings with defaults
+   * Default seller monitoring settings.
    */
-  async getSettings(): Promise<SellerMonitoringSettings> {
-    try {
-      const settings =
-        await this.fileStorage.readJSON<SellerMonitoringSettings>(
-          this.SETTINGS_FILE
-        );
-
-      if (settings && settings.schemaVersion === 1) {
-        return settings;
-      }
-    } catch {
-      this.logger.debug('No settings file found, using defaults');
-    }
-
-    // Return defaults
+  private getDefaultSettings(): SellerMonitoringSettings {
     return {
       schemaVersion: 1,
       scanFrequencyDays: FULL_SCAN_INTERVAL_DAYS,
@@ -301,7 +287,53 @@ export class SellerMonitoringService {
   }
 
   /**
-   * Save seller monitoring settings
+   * Get seller monitoring settings with defaults.
+   *
+   * Accepts a stored file at schemaVersion 1 or 2. A v2 file is a leftover
+   * from an abandoned earlier attempt and carries extra auto-scan keys
+   * (autoScanEnabled, autoScanIntervalHours, autoScanLastRun,
+   * autoScanNextRun). Stored values are merged over the defaults; a known
+   * field is only taken from the file when its type matches the default's.
+   * Unknown/extra keys are passed through so that saveSettings does not drop
+   * them. The returned object is always normalized to schemaVersion 1.
+   */
+  async getSettings(): Promise<SellerMonitoringSettings> {
+    const defaults = this.getDefaultSettings();
+
+    let stored: Record<string, unknown> | null = null;
+    try {
+      stored = await this.fileStorage.readJSON<Record<string, unknown>>(
+        this.SETTINGS_FILE
+      );
+    } catch {
+      this.logger.debug('No settings file found, using defaults');
+      return defaults;
+    }
+
+    if (
+      !stored ||
+      typeof stored !== 'object' ||
+      Array.isArray(stored) ||
+      (stored.schemaVersion !== 1 && stored.schemaVersion !== 2)
+    ) {
+      return defaults;
+    }
+
+    const merged: Record<string, unknown> = { ...stored };
+    const defaultRecord = defaults as unknown as Record<string, unknown>;
+    for (const [key, defaultValue] of Object.entries(defaultRecord)) {
+      if (typeof merged[key] !== typeof defaultValue) {
+        merged[key] = defaultValue;
+      }
+    }
+    merged.schemaVersion = 1;
+
+    return merged as unknown as SellerMonitoringSettings;
+  }
+
+  /**
+   * Save seller monitoring settings. Always writes schemaVersion 1 and keeps
+   * any extra keys already present in the stored file.
    */
   async saveSettings(
     settings: Partial<SellerMonitoringSettings>

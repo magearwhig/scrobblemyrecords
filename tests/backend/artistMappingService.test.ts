@@ -47,6 +47,30 @@ describe('ArtistMappingService', () => {
     }
   });
 
+  describe('reload', () => {
+    it('picks up a mappings file rewritten on disk', () => {
+      expect(artistMappingService.getLastfmName('Alpha')).toBe('Alpha');
+      fs.writeFileSync(
+        path.join(testDataDir, 'mappings', 'artist-mappings.json'),
+        JSON.stringify({
+          mappings: [
+            {
+              discogsName: 'Alpha',
+              lastfmName: 'Alpha (Last.fm)',
+              dateAdded: 0,
+            },
+          ],
+        })
+      );
+
+      artistMappingService.reload();
+
+      expect(artistMappingService.getLastfmName('Alpha')).toBe(
+        'Alpha (Last.fm)'
+      );
+    });
+  });
+
   describe('getLastfmName', () => {
     it('should return original name when no mapping exists and no disambiguation', () => {
       // Act

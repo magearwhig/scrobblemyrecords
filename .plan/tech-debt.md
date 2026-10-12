@@ -2,7 +2,7 @@
 
 Consolidated from the January–February 2026 audits and the 2026-03-22 consistency audit. **Last re-verified against the code: 2026-10-11** (branch `feat/album-version-merging`, HEAD `0f43ff8`).
 
-**Status: 24 open, 42 completed / resolved.**
+**Status: 19 open, 47 completed / resolved.**
 
 - Open = C1 (coverage, ongoing) + 20 still-open items from the March 2026 audit + 3 new open items from the October 2026 reviews (M31–M33). M32 and M33 came out of the 2026-10-11 planning review (data-export and marketplace plans). H15, found in the same review, was fixed the same day.
 - 2026-10-11 review closed M26 (not applicable) and M29 (resolved). It narrowed H14, M27, M28, M30, L15, L16 and L17 to what is still true.
@@ -26,12 +26,7 @@ Open items are ranked by **what to do next**. The original audit severity is kep
 
 | # | Finding | Priority | Audit severity | Effort | Why this priority |
 |---|---------|----------|----------------|--------|-------------------|
-| H9 | Duplicate logger, and the two copies have drifted | **P1** | High | Low | Backend is missing the renderer's URL-token redaction pattern, so a security-relevant gap. |
-| H11 | Toast icons use unicode, not lucide-react | **P1** | High | Low | Breaks CLAUDE.md icon rule. One-file fix. |
-| H12 | `EmptyState.css` hardcoded `font-size: 4rem` | **P1** | High | Low | Breaks CLAUDE.md token rule. Needs a new token (see detail). |
-| H13 | `--accent-warning` token undefined (10 usages rely on fallback) | **P1** | High | Low | Breaks the token rule. Dark mode gets no override. |
-| M31 | Warm stats cache not invalidated by every album-mapping change | **P2** | Medium (new) | Low | Can serve stale top-album stats until the next sync. |
-| M32 | Backups omit several user-created data files | **P2** | Medium (new) | Low–Medium | A restore silently loses track mappings, compound-artist mappings, dismissed album merges and scrobble sessions. |
+| M32 | Backups omit scrobble session files | **P2** | Medium (new) | Low | Mapping files fixed 2026-10-11; only the session-files decision remains. |
 | M33 | "Median sale price" label shows a Discogs price suggestion | **P2** | Medium (new) | Low | Misleading value estimates. Copy and field-name fix. |
 | C1 | Coverage thresholds (60/65/73/72) vs 90% target | **P2** | Critical (policy) | Ongoing | Policy gap, but thresholds already stop regressions. Next step is to measure and ratchet. |
 | M23 | Two notification systems (toast vs persistent) | **P2** | Medium | Low (doc) / High (merge) | Short-term guidance doc is cheap. `SellersPage` uses both. |
@@ -52,7 +47,7 @@ Open items are ranked by **what to do next**. The original audit severity is kep
 | L15 | Hook/context tests | **P3** | Low → narrowed | Medium | 6 hooks and ThemeContext have no dedicated test. |
 | L16 | E2E coverage (7 smoke tests) | **P3** | Low | High | Only a smoke suite. |
 
-> C1-a is a sub-action of C1, shown separately for visibility. It is **not** counted separately: 24 open = C1, H8–H14 (7), M21–M25, M27, M28, M30–M33 (11), L13–L17 (5).
+> C1-a is a sub-action of C1, shown separately for visibility. It is **not** counted separately: 19 open = C1, H8, H10, H14 (3), M21–M25, M27, M28, M30, M32, M33 (10), L13–L17 (5).
 
 ---
 
@@ -71,78 +66,9 @@ Open items are ranked by **what to do next**. The original audit severity is kep
 
 ### P1 — do next
 
-#### H9. Duplicate logger implementation, now drifted
-
-**Audit severity**: High | **Effort**: Low | **Quick Win**: Yes
-
-`src/renderer/utils/logger.ts` (226 lines) and `src/backend/utils/logger.ts` (209 lines) both implement `SecureLogger` with their own `SENSITIVE_PATTERNS`. **The copies have diverged.** The renderer has an extra pattern for URLs with embedded `token`/`api_key`/`oauth_token` query params and smarter `:`/`=` prefix handling in redaction. The backend has neither. Production log levels also differ (renderer `WARN`, backend `INFO`). The backend is where URLs with OAuth params are actually logged, so this is a redaction gap, not just duplication.
-
-**Action:**
-- [ ] Extract the shared patterns and redaction logic to `src/shared/utils/` (e.g. `logRedaction.ts`). Keep env-specific level defaults in each wrapper.
-- [ ] Add a unit test that both loggers redact the same sample strings.
-
-**Files:** `src/renderer/utils/logger.ts`, `src/backend/utils/logger.ts`
-
----
-
-#### H11. Toast icons use unicode instead of lucide-react
-
-**Audit severity**: High (violates CLAUDE.md) | **Effort**: Low | **Quick Win**: Yes
-
-`ToastContainer.tsx` `TOAST_ICONS` maps types to `'✓'`, `'✗'`, `'⚠'`, `'ℹ'` (✓ ✗ ⚠ ℹ). The dismiss button uses `&times;`.
-
-**Action:**
-- [ ] Replace with lucide `Check`, `X`, `AlertTriangle`, `Info` (16px, `aria-hidden="true"`). Use `X` for the dismiss button too.
-
-**Files:** `src/renderer/components/ToastContainer.tsx`
-
----
-
-#### H12. `EmptyState.css` hardcoded font-size
-
-**Audit severity**: High (violates CLAUDE.md) | **Effort**: Low | **Quick Win**: Yes
-
-`.empty-state-container--large .empty-state-icon` (line 35) uses `font-size: 4rem`. Note: the originally suggested `var(--text-3xl)` is only `2rem` and would halve the icon.
-
-**Action:**
-- [ ] Add a display/icon size token (e.g. `--text-display: 4rem` or `--icon-size-xl`) in `:root` in `styles.css` and use it here.
-
-**Files:** `src/renderer/components/ui/EmptyState.css`, `src/renderer/styles.css`
-
----
-
-#### H13. Missing `--accent-warning` design token
-
-**Audit severity**: High | **Effort**: Low | **Quick Win**: Yes
-
-`--accent-warning` is never defined. There are 10 usages, all relying on the CSS fallback `#f59e0b`: `Button.css` (4), `MarketplacePage.page.css` (3), `styles.css:3297`, `WishlistPage.page.css`, `ReleaseDetailsPage.page.css`. The `.dark-mode` block therefore cannot adjust it. `--status-warning` exists (`#ffc107` / `#ffd43b`), but it is a different colour.
-
-**Action:**
-- [ ] Define `--accent-warning` in `:root` and `.dark-mode` in `styles.css` (or alias it to `--status-warning` after a visual check). Then drop the inline fallbacks.
-
-**Files:** `src/renderer/styles.css`, plus the 4 files listed above
-
----
+None open. H9, H11, H12 and H13 were fixed on 2026-10-11 (see Resolved).
 
 ### P2 — schedule soon
-
-#### M31. Warm stats cache not invalidated by every album-mapping change (new, 2026-10-11)
-
-**Audit severity**: Medium | **Effort**: Low | **Quick Win**: Yes
-
-Since album version merging (`135badf`), warm-cached stats such as `topAlbums` depend on album mappings. `getValidWarmCache()` checks the sync timestamp, `WARM_CACHE_VERSION` and the artist-alias fingerprint, but has **no album-mapping fingerprint**. Freshness instead relies on callers. `routes/suggestions.ts` calls `refreshStatsAfterAlbumMappingChange()` on add, bulk-add and remove. Two other paths do not:
-- auto-created mappings in `routes/scrobble.ts` (`mappingService.addAlbumMapping`, ~line 317)
-- backup import of `mappings/album-mappings.json` (`backupService.ts`)
-
-Those changes only show up in warm-cached stats after the next history sync invalidates the cache.
-
-**Action:**
-- [ ] Add an album-mapping fingerprint to the warm block, mirroring `artistAliasFingerprint`. This is preferred because it removes the need for callers to remember.
-- [ ] Or invoke the same refresh from the scrobble auto-mapping and backup-restore paths.
-
-**Files:** `src/backend/services/statsService.ts`, `src/backend/routes/scrobble.ts`, `src/backend/services/backupService.ts`, `src/shared/types.ts` (`StatsCache['warm']`)
-
----
 
 #### C1. Test coverage thresholds vs stated 90% baseline
 
@@ -227,7 +153,7 @@ There are two systems:
 A backup restore silently loses these. Found while writing [data-export-plan.md](data-export-plan.md) and [context-tags-plan.md](context-tags-plan.md).
 
 **Action:**
-- [ ] Add the three mapping files to `FILE_PATHS`, `BackupData` and the import/merge logic (with tests).
+- [x] ~~Add the three mapping files to `FILE_PATHS`, `BackupData` and the import/merge logic (with tests).~~ Done 2026-10-11, including import preview/compare, `migrationService` registration for track and compound-artist mappings, legacy raw-array track mapping files, and a post-import reload (`BackupService.setAfterImport`, wired in `server.ts`) so running services see restored mappings without a restart.
 - [ ] Decide whether scrobble session files belong in backups (open decision in context-tags-plan.md). If yes, register them in `migrationService.ts` too.
 
 #### M33. "Median sale price" label shows a Discogs price suggestion (new, 2026-10-11)
@@ -405,6 +331,27 @@ No dedicated test: `ThemeContext`, `useConfirmModal`, `useEmbeddingStatus`, `use
 41 items. Newest first within each group. The original write-ups are kept below the table for history.
 
 ### Resolved in the 2026-10-11 review
+
+#### ~~H9. Duplicate logger, drifted redaction~~ FIXED (2026-10-11)
+
+Redaction now lives in one shared module, `src/shared/utils/logRedaction.ts` (`SENSITIVE_PATTERNS`, `redactSensitiveText`), used by both `src/backend/utils/logger.ts` and `src/renderer/utils/logger.ts`. The backend gained the URL-token rule. Also fixed: bare 32+ character hex tokens were partly kept by the renderer, and OAuth header parameters (`oauth_token="..."`, including the escaped form inside serialized objects) were logged in plain text by both loggers. Logged URLs keep their host and path. Shared samples in `tests/fixtures/logRedactionSamples.ts` run against both loggers.
+
+#### ~~H11. Toast icons used unicode~~ FIXED (2026-10-11)
+
+`ToastContainer.tsx` uses lucide `Check`, `X`, `AlertTriangle`, `Info` (16px, `aria-hidden`), and `X` for dismiss. Tests assert an svg is rendered and no unicode glyph.
+
+#### ~~H12. `EmptyState.css` hardcoded font-size~~ FIXED (2026-10-11)
+
+New token `--text-display: 4rem` in `styles.css`; `EmptyState.css` uses it.
+
+#### ~~H13. `--accent-warning` undefined~~ FIXED (2026-10-11)
+
+Defined in `styles.css` (`#f59e0b` light, `#fbbf24` dark). The `#f59e0b` fallbacks were removed from all 10 uses.
+
+#### ~~M31. Warm stats cache not invalidated by every album-mapping change~~ FIXED (2026-10-11)
+
+The warm block stores `albumMappingFingerprint` (sorted mapping keys, SHA-1, taken when warming starts). `getValidWarmCache()` rejects a cache whose fingerprint differs from the current mappings, so auto-created mappings and backup restores no longer leave stale top-album stats.
+
 
 #### ~~H15. Wishlist search returned a master ID as `releaseId`~~ FIXED (2026-10-11)
 

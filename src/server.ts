@@ -670,6 +670,17 @@ async function startServer() {
     rankingsService.setArtistNameResolver(artistNameResolver);
     analyticsService.setArtistNameResolver(artistNameResolver);
 
+    // A backup restore rewrites mapping files; reload everything that keeps
+    // them in memory so the restore takes effect without a restart
+    backupService.setAfterImport(async () => {
+      mappingService.clearCache();
+      trackMappingService.clearCache();
+      compoundMappingService.clearCache();
+      artistMappingService.reload();
+      await artistNameResolver.rebuild();
+      await statsService.invalidateStatsCache();
+    });
+
     // Create merge service for detecting and merging split history index entries
     const historyIndexMergeService = new HistoryIndexMergeService(
       artistNameResolver,

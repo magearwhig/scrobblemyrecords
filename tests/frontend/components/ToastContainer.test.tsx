@@ -187,6 +187,34 @@ describe('ToastContainer', () => {
     expect(icon).toBeInTheDocument();
   });
 
+  it.each(['success', 'error', 'warning', 'info'] as const)(
+    'renders a decorative svg icon (not a unicode glyph) for %s type',
+    async type => {
+      renderWithProvider({ type });
+
+      await user.click(screen.getByText('Show Toast'));
+
+      const icon = screen
+        .getByRole('alert')
+        .querySelector(`.toast-icon--${type}`);
+      const svg = icon?.querySelector('svg');
+      expect(svg).toBeInTheDocument();
+      expect(svg).toHaveAttribute('aria-hidden', 'true');
+      expect(svg).toHaveAttribute('width', '16');
+      expect(icon?.textContent).toBe('');
+    }
+  );
+
+  it('renders the dismiss button with an svg icon instead of a times glyph', async () => {
+    renderWithProvider();
+
+    await user.click(screen.getByText('Show Toast'));
+
+    const dismiss = screen.getByLabelText('Dismiss notification');
+    expect(dismiss.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(dismiss.textContent).not.toContain('\u00d7');
+  });
+
   it('sets aria-live assertive for accessibility', async () => {
     renderWithProvider();
 

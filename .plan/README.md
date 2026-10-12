@@ -9,7 +9,7 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | done/button-system-consolidation.md | Complete -- all 4 phases, 54 files migrated, legacy .btn CSS removed |
 | done/mapping-resolution-plan.md | Complete -- Feature 16, all 6 phases implemented |
 | done/ui-audit-report.md | Complete -- All 3 phases (design tokens, visual polish, cleanup) implemented March 2026 |
-| tech-debt.md | Active -- 24 open (4 P1 quick wins, 7 P2, 13 P3), 42 completed; re-verified 2026-10-11 |
+| tech-debt.md | Active -- 19 open (0 P1, 6 P2, 13 P3), 47 completed; P1 quick wins, M31 and backup mapping files fixed 2026-10-11 |
 | done/wishlist-enhancements-plan.md | Complete -- all 4 enhancements implemented, tested, verified |
 | cancelled/spotify-integration-plan.md | Cancelled -- Spotify genre enrichment for embeddings |
 | cancelled/smart-scrobble-scheduling-plan.md | Cancelled -- superseded by memory-scrobble-plan |
@@ -26,7 +26,7 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | unresolved-listening-history-plan.md | Backlog -- revised 2026-10-11 (renamed from missing-albums-page-plan.md); count album-less scrobbles in listening stats and resolve albums without duplicating plays; not started |
 | context-tags-plan.md | Backlog -- Effort F (#18); revised 2026-10-11, nothing implemented; stable tag IDs, multiple tags per session |
 | marketplace-upgrade-plan.md | Backlog -- Effort C (#19 + #20); re-planned 2026-10-11 against the code; not started (Phase 0 API check first) |
-| reissue-label-discovery-plan.md | Mostly shipped (`6be3c73`) -- remaining: reissue dedupe and settings-defaults merge, label/website auto-scan, new-item notifications |
+| reissue-label-discovery-plan.md | Mostly shipped (`6be3c73`); reissue dedupe and settings defaults fixed 2026-10-11 -- remaining: label/website auto-scan, new-item notifications |
 | backlog-shark-tank-2026-03-08.md | Reference -- 24 tracked items, 19 done, 5 remaining (#5, #9, #18, #19, #20), each linked to a plan |
 | smart-crates-plan.md | Backlog -- new 2026-10-11; rule-based, auto-updating album crates with manual include/exclude, match explanations, and rotating suggested crates with one-click Add; not started |
 | pocket-list-export-plan.md | Backlog -- new 2026-10-11; offline phone-readable PDF of wishlist/collection; depends on data-export-plan Phase 1 |

@@ -3,7 +3,8 @@
  *
  * Exports user-generated data that cannot be recovered from external APIs:
  * - Settings (user, suggestion, AI, wishlist, seller, release, sync)
- * - Mappings (album, artist, history-artist)
+ * - Mappings (album, artist, history-artist, track, compound-artist,
+ *   dismissed album merges)
  * - Discovery (hidden albums/artists)
  * - Wishlist (local want list)
  * - Sellers (monitored sellers)
@@ -33,8 +34,11 @@ import {
   BackupImportResult,
   BackupPreview,
   BackupSettings,
+  CompoundArtistMapping,
+  CompoundArtistMappingsStore,
   DiscardPileItem,
   DiscardPileStore,
+  DismissedAlbumMergesStore,
   ExcludedArtist,
   ExcludedArtistsStore,
   HiddenAlbum,
@@ -60,6 +64,8 @@ import {
   SellerMonitoringSettings,
   SuggestionSettings,
   SyncSettings,
+  TrackMapping,
+  TrackMappingsStore,
   UserSettings,
   WebsiteMonitoringSettings,
   WishlistSettings,
@@ -84,6 +90,9 @@ const FILE_PATHS = {
   albumMappings: 'mappings/album-mappings.json',
   artistMappings: 'mappings/artist-mappings.json',
   historyArtistMappings: 'mappings/history-artist-mappings.json',
+  trackMappings: 'mappings/track-mappings.json',
+  compoundArtistMappings: 'mappings/compound-artist-mappings.json',
+  dismissedAlbumMerges: 'mappings/dismissed-album-merges.json',
   hiddenAlbums: 'discovery/hidden-albums.json',
   hiddenArtists: 'discovery/hidden-artists.json',
   localWantList: 'wishlist/local-want-list.json',
@@ -99,6 +108,16 @@ const FILE_PATHS = {
 } as const;
 
 const BACKUP_DIR = 'backups';
+
+type DismissedAlbumMerge = DismissedAlbumMergesStore['items'][number];
+
+// Identity keys. These match the keys the owning services use, so a merge
+// never produces two entries that the service would collapse into one.
+const trackMappingKey = (m: TrackMapping): string =>
+  `${m.historyArtist.toLowerCase().trim()}|${m.historyAlbum.toLowerCase().trim()}|${m.historyTrack.toLowerCase().trim()}`;
+const compoundArtistMappingKey = (m: CompoundArtistMapping): string =>
+  m.compoundName.toLowerCase().trim();
+const dismissedAlbumMergeKey = (d: DismissedAlbumMerge): string => d.id;
 
 // Read version from package.json
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -123,10 +142,22 @@ const DEFAULT_BACKUP_SETTINGS: BackupSettings = {
 export class BackupService {
   private fileStorage: FileStorage;
   private dataDir: string;
+  /** Runs after an import writes files, so services drop stale caches */
+  private afterImport: (() => Promise<void>) | null = null;
 
   constructor(fileStorage: FileStorage, dataDir: string = 'data') {
     this.fileStorage = fileStorage;
     this.dataDir = dataDir;
+  }
+
+  /**
+   * Register work to run after a backup import has written its files, e.g.
+   * reloading services that keep the restored data in memory. Without it, a
+   * restore is invisible until restart and the next edit writes stale data
+   * back over the restored file.
+   */
+  setAfterImport(hook: () => Promise<void>): void {
+    this.afterImport = hook;
   }
 
   // ============================================
@@ -323,6 +354,29 @@ export class BackupService {
     return store?.mappings ?? [];
   }
 
+  private async loadTrackMappings(): Promise<TrackMapping[]> {
+    // Older installs may still hold a raw array (pre-migration format)
+    const store = await this.fileStorage.readJSON<
+      TrackMappingsStore | TrackMapping[]
+    >(FILE_PATHS.trackMappings);
+    if (Array.isArray(store)) return store;
+    return store?.mappings ?? [];
+  }
+
+  private async loadCompoundArtistMappings(): Promise<CompoundArtistMapping[]> {
+    const store = await this.fileStorage.readJSON<CompoundArtistMappingsStore>(
+      FILE_PATHS.compoundArtistMappings
+    );
+    return store?.mappings ?? [];
+  }
+
+  private async loadDismissedAlbumMerges(): Promise<DismissedAlbumMerge[]> {
+    const store = await this.fileStorage.readJSON<DismissedAlbumMergesStore>(
+      FILE_PATHS.dismissedAlbumMerges
+    );
+    return store?.items ?? [];
+  }
+
   private async loadHiddenAlbums(): Promise<HiddenAlbum[]> {
     const store = await this.fileStorage.readJSON<HiddenAlbumsStore>(
       FILE_PATHS.hiddenAlbums
@@ -421,6 +475,9 @@ export class BackupService {
       albumMappings,
       artistMappings,
       historyArtistMappings,
+      trackMappings,
+      compoundArtistMappings,
+      dismissedAlbumMerges,
       hiddenAlbums,
       hiddenArtists,
       localWantList,
@@ -445,6 +502,9 @@ export class BackupService {
       this.loadAlbumMappings(),
       this.loadArtistMappings(),
       this.loadHistoryArtistMappings(),
+      this.loadTrackMappings(),
+      this.loadCompoundArtistMappings(),
+      this.loadDismissedAlbumMerges(),
       this.loadHiddenAlbums(),
       this.loadHiddenArtists(),
       this.loadLocalWantList(),
@@ -471,6 +531,9 @@ export class BackupService {
       albumMappingsCount: albumMappings.length,
       artistMappingsCount: artistMappings.length,
       historyArtistMappingsCount: historyArtistMappings.length,
+      trackMappingsCount: trackMappings.length,
+      compoundArtistMappingsCount: compoundArtistMappings.length,
+      dismissedAlbumMergesCount: dismissedAlbumMerges.length,
       hiddenAlbumsCount: hiddenAlbums.length,
       hiddenArtistsCount: hiddenArtists.length,
       localWantListCount: localWantList.length,
@@ -515,6 +578,9 @@ export class BackupService {
       albumMappings,
       artistMappings,
       historyArtistMappings,
+      trackMappings,
+      compoundArtistMappings,
+      dismissedAlbumMerges,
       hiddenAlbums,
       hiddenArtists,
       localWantList,
@@ -539,6 +605,9 @@ export class BackupService {
       this.loadAlbumMappings(),
       this.loadArtistMappings(),
       this.loadHistoryArtistMappings(),
+      this.loadTrackMappings(),
+      this.loadCompoundArtistMappings(),
+      this.loadDismissedAlbumMerges(),
       this.loadHiddenAlbums(),
       this.loadHiddenArtists(),
       this.loadLocalWantList(),
@@ -566,6 +635,9 @@ export class BackupService {
       albumMappings,
       artistMappings,
       historyArtistMappings,
+      trackMappings,
+      compoundArtistMappings,
+      dismissedAlbumMerges,
       hiddenAlbums,
       hiddenArtists,
       localWantList,
@@ -680,6 +752,9 @@ export class BackupService {
       currentAlbumMappings,
       currentArtistMappings,
       currentHistoryArtistMappings,
+      currentTrackMappings,
+      currentCompoundArtistMappings,
+      currentDismissedAlbumMerges,
       currentHiddenAlbums,
       currentHiddenArtists,
       currentLocalWantList,
@@ -695,6 +770,9 @@ export class BackupService {
       this.loadAlbumMappings(),
       this.loadArtistMappings(),
       this.loadHistoryArtistMappings(),
+      this.loadTrackMappings(),
+      this.loadCompoundArtistMappings(),
+      this.loadDismissedAlbumMerges(),
       this.loadHiddenAlbums(),
       this.loadHiddenArtists(),
       this.loadLocalWantList(),
@@ -724,6 +802,21 @@ export class BackupService {
         backup.data.historyArtistMappings,
         currentHistoryArtistMappings,
         (m: ArtistMapping) => m.historyArtist
+      ),
+      trackMappings: this.compareMappings(
+        backup.data.trackMappings ?? [],
+        currentTrackMappings,
+        trackMappingKey
+      ),
+      compoundArtistMappings: this.compareMappings(
+        backup.data.compoundArtistMappings ?? [],
+        currentCompoundArtistMappings,
+        compoundArtistMappingKey
+      ),
+      dismissedAlbumMerges: this.compareMappings(
+        backup.data.dismissedAlbumMerges ?? [],
+        currentDismissedAlbumMerges,
+        dismissedAlbumMergeKey
       ),
       hiddenAlbums: this.compareMappings(
         backup.data.hiddenAlbums,
@@ -798,6 +891,9 @@ export class BackupService {
       albumMappings: { new: 0, existing: 0 },
       artistMappings: { new: 0, existing: 0 },
       historyArtistMappings: { new: 0, existing: 0 },
+      trackMappings: { new: 0, existing: 0 },
+      compoundArtistMappings: { new: 0, existing: 0 },
+      dismissedAlbumMerges: { new: 0, existing: 0 },
       hiddenAlbums: { new: 0, existing: 0 },
       hiddenArtists: { new: 0, existing: 0 },
       localWantList: { new: 0, existing: 0 },
@@ -1012,6 +1108,17 @@ export class BackupService {
       logger.error('Backup import failed', error);
     }
 
+    // Files may have been written even if some steps failed, so always reload
+    if (this.afterImport) {
+      try {
+        await this.afterImport();
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        errors.push(`Reloading restored data failed: ${msg}`);
+        logger.error('Reloading after backup import failed', error);
+      }
+    }
+
     return {
       success: errors.length === 0,
       itemsAdded,
@@ -1119,6 +1226,64 @@ export class BackupService {
       errors.push(
         `History artist mappings: ${e instanceof Error ? e.message : e}`
       );
+    }
+
+    // Import track mappings (optional: older backups lack it)
+    if (data.trackMappings) {
+      try {
+        const result = await this.mergeAndSave(
+          FILE_PATHS.trackMappings,
+          data.trackMappings,
+          trackMappingKey,
+          'mappings',
+          merge,
+          (a, b) => (a.createdAt > b.createdAt ? a : b)
+        );
+        added += result.added;
+        updated += result.updated;
+      } catch (e) {
+        errors.push(`Track mappings: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+
+    // Import compound artist mappings (optional: older backups lack it)
+    if (data.compoundArtistMappings) {
+      try {
+        const result = await this.mergeAndSave(
+          FILE_PATHS.compoundArtistMappings,
+          data.compoundArtistMappings,
+          compoundArtistMappingKey,
+          'mappings',
+          merge,
+          (a, b) => (a.createdAt > b.createdAt ? a : b)
+        );
+        added += result.added;
+        updated += result.updated;
+      } catch (e) {
+        errors.push(
+          `Compound artist mappings: ${e instanceof Error ? e.message : e}`
+        );
+      }
+    }
+
+    // Import dismissed album merges (optional: older backups lack it)
+    if (data.dismissedAlbumMerges) {
+      try {
+        const result = await this.mergeAndSave(
+          FILE_PATHS.dismissedAlbumMerges,
+          data.dismissedAlbumMerges,
+          dismissedAlbumMergeKey,
+          'items',
+          merge,
+          (a, b) => (a.dismissedAt > b.dismissedAt ? a : b)
+        );
+        added += result.added;
+        updated += result.updated;
+      } catch (e) {
+        errors.push(
+          `Dismissed album merges: ${e instanceof Error ? e.message : e}`
+        );
+      }
     }
 
     // Import hidden albums
@@ -1334,7 +1499,10 @@ export class BackupService {
     // Merge mode
     const current =
       await this.fileStorage.readJSON<Record<string, unknown>>(filePath);
-    const currentArray = ((current?.[arrayKey] as T[]) || []) as T[];
+    // A pre-migration file may still be a raw array; treat it as the items
+    const currentArray: T[] = Array.isArray(current)
+      ? (current as T[])
+      : ((current?.[arrayKey] as T[]) ?? []);
     const currentMap = new Map(currentArray.map(item => [getKey(item), item]));
 
     let added = 0;

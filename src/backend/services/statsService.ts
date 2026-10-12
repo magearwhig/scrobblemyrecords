@@ -1,3 +1,5 @@
+import { createHash } from 'crypto';
+
 import {
   AlbumArcBucket,
   AlbumDetailResponse,
@@ -32,6 +34,7 @@ import {
   TrackPlayCount,
 } from '../../shared/types';
 import {
+  albumNameKey,
   createAlbumCanonicalizer,
   createCollectionNameResolver,
   isCollectionLinked,
@@ -365,6 +368,11 @@ export class StatsService {
         return;
       }
 
+      // Taken before computing, so a change made while warming still
+      // invalidates the result
+      const artistAliasFingerprint = this.artistAliasFingerprint();
+      const albumMappingFingerprint = await this.albumMappingFingerprint();
+
       const WARM_PERIODS = ['month', 'year', 'all'] as const;
       const TOP_LIMIT = 10;
 
@@ -417,7 +425,8 @@ export class StatsService {
           warmedAt: now,
           syncTimestamp: lastSyncTimestamp,
           version: WARM_CACHE_VERSION,
-          artistAliasFingerprint: this.artistAliasFingerprint(),
+          artistAliasFingerprint,
+          albumMappingFingerprint,
           streaks,
           counts,
           listeningHours,
@@ -470,11 +479,35 @@ export class StatsService {
     if (cache.warm.artistAliasFingerprint !== this.artistAliasFingerprint()) {
       return null;
     }
+    // Album mappings merge album versions in top albums, so any mapping change
+    // (including auto-created mappings and backup restores) invalidates
+    if (
+      (cache.warm.albumMappingFingerprint ?? '') !==
+      (await this.albumMappingFingerprint())
+    ) {
+      return null;
+    }
     return cache.warm;
   }
 
   private artistAliasFingerprint(): string {
     return this.artistNameResolver?.getFingerprint() ?? '';
+  }
+
+  /** Identifies the current album mappings; '' when there are none. */
+  private async albumMappingFingerprint(): Promise<string> {
+    const mappings = await loadAlbumMappings(this.mappingService);
+    if (mappings.length === 0) return '';
+    const lines = mappings
+      .map(m =>
+        [
+          albumNameKey(m.historyArtist, m.historyAlbum),
+          m.collectionId,
+          albumNameKey(m.collectionArtist, m.collectionAlbum),
+        ].join('\t')
+      )
+      .sort();
+    return createHash('sha1').update(lines.join('\n')).digest('hex');
   }
 
   /**

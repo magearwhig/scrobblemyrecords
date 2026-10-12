@@ -1,12 +1,13 @@
+import { AlertTriangle, Check, Info, LucideIcon, X } from 'lucide-react';
 import React, { useEffect, useState, useCallback } from 'react';
 
 import { Toast, useToast } from '../context/ToastContext';
 
-const TOAST_ICONS: Record<Toast['type'], string> = {
-  success: '\u2713',
-  error: '\u2717',
-  warning: '\u26A0',
-  info: '\u2139',
+const TOAST_ICONS: Record<Toast['type'], LucideIcon> = {
+  success: Check,
+  error: X,
+  warning: AlertTriangle,
+  info: Info,
 };
 
 interface ToastItemProps {
@@ -29,6 +30,8 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onRemove }) => {
     }
   }, [toast.duration, dismiss]);
 
+  const Icon = TOAST_ICONS[toast.type];
+
   return (
     <div
       className={`toast toast--${toast.type} ${exiting ? 'toast--exiting' : ''}`}
@@ -36,7 +39,7 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onRemove }) => {
       aria-live='assertive'
     >
       <span className={`toast-icon toast-icon--${toast.type}`}>
-        {TOAST_ICONS[toast.type]}
+        <Icon size={16} aria-hidden='true' />
       </span>
       <span className='toast-message'>{toast.message}</span>
       {toast.action && (
@@ -55,7 +58,7 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, onRemove }) => {
         onClick={dismiss}
         aria-label='Dismiss notification'
       >
-        &times;
+        <X size={16} aria-hidden='true' />
       </button>
     </div>
   );

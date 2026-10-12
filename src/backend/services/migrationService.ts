@@ -105,6 +105,25 @@ export class MigrationService {
       arrayWrapperKey: 'mappings',
     });
 
+    // Track mappings for Forgotten Favorites (used by trackMappingService)
+    // NOTE: This file originally stored raw arrays.
+    // Migration wraps them in versioned objects with 'mappings' key.
+    this.register('track-mappings', {
+      path: 'mappings/track-mappings.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+      arrayWrapperKey: 'mappings',
+    });
+
+    // Compound artist mappings (used by compoundArtistMappingService)
+    this.register('compound-artist-mappings', {
+      path: 'mappings/compound-artist-mappings.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
     this.register('dismissed-album-merges', {
       path: 'mappings/dismissed-album-merges.json',
       currentVersion: 1,

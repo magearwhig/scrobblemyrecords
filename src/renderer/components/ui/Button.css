@@ -103,12 +103,12 @@
 /* Warning variant (outline style with warning color) */
 .button--warning {
   background: transparent;
-  color: var(--accent-warning, #f59e0b);
-  border-color: var(--accent-warning, #f59e0b);
+  color: var(--accent-warning);
+  border-color: var(--accent-warning);
 }
 
 .button--warning:hover:not(:disabled) {
-  background: var(--accent-warning, #f59e0b);
+  background: var(--accent-warning);
   color: var(--text-inverse);
 }
 
@@ -169,7 +169,7 @@
 }
 
 .button--warning .button-spinner {
-  border-color: var(--accent-warning, #f59e0b);
+  border-color: var(--accent-warning);
   border-right-color: transparent;
 }
 

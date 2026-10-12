@@ -14,6 +14,11 @@ jest.mock('../../src/backend/services/mappingService');
 jest.mock('../../src/backend/services/artistNameResolver');
 
 describe('StatsService', () => {
+  // Some tests pin the clock; always restore it, even if an assertion fails
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   let statsService: StatsService;
   let mockFileStorage: jest.Mocked<FileStorage>;
   let mockHistoryStorage: jest.Mocked<ScrobbleHistoryStorage>;
@@ -306,7 +311,9 @@ describe('StatsService', () => {
     });
 
     it('should estimate listening hours based on track counts', async () => {
-      // Arrange
+      // Arrange — fixed midday clock, so "today" can hold all 10 plays
+      // (just after midnight, most of them would fall on yesterday)
+      jest.useFakeTimers({ now: new Date(2026, 5, 15, 12, 0, 0) });
       const now = new Date();
       const todayTimestamp = Math.floor(now.getTime() / 1000);
 
@@ -330,6 +337,7 @@ describe('StatsService', () => {
 
       // Assert
       expect(hours.today).toBeCloseTo(0.6, 1); // 10 * 210 sec / 3600 = 0.58
+      jest.useRealTimers();
     });
   });
 
@@ -1208,6 +1216,59 @@ describe('StatsService', () => {
       // Assert — recomputed live from the (empty) index
       expect(topAlbums).toEqual([]);
       expect(mockHistoryStorage.getIndex).toHaveBeenCalled();
+    });
+
+    it('should ignore a warm cache built before an album mapping change, and serve it once warmed again', async () => {
+      // Arrange
+      const syncTimestamp = 1700000000000;
+      mockHistoryStorage.getLastSyncTimestamp.mockResolvedValue(syncTimestamp);
+      mockHistoryStorage.getIndex.mockResolvedValue(createMockIndex({}));
+      const cached = [{ artist: 'cached', album: 'cached' }];
+      const warmBlock = {
+        warmedAt: 0,
+        syncTimestamp,
+        version: 2,
+        artistAliasFingerprint: '',
+        // Built when there were no album mappings
+        topAlbums: { all: cached },
+      };
+      let stored: unknown = {
+        schemaVersion: 1,
+        lastUpdated: 0,
+        streaks: { currentStreak: 0, longestStreak: 0 },
+        milestoneHistory: [],
+        warm: warmBlock,
+      };
+      mockFileStorage.readJSON.mockImplementation(async () => stored);
+      mockFileStorage.writeJSONWithBackup.mockImplementation(
+        async (_p, data) => {
+          stored = data;
+        }
+      );
+      statsService.setMappingService({
+        getAllAlbumMappings: jest.fn().mockResolvedValue([
+          {
+            historyArtist: 'a',
+            historyAlbum: 'b (deluxe)',
+            collectionId: 0,
+            collectionArtist: 'a',
+            collectionAlbum: 'b',
+            createdAt: 0,
+          },
+        ]),
+        getAlbumMapping: jest.fn().mockResolvedValue(null),
+      } as unknown as MappingService);
+
+      // Act + Assert — a mapping now exists, so the cache is stale
+      await expect(statsService.getTopAlbums('all', 10)).resolves.toEqual([]);
+
+      // Re-warm with the mapping in place; the new cache is served
+      await statsService.warmCache();
+      const rewarmed = stored as { warm: { albumMappingFingerprint?: string } };
+      expect(rewarmed.warm.albumMappingFingerprint).toMatch(/^[0-9a-f]{40}$/);
+      mockHistoryStorage.getIndex.mockClear();
+      await statsService.getTopAlbums('all', 10);
+      expect(mockHistoryStorage.getIndex).not.toHaveBeenCalled();
     });
 
     it('should fall back to live computation when no cache exists', async () => {
@@ -2732,7 +2793,9 @@ describe('StatsService', () => {
     });
 
     it('should aggregate scrobbles by day', async () => {
-      // Arrange
+      // Arrange — fixed midday clock, so the plays at midnight + 2000s are not
+      // in the future
+      jest.useFakeTimers({ now: new Date(2026, 5, 15, 12, 0, 0) });
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const yesterday = new Date(today);
@@ -2765,6 +2828,7 @@ describe('StatsService', () => {
           `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
       );
       expect(todayData?.count).toBe(3);
+      jest.useRealTimers();
     });
 
     it('should aggregate scrobbles by week', async () => {

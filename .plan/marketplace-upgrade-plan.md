@@ -811,8 +811,10 @@ versions modal and in a match details popover.
 ### Phase 0: Spike and settings hygiene. **Size: XS** | No dependencies
 1. ~~Run the API spike (2f)~~ — done 2026-10-11; sections 2a, 2c, 2d
    updated. Remaining fixture captures are listed in 2f.
-2. Make `SellerMonitoringService.getSettings` accept v1/v2 and merge
-   defaults; add tests.
+2. ~~Make `SellerMonitoringService.getSettings` accept v1/v2 and merge
+   defaults; add tests.~~ Done 2026-10-11: v1 and v2 files are accepted,
+   values merge over defaults, unknown keys (the leftover auto-scan fields)
+   are preserved on save, and the file is written as v1.
 3. Add a doc comment on `MarketplaceStats.medianPrice`/`highestPrice`
    (G7).
 
