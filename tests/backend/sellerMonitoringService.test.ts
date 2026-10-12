@@ -163,6 +163,76 @@ describe('SellerMonitoringService', () => {
       expect(result.schemaVersion).toBe(1);
       expect(result.scanFrequencyDays).toBe(7); // Default
     });
+
+    it('should return defaults when readJSON returns null (missing file)', async () => {
+      mockFileStorage.readJSON.mockResolvedValue(null);
+
+      const result = await sellerMonitoringService.getSettings();
+
+      expect(result).toEqual({
+        schemaVersion: 1,
+        scanFrequencyDays: 7,
+        quickCheckFrequencyHours: 24,
+        notifyOnNewMatch: true,
+        vinylFormatsOnly: true,
+      });
+    });
+
+    it('should fill missing fields of a v1 file from defaults', async () => {
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        scanFrequencyDays: 2,
+      });
+
+      const result = await sellerMonitoringService.getSettings();
+
+      expect(result).toEqual({
+        schemaVersion: 1,
+        scanFrequencyDays: 2,
+        quickCheckFrequencyHours: 24,
+        notifyOnNewMatch: true,
+        vinylFormatsOnly: true,
+      });
+    });
+
+    it('should honor values from a leftover v2 file, fill defaults and keep extra keys', async () => {
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 2,
+        scanFrequencyDays: 5,
+        notifyOnNewMatch: false,
+        autoScanEnabled: true,
+        autoScanIntervalHours: 24,
+        autoScanNextRun: 1774222965112,
+        autoScanLastRun: 1774136565102,
+      });
+
+      const result = await sellerMonitoringService.getSettings();
+
+      expect(result).toEqual({
+        schemaVersion: 1,
+        scanFrequencyDays: 5,
+        quickCheckFrequencyHours: 24,
+        notifyOnNewMatch: false,
+        vinylFormatsOnly: true,
+        autoScanEnabled: true,
+        autoScanIntervalHours: 24,
+        autoScanNextRun: 1774222965112,
+        autoScanLastRun: 1774136565102,
+      });
+    });
+
+    it('should fall back to the default for a known field with the wrong type', async () => {
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 2,
+        scanFrequencyDays: null,
+        vinylFormatsOnly: 'yes',
+      });
+
+      const result = await sellerMonitoringService.getSettings();
+
+      expect(result.scanFrequencyDays).toBe(7);
+      expect(result.vinylFormatsOnly).toBe(true);
+    });
   });
 
   describe('saveSettings', () => {
@@ -196,6 +266,37 @@ describe('SellerMonitoringService', () => {
           scanFrequencyDays: 3,
           notifyOnNewMatch: false,
         })
+      );
+    });
+
+    it('should write v1 and keep extra auto-scan keys after reading a v2 file', async () => {
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 2,
+        scanFrequencyDays: 7,
+        quickCheckFrequencyHours: 24,
+        notifyOnNewMatch: true,
+        vinylFormatsOnly: true,
+        autoScanEnabled: true,
+        autoScanIntervalHours: 24,
+        autoScanNextRun: 1774222965112,
+        autoScanLastRun: 1774136565102,
+      });
+
+      await sellerMonitoringService.saveSettings({ scanFrequencyDays: 3 });
+
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledWith(
+        'sellers/settings.json',
+        {
+          schemaVersion: 1,
+          scanFrequencyDays: 3,
+          quickCheckFrequencyHours: 24,
+          notifyOnNewMatch: true,
+          vinylFormatsOnly: true,
+          autoScanEnabled: true,
+          autoScanIntervalHours: 24,
+          autoScanNextRun: 1774222965112,
+          autoScanLastRun: 1774136565102,
+        }
       );
     });
   });
