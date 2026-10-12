@@ -119,6 +119,41 @@ describe('ApiService unresolved history methods', () => {
     expect(lastRequest('get').params).toEqual({ artist: 'guided by voices' });
   });
 
+  it('matchUnresolvedFromDiscogsAlbum POSTs artist, url and includeHidden', async () => {
+    mock
+      .onPost('/stats/unresolved-history/discogs-album-match')
+      .reply(200, envelope);
+
+    const result = await api.matchUnresolvedFromDiscogsAlbum(
+      'john vanderslice',
+      'https://www.discogs.com/master/123',
+      { includeHidden: true }
+    );
+
+    expect(result).toEqual(DATA);
+    expect(JSON.parse(lastRequest('post').data)).toEqual({
+      artist: 'john vanderslice',
+      url: 'https://www.discogs.com/master/123',
+      includeHidden: true,
+    });
+  });
+
+  it('matchUnresolvedFromDiscogsAlbum omits includeHidden when unset and rejects on 400', async () => {
+    mock
+      .onPost('/stats/unresolved-history/discogs-album-match')
+      .reply(400, { success: false, error: 'Paste a Discogs link' });
+
+    await expect(
+      api.matchUnresolvedFromDiscogsAlbum('john vanderslice', 'nope')
+    ).rejects.toMatchObject({
+      response: { status: 400, data: { error: 'Paste a Discogs link' } },
+    });
+    expect(JSON.parse(lastRequest('post').data)).toEqual({
+      artist: 'john vanderslice',
+      url: 'nope',
+    });
+  });
+
   it('getUnresolvedResolutions GETs the rules', async () => {
     mock.onGet('/stats/unresolved-history/resolutions').reply(200, envelope);
 

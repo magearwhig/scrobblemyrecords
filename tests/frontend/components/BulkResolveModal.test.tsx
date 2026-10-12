@@ -12,6 +12,7 @@ import {
 import { ToastProvider } from '../../../src/renderer/context/ToastContext';
 import * as apiService from '../../../src/renderer/services/api';
 import {
+  AlbumTracklistMatch,
   UnresolvedArtistAlbumSuggestions,
   UnresolvedHistoryGroup,
   UnresolvedTrackAlbumSuggestion,
@@ -74,6 +75,7 @@ const suggestions: UnresolvedArtistAlbumSuggestions = {
 let mockApi: {
   getUnresolvedAlbumSuggestions: jest.Mock;
   lookupUnresolvedAlbum: jest.Mock;
+  matchUnresolvedFromDiscogsAlbum: jest.Mock;
   saveUnresolvedResolutions: jest.Mock;
 };
 let onClose: jest.Mock;
@@ -115,6 +117,7 @@ describe('BulkResolveModal', () => {
     mockApi = {
       getUnresolvedAlbumSuggestions: jest.fn(),
       lookupUnresolvedAlbum: jest.fn().mockResolvedValue({ album: null }),
+      matchUnresolvedFromDiscogsAlbum: jest.fn(),
       saveUnresolvedResolutions: jest.fn().mockResolvedValue({ saved: [] }),
     };
     mockApiService.getApiService.mockReturnValue(mockApi as any);
@@ -674,6 +677,397 @@ describe('BulkResolveModal', () => {
       expect(screen.getByRole('status')).toHaveTextContent(
         'Last.fm found albums for 2 of 2 tracks — 1 confirmed on the tracklist, 1 not on the tracklist (left unselected).'
       );
+    });
+  });
+
+  describe('matching tracks from a Discogs album', () => {
+    const key = (name: string) => `guided by voices|${name.toLowerCase()}`;
+
+    const liveAlbum: AlbumTracklistMatch = {
+      album: 'Live at the Nightclub',
+      albumArtist: 'Guided By Voices',
+      trackCount: 12,
+      imageUrl: 'https://img.example/live.jpg',
+      albumUrl: 'https://www.discogs.com/master/123',
+      unmatchedCount: 0,
+      matches: [
+        {
+          key: key('Motor Away'),
+          track: 'Motor Away',
+          playCount: 4,
+          albumTrack: 'Motor Away',
+          position: 3,
+          positionLabel: 'A3',
+          quality: 'exact',
+          liveMismatch: false,
+        },
+        {
+          key: key('Tractor Rape Chain'),
+          track: 'Tractor Rape Chain',
+          playCount: 2,
+          albumTrack: 'Tractor Rape Chain (Live)',
+          position: 5,
+          quality: 'tags',
+          liveMismatch: false,
+        },
+        {
+          key: key('Game of Pricks'),
+          track: 'Game of Pricks',
+          playCount: 9,
+          albumTrack: 'Game of Prick',
+          position: 7,
+          quality: 'near',
+          liveMismatch: false,
+        },
+        {
+          key: key('Echos Myron'),
+          track: 'Echos Myron',
+          playCount: 5,
+          albumTrack: 'Echos Myron',
+          position: 9,
+          quality: 'exact',
+          liveMismatch: true,
+        },
+      ],
+    };
+
+    const secondAlbum: AlbumTracklistMatch = {
+      album: 'Under the Bushes Under the Stars',
+      albumArtist: 'Guided By Voices',
+      trackCount: 24,
+      unmatchedCount: 3,
+      matches: [
+        {
+          key: key('Motor Away'),
+          track: 'Motor Away',
+          playCount: 4,
+          albumTrack: 'Motor Away',
+          position: 2,
+          quality: 'exact',
+          liveMismatch: false,
+        },
+      ],
+    };
+
+    const rowFor = (name: string) =>
+      screen.getByLabelText(`Album for ${name}`).closest('li') as HTMLElement;
+
+    const matchAlbum = async (url: string) => {
+      const input = screen.getByLabelText('Discogs album link');
+      await userEvent.clear(input);
+      await userEvent.type(input, `${url}{Enter}`);
+    };
+
+    const resultsList = () =>
+      screen.getByRole('list', { name: 'Albums matched from Discogs' });
+
+    it('fills matching rows with the album, position and source', async () => {
+      mockApi.matchUnresolvedFromDiscogsAlbum.mockResolvedValue(liveAlbum);
+      renderModal();
+      await waitForRows();
+
+      await matchAlbum('https://www.discogs.com/master/123');
+
+      expect(mockApi.matchUnresolvedFromDiscogsAlbum).toHaveBeenCalledWith(
+        'guided by voices',
+        'https://www.discogs.com/master/123',
+        { includeHidden: false }
+      );
+      const motor = rowFor('Motor Away');
+      expect(
+        await within(motor).findByText('Track A3 of 12: Motor Away')
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Album for Motor Away')).toHaveValue(
+        'Live at the Nightclub'
+      );
+      expect(within(motor).getByText('from Discogs')).toBeInTheDocument();
+      expect(screen.getByLabelText('Include Motor Away')).toBeChecked();
+
+      const tractor = rowFor('Tractor Rape Chain');
+      expect(
+        within(tractor).getByText('Track 5 of 12: Tractor Rape Chain (Live)')
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Include Tractor Rape Chain')).toBeChecked();
+
+      // The result card
+      const card = within(resultsList()).getByRole('listitem');
+      expect(
+        within(card).getByText('Live at the Nightclub')
+      ).toBeInTheDocument();
+      expect(within(card).getByText('Guided By Voices')).toBeInTheDocument();
+      expect(
+        within(card).getByText(
+          /Matched 4 of the artist's unresolved tracks \(0 not on this album\)/
+        )
+      ).toBeInTheDocument();
+      expect(card.querySelector('img')).toHaveAttribute(
+        'src',
+        'https://img.example/live.jpg'
+      );
+      expect(card.querySelector('img')).toHaveAttribute('alt', '');
+      const link = within(card).getByRole('link', { name: /View on Discogs/ });
+      expect(link).toHaveAttribute(
+        'href',
+        'https://www.discogs.com/master/123'
+      );
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+
+      // Announced, and the summary counts the new fills
+      expect(
+        screen
+          .getByText(/^Live at the Nightclub: Matched 4/)
+          .closest('[aria-live]')
+      ).toHaveAttribute('aria-live', 'polite');
+      expect(
+        screen.getByText(/Suggested albums for 4 of 4 tracks\./)
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Discogs album link')).toHaveValue('');
+    });
+
+    it('leaves close and live-mismatched matches unselected with a note', async () => {
+      mockApi.matchUnresolvedFromDiscogsAlbum.mockResolvedValue(liveAlbum);
+      renderModal();
+      await waitForRows();
+
+      await matchAlbum('m123');
+
+      const pricks = rowFor('Game of Pricks');
+      expect(
+        await within(pricks).findByText(
+          'Close match: \u201CGame of Prick\u201D'
+        )
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Include Game of Pricks')).not.toBeChecked();
+      // The history suggestion was replaced with the chosen album
+      expect(screen.getByLabelText('Album for Game of Pricks')).toHaveValue(
+        'Live at the Nightclub'
+      );
+      expect(
+        within(pricks).queryByText(/from your history/)
+      ).not.toBeInTheDocument();
+
+      const echos = rowFor('Echos Myron');
+      expect(
+        within(echos).getByText(
+          "Album is live but this play isn't tagged live (or vice versa) \u2014 may be a different version"
+        )
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Include Echos Myron')).not.toBeChecked();
+      expect(
+        within(resultsList()).getByText(/2 left unselected to check/)
+      ).toBeInTheDocument();
+    });
+
+    it('keeps albums the user typed and reports how many were skipped', async () => {
+      mockApi.matchUnresolvedFromDiscogsAlbum.mockResolvedValue(liveAlbum);
+      renderModal();
+      await waitForRows();
+
+      await userEvent.type(
+        screen.getByLabelText('Album for Motor Away'),
+        'Alien Lanes'
+      );
+      await matchAlbum('m123');
+
+      expect(
+        await within(resultsList()).findByText(/Skipped 1 track you edited\./)
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Album for Motor Away')).toHaveValue(
+        'Alien Lanes'
+      );
+      expect(
+        within(rowFor('Motor Away')).queryByText('from Discogs')
+      ).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Album for Tractor Rape Chain')).toHaveValue(
+        'Live at the Nightclub'
+      );
+    });
+
+    it('shows the server error for a bad link', async () => {
+      mockApi.matchUnresolvedFromDiscogsAlbum.mockRejectedValue(
+        Object.assign(new Error('Request failed with status code 400'), {
+          response: {
+            status: 400,
+            data: {
+              success: false,
+              error: 'Paste a Discogs master or release link',
+            },
+          },
+        })
+      );
+      renderModal();
+      await waitForRows();
+
+      await matchAlbum('not a link');
+
+      expect(
+        await screen.findByText('Paste a Discogs master or release link')
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Discogs album link')).toHaveValue(
+        'not a link'
+      );
+      expect(screen.getByLabelText('Album for Motor Away')).toHaveValue('');
+      expect(
+        screen.queryByRole('list', { name: 'Albums matched from Discogs' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('undo restores the rows to what they held before', async () => {
+      mockApi.matchUnresolvedFromDiscogsAlbum.mockResolvedValue(liveAlbum);
+      renderModal();
+      await waitForRows();
+      await userEvent.click(screen.getByLabelText('Include Game of Pricks'));
+
+      await matchAlbum('m123');
+      await within(rowFor('Motor Away')).findByText('from Discogs');
+
+      await userEvent.click(
+        screen.getByRole('button', {
+          name: 'Undo matches from Live at the Nightclub',
+        })
+      );
+
+      expect(screen.getByLabelText('Album for Motor Away')).toHaveValue('');
+      expect(screen.getByLabelText('Include Motor Away')).not.toBeChecked();
+      expect(screen.getByLabelText('Album for Game of Pricks')).toHaveValue(
+        'Alien Lanes'
+      );
+      // Its deliberate uncheck is restored too
+      expect(screen.getByLabelText('Include Game of Pricks')).not.toBeChecked();
+      expect(
+        screen.getByText('from your history · played 7× on this album')
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Album for Echos Myron')).toHaveValue(
+        'Bee Thousand'
+      );
+      expect(
+        screen.queryByRole('list', { name: 'Albums matched from Discogs' })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByText(/Suggested albums for 2 of 4 tracks/)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('Undid the matches from Live at the Nightclub.')
+      ).toBeInTheDocument();
+    });
+
+    it('applies a second album on top, each with its own undo', async () => {
+      mockApi.matchUnresolvedFromDiscogsAlbum
+        .mockResolvedValueOnce(liveAlbum)
+        .mockResolvedValueOnce(secondAlbum);
+      renderModal();
+      await waitForRows();
+
+      await matchAlbum('m123');
+      await within(rowFor('Motor Away')).findByText('from Discogs');
+      await matchAlbum('r456');
+
+      expect(
+        await within(rowFor('Motor Away')).findByText(
+          'Track 2 of 24: Motor Away'
+        )
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText('Album for Motor Away')).toHaveValue(
+        'Under the Bushes Under the Stars'
+      );
+      expect(screen.getByLabelText('Album for Tractor Rape Chain')).toHaveValue(
+        'Live at the Nightclub'
+      );
+      expect(within(resultsList()).getAllByRole('listitem')).toHaveLength(2);
+
+      // Undoing the second album goes back to the first album's fill
+      await userEvent.click(
+        screen.getByRole('button', {
+          name: 'Undo matches from Under the Bushes Under the Stars',
+        })
+      );
+      expect(screen.getByLabelText('Album for Motor Away')).toHaveValue(
+        'Live at the Nightclub'
+      );
+      expect(
+        within(rowFor('Motor Away')).getByText('Track A3 of 12: Motor Away')
+      ).toBeInTheDocument();
+    });
+
+    it('undoing the first album after a second replaced a row skips that row', async () => {
+      mockApi.matchUnresolvedFromDiscogsAlbum
+        .mockResolvedValueOnce(liveAlbum)
+        .mockResolvedValueOnce(secondAlbum);
+      renderModal();
+      await waitForRows();
+
+      await matchAlbum('m123');
+      await within(rowFor('Motor Away')).findByText('from Discogs');
+      await matchAlbum('r456');
+      await within(rowFor('Motor Away')).findByText(
+        'Track 2 of 24: Motor Away'
+      );
+
+      await userEvent.click(
+        screen.getByRole('button', {
+          name: 'Undo matches from Live at the Nightclub',
+        })
+      );
+      expect(screen.getByLabelText('Album for Motor Away')).toHaveValue(
+        'Under the Bushes Under the Stars'
+      );
+      expect(screen.getByLabelText('Album for Tractor Rape Chain')).toHaveValue(
+        ''
+      );
+
+      // Then undoing the second album restores the original, not the first
+      await userEvent.click(
+        screen.getByRole('button', {
+          name: 'Undo matches from Under the Bushes Under the Stars',
+        })
+      );
+      expect(screen.getByLabelText('Album for Motor Away')).toHaveValue('');
+    });
+
+    it('saves Discogs-filled rows as the user’s choice', async () => {
+      mockApi.matchUnresolvedFromDiscogsAlbum.mockResolvedValue(liveAlbum);
+      renderModal();
+      await waitForRows();
+
+      await matchAlbum('m123');
+      await within(rowFor('Motor Away')).findByText('from Discogs');
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Save 2 albums' })
+      );
+
+      await waitFor(() =>
+        expect(mockApi.saveUnresolvedResolutions).toHaveBeenCalledTimes(1)
+      );
+      expect(mockApi.saveUnresolvedResolutions).toHaveBeenCalledWith([
+        {
+          artist: 'guided by voices',
+          track: 'Motor Away',
+          album: 'Live at the Nightclub',
+          source: 'user',
+        },
+        {
+          artist: 'guided by voices',
+          track: 'Tractor Rape Chain',
+          album: 'Live at the Nightclub',
+          source: 'user',
+        },
+      ]);
+    });
+
+    it('submits with the Match button', async () => {
+      mockApi.matchUnresolvedFromDiscogsAlbum.mockResolvedValue(secondAlbum);
+      renderModal();
+      await waitForRows();
+
+      expect(screen.getByRole('button', { name: 'Match' })).toBeDisabled();
+      await userEvent.type(screen.getByLabelText('Discogs album link'), 'r456');
+      await userEvent.click(screen.getByRole('button', { name: 'Match' }));
+
+      expect(
+        await within(rowFor('Motor Away')).findByText('from Discogs')
+      ).toBeInTheDocument();
+      expect(mockApi.matchUnresolvedFromDiscogsAlbum).toHaveBeenCalledTimes(1);
     });
   });
 

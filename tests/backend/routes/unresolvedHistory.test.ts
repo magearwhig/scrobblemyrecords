@@ -1,7 +1,9 @@
 import express from 'express';
 import request from 'supertest';
 
-import createUnresolvedHistoryRouter from '../../../src/backend/routes/unresolvedHistory';
+import createUnresolvedHistoryRouter, {
+  parseDiscogsAlbumUrl,
+} from '../../../src/backend/routes/unresolvedHistory';
 import { ScrobbleHistoryStorage } from '../../../src/backend/services/scrobbleHistoryStorage';
 import { UnresolvedHistoryService } from '../../../src/backend/services/unresolvedHistoryService';
 
@@ -48,6 +50,9 @@ describe('unresolved history routes', () => {
         .mockResolvedValue([{ artist: 'a', artistName: 'A', plays: 1 }]),
       setExcluded: jest.fn().mockResolvedValue(1),
       suggestExclusions: jest.fn().mockResolvedValue([]),
+      matchAlbumTracklist: jest
+        .fn()
+        .mockResolvedValue({ album: 'Live', matches: [], unmatchedCount: 0 }),
       suggestAlbums: jest
         .fn()
         .mockResolvedValue({ artist: 'a', artistName: 'A', tracks: [] }),
@@ -265,5 +270,111 @@ describe('unresolved history routes', () => {
       '/api/v1/stats/unresolved-history/album-suggestions'
     );
     expect(missing.status).toBe(400);
+  });
+
+  it.each([
+    [
+      'https://www.discogs.com/master/1750039-John-Vanderslice-Live-at-The-Casbah',
+      { kind: 'master', id: 1750039 },
+    ],
+    [
+      'https://www.discogs.com/release/15419351',
+      { kind: 'release', id: 15419351 },
+    ],
+    [
+      'https://www.discogs.com/fr/release/15419351-Some-Title',
+      { kind: 'release', id: 15419351 },
+    ],
+    ['m1750039', { kind: 'master', id: 1750039 }],
+    ['discogs.com/master/42', { kind: 'master', id: 42 }],
+    ['https://www.discogs.com/artist/123', null],
+    ['https://notdiscogs.com/master/123', null],
+    ['https://example.com/?u=discogs.com/master/123', null],
+    ['https://www.discogs.com/master/123abc', null],
+    ['https://www.discogs.com/master/99999999999999999999', null],
+    ['not a link', null],
+  ])('parses Discogs album link %s', (input, expected) => {
+    expect(parseDiscogsAlbumUrl(input)).toEqual(expected);
+  });
+
+  it('matches an artist against a Discogs album link', async () => {
+    const album = { title: 'Live', artist: 'JV', tracks: [] };
+    const fetchDiscogsAlbum = jest.fn().mockResolvedValue(album);
+    const appWithDiscogs = express();
+    appWithDiscogs.use(express.json());
+    appWithDiscogs.use(
+      '/u',
+      createUnresolvedHistoryRouter(
+        service,
+        historyStorage,
+        stats,
+        () => undefined,
+        {
+          fetchDiscogsAlbum,
+        }
+      )
+    );
+
+    const ok = await request(appWithDiscogs)
+      .post('/u/discogs-album-match')
+      .send({
+        artist: 'john vanderslice',
+        url: 'https://www.discogs.com/master/1750039',
+      });
+    const badLink = await request(appWithDiscogs)
+      .post('/u/discogs-album-match')
+      .send({ artist: 'a', url: 'https://example.com' });
+    fetchDiscogsAlbum.mockResolvedValueOnce(null);
+    const missing = await request(appWithDiscogs)
+      .post('/u/discogs-album-match')
+      .send({ artist: 'a', url: 'r1' });
+    const unavailable = await request(app)
+      .post('/api/v1/stats/unresolved-history/discogs-album-match')
+      .send({ artist: 'a', url: 'r1' });
+
+    expect(ok.status).toBe(200);
+    expect(fetchDiscogsAlbum).toHaveBeenCalledWith('master', 1750039);
+    expect(service.matchAlbumTracklist).toHaveBeenCalledWith(
+      index,
+      'john vanderslice',
+      album,
+      { includeHidden: false }
+    );
+    expect(badLink.status).toBe(400);
+    expect(missing.status).toBe(404);
+    expect(unavailable.status).toBe(503);
+  });
+
+  it('reports why Discogs could not load an album', async () => {
+    const fetchDiscogsAlbum = jest.fn();
+    const appWithDiscogs = express();
+    appWithDiscogs.use(express.json());
+    appWithDiscogs.use(
+      '/u',
+      createUnresolvedHistoryRouter(
+        service,
+        historyStorage,
+        stats,
+        () => undefined,
+        { fetchDiscogsAlbum }
+      )
+    );
+    const send = () =>
+      request(appWithDiscogs)
+        .post('/u/discogs-album-match')
+        .send({ artist: 'a', url: 'r1' });
+
+    fetchDiscogsAlbum.mockRejectedValueOnce({ response: { status: 429 } });
+    const limited = await send();
+    fetchDiscogsAlbum.mockRejectedValueOnce({ response: { status: 401 } });
+    const unauthorized = await send();
+    fetchDiscogsAlbum.mockRejectedValueOnce(new Error('ECONNRESET'));
+    const network = await send();
+
+    expect(limited.status).toBe(502);
+    expect(limited.body.error).toMatch(/rate limiting/);
+    expect(unauthorized.body.error).toMatch(/Settings/);
+    expect(network.status).toBe(502);
+    expect(network.body.error).toMatch(/Could not reach Discogs/);
   });
 });

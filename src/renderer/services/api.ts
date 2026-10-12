@@ -6,6 +6,7 @@ import {
   AlbumMapping,
   AlbumMergeSuggestion,
   AlbumPlayCountResponse,
+  AlbumTracklistMatch,
   ApiResponse,
   ArtistDisambiguationStatus,
   ArtistMapping,
@@ -829,6 +830,31 @@ class ApiService {
     const response = await this.api.get(
       '/stats/unresolved-history/album-suggestions',
       { params }
+    );
+    return response.data.data;
+  }
+
+  /**
+   * Match an artist's unresolved tracks against the tracklist of a Discogs
+   * master or release the user points at.
+   * @param artist Normalized artist key (UnresolvedHistoryGroup.artist)
+   * @param url Discogs master/release link, or a short id like "m123"/"r456"
+   */
+  async matchUnresolvedFromDiscogsAlbum(
+    artist: string,
+    url: string,
+    options: { includeHidden?: boolean } = {}
+  ): Promise<AlbumTracklistMatch> {
+    const body: { artist: string; url: string; includeHidden?: boolean } = {
+      artist,
+      url,
+    };
+    if (options.includeHidden !== undefined) {
+      body.includeHidden = options.includeHidden;
+    }
+    const response = await this.api.post(
+      '/stats/unresolved-history/discogs-album-match',
+      body
     );
     return response.data.data;
   }

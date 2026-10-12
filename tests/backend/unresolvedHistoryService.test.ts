@@ -213,6 +213,35 @@ describe('UnresolvedHistoryService', () => {
     expect(lookup.getAlbumInfo).toHaveBeenCalledTimes(1);
   });
 
+  it('retries a failed tracklist lookup after a short wait', async () => {
+    jest.useFakeTimers({ now: new Date('2026-10-01T12:00:00Z') });
+    try {
+      const { storage } = memoryStorage();
+      const getAlbumInfo = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Last.fm down'))
+        .mockResolvedValue({
+          name: 'Album',
+          tracks: { track: [{ name: 'x', '@attr': { rank: 1 } }] },
+        });
+      const service = new UnresolvedHistoryService(storage, {
+        getTrackInfo: jest.fn().mockResolvedValue({ album: 'Album' }),
+        getAlbumInfo,
+      });
+
+      await service.lookupAlbum('a', 'x');
+      await service.lookupAlbum('a', 'x');
+      expect(getAlbumInfo).toHaveBeenCalledTimes(1);
+
+      jest.advanceTimersByTime(3 * 60 * 1000);
+      const retried = await service.lookupAlbum('a', 'x');
+      expect(getAlbumInfo).toHaveBeenCalledTimes(2);
+      expect(retried.verification).toMatchObject({ onTracklist: true });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('reports an unverifiable suggestion when the tracklist is unavailable', async () => {
     const { storage } = memoryStorage();
     const service = new UnresolvedHistoryService(storage, {
@@ -380,6 +409,114 @@ describe('UnresolvedHistoryService', () => {
       expect(trackMatchKey('Song (feat. Someone)')).toBe(trackMatchKey('Song'));
       expect(trackMatchKey('Don’t Stop')).toBe(trackMatchKey("Don't Stop"));
       expect(trackMatchKey('Song (Live)')).not.toBe(trackMatchKey('Song'));
+      // Different songs that share a title stem stay apart
+      expect(trackMatchKey('Song (Part 2)')).not.toBe(
+        trackMatchKey('Song (Part 1)')
+      );
+      expect(trackMatchKey('Song (1)')).not.toBe(trackMatchKey('Song (2)'));
+      expect(trackMatchKey('Song - Live')).not.toBe(
+        trackMatchKey('Song - Demo')
+      );
+    });
+  });
+
+  describe('matchAlbumTracklist', () => {
+    const vanderslice = (): ScrobbleHistoryIndex => ({
+      lastSyncTimestamp: 0,
+      totalScrobbles: 0,
+      oldestScrobbleDate: 0,
+      albums: {},
+      unresolved: {
+        'john vanderslice': {
+          lastPlayed: 9,
+          playCount: 8,
+          plays: [
+            { timestamp: 1, track: 'Pale Horse (Live)' },
+            { timestamp: 2, track: 'Pale Horse (Live)' },
+            { timestamp: 3, track: 'White Plains' },
+            { timestamp: 4, track: 'Lunar Landscapes' },
+            { timestamp: 5, track: 'Angela (live)' },
+            { timestamp: 6, track: 'Up Above The Sea (Live)' },
+            { timestamp: 7, track: 'Gas' },
+            { timestamp: 8, track: 'Glass' },
+          ],
+        },
+      },
+    });
+    const casbah = {
+      title: 'John Vanderslice Live at The Casbah 06/05/2004',
+      artist: 'John Vanderslice',
+      tracks: [
+        { position: '3', title: 'White Plains' },
+        { position: '5', title: 'Pale Horse' },
+        { position: '10', title: 'Lunar Landscape' },
+        { position: '13', title: 'Up Above The Sea' },
+        { position: '14', title: 'Ga' },
+        { position: '15', title: 'Glas' },
+      ],
+      imageUrl: 'cover.jpg',
+      url: 'https://www.discogs.com/master/1750039',
+    };
+
+    it('matches by title, ignoring tags, then near, and flags live mismatches', async () => {
+      const { storage } = memoryStorage();
+      const service = new UnresolvedHistoryService(storage);
+
+      const result = await service.matchAlbumTracklist(
+        vanderslice(),
+        'John Vanderslice',
+        casbah
+      );
+
+      expect(result).toMatchObject({
+        album: casbah.title,
+        albumArtist: 'John Vanderslice',
+        trackCount: 6,
+        imageUrl: 'cover.jpg',
+        albumUrl: casbah.url,
+        unmatchedCount: 3,
+      });
+      const byTrack = Object.fromEntries(result.matches.map(m => [m.track, m]));
+      expect(byTrack['Pale Horse (Live)']).toMatchObject({
+        albumTrack: 'Pale Horse',
+        position: 2,
+        positionLabel: '5',
+        playCount: 2,
+        quality: 'tags',
+        liveMismatch: false,
+      });
+      // Untagged play matched to a live album: maybe the studio version
+      expect(byTrack['White Plains']).toMatchObject({
+        quality: 'exact',
+        liveMismatch: true,
+      });
+      expect(byTrack['Lunar Landscapes']).toMatchObject({
+        albumTrack: 'Lunar Landscape',
+        quality: 'near',
+      });
+      expect(byTrack['Angela (live)']).toBeUndefined();
+      // Only real plurals are singularized: not 'gas' or 'glass'
+      expect(byTrack['Gas']).toBeUndefined();
+      expect(byTrack['Glass']).toBeUndefined();
+      expect(result.matches.map(m => m.position)).toEqual([1, 2, 3, 4]);
+    });
+
+    it('flags a live play matched to a studio album', async () => {
+      const { storage } = memoryStorage();
+      const service = new UnresolvedHistoryService(storage);
+      const result = await service.matchAlbumTracklist(
+        vanderslice(),
+        'john vanderslice',
+        {
+          title: 'Cellar Door',
+          artist: 'JV',
+          tracks: [{ title: 'Pale Horse' }],
+        }
+      );
+      expect(result.matches[0]).toMatchObject({
+        quality: 'tags',
+        liveMismatch: true,
+      });
     });
   });
 });

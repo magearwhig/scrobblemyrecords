@@ -197,6 +197,130 @@
   color: var(--text-secondary);
 }
 
+/* Match tracks from a Discogs album the user pastes a link to */
+
+.bulk-resolve-discogs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-sunken);
+  color: var(--text-primary);
+}
+
+.bulk-resolve-discogs-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.bulk-resolve-discogs-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+}
+
+.bulk-resolve-discogs-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.bulk-resolve-discogs-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.bulk-resolve-discogs-live:empty {
+  display: none;
+}
+
+.bulk-resolve-discogs-message {
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
+}
+
+.bulk-resolve-discogs-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--status-error);
+}
+
+.bulk-resolve-discogs-error svg {
+  flex-shrink: 0;
+}
+
+.bulk-resolve-discogs-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bulk-resolve-discogs-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-raised);
+  color: var(--text-primary);
+}
+
+.bulk-resolve-discogs-cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-12);
+  height: var(--space-12);
+  object-fit: cover;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface-sunken);
+}
+
+.bulk-resolve-discogs-cover--empty {
+  color: var(--text-muted);
+}
+
+.bulk-resolve-discogs-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.bulk-resolve-discogs-title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.bulk-resolve-discogs-artist,
+.bulk-resolve-discogs-counts {
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
+}
+
+.bulk-resolve-discogs-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+}
+
 @media (max-width: 640px) {
   .bulk-resolve-row {
     grid-template-columns: auto minmax(0, 1fr);
@@ -208,5 +332,16 @@
 
   .bulk-resolve-footer-note {
     flex-basis: 100%;
+  }
+
+  .bulk-resolve-discogs-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .bulk-resolve-discogs-actions {
+    grid-column: 2;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
   }
 }

@@ -4,6 +4,8 @@ import {
   ExcludedHistoryArtist,
   ExclusionSuggestion,
   ScrobbleHistoryIndex,
+  AlbumTrackMatchQuality,
+  AlbumTracklistMatch,
   UnresolvedAlbumLookup,
   UnresolvedAlbumOption,
   UnresolvedAlbumVerification,
@@ -14,7 +16,6 @@ import {
   UnresolvedHistorySummary,
   UnresolvedTrackResolution,
 } from '../../shared/types';
-import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import { FileStorage } from '../utils/fileStorage';
 import {
   albumFromAlbumKey,
@@ -48,6 +49,8 @@ export interface TrackInfoLookup {
 
 /** How long a looked-up album tracklist is reused (ms) */
 const ALBUM_INFO_TTL = 60 * 60 * 1000;
+/** A failed lookup is retried after this long, not an hour later */
+const ALBUM_INFO_FAILURE_TTL = 2 * 60 * 1000;
 const ALBUM_INFO_CACHE_LIMIT = 200;
 
 interface AlbumTracklist {
@@ -90,6 +93,53 @@ export interface OwnedReleaseTracks {
   tracks: string[];
 }
 
+/** Words that tag a version of a song rather than a different song */
+const VERSION_WORDS =
+  '(?:live|demo|acoustic|remix|mix|edit|version|session|take|instrumental|unplugged|alternate|alt|rehearsal|bootleg|early|rough)';
+/** "(live)", "[Demo Version]", "(Live at the Casbah)" */
+const VERSION_TAG_IN_BRACKETS = new RegExp(
+  `\\s*[([][^)\\]]*\\b${VERSION_WORDS}\\b[^)\\]]*[)\\]]`,
+  'gi'
+);
+/** " - Live", " - Demo Version" at the end */
+const VERSION_TAG_AFTER_DASH = new RegExp(
+  `\\s+-\\s+[^-]*\\b${VERSION_WORDS}\\b[^-]*$`,
+  'i'
+);
+
+/**
+ * Title key with version tags removed: "Angela (live)" -> "angela", but
+ * "Song (Part 2)" keeps its part number.
+ */
+function untaggedMatchKey(track: string): string {
+  return trackMatchKey(
+    track
+      .replace(VERSION_TAG_IN_BRACKETS, ' ')
+      .replace(VERSION_TAG_AFTER_DASH, '')
+  );
+}
+
+/**
+ * Looser key for near matches: words normalized first, then a plural "s"
+ * dropped from longer words ("Landscapes!" -> "landscape", not "Gas" -> "Ga").
+ */
+function nearMatchKey(track: string): string {
+  const words = titleWords(
+    stripReleaseTags(
+      track
+        .replace(VERSION_TAG_IN_BRACKETS, ' ')
+        .replace(VERSION_TAG_AFTER_DASH, '')
+    )
+  ).map(word =>
+    word.length > 3 && word.endsWith('s') && !word.endsWith('ss')
+      ? word.slice(0, -1)
+      : word
+  );
+  return words.join('') || track.toLowerCase().trim();
+}
+
+const LIVE = /\blive\b/i;
+
 /** "bee thousand" -> "Bee Thousand" (history album keys are lowercase) */
 function titleCase(name: string): string {
   return name.replace(
@@ -104,15 +154,38 @@ function titleCase(name: string): string {
  * quotes and punctuation.
  */
 export function trackMatchKey(track: string): string {
-  const simplified = normalizeForMatching(track)
+  return (
+    titleWords(stripReleaseTags(track)).join('') || track.toLowerCase().trim()
+  );
+}
+
+/**
+ * Remove tags that describe a release rather than a recording: remasters,
+ * mono/stereo, explicit/clean, "feat." credits. Recording identifiers (live,
+ * demo, remix, acoustic, part numbers) are kept, so they stay distinct.
+ */
+function stripReleaseTags(track: string): string {
+  return track
     .replace(
-      /\s+-\s+[^-]*\b(remaster(ed)?|version|mono|stereo|edit|mix|live|demo|single)\b.*$/i,
+      /\s*[([](?:\d{4}\s+)?(?:remaster(?:ed)?|explicit|clean|mono|stereo|bonus track)(?:\s+(?:version|\d{4}))?[)\]]/gi,
+      ' '
+    )
+    .replace(
+      /\s+-\s+(?:\d{4}\s+)?(?:remaster(?:ed)?(?:\s+\d{4})?|(?:\d{4}\s+)?remaster|mono|stereo)(?:\s+(?:version|mix))?\s*$/i,
       ''
     )
+    .replace(/\s*[([]?\b(?:feat\.?|ft\.?|featuring)\s+[^)\]]*[)\]]?\s*$/i, '');
+}
+
+/** Lowercased words of a title, accents and punctuation removed */
+function titleWords(title: string): string[] {
+  return title
+    .toLowerCase()
+    .replace(/[’‘'`"“”]/g, '')
     .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^\p{L}\p{N}\p{M}]/gu, '');
-  return simplified || track.toLowerCase().trim();
+    .replace(/[̀-ͯ]/g, '')
+    .split(/[^\p{L}\p{N}\p{M}]+/u)
+    .filter(Boolean);
 }
 
 /**
@@ -409,6 +482,98 @@ export class UnresolvedHistoryService {
     return result;
   }
 
+  /**
+   * Match an artist's unresolved tracks against one album's tracklist (e.g. a
+   * Discogs album the user points at). Exact titles first, then titles with
+   * bracketed tags like "(live)" ignored, then near matches (plurals).
+   * `liveMismatch` flags a match where only one side says "live", which may
+   * be a different version of the song.
+   */
+  async matchAlbumTracklist(
+    index: ScrobbleHistoryIndex | null,
+    artist: string,
+    album: {
+      title: string;
+      artist: string;
+      tracks: Array<{ position?: string; title: string }>;
+      imageUrl?: string;
+      url?: string;
+    },
+    options: { includeHidden?: boolean } = {}
+  ): Promise<AlbumTracklistMatch> {
+    const artistKey = normalizeHistoryName(artist);
+    const result: AlbumTracklistMatch = {
+      album: album.title,
+      albumArtist: album.artist,
+      trackCount: album.tracks.length,
+      imageUrl: album.imageUrl,
+      albumUrl: album.url,
+      matches: [],
+      unmatchedCount: 0,
+    };
+    const entry = index?.unresolved?.[artistKey];
+    if (!entry) return result;
+
+    const byKey = (keyOf: (title: string) => string) => {
+      const map = new Map<string, number>();
+      album.tracks.forEach((t, i) => {
+        const key = keyOf(t.title);
+        if (key && !map.has(key)) map.set(key, i);
+      });
+      return map;
+    };
+    const exact = byKey(trackMatchKey);
+    const untagged = byKey(untaggedMatchKey);
+    const near = byKey(nearMatchKey);
+    const albumIsLive = LIVE.test(album.title);
+
+    const hidden = new Set((await this.getStore()).hidden);
+    const tracks = new Map<string, { track: string; plays: number }>();
+    for (const play of entry.plays) {
+      const track = play.track ?? '';
+      const key = unresolvedTrackKey(artistKey, track);
+      const current = tracks.get(key);
+      if (current) current.plays++;
+      else tracks.set(key, { track, plays: 1 });
+    }
+
+    for (const [key, { track, plays }] of tracks) {
+      if (hidden.has(key) && !options.includeHidden) continue;
+      let quality: AlbumTrackMatchQuality = 'exact';
+      let index = exact.get(trackMatchKey(track));
+      if (index === undefined) {
+        quality = 'tags';
+        index = untagged.get(untaggedMatchKey(track));
+      }
+      if (index === undefined) {
+        quality = 'near';
+        index = near.get(nearMatchKey(track));
+      }
+      if (index === undefined) {
+        result.unmatchedCount++;
+        continue;
+      }
+      const albumTrack = album.tracks[index];
+      const trackIsLive = LIVE.test(track) && !LIVE.test(albumTrack.title);
+      const albumOnlyLive =
+        (albumIsLive || LIVE.test(albumTrack.title)) && !LIVE.test(track);
+      result.matches.push({
+        key,
+        track,
+        playCount: plays,
+        albumTrack: albumTrack.title,
+        position: index + 1,
+        positionLabel: albumTrack.position || undefined,
+        quality,
+        liveMismatch: albumIsLive
+          ? albumOnlyLive
+          : trackIsLive || albumOnlyLive,
+      });
+    }
+    result.matches.sort((a, b) => a.position - b.position);
+    return result;
+  }
+
   /** Album suggestion for an unresolved track from Last.fm track.getInfo. */
   async lookupAlbum(
     artist: string,
@@ -459,7 +624,8 @@ export class UnresolvedHistoryService {
       normalizeHistoryName(album),
     ]);
     const cached = this.albumInfoCache.get(key);
-    if (cached && Date.now() - cached.at < ALBUM_INFO_TTL) return cached.value;
+    const ttl = cached?.value ? ALBUM_INFO_TTL : ALBUM_INFO_FAILURE_TTL;
+    if (cached && Date.now() - cached.at < ttl) return cached.value;
     let value: AlbumTracklist | null;
     try {
       value = parseLastfmAlbum(

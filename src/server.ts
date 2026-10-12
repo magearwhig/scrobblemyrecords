@@ -93,6 +93,7 @@ import { getAllCachedCollectionItems } from './backend/utils/collectionCache';
 import { resolveDataDir } from './backend/utils/dataDir';
 import { FileStorage } from './backend/utils/fileStorage';
 import { createLogger } from './backend/utils/logger';
+import { CollectionItem } from './shared/types';
 import { stripDiscogsSuffix } from './shared/utils/albumMapping';
 
 const log = createLogger('Server');
@@ -712,6 +713,46 @@ async function startServer() {
       );
     }
 
+    // Owned releases' tracklists for album suggestions. Release files rarely
+    // change, so tracklists are kept; the collection list is re-read after
+    // 5 minutes.
+    const releaseTracklists = new Map<number, string[] | null>();
+    let collectionItems: { at: number; items: CollectionItem[] } | null = null;
+    const ownedReleaseTracks = async (isArtist: (name: string) => boolean) => {
+      const username = (await authService.getUserSettings()).discogs.username;
+      if (!username) return [];
+      if (!collectionItems || Date.now() - collectionItems.at > 5 * 60 * 1000) {
+        collectionItems = {
+          at: Date.now(),
+          items: await getAllCachedCollectionItems(username, fileStorage),
+        };
+      }
+      const releases: Array<{ title: string; tracks: string[] }> = [];
+      const seen = new Set<number>();
+      for (const item of collectionItems.items) {
+        const id = item.release.id;
+        if (
+          seen.has(id) ||
+          !isArtist(stripDiscogsSuffix(item.release.artist))
+        ) {
+          continue;
+        }
+        seen.add(id);
+        if (!releaseTracklists.has(id)) {
+          const details = await fileStorage.readJSON<{
+            tracklist?: Array<{ title?: string; position?: string }>;
+          }>(`collections/release-${id}.json`);
+          const tracks = (details?.tracklist ?? [])
+            .filter(t => t.title && t.position !== '')
+            .map(t => t.title as string);
+          releaseTracklists.set(id, tracks.length > 0 ? tracks : null);
+        }
+        const tracks = releaseTracklists.get(id);
+        if (tracks) releases.push({ title: item.release.title, tracks });
+      }
+      return releases;
+    };
+
     // Unresolved Listening History (mounted before the stats router)
     app.use(
       '/api/v1/stats/unresolved-history',
@@ -722,29 +763,9 @@ async function startServer() {
         () => artist => artistNameResolver.getDisplayName(artist),
         {
           getSameArtist: () => (a, b) => artistNameResolver.areSameArtist(a, b),
-          ownedReleases: async isArtist => {
-            const username = (await authService.getUserSettings()).discogs
-              .username;
-            if (!username) return [];
-            const items = await getAllCachedCollectionItems(
-              username,
-              fileStorage
-            );
-            const releases = [];
-            for (const item of items) {
-              if (!isArtist(stripDiscogsSuffix(item.release.artist))) continue;
-              const details = await fileStorage.readJSON<{
-                tracklist?: Array<{ title?: string; position?: string }>;
-              }>(`collections/release-${item.release.id}.json`);
-              const tracks = (details?.tracklist ?? [])
-                .filter(t => t.title && t.position !== '')
-                .map(t => t.title as string);
-              if (tracks.length > 0) {
-                releases.push({ title: item.release.title, tracks });
-              }
-            }
-            return releases;
-          },
+          fetchDiscogsAlbum: (kind, id) =>
+            wishlistService.getDiscogsAlbum(kind, id),
+          ownedReleases: isArtist => ownedReleaseTracks(isArtist),
         }
       )
     );

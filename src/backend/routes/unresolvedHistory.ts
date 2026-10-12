@@ -18,6 +18,45 @@ export interface UnresolvedHistoryStatsHooks {
 const SORTS: UnresolvedSort[] = ['plays', 'artist', 'recent'];
 
 /**
+ * Master or release id from a Discogs link: discogs.com/master/123-Slug,
+ * discogs.com/release/456, discogs.com/<lang>/release/456 (or "m123" /
+ * "r456" as shorthand).
+ */
+export function parseDiscogsAlbumUrl(
+  input: string
+): { kind: 'master' | 'release'; id: number } | null {
+  const text = input.trim();
+  const toResult = (kind: string, digits: string) => {
+    const id = Number(digits);
+    return Number.isSafeInteger(id) && id > 0
+      ? { kind: kind.toLowerCase() as 'master' | 'release', id }
+      : null;
+  };
+
+  const short = /^([mr])(\d+)$/i.exec(text);
+  if (short)
+    return toResult(
+      short[1] === 'm' || short[1] === 'M' ? 'master' : 'release',
+      short[2]
+    );
+
+  let url: URL;
+  try {
+    url = new URL(/^https?:\/\//i.test(text) ? text : `https://${text}`);
+  } catch {
+    return null;
+  }
+  const host = url.hostname.toLowerCase();
+  if (host !== 'discogs.com' && !host.endsWith('.discogs.com')) return null;
+  // /master/123-Slug, /release/456, /fr/release/456-Slug
+  const match =
+    /^\/(?:[a-z]{2}\/)?(master|release)\/(\d+)(?:-[^/]*)?\/?$/i.exec(
+      url.pathname
+    );
+  return match ? toResult(match[1], match[2]) : null;
+}
+
+/**
  * Routes for Unresolved Listening History (scrobbles without album info),
  * mounted at /api/v1/stats/unresolved-history.
  */
@@ -33,6 +72,17 @@ export default function createUnresolvedHistoryRouter(
     ownedReleases?: (
       isArtist: (name: string) => boolean
     ) => Promise<OwnedReleaseTracks[]>;
+    /** Fetch a Discogs master or release (title, artist, tracklist) */
+    fetchDiscogsAlbum?: (
+      kind: 'master' | 'release',
+      id: number
+    ) => Promise<{
+      title: string;
+      artist: string;
+      tracks: Array<{ position?: string; title: string }>;
+      imageUrl?: string;
+      url?: string;
+    } | null>;
   } = {}
 ) {
   const router = express.Router();
@@ -161,6 +211,69 @@ export default function createUnresolvedHistoryRouter(
       res.json({ success: true, data: suggestions });
     } catch (error) {
       fail(res, error, 'Error suggesting albums');
+    }
+  });
+
+  /**
+   * POST /discogs-album-match { artist, url, includeHidden? }
+   * Match an artist's unresolved tracks against a Discogs master or release
+   * the user points at (e.g. a live album not in history or Last.fm).
+   */
+  router.post('/discogs-album-match', async (req: Request, res: Response) => {
+    try {
+      const { artist, url, includeHidden } = req.body ?? {};
+      if (!isNonEmptyString(artist) || !isNonEmptyString(url)) {
+        return res.status(400).json({
+          success: false,
+          error: 'artist and url are required',
+        });
+      }
+      const parsed = parseDiscogsAlbumUrl(url);
+      if (!parsed) {
+        return res.status(400).json({
+          success: false,
+          error:
+            'Paste a Discogs master or release link, e.g. https://www.discogs.com/master/123',
+        });
+      }
+      if (!extras.fetchDiscogsAlbum) {
+        return res.status(503).json({
+          success: false,
+          error: 'Discogs lookups are not available',
+        });
+      }
+      let album;
+      try {
+        album = await extras.fetchDiscogsAlbum(parsed.kind, parsed.id);
+      } catch (error) {
+        const status = (error as { response?: { status?: number } })?.response
+          ?.status;
+        logger.warn('Discogs album lookup failed', error);
+        return res.status(502).json({
+          success: false,
+          error:
+            status === 401 || status === 403
+              ? 'Discogs rejected the request; check your Discogs connection in Settings'
+              : status === 429
+                ? 'Discogs is rate limiting requests; try again in a minute'
+                : 'Could not reach Discogs; try again',
+        });
+      }
+      if (!album) {
+        return res.status(404).json({
+          success: false,
+          error: 'Could not load that album from Discogs',
+        });
+      }
+      const match = await service.matchAlbumTracklist(
+        await historyStorage.getIndex(),
+        artist,
+        album,
+        { includeHidden: includeHidden === true }
+      );
+      res.json({ success: true, data: match });
+    } catch (error) {
+      fail(res, error, 'Error matching a Discogs album');
     }
   });
 

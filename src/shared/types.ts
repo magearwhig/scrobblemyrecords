@@ -3294,3 +3294,40 @@ export interface UnresolvedAlbumLookup {
   album: string | null;
   verification?: UnresolvedAlbumVerification;
 }
+
+/** How an unresolved track matched a song on a chosen album */
+export type AlbumTrackMatchQuality =
+  /** Same title */
+  | 'exact'
+  /** Same title once bracketed tags like "(live)" are ignored */
+  | 'tags'
+  /** Close but not identical (e.g. "Landscapes" vs "Landscape") */
+  | 'near';
+
+export interface AlbumTrackMatch {
+  /** "artist|track" key of the unresolved track */
+  key: string;
+  track: string;
+  playCount: number;
+  /** Title on the album's tracklist */
+  albumTrack: string;
+  /** 1-based position in the tracklist */
+  position: number;
+  /** Position label from the source, e.g. "A3" or "12" */
+  positionLabel?: string;
+  quality: AlbumTrackMatchQuality;
+  /** One side says "live" and the other doesn't: may be a different version */
+  liveMismatch: boolean;
+}
+
+/** An artist's unresolved tracks matched against one album's tracklist */
+export interface AlbumTracklistMatch {
+  album: string;
+  albumArtist: string;
+  trackCount: number;
+  imageUrl?: string;
+  albumUrl?: string;
+  matches: AlbumTrackMatch[];
+  /** Unresolved tracks of the artist that weren't on the album */
+  unmatchedCount: number;
+}

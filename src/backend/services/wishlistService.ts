@@ -913,6 +913,66 @@ export class WishlistService {
   }
 
   /**
+   * Title, artist, tracklist and cover of a Discogs master or release, e.g.
+   * to match unresolved plays against an album the user points at. Track
+   * titles are in tracklist order; headings (no position) are skipped.
+   * Returns null if Discogs has no such album; throws on other failures.
+   */
+  async getDiscogsAlbum(
+    kind: 'master' | 'release',
+    id: number
+  ): Promise<{
+    title: string;
+    artist: string;
+    tracks: Array<{ position: string; title: string }>;
+    imageUrl?: string;
+    url: string;
+  } | null> {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await this.axios.get(
+        `/${kind === 'master' ? 'masters' : 'releases'}/${id}`,
+        { headers }
+      );
+      const data = response.data as {
+        title?: string;
+        artists?: Array<{ name?: string }>;
+        tracklist?: Array<{
+          position?: string;
+          title?: string;
+          type_?: string;
+        }>;
+        images?: Array<{ type?: string; uri?: string; uri150?: string }>;
+        uri?: string;
+      };
+      if (!data?.title) return null;
+      const tracks = (data.tracklist ?? [])
+        .filter(t => t.title && t.type_ !== 'heading' && t.position !== '')
+        .map(t => ({ position: t.position ?? '', title: t.title as string }));
+      const image =
+        data.images?.find(i => i.type === 'primary') ?? data.images?.[0];
+      return {
+        title: data.title,
+        artist: (data.artists ?? [])
+          .map(a => a.name)
+          .filter(Boolean)
+          .join(', '),
+        tracks,
+        imageUrl: image?.uri150 || image?.uri || undefined,
+        url: data.uri || `https://www.discogs.com/${kind}/${id}`,
+      };
+    } catch (error) {
+      // Not found is a normal answer; anything else (auth, rate limit,
+      // network) is reported so the caller can say what went wrong
+      const status = (error as { response?: { status?: number } })?.response
+        ?.status;
+      if (status === 404) return null;
+      this.logger.warn(`Failed to get Discogs ${kind} ${id}`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Add a release to the user's Discogs wantlist
    */
   async addToDiscogsWantlist(
