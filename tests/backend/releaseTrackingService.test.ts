@@ -2185,6 +2185,86 @@ describe('ReleaseTrackingService', () => {
       expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalled();
     });
 
+    it('looks up a reissue by its pressing, then by its album', async () => {
+      const reissue = (mbid: string, releaseGroupMbid: string) => ({
+        mbid,
+        title: 'Surfer Rosa',
+        artistName: 'Pixies',
+        artistMbid: 'artist-mbid',
+        releaseDate: '2025-12-05',
+        releaseType: 'album' as const,
+        vinylStatus: 'unknown' as const,
+        firstSeen: Date.now(),
+        isUpcoming: false,
+        inWishlist: false,
+        isReissue: true,
+        releaseGroupMbid,
+      });
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: [
+          reissue('pressing-1', 'rg-1'),
+          reissue('pressing-2', 'rg-2'),
+        ],
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+      mockMusicBrainzService.getCoverArtUrl.mockImplementation(
+        async (mbid: string, entity?: string) =>
+          mbid === 'pressing-1' && entity === 'release'
+            ? 'pressing.jpg'
+            : mbid === 'rg-2' && entity === 'release-group'
+              ? 'album.jpg'
+              : null
+      );
+
+      const count = await service.fetchMissingCoverArt();
+
+      expect(count).toBe(2);
+      // A reissue's mbid is never looked up as an album
+      expect(mockMusicBrainzService.getCoverArtUrl).not.toHaveBeenCalledWith(
+        'pressing-1',
+        'release-group'
+      );
+      expect(mockMusicBrainzService.getCoverArtUrl).not.toHaveBeenCalledWith(
+        'pressing-1'
+      );
+      expect(mockMusicBrainzService.getCoverArtUrl).not.toHaveBeenCalledWith(
+        'rg-1',
+        'release-group'
+      );
+      const saved = mockFileStorage.writeJSONWithBackup.mock
+        .calls[0][1] as TrackedReleasesStore;
+      expect(saved.releases.map(r => r.coverArtUrl)).toEqual([
+        'pressing.jpg',
+        'album.jpg',
+      ]);
+    });
+
+    it('saves every 25 covers found during a long run', async () => {
+      const store: TrackedReleasesStore = {
+        schemaVersion: 1,
+        lastUpdated: Date.now(),
+        releases: Array.from({ length: 30 }, (_, i) => ({
+          mbid: `rg-${i}`,
+          title: `Album ${i}`,
+          artistName: 'Artist',
+          artistMbid: 'artist-mbid',
+          releaseDate: '2024-01-01',
+          releaseType: 'album' as const,
+          vinylStatus: 'unknown' as const,
+          firstSeen: Date.now(),
+          isUpcoming: false,
+          inWishlist: false,
+        })),
+      };
+      mockFileStorage.readJSON.mockResolvedValue(store);
+      mockMusicBrainzService.getCoverArtUrl.mockResolvedValue('cover.jpg');
+
+      await expect(service.fetchMissingCoverArt()).resolves.toBe(30);
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledTimes(2);
+    });
+
     it('should not save if no cover art was found', async () => {
       // Arrange
       const store: TrackedReleasesStore = {

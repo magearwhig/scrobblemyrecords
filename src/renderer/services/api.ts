@@ -2052,7 +2052,7 @@ class ApiService {
       '/releases/sync',
       {},
       {
-        timeout: 600000, // 10 minutes
+        timeout: 900000, // 15 minutes // 10 minutes
       }
     );
     return { message: response.data.message, status: response.data.data };
@@ -2165,7 +2165,11 @@ class ApiService {
   }
 
   async fetchReleaseCoverArt(): Promise<{ updated: number }> {
-    const response = await this.api.post('/releases/fetch-covers');
+    // One Cover Art Archive lookup (about 2s) per release without a cover,
+    // which can be hundreds after a sync that found reissues
+    const response = await this.api.post('/releases/fetch-covers', undefined, {
+      timeout: 900000, // 15 minutes
+    });
     return response.data.data;
   }
 

@@ -706,6 +706,22 @@ describe('MusicBrainzService', () => {
   });
 
   describe('getCoverArtUrl', () => {
+    it('looks up an album by default and a pressing when asked', async () => {
+      mockCoverArtAxios.get.mockResolvedValue({ data: { images: [] } });
+
+      await service.getCoverArtUrl('rg-mbid');
+      await service.getCoverArtUrl('release-mbid', 'release');
+
+      expect(mockCoverArtAxios.get).toHaveBeenNthCalledWith(
+        1,
+        '/release-group/rg-mbid'
+      );
+      expect(mockCoverArtAxios.get).toHaveBeenNthCalledWith(
+        2,
+        '/release/release-mbid'
+      );
+    });
+
     it('should return front cover URL when available', async () => {
       // Arrange
       mockCoverArtAxios.get.mockResolvedValue({

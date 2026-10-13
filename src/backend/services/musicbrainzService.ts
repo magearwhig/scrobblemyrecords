@@ -554,15 +554,18 @@ export class MusicBrainzService {
 
   /**
    * Get cover art URL from Cover Art Archive
-   * Returns the URL of the front cover image, or null if not available
+   * Returns the URL of the front cover image, or null if not available.
+   * `entity` says what the MBID identifies: an album (release group, the
+   * default) or a single pressing (release).
    */
-  async getCoverArtUrl(releaseGroupMbid: string): Promise<string | null> {
+  async getCoverArtUrl(
+    mbid: string,
+    entity: 'release-group' | 'release' = 'release-group'
+  ): Promise<string | null> {
     await this.enforceCoverArtRateLimit();
 
     try {
-      const response = await this.coverArtAxios.get(
-        `/release-group/${releaseGroupMbid}`
-      );
+      const response = await this.coverArtAxios.get(`/${entity}/${mbid}`);
 
       const images = response.data.images || [];
 
@@ -578,7 +581,7 @@ export class MusicBrainzService {
         return null;
       }
       this.logger.debug(
-        `CAA lookup failed for ${releaseGroupMbid}`,
+        `CAA lookup failed for ${entity} ${mbid}`,
         error instanceof Error ? error.message : 'Unknown error'
       );
       return null;
