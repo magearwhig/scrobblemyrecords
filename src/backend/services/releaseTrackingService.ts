@@ -1270,6 +1270,28 @@ export class ReleaseTrackingService {
   }
 
   /**
+   * Front cover for a tracked release. A reissue's `mbid` is a single
+   * pressing (release), not an album (release group), so it is looked up as
+   * a release, falling back to its album's cover when the pressing has none.
+   */
+  private async lookupCoverArt(
+    release: TrackedRelease
+  ): Promise<string | null> {
+    if (!release.isReissue) {
+      return this.musicBrainzService.getCoverArtUrl(release.mbid);
+    }
+    const pressingCover = await this.musicBrainzService.getCoverArtUrl(
+      release.mbid,
+      'release'
+    );
+    if (pressingCover || !release.releaseGroupMbid) return pressingCover;
+    return this.musicBrainzService.getCoverArtUrl(
+      release.releaseGroupMbid,
+      'release-group'
+    );
+  }
+
+  /**
    * Fetch cover art for releases that are missing it
    */
   async fetchMissingCoverArt(): Promise<number> {
@@ -1284,16 +1306,17 @@ export class ReleaseTrackingService {
 
     let updated = 0;
     for (const release of needsCoverArt) {
-      const coverUrl = await this.musicBrainzService.getCoverArtUrl(
-        release.mbid
-      );
+      const coverUrl = await this.lookupCoverArt(release);
       if (coverUrl) {
         release.coverArtUrl = coverUrl;
         updated++;
+        // A few hundred lookups take minutes; save along the way so a
+        // reload shows progress and an interruption keeps what was found
+        if (updated % 25 === 0) await this.saveTrackedReleases(releases);
       }
     }
 
-    if (updated > 0) {
+    if (updated % 25 !== 0) {
       await this.saveTrackedReleases(releases);
       this.logger.info(`Updated cover art for ${updated} releases`);
     }
@@ -1317,9 +1340,7 @@ export class ReleaseTrackingService {
       }
 
       try {
-        const coverUrl = await this.musicBrainzService.getCoverArtUrl(
-          release.mbid
-        );
+        const coverUrl = await this.lookupCoverArt(release);
         if (coverUrl) {
           release.coverArtUrl = coverUrl;
           updated++;
