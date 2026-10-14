@@ -268,8 +268,8 @@ describe('WishlistPriceService', () => {
         // alerted: 201 fresh (<6h), 202 stale (>6h), 203 never checked
         '201': entry(50, { fetchedAt: NOW - 2 * HOUR }),
         '202': entry(50, { fetchedAt: NOW - 7 * HOUR }),
-        // plain: 100 fresh (<24h), 101 oldest stale, 102 stale, 103 other currency
-        '100': entry(50, { fetchedAt: NOW - 20 * HOUR }),
+        // plain: 100 fresh (<12h), 101 oldest stale, 102 stale, 103 other currency
+        '100': entry(50, { fetchedAt: NOW - 10 * HOUR }),
         '101': entry(50, { fetchedAt: NOW - 30 * DEFAULT_REFRESH_MS }),
         '102': entry(50, { fetchedAt: NOW - 2 * DEFAULT_REFRESH_MS }),
         '103': entry(50, { currency: 'EUR', fetchedAt: NOW - HOUR }),
@@ -620,6 +620,7 @@ describe('WishlistPriceService', () => {
         pressingsFresh: 2,
         pressingsUnchecked: 1,
         lastRunAt: undefined,
+        lastCheckedAt: NOW - HOUR,
         alertsTriggered: 1,
         alertsTotal: 2,
       });

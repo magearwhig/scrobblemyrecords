@@ -458,7 +458,7 @@ Sync and manage your Discogs wantlist with vinyl availability tracking:
 **Lowest Listing & Price Alerts:**
 - **Lowest Listing**: Each record shows its cheapest current vinyl listing across all pressings (e.g. "Lowest $11.83 · 1988 UK LP · 23 for sale"), linked to that pressing's Discogs marketplace page
 - **Price Alerts**: Set an alert price right on the record. When any vinyl pressing is listed at or below it you get a notification, and the record is marked "Below your price". It alerts again only if the price drops further
-- **Background Price Checks**: Prices are checked in the background a few at a time (records with an alert every 6 hours, others daily), so the first full pass takes a few hours
+- **Background Price Checks**: Prices are checked in the background a few at a time (records with an alert every 6 hours, others every 12 hours), so the first full pass takes a few hours. The page shows when prices were last checked, and each price shows its age
 - Prices are Discogs asking prices before shipping, from sellers in any country (the Discogs API can't filter by seller location; use the linked page to filter by ships-from)
 
 **Filtering & Sorting:**

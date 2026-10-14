@@ -83,11 +83,11 @@ export const WishlistLowestListingLine: React.FC<LowestListingLineProps> = ({
 
   const price = formatMoney(listing.price, listing.currency);
   const pressing = describePressing(listing);
-  const checked = `Checked ${formatCheckedAgo(listing.checkedAt)}`;
+  const checked = `checked ${formatCheckedAgo(listing.checkedAt)}`;
   const partial = listing.pressingsChecked < listing.pressingsTotal;
 
   return (
-    <span className='wishlist-price-listing' title={checked}>
+    <span className='wishlist-price-listing'>
       <a
         className='wishlist-price-link'
         href={`https://www.discogs.com/sell/release/${listing.releaseId}`}
@@ -104,13 +104,13 @@ export const WishlistLowestListingLine: React.FC<LowestListingLineProps> = ({
           aria-hidden='true'
         />
       </a>
-      {partial && (
-        <span className='wishlist-price-muted'>
-          {' '}
-          · {listing.pressingsChecked} of {listing.pressingsTotal} pressings
-          checked
-        </span>
-      )}
+      <span className='wishlist-price-muted'>
+        {' '}
+        ·{' '}
+        {partial
+          ? `${listing.pressingsChecked} of ${listing.pressingsTotal} pressings checked`
+          : checked}
+      </span>
     </span>
   );
 };

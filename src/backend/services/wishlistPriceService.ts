@@ -21,7 +21,7 @@ const HOUR_MS = 60 * 60 * 1000;
 /** Price checks of records with an alert are refreshed after this long */
 export const ALERTED_REFRESH_MS = 6 * HOUR_MS;
 /** Price checks of other records are refreshed after this long */
-export const DEFAULT_REFRESH_MS = 24 * HOUR_MS;
+export const DEFAULT_REFRESH_MS = 12 * HOUR_MS;
 /** A release whose price check failed is skipped for this long */
 export const FAILURE_BACKOFF_MS = HOUR_MS;
 /** Pressings checked per background tick (~1 request/s shared limit) */
@@ -533,6 +533,11 @@ export class WishlistPriceService {
       MAX_PRESSINGS_PER_TICK
     );
     const result = await this.fetchAndStore(due, settings.currency);
+    if (due.length > 0) {
+      this.logger.info(
+        `Checked ${result.fetched} wishlist pressing prices (${result.failed} failed)`
+      );
+    }
     await this.pruneOrphans(candidates);
     if (result.masters.size > 0) {
       await this.evaluateAlerts(result.masters, items);
@@ -767,7 +772,11 @@ export class WishlistPriceService {
     const candidates = await this.getCandidates(items);
     let pressingsFresh = 0;
     let pressingsUnchecked = 0;
+    let lastCheckedAt: number | undefined;
     for (const c of candidates) {
+      if (c.entry && c.entry.fetchedAt > (lastCheckedAt ?? 0)) {
+        lastCheckedAt = c.entry.fetchedAt;
+      }
       if (!c.entry) pressingsUnchecked++;
       else if (!this.isDue(c, settings.currency, now)) pressingsFresh++;
     }
@@ -801,6 +810,7 @@ export class WishlistPriceService {
       pressingsFresh,
       pressingsUnchecked,
       lastRunAt: this.lastRunAt,
+      lastCheckedAt,
       alertsTriggered,
       alertsTotal,
     };

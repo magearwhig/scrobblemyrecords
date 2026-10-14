@@ -1117,9 +1117,30 @@ describe('WishlistPage', () => {
       expect(link).toHaveTextContent('1987 UK LP');
       expect(link).toHaveTextContent('3 for sale');
       expect(screen.getByText(/2 of 5 pressings checked/)).toBeInTheDocument();
-      expect(link.parentElement).toHaveAttribute(
-        'title',
-        'Checked 2 hours ago'
+    });
+
+    it('shows how old a fully checked price is', async () => {
+      mockGetWishlist.mockResolvedValue([
+        radioheadWith({ lowestListing: { ...mockListing } }),
+      ]);
+      renderWishlistPage();
+
+      const card = await screen.findByRole('link', {
+        name: /Lowest listing \$39\.28/,
+      });
+      expect(card.parentElement).toHaveTextContent('checked 2 hours ago');
+    });
+
+    it('says when prices were last checked once every pressing is checked', async () => {
+      mockGetWishlistPriceRefreshStatus.mockResolvedValue({
+        ...mockPriceRefreshStatusDone,
+        lastCheckedAt: Date.now() - 3 * 60 * 1000,
+      });
+      renderWishlistPage();
+
+      const line = await screen.findByText(/are rechecked every 12 hours/);
+      expect(line.parentElement).toHaveTextContent(
+        'Prices of 843 pressings are rechecked every 12 hours (every 6 for records with an alert) · last check 3 minutes ago'
       );
     });
 
@@ -1439,7 +1460,7 @@ describe('WishlistPage', () => {
             within(getCard('OK Computer')).queryByText('Price not checked yet')
           ).not.toBeInTheDocument()
         );
-        // Done checking: the status line goes away and polling stops
+        // Done checking: the progress text goes away and fast polling stops
         expect(
           screen.queryByText(/Checking prices in the background/)
         ).not.toBeInTheDocument();

@@ -158,7 +158,8 @@ A rolling refresh on the server, independent of any open page:
 - Runs every **5 minutes**; each tick fetches at most **15 pressings**
   (one stats call each, `curr_abbr` = wishlist currency).
 - A pressing is due when its entry is older than **6h** (record has an
-  alert) or **24h** (no alert).
+  alert) or **12h** (no alert). (Was 24h; a sold copy kept showing for up
+  to a day, so it was halved — still well inside the tick budget.)
 - Order: pressings of records with an alert first, then never-checked
   pressings, then oldest `fetchedAt`.
 - Setting or changing an alert refreshes that record's pressings right
@@ -169,8 +170,8 @@ A rolling refresh on the server, independent of any open page:
   skipped.
 - After each tick, alerts for the records touched are evaluated (3c).
 
-Budget check: 15 pressings / 5 min = 180/h ≈ 4,300/day, against ≈ 1,000/day
-needed for 843 pressings at 24h plus alerted ones at 6h. The first full
+Budget check: 15 pressings / 5 min = 180/h ≈ 4,300/day, against ≈ 2,000/day
+needed for 843 pressings at 12h plus alerted ones at 6h. The first full
 pass takes ≈ 4.7h of ticks; the progress line (3e) shows it.
 
 ### 3c. Alerts
@@ -266,7 +267,7 @@ Follow the project CSS rules: co-located `.page.css`, design tokens,
 ## 5. Tests
 
 - Service: due-pressing selection and ordering (alerted, never checked,
-  oldest), per-tick limit, 6h/24h intervals, failure backoff.
+  oldest), per-tick limit, 6h/12h intervals, failure backoff.
 - Service: lowest-listing computation (nulls, partial checks, mixed
   currencies, no vinyl pressings).
 - Service: alert evaluation — first notify, no repeat at the same price,
@@ -294,5 +295,5 @@ Follow the project CSS rules: co-located `.page.css`, design tokens,
   revisit.
 - **Q3. Shipping.** Prices are before shipping; the alert price has no
   shipping allowance. Add a note in the UI; no setting in v1.
-- **Q4. Refresh cadence.** 6h/24h and 15 pressings per 5 min are first
+- **Q4. Refresh cadence.** 6h/12h and 15 pressings per 5 min are first
   guesses; adjust after watching the progress line and rate-limit logs.

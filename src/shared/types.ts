@@ -1170,6 +1170,8 @@ export interface WishlistPriceRefreshStatus {
   /** Pressings never checked */
   pressingsUnchecked: number;
   lastRunAt?: number;
+  /** Newest saved price check of any wishlist pressing (survives restarts) */
+  lastCheckedAt?: number;
   /** Records whose alert is currently triggered */
   alertsTriggered: number;
   alertsTotal: number;

@@ -28,7 +28,9 @@ import {
   TableRowSkeleton,
 } from '../components/ui/Skeleton';
 import { NewReleasesTab } from '../components/wishlist/NewReleasesTab';
-import WishlistPriceAlert from '../components/wishlist/WishlistPriceAlert';
+import WishlistPriceAlert, {
+  formatCheckedAgo,
+} from '../components/wishlist/WishlistPriceAlert';
 import WishlistItemCard from '../components/WishlistItemCard';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -44,6 +46,8 @@ const logger = createLogger('WishlistPage');
 
 /** How often prices are re-read while the background check is still filling them in */
 export const PRICE_POLL_MS = 60 * 1000;
+/** How often prices are re-read once every pressing has been checked */
+export const PRICE_IDLE_POLL_MS = 5 * 60 * 1000;
 /** After setting an alert, when to re-read its record's freshly checked prices */
 const ALERT_PRICE_RECHECK_MS = 30 * 1000;
 
@@ -188,8 +192,10 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
 
   const pricesPending = (priceRefreshStatus?.pressingsUnchecked ?? 0) > 0;
   useEffect(() => {
-    if (!pricesPending) return;
-    const timer = setInterval(refreshPricesQuietly, PRICE_POLL_MS);
+    const timer = setInterval(
+      refreshPricesQuietly,
+      pricesPending ? PRICE_POLL_MS : PRICE_IDLE_POLL_MS
+    );
     return () => clearInterval(timer);
   }, [pricesPending, refreshPricesQuietly]);
 
@@ -847,17 +853,36 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
         </div>
       )}
 
-      {priceRefreshStatus && priceRefreshStatus.pressingsUnchecked > 0 && (
-        <div className='wishlist-price-refresh-status'>
-          Checking prices in the background:{' '}
-          {(
-            priceRefreshStatus.pressingsTotal -
-            priceRefreshStatus.pressingsUnchecked
-          ).toLocaleString()}{' '}
-          of {priceRefreshStatus.pressingsTotal.toLocaleString()} pressings
-          checked
-        </div>
-      )}
+      {priceRefreshStatus &&
+        (priceRefreshStatus.pressingsUnchecked > 0 ||
+          priceRefreshStatus.lastCheckedAt !== undefined) && (
+          <div className='wishlist-price-refresh-status'>
+            {priceRefreshStatus.pressingsUnchecked > 0 ? (
+              <span>
+                Checking prices in the background:{' '}
+                {(
+                  priceRefreshStatus.pressingsTotal -
+                  priceRefreshStatus.pressingsUnchecked
+                ).toLocaleString()}{' '}
+                of {priceRefreshStatus.pressingsTotal.toLocaleString()}{' '}
+                pressings checked
+              </span>
+            ) : (
+              <span>
+                Prices of {priceRefreshStatus.pressingsTotal.toLocaleString()}{' '}
+                pressings are rechecked every 12 hours (every 6 for records with
+                an alert)
+              </span>
+            )}
+            {priceRefreshStatus.lastCheckedAt !== undefined && (
+              <span>
+                {' '}
+                · last check{' '}
+                {formatCheckedAgo(priceRefreshStatus.lastCheckedAt)}
+              </span>
+            )}
+          </div>
+        )}
 
       {error && <div className='error-message'>{error}</div>}
 
