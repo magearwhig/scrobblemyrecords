@@ -21,7 +21,7 @@ import {
 
 import AlbumLink from './AlbumLink';
 import ArtistLink from './ArtistLink';
-import { RankedRow } from './RankedRow';
+import { RankedListHeader, RankedRow } from './RankedRow';
 import TrackLink from './TrackLink';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
@@ -34,6 +34,7 @@ interface AlbumHistoryItem {
   artistName?: string;
   album: string;
   playCount: number;
+  firstPlayed?: number;
   lastPlayed: number;
 }
 
@@ -45,6 +46,7 @@ interface TrackHistoryItem {
   albumUnknown?: boolean;
   track: string;
   playCount: number;
+  firstPlayed?: number;
   lastPlayed: number;
 }
 
@@ -52,6 +54,7 @@ interface ArtistHistoryItem {
   artist: string;
   playCount: number;
   albumCount: number;
+  firstPlayed?: number;
   lastPlayed: number;
 }
 
@@ -115,6 +118,12 @@ const displayAlbum = (
   return toDisplayName(album);
 };
 
+const formatMonthYear = (timestamp: number): string =>
+  new Date(timestamp * 1000).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+  });
+
 const formatDate = (timestamp: number): string =>
   new Date(timestamp * 1000).toLocaleDateString(undefined, {
     year: 'numeric',
@@ -175,6 +184,8 @@ const LastFmHistoryTab: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  // Top play count among all results, to scale the play bars
+  const [maxPlayCount, setMaxPlayCount] = useState(0);
   const perPage = 50;
 
   // Search and sort
@@ -215,6 +226,10 @@ const LastFmHistoryTab: React.FC = () => {
       setAlbums(result.items);
       setTotalPages(result.totalPages);
       setTotal(result.total);
+      setMaxPlayCount(
+        result.maxPlayCount ??
+          result.items.reduce((max, i) => Math.max(max, i.playCount), 0)
+      );
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to load album history'
@@ -239,6 +254,10 @@ const LastFmHistoryTab: React.FC = () => {
       setTracks(result.items);
       setTotalPages(result.totalPages);
       setTotal(result.total);
+      setMaxPlayCount(
+        result.maxPlayCount ??
+          result.items.reduce((max, i) => Math.max(max, i.playCount), 0)
+      );
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to load track history'
@@ -263,6 +282,10 @@ const LastFmHistoryTab: React.FC = () => {
       setArtists(result.items);
       setTotalPages(result.totalPages);
       setTotal(result.total);
+      setMaxPlayCount(
+        result.maxPlayCount ??
+          result.items.reduce((max, i) => Math.max(max, i.playCount), 0)
+      );
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to load artist history'
@@ -402,11 +425,23 @@ const LastFmHistoryTab: React.FC = () => {
     </button>
   );
 
-  const lastPlayedMeta = (timestamp: number) => (
+  const lastPlayedCell = (timestamp: number) => (
     <span title={`Last played ${formatDate(timestamp)}`}>
       {formatLastPlayed(timestamp)}
     </span>
   );
+
+  const firstPlayedCell = (timestamp: number | undefined) =>
+    timestamp ? (
+      <span title={`First played ${formatDate(timestamp)}`}>
+        {formatMonthYear(timestamp)}
+      </span>
+    ) : (
+      ''
+    );
+
+  const shareOf = (playCount: number): number | undefined =>
+    maxPlayCount > 0 ? playCount / maxPlayCount : undefined;
 
   return (
     <div className='lastfm-history-tab'>
@@ -612,7 +647,7 @@ const LastFmHistoryTab: React.FC = () => {
 
       {items.length > 0 && (
         <section
-          className='card lastfm-history-list-card'
+          className='card lastfm-history-list-card ranked-list-container'
           aria-labelledby='lastfm-history-list-title'
           aria-busy={loading}
         >
@@ -631,6 +666,7 @@ const LastFmHistoryTab: React.FC = () => {
             </p>
           </div>
 
+          <RankedListHeader />
           <ol className='ranked-list' aria-label={`All-time ${itemType}`}>
             {viewMode === 'albums' &&
               albums.map((album, index) => {
@@ -671,7 +707,9 @@ const LastFmHistoryTab: React.FC = () => {
                         )}
                       />
                     }
-                    meta={lastPlayedMeta(album.lastPlayed)}
+                    share={shareOf(album.playCount)}
+                    firstPlayed={firstPlayedCell(album.firstPlayed)}
+                    lastPlayed={lastPlayedCell(album.lastPlayed)}
                     onPlay={() => playAlbumOnSpotify(album.artist, album.album)}
                     playCount={album.playCount}
                   />
@@ -739,7 +777,9 @@ const LastFmHistoryTab: React.FC = () => {
                         )}
                       </>
                     }
-                    meta={lastPlayedMeta(track.lastPlayed)}
+                    share={shareOf(track.playCount)}
+                    firstPlayed={firstPlayedCell(track.firstPlayed)}
+                    lastPlayed={lastPlayedCell(track.lastPlayed)}
                     onPlay={() =>
                       playTrackOnSpotify(
                         track.artist,
@@ -781,7 +821,9 @@ const LastFmHistoryTab: React.FC = () => {
                       )
                     }
                     subtitle={`${artist.albumCount.toLocaleString()} ${artist.albumCount === 1 ? 'album' : 'albums'}`}
-                    meta={lastPlayedMeta(artist.lastPlayed)}
+                    share={shareOf(artist.playCount)}
+                    firstPlayed={firstPlayedCell(artist.firstPlayed)}
+                    lastPlayed={lastPlayedCell(artist.lastPlayed)}
                     onPlay={() => playArtistOnSpotify(artist.artist)}
                     playCount={artist.playCount}
                   />

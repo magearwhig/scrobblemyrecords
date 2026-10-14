@@ -1,4 +1,10 @@
-/* Ranked list row (Stats top lists, History full lists) */
+/* Ranked list row (Stats top lists, History full lists).
+ * Compact by default; inside a wide .ranked-list-container the row becomes
+ * aligned columns with a play-share bar and first/last played dates. */
+.ranked-list-container {
+  container: ranked-list / inline-size;
+}
+
 .ranked-list {
   display: flex;
   flex-direction: column;
@@ -90,11 +96,33 @@
   color: var(--text-secondary);
 }
 
-.ranked-row-meta {
+.ranked-row-date {
   flex-shrink: 0;
   font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
   color: var(--text-secondary);
   white-space: nowrap;
+}
+
+/* Wide-only parts */
+.ranked-row-bar,
+.ranked-row-date--first,
+.ranked-list-header {
+  display: none;
+}
+
+.ranked-row-bar {
+  height: 6px;
+  overflow: hidden;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-full);
+}
+
+.ranked-row-bar-fill {
+  width: var(--share, 0%);
+  height: 100%;
+  background-color: var(--accent-primary);
+  border-radius: var(--radius-full);
 }
 
 .ranked-row-play-btn {
@@ -114,8 +142,84 @@
   border-radius: var(--radius-sm);
 }
 
-@media (max-width: 640px) {
-  .ranked-row-meta {
+@container ranked-list (max-width: 479px) {
+  .ranked-row-date--last {
     display: none;
+  }
+}
+
+@container ranked-list (min-width: 720px) {
+  .ranked-row,
+  .ranked-list-header {
+    display: grid;
+    grid-template-columns:
+      2rem 40px minmax(14rem, 1.4fr) minmax(8rem, 1.6fr)
+      6.5rem 7.5rem 2rem 3.5rem;
+    grid-template-areas: 'rank cover info bar first last play count';
+    column-gap: var(--space-4);
+  }
+
+  .ranked-row-rank {
+    grid-area: rank;
+  }
+
+  .ranked-row-cover {
+    grid-area: cover;
+  }
+
+  .ranked-row-info {
+    grid-area: info;
+  }
+
+  .ranked-row-bar {
+    display: block;
+    grid-area: bar;
+  }
+
+  .ranked-row-date--first {
+    display: block;
+    grid-area: first;
+  }
+
+  .ranked-row-date--last {
+    grid-area: last;
+  }
+
+  .ranked-row-play-btn {
+    grid-area: play;
+  }
+
+  .ranked-row-count {
+    grid-area: count;
+    justify-self: end;
+  }
+
+  .ranked-list-header {
+    grid-template-areas: 'name name name bar first last play count';
+    padding: 0 var(--space-2) var(--space-2);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  .ranked-list-header .ranked-row-date {
+    display: block;
+    font-size: inherit;
+    color: inherit;
+  }
+
+  .ranked-list-header-name {
+    grid-area: name;
+  }
+
+  .ranked-list-header-bar {
+    grid-area: bar;
+  }
+
+  .ranked-list-header-count {
+    grid-area: count;
+    justify-self: end;
   }
 }

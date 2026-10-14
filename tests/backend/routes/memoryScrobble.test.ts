@@ -384,12 +384,14 @@ describe('Memory Scrobble Routes', () => {
             album: 'Kid A',
             track: 'Everything In Its Right Place',
             playCount: 10,
+            firstPlayed: 1700000000000,
             lastPlayed: 1700000000000,
           },
         ],
         total: 1,
         totalPages: 1,
         page: 1,
+        maxPlayCount: 0,
       });
 
       mockSavedCollectionService.getCollections.mockResolvedValue([
@@ -415,12 +417,14 @@ describe('Memory Scrobble Routes', () => {
             album: 'Kid A',
             track: 'Everything In Its Right Place',
             playCount: 10,
+            firstPlayed: 1700000000000,
             lastPlayed: 1700000000000,
           },
         ],
         total: 1,
         totalPages: 1,
         page: 1,
+        maxPlayCount: 0,
       });
 
       mockSavedCollectionService.getCollections.mockResolvedValue([
@@ -445,6 +449,7 @@ describe('Memory Scrobble Routes', () => {
         total: 0,
         totalPages: 0,
         page: 1,
+        maxPlayCount: 0,
       });
 
       mockSavedCollectionService.getCollections.mockResolvedValue([]);

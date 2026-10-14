@@ -65,8 +65,14 @@ export interface RankedRowProps {
   badge?: React.ReactNode;
   /** Second line, e.g. the artist */
   subtitle?: React.ReactNode;
-  /** Extra detail on the right on wide screens, e.g. when last played */
-  meta?: React.ReactNode;
+  /**
+   * Plays relative to the top item (0 to 1), drawn as a bar where the row
+   * has room for it
+   */
+  share?: number;
+  /** When first and last played; shown as columns where there is room */
+  firstPlayed?: React.ReactNode;
+  lastPlayed?: React.ReactNode;
   /** Plays the item on Spotify; the button is left out without it */
   onPlay?: () => void;
   playCount: number;
@@ -84,7 +90,9 @@ export const RankedRow: React.FC<RankedRowProps> = ({
   title,
   badge,
   subtitle,
-  meta,
+  share,
+  firstPlayed,
+  lastPlayed,
   onPlay,
   playCount,
 }) => (
@@ -108,7 +116,27 @@ export const RankedRow: React.FC<RankedRowProps> = ({
       </div>
       {subtitle && <div className='ranked-row-subtitle'>{subtitle}</div>}
     </div>
-    {meta && <div className='ranked-row-meta'>{meta}</div>}
+    {share !== undefined && (
+      <div className='ranked-row-bar' aria-hidden='true'>
+        <div
+          className='ranked-row-bar-fill'
+          ref={el => {
+            el?.style.setProperty(
+              '--share',
+              `${Math.round(Math.min(1, Math.max(0, share)) * 1000) / 10}%`
+            );
+          }}
+        />
+      </div>
+    )}
+    {firstPlayed !== undefined && (
+      <div className='ranked-row-date ranked-row-date--first'>
+        {firstPlayed}
+      </div>
+    )}
+    {lastPlayed !== undefined && (
+      <div className='ranked-row-date ranked-row-date--last'>{lastPlayed}</div>
+    )}
     {onPlay && (
       <IconButton
         icon={<Play size={14} aria-hidden='true' />}
@@ -128,6 +156,20 @@ export const RankedRow: React.FC<RankedRowProps> = ({
       <span className='sr-only'>{playCount === 1 ? ' play' : ' plays'}</span>
     </div>
   </li>
+);
+
+/**
+ * Column labels for rows that have date columns, shown only where the
+ * columns are (wide lists)
+ */
+export const RankedListHeader: React.FC = () => (
+  <div className='ranked-list-header' aria-hidden='true'>
+    <span className='ranked-list-header-name'>Name</span>
+    <span className='ranked-list-header-bar'>Share of plays</span>
+    <span className='ranked-row-date ranked-row-date--first'>First played</span>
+    <span className='ranked-row-date ranked-row-date--last'>Last played</span>
+    <span className='ranked-list-header-count'>Plays</span>
+  </div>
 );
 
 export default RankedRow;

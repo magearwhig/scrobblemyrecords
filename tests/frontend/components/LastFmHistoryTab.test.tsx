@@ -297,6 +297,41 @@ describe('LastFmHistoryTab list rows', () => {
     );
   });
 
+  it('draws play bars against the top result and shows first played', async () => {
+    api.getAlbumHistoryPaginated.mockResolvedValue({
+      items: [
+        {
+          artist: 'a',
+          album: 'top',
+          playCount: 200,
+          firstPlayed: Date.UTC(2005, 1, 14) / 1000,
+          lastPlayed: Math.floor(Date.now() / 1000),
+        },
+        {
+          artist: 'a',
+          album: 'half',
+          playCount: 100,
+          lastPlayed: Math.floor(Date.now() / 1000),
+        },
+      ],
+      total: 2,
+      totalPages: 1,
+      page: 1,
+      maxPlayCount: 400,
+    });
+
+    render(<LastFmHistoryTab />);
+    await screen.findByText('Top');
+
+    const fills = document.querySelectorAll<HTMLElement>(
+      '.ranked-row-bar-fill'
+    );
+    expect(fills[0].style.getPropertyValue('--share')).toBe('50%');
+    expect(fills[1].style.getPropertyValue('--share')).toBe('25%');
+    expect(screen.getByTitle(/^First played/)).toHaveTextContent(/2005/);
+    expect(screen.getByText('First played')).toBeInTheDocument();
+  });
+
   it('uses a collection cover for an artist', async () => {
     api.getAlbumHistoryPaginated.mockResolvedValue(createMockAlbumHistory(1));
     api.getArtistHistoryPaginated.mockResolvedValue(createMockArtistHistory(1));
