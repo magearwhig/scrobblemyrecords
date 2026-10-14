@@ -199,12 +199,15 @@ const LastFmHistoryTab: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
   useEffect(() => {
+    // Only a changed search goes back to page 1; otherwise this would also
+    // fire 300ms after opening and undo a quick click on Next
+    if (searchQuery === debouncedSearch) return;
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
-      setPage(1); // Reset to first page on search
+      setPage(1);
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, debouncedSearch]);
 
   // Reset pagination when switching view modes
   useEffect(() => {

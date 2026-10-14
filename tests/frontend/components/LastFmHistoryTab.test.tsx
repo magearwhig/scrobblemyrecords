@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import React from 'react';
@@ -145,6 +145,30 @@ describe('LastFmHistoryTab list rows', () => {
   const owned = (artist: string, title: string, cover: string) => ({
     id: 7,
     release: { id: 70, artist, title, cover_image: cover },
+  });
+
+  it('stays on the next page when Next is clicked right after opening', async () => {
+    jest.useFakeTimers();
+    try {
+      api.getAlbumHistoryPaginated.mockImplementation(async (page: number) => ({
+        ...createMockAlbumHistory(50),
+        total: 120,
+        totalPages: 3,
+        page,
+      }));
+      const user = userEvent.setup({ delay: null });
+      render(<LastFmHistoryTab />);
+      await screen.findByText('1–50 of 120 albums');
+
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+
+      expect(screen.getByText('51–100 of 120 albums')).toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('continues ranks on later pages and hides them while searching', async () => {
