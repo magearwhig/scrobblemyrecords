@@ -1681,6 +1681,104 @@ describe('ScrobbleHistoryStorage', () => {
   });
 
   describe('getTracksPaginated', () => {
+    it('reports first plays and the top play count for every list', async () => {
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: 500,
+              playCount: 3,
+              plays: [
+                { timestamp: 500, track: 'Kid A' },
+                { timestamp: 100, track: 'Kid A' },
+                { timestamp: 300, track: 'Idioteque' },
+              ],
+            },
+            'radiohead|amnesiac': {
+              lastPlayed: 400,
+              playCount: 1,
+              plays: [{ timestamp: 50, track: 'Pyramid Song' }],
+            },
+          },
+          unresolved: {
+            radiohead: {
+              lastPlayed: 600,
+              playCount: 1,
+              plays: [{ timestamp: 20, track: 'Spooks' }],
+            },
+          },
+        })
+      );
+
+      const albums = await storage.getAlbumsPaginated(1, 1);
+      const artists = await storage.getArtistsPaginated();
+      const tracks = await storage.getTracksPaginated(1, 50, 'track', 'asc');
+
+      expect(albums.maxPlayCount).toBe(3);
+      expect(albums.items[0]).toMatchObject({
+        album: 'kid a',
+        firstPlayed: 100,
+      });
+      expect(artists.items[0]).toMatchObject({ playCount: 5, firstPlayed: 20 });
+      expect(artists.maxPlayCount).toBe(5);
+      expect(tracks.maxPlayCount).toBe(2);
+      expect(tracks.items.find(t => t.track === 'Kid A')).toMatchObject({
+        firstPlayed: 100,
+        lastPlayed: 500,
+      });
+    });
+
+    it('adds artist display names and flags plays without album info', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: now,
+              playCount: 1,
+              plays: [{ timestamp: now, track: 'Kid A' }],
+            },
+          },
+          unresolved: {
+            radiohead: {
+              lastPlayed: now - 10,
+              playCount: 1,
+              plays: [{ timestamp: now - 10, track: 'Spooks' }],
+            },
+          },
+        })
+      );
+      storage.setArtistNameResolver({
+        resolveArtist: (name: string) => name,
+        resolveArtistMulti: (name: string) => [name],
+        getDisplayName: (name: string) =>
+          name === 'radiohead' ? 'Radiohead' : name,
+      } as unknown as Parameters<typeof storage.setArtistNameResolver>[0]);
+
+      const tracks = await storage.getTracksPaginated(1, 50, 'track', 'asc');
+      const albums = await storage.getAlbumsPaginated();
+
+      expect(tracks.items).toEqual([
+        expect.objectContaining({
+          track: 'Kid A',
+          artistName: 'Radiohead',
+          album: 'kid a',
+        }),
+        expect.objectContaining({
+          track: 'Spooks',
+          artistName: 'Radiohead',
+          albumUnknown: true,
+        }),
+      ]);
+      expect(tracks.items[0].albumUnknown).toBeUndefined();
+      expect(albums.items[0]).toMatchObject({
+        artist: 'radiohead',
+        artistName: 'Radiohead',
+      });
+    });
+
     it('should return empty result when no index exists', async () => {
       // Act
       const result = await storage.getTracksPaginated();
@@ -2241,6 +2339,7 @@ describe('ScrobbleHistoryStorage', () => {
         artist: 'radiohead',
         playCount: 3,
         albumCount: 1,
+        firstPlayed: tueAt9,
         lastPlayed: satAt22,
       });
       const singles = result.items.find(i => i.artist === 'singles only');
@@ -2248,6 +2347,7 @@ describe('ScrobbleHistoryStorage', () => {
         artist: 'singles only',
         playCount: 2,
         albumCount: 0,
+        firstPlayed: sunAt23 - 600,
         lastPlayed: sunAt23,
       });
     });
@@ -2280,25 +2380,33 @@ describe('ScrobbleHistoryStorage', () => {
         expect.arrayContaining([
           {
             artist: 'radiohead',
+            artistName: 'radiohead',
             album: 'kid a',
             track: 'Idioteque',
             playCount: 2,
+            firstPlayed: tueAt9,
             lastPlayed: tueAt10,
           },
           {
             artist: 'radiohead',
+            artistName: 'radiohead',
             album: 'Unknown album',
+            albumUnknown: true,
             track: 'Idioteque',
             playCount: 1,
+            firstPlayed: satAt22,
             lastPlayed: satAt22,
           },
         ])
       );
       expect(result.items.find(i => i.track === 'B-Side')).toEqual({
         artist: 'singles only',
+        artistName: 'singles only',
         album: 'Unknown album',
+        albumUnknown: true,
         track: 'B-Side',
         playCount: 2,
+        firstPlayed: sunAt23 - 600,
         lastPlayed: sunAt23,
       });
     });

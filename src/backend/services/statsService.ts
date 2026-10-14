@@ -40,6 +40,7 @@ import {
   createCollectionNameResolver,
   isCollectionLinked,
 } from '../../shared/utils/albumMapping';
+import { toDisplayName } from '../../shared/utils/displayName';
 import {
   createNormalizedTrackKey,
   normalizeForMatching,
@@ -2863,19 +2864,14 @@ export class StatsService {
     return new Date(date.getFullYear(), 0, 1);
   }
 
+  // History keys are lowercased; these give them display casing (the same
+  // rules the History lists use)
   private capitalizeArtist(artist: string): string {
-    // Simple title case for artist names
-    return artist
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
+    return toDisplayName(artist);
   }
 
   private capitalizeTitle(title: string): string {
-    return title
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
+    return toDisplayName(title);
   }
 
   private async loadStatsCache(): Promise<StatsCache | null> {

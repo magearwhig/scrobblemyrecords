@@ -914,6 +914,22 @@ export class ScrobbleHistoryStorage {
     return days;
   }
 
+  /** Earliest play in a history entry (falls back to its last play) */
+  private firstPlayedOf(history: AlbumHistoryEntry): number {
+    let first = history.lastPlayed;
+    for (const play of history.plays) {
+      if (play.timestamp < first) first = play.timestamp;
+    }
+    return first;
+  }
+
+  /** Artist name with display casing from the alias mappings, if any */
+  private artistDisplayName(artist: string): string {
+    return this.artistNameResolver
+      ? this.artistNameResolver.getDisplayName(artist)
+      : artist;
+  }
+
   /**
    * Get paginated albums with sorting and search
    */
@@ -926,13 +942,18 @@ export class ScrobbleHistoryStorage {
   ): Promise<{
     items: Array<{
       artist: string;
+      /** Artist name with display casing, where a mapping provides one */
+      artistName: string;
       album: string;
       playCount: number;
+      firstPlayed: number;
       lastPlayed: number;
     }>;
     total: number;
     totalPages: number;
     page: number;
+    /** Highest play count among all matching items, to scale play bars */
+    maxPlayCount: number;
   }> {
     const allAlbums = await this.getAllAlbums();
 
@@ -977,13 +998,19 @@ export class ScrobbleHistoryStorage {
     return {
       items: paginatedItems.map(({ artist, album, history }) => ({
         artist,
+        artistName: this.artistDisplayName(artist),
         album,
         playCount: history.playCount,
+        firstPlayed: this.firstPlayedOf(history),
         lastPlayed: history.lastPlayed,
       })),
       total,
       totalPages,
       page,
+      maxPlayCount: filtered.reduce(
+        (max, item) => Math.max(max, item.history.playCount),
+        0
+      ),
     };
   }
 
@@ -1003,11 +1030,14 @@ export class ScrobbleHistoryStorage {
       artist: string;
       playCount: number;
       albumCount: number;
+      firstPlayed: number;
       lastPlayed: number;
     }>;
     total: number;
     totalPages: number;
     page: number;
+    /** Highest play count among all matching items, to scale play bars */
+    maxPlayCount: number;
   }> {
     const allAlbums = await this.getAllAlbums();
 
@@ -1018,12 +1048,14 @@ export class ScrobbleHistoryStorage {
         artist: string;
         playCount: number;
         albumCount: number;
+        firstPlayed: number;
         lastPlayed: number;
       }
     >();
 
     for (const { artist, history } of allAlbums) {
       const keys = this.resolveArtistNames(artist);
+      const firstPlayed = this.firstPlayedOf(history);
       for (const key of keys) {
         const existing = artistMap.get(key);
         if (existing) {
@@ -1032,6 +1064,7 @@ export class ScrobbleHistoryStorage {
           if (history.lastPlayed > existing.lastPlayed) {
             existing.lastPlayed = history.lastPlayed;
           }
+          existing.firstPlayed = Math.min(existing.firstPlayed, firstPlayed);
         } else {
           const displayName = this.artistNameResolver
             ? this.artistNameResolver.getDisplayName(key)
@@ -1040,6 +1073,7 @@ export class ScrobbleHistoryStorage {
             artist: displayName,
             playCount: history.playCount,
             albumCount: 1,
+            firstPlayed,
             lastPlayed: history.lastPlayed,
           });
         }
@@ -1047,6 +1081,7 @@ export class ScrobbleHistoryStorage {
     }
 
     for (const { artist, history } of await this.getUnresolvedEntries()) {
+      const firstPlayed = this.firstPlayedOf(history);
       for (const key of this.resolveArtistNames(artist)) {
         const existing = artistMap.get(key);
         if (existing) {
@@ -1054,6 +1089,7 @@ export class ScrobbleHistoryStorage {
           if (history.lastPlayed > existing.lastPlayed) {
             existing.lastPlayed = history.lastPlayed;
           }
+          existing.firstPlayed = Math.min(existing.firstPlayed, firstPlayed);
         } else {
           const displayName = this.artistNameResolver
             ? this.artistNameResolver.getDisplayName(key)
@@ -1062,6 +1098,7 @@ export class ScrobbleHistoryStorage {
             artist: displayName,
             playCount: history.playCount,
             albumCount: 0,
+            firstPlayed,
             lastPlayed: history.lastPlayed,
           });
         }
@@ -1110,6 +1147,7 @@ export class ScrobbleHistoryStorage {
       total,
       totalPages,
       page,
+      maxPlayCount: artists.reduce((max, a) => Math.max(max, a.playCount), 0),
     };
   }
 
@@ -1133,18 +1171,25 @@ export class ScrobbleHistoryStorage {
   ): Promise<{
     items: Array<{
       artist: string;
+      /** Artist name with display casing, where a mapping provides one */
+      artistName: string;
       album: string;
+      /** True for plays without album info (album is a placeholder label) */
+      albumUnknown?: boolean;
       track: string;
       playCount: number;
+      firstPlayed: number;
       lastPlayed: number;
     }>;
     total: number;
     totalPages: number;
     page: number;
+    /** Highest play count among all matching items, to scale play bars */
+    maxPlayCount: number;
   }> {
     const index = await this.getIndex();
     if (!index) {
-      return { items: [], total: 0, totalPages: 0, page };
+      return { items: [], total: 0, totalPages: 0, page, maxPlayCount: 0 };
     }
 
     // Aggregate all tracks across all albums
@@ -1153,8 +1198,10 @@ export class ScrobbleHistoryStorage {
       {
         artist: string;
         album: string;
+        albumUnknown?: boolean;
         track: string;
         playCount: number;
+        firstPlayed: number;
         lastPlayed: number;
       }
     >();
@@ -1175,12 +1222,17 @@ export class ScrobbleHistoryStorage {
         if (play.timestamp > existing.lastPlayed) {
           existing.lastPlayed = play.timestamp;
         }
+        if (play.timestamp < existing.firstPlayed) {
+          existing.firstPlayed = play.timestamp;
+        }
       } else {
         trackMap.set(trackKey, {
           artist,
           album,
+          ...(albumOrNull === null ? { albumUnknown: true } : {}),
           track: play.track,
           playCount: 1,
+          firstPlayed: play.timestamp,
           lastPlayed: play.timestamp,
         });
       }
@@ -1230,10 +1282,14 @@ export class ScrobbleHistoryStorage {
     const paginatedItems = tracks.slice(startIndex, endIndex);
 
     return {
-      items: paginatedItems,
+      items: paginatedItems.map(item => ({
+        ...item,
+        artistName: this.artistDisplayName(item.artist),
+      })),
       total,
       totalPages,
       page,
+      maxPlayCount: tracks.reduce((max, t) => Math.max(max, t.playCount), 0),
     };
   }
 

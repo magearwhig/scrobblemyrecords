@@ -949,13 +949,16 @@ class ApiService {
   ): Promise<{
     items: Array<{
       artist: string;
+      artistName?: string;
       album: string;
       playCount: number;
+      firstPlayed?: number;
       lastPlayed: number;
     }>;
     total: number;
     totalPages: number;
     page: number;
+    maxPlayCount?: number;
   }> {
     const params: Record<string, string | number> = {
       page,
@@ -990,14 +993,18 @@ class ApiService {
   ): Promise<{
     items: Array<{
       artist: string;
+      artistName?: string;
       album: string;
+      albumUnknown?: boolean;
       track: string;
       playCount: number;
+      firstPlayed?: number;
       lastPlayed: number;
     }>;
     total: number;
     totalPages: number;
     page: number;
+    maxPlayCount?: number;
   }> {
     const params: Record<string, string | number> = {
       page,
@@ -1029,11 +1036,13 @@ class ApiService {
       artist: string;
       playCount: number;
       albumCount: number;
+      firstPlayed?: number;
       lastPlayed: number;
     }>;
     total: number;
     totalPages: number;
     page: number;
+    maxPlayCount?: number;
   }> {
     const params: Record<string, string | number> = {
       page,

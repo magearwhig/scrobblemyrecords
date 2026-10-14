@@ -1,4 +1,3 @@
-import { Play } from 'lucide-react';
 import React, { useState } from 'react';
 
 import {
@@ -8,16 +7,18 @@ import {
   DateRange,
   TrackPlayCount,
 } from '../../../shared/types';
+import { toDisplayName } from '../../../shared/utils/displayName';
 import { normalizeForMatching } from '../../../shared/utils/trackNormalization';
 import { Badge } from '../../components/ui/Badge';
 import {
   playTrackOnSpotify,
   playAlbumOnSpotify,
+  playArtistOnSpotify,
 } from '../../utils/spotifyUtils';
 import AlbumLink from '../AlbumLink';
 import ArtistLink from '../ArtistLink';
+import { RankedRow } from '../RankedRow';
 import TrackLink from '../TrackLink';
-import { IconButton } from '../ui/Button';
 
 import DateRangePicker from './DateRangePicker';
 import './TopList.css';
@@ -48,53 +49,9 @@ interface TopListProps {
   customDateRange?: DateRange;
   collectionMap?: Map<string, CollectionItem>;
   collectionArtistCounts?: Map<string, number>;
+  /** Cover of an owned record per artist, shown when there's no photo */
+  collectionArtistCovers?: Map<string, string>;
 }
-
-/**
- * Placeholder SVG for album covers
- */
-const AlbumPlaceholder: React.FC = () => (
-  <svg
-    className='top-list-placeholder'
-    viewBox='0 0 40 40'
-    width='40'
-    height='40'
-  >
-    <rect width='40' height='40' fill='var(--bg-tertiary)' rx='4' />
-    <circle
-      cx='20'
-      cy='20'
-      r='12'
-      fill='none'
-      stroke='var(--text-muted)'
-      strokeWidth='1'
-    />
-    <circle
-      cx='20'
-      cy='20'
-      r='4'
-      fill='none'
-      stroke='var(--text-muted)'
-      strokeWidth='1'
-    />
-  </svg>
-);
-
-/**
- * Placeholder SVG for artist images
- */
-const ArtistPlaceholder: React.FC = () => (
-  <svg
-    className='top-list-placeholder'
-    viewBox='0 0 40 40'
-    width='40'
-    height='40'
-  >
-    <rect width='40' height='40' fill='var(--bg-tertiary)' rx='20' />
-    <circle cx='20' cy='16' r='6' fill='var(--text-muted)' />
-    <path d='M10 35 C10 27 30 27 30 35' fill='var(--text-muted)' />
-  </svg>
-);
 
 /**
  * Format date range for display in button
@@ -144,6 +101,7 @@ export const TopList: React.FC<TopListProps> = ({
   customDateRange,
   collectionMap,
   collectionArtistCounts,
+  collectionArtistCovers,
 }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -247,124 +205,101 @@ export const TopList: React.FC<TopListProps> = ({
           </div>
         ) : (
           <>
-            <ol className='top-list-items'>
-              {data.map((item, index) => (
-                <li key={index} className='top-list-item'>
-                  <span className='top-list-rank'>{index + 1}</span>
-                  <div className='top-list-cover'>
-                    {isAlbumData(item) ? (
-                      item.coverUrl ? (
-                        <img
-                          src={item.coverUrl}
-                          alt={`${item.album} cover`}
-                          loading='lazy'
-                        />
-                      ) : (
-                        <AlbumPlaceholder />
-                      )
-                    ) : isTrackData(item) ? (
-                      <AlbumPlaceholder />
-                    ) : (item as ArtistPlayCount).imageUrl ? (
-                      <img
-                        src={(item as ArtistPlayCount).imageUrl}
-                        alt={`${item.artist}`}
-                        loading='lazy'
-                      />
-                    ) : (
-                      <ArtistPlaceholder />
-                    )}
-                  </div>
-                  <div className='top-list-info'>
-                    {isTrackData(item) ? (
-                      <>
-                        <div className='top-list-name'>
-                          <TrackLink
-                            artist={item.artist}
-                            track={item.track}
-                            album={item.album}
-                          />
-                        </div>
-                        <div className='top-list-artist'>
-                          <ArtistLink artist={item.artist} />
-                        </div>
-                      </>
-                    ) : isAlbumData(item) ? (
-                      <>
-                        <div className='top-list-name'>
-                          <span className='top-list-name-text'>
-                            <AlbumLink
-                              artist={item.artist}
-                              album={item.album}
-                            />
-                          </span>
-                          {((item as AlbumPlayCount).inCollection ||
-                            (collectionMap &&
-                              collectionMap.has(
-                                `${normalizeForMatching(item.artist)}|${normalizeForMatching(item.album)}`
-                              ))) && (
-                            <Badge
-                              variant='success'
-                              size='small'
-                              className='top-list-owned-badge'
-                            >
-                              Owned
-                            </Badge>
-                          )}
-                        </div>
-                        <div className='top-list-artist'>
-                          <ArtistLink artist={item.artist} />
-                        </div>
-                      </>
-                    ) : (
-                      <div className='top-list-name'>
-                        <span className='top-list-name-text'>
-                          <ArtistLink artist={item.artist} />
-                        </span>
-                        {collectionArtistCounts &&
-                          (() => {
-                            const count = collectionArtistCounts.get(
-                              normalizeForMatching(item.artist)
-                            );
-                            return count && count > 0 ? (
-                              <Badge
-                                variant='success'
-                                size='small'
-                                className='top-list-owned-badge'
-                              >
-                                {count} owned
-                              </Badge>
-                            ) : null;
-                          })()}
-                      </div>
-                    )}
-                  </div>
-                  <IconButton
-                    icon={<Play size={14} aria-hidden='true' />}
-                    aria-label='Play on Spotify'
-                    variant='ghost'
-                    size='small'
-                    className='top-list-play-btn'
-                    onClick={() => {
-                      if (isTrackData(item)) {
-                        playTrackOnSpotify(item.artist, item.track, item.album);
-                      } else if (isAlbumData(item)) {
-                        playAlbumOnSpotify(item.artist, item.album);
-                      }
-                    }}
-                    title='Play on Spotify'
+            <ol className='ranked-list'>
+              {data.map((item, index) => {
+                const artistLink = (
+                  <ArtistLink
+                    artist={item.artist}
+                    label={toDisplayName(item.artist)}
                   />
-                  <div className='top-list-count'>
-                    {item.playCount.toLocaleString()}
-                  </div>
-                </li>
-              ))}
+                );
+                if (isTrackData(item)) {
+                  return (
+                    <RankedRow
+                      key={index}
+                      rank={index + 1}
+                      imageKind='album'
+                      imageAlt={`${item.album} cover`}
+                      title={
+                        <TrackLink
+                          artist={item.artist}
+                          track={item.track}
+                          album={item.album}
+                        />
+                      }
+                      subtitle={artistLink}
+                      onPlay={() =>
+                        playTrackOnSpotify(item.artist, item.track, item.album)
+                      }
+                      playCount={item.playCount}
+                    />
+                  );
+                }
+                if (isAlbumData(item)) {
+                  const owned =
+                    item.inCollection ||
+                    !!collectionMap?.has(
+                      `${normalizeForMatching(item.artist)}|${normalizeForMatching(item.album)}`
+                    );
+                  return (
+                    <RankedRow
+                      key={index}
+                      rank={index + 1}
+                      imageKind='album'
+                      imageUrl={item.coverUrl}
+                      imageAlt={`${item.album} cover`}
+                      title={
+                        <AlbumLink artist={item.artist} album={item.album} />
+                      }
+                      badge={
+                        owned && (
+                          <Badge variant='success' size='small'>
+                            Owned
+                          </Badge>
+                        )
+                      }
+                      subtitle={artistLink}
+                      onPlay={() => playAlbumOnSpotify(item.artist, item.album)}
+                      playCount={item.playCount}
+                    />
+                  );
+                }
+                const ownedCount = collectionArtistCounts?.get(
+                  normalizeForMatching(item.artist)
+                );
+                return (
+                  <RankedRow
+                    key={index}
+                    rank={index + 1}
+                    imageKind='artist'
+                    imageUrl={
+                      (item as ArtistPlayCount).imageUrl ||
+                      collectionArtistCovers?.get(
+                        normalizeForMatching(item.artist)
+                      )
+                    }
+                    imageAlt={item.artist}
+                    title={artistLink}
+                    badge={
+                      !!ownedCount &&
+                      ownedCount > 0 && (
+                        <Badge variant='success' size='small'>
+                          {ownedCount} owned
+                        </Badge>
+                      )
+                    }
+                    onPlay={() => playArtistOnSpotify(item.artist)}
+                    playCount={item.playCount}
+                  />
+                );
+              })}
             </ol>
             <div className='top-list-view-all'>
               <a
                 href={`#history?view=${type}`}
                 className='top-list-view-all-link'
               >
-                View All {VIEW_ALL_LABELS[type]}
+                View all-time {VIEW_ALL_LABELS[type].toLowerCase()}
               </a>
             </div>
           </>

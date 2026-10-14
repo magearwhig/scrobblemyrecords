@@ -69,3 +69,26 @@ export const playAlbumOnSpotify = (artist: string, album: string): void => {
     window.open(webUrl, '_blank');
   }, 500);
 };
+
+/**
+ * Opens an artist on Spotify (desktop app or web player).
+ *
+ * @param artist - Artist name
+ */
+export const playArtistOnSpotify = (artist: string): void => {
+  const spotifyUri = `spotify:search:${encodeURIComponent(`artist:${artist}`)}`;
+
+  // Create a temporary link to trigger the spotify: URI
+  const desktopLink = document.createElement('a');
+  desktopLink.href = spotifyUri;
+  desktopLink.style.display = 'none';
+  document.body.appendChild(desktopLink);
+  desktopLink.click();
+  document.body.removeChild(desktopLink);
+
+  // Fallback to web player after a short delay
+  setTimeout(() => {
+    const webUrl = `https://open.spotify.com/search/${encodeURIComponent(artist)}`;
+    window.open(webUrl, '_blank');
+  }, 500);
+};

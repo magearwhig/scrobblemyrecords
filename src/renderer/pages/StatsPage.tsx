@@ -78,7 +78,8 @@ type CoveragePeriod =
 
 export const StatsPage: React.FC = () => {
   // Collection lookup for "In Collection" badges
-  const { collectionMap, collectionArtistCounts } = useCollectionLookup();
+  const { collectionMap, collectionArtistCounts, collectionArtistCovers } =
+    useCollectionLookup();
 
   // Loading states
   const [loading, setLoading] = useState(true);
@@ -732,6 +733,7 @@ export const StatsPage: React.FC = () => {
           loading={topListsLoading}
           customDateRange={artistDateRange}
           collectionArtistCounts={collectionArtistCounts}
+          collectionArtistCovers={collectionArtistCovers}
         />
         <TopList
           title='Top Albums'

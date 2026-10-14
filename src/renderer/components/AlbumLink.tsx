@@ -6,6 +6,8 @@ interface AlbumLinkProps {
   artist: string;
   album: string;
   className?: string;
+  /** Text to show instead of the name, e.g. with display casing */
+  label?: string;
 }
 
 /**
@@ -18,6 +20,7 @@ const AlbumLink: React.FC<AlbumLinkProps> = ({
   artist,
   album,
   className = '',
+  label,
 }) => {
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -53,9 +56,9 @@ const AlbumLink: React.FC<AlbumLinkProps> = ({
       onKeyDown={handleKeyDown}
       role='link'
       tabIndex={0}
-      aria-label={`View album details for ${album}`}
+      aria-label={`View album details for ${label ?? album}`}
     >
-      {album}
+      {label ?? album}
     </span>
   );
 };

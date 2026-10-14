@@ -7,6 +7,8 @@ interface TrackLinkProps {
   track: string;
   album?: string;
   className?: string;
+  /** Text to show instead of the name, e.g. with display casing */
+  label?: string;
 }
 
 /**
@@ -20,6 +22,7 @@ const TrackLink: React.FC<TrackLinkProps> = ({
   track,
   album,
   className = '',
+  label,
 }) => {
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -58,9 +61,9 @@ const TrackLink: React.FC<TrackLinkProps> = ({
       onKeyDown={handleKeyDown}
       role='link'
       tabIndex={0}
-      aria-label={`View track details for ${track}`}
+      aria-label={`View track details for ${label ?? track}`}
     >
-      {track}
+      {label ?? track}
     </span>
   );
 };

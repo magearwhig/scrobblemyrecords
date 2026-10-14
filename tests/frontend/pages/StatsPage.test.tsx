@@ -10,6 +10,7 @@ jest.mock('../../../src/renderer/hooks/useCollectionLookup', () => ({
   useCollectionLookup: () => ({
     collectionMap: new Map(),
     collectionArtistCounts: new Map(),
+    collectionArtistCovers: new Map(),
     loading: false,
     collection: [],
   }),

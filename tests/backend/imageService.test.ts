@@ -193,6 +193,36 @@ describe('ImageService', () => {
       expect(url).toBe('https://extralarge.jpg');
     });
 
+    it("treats Last.fm's grey star placeholder as no image", async () => {
+      const star =
+        'https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png';
+      mockLastFmService.getArtistInfo.mockResolvedValue({
+        name: 'Artist',
+        image: [{ size: 'extralarge', '#text': star }],
+      });
+
+      await expect(imageService.getArtistImage('Artist')).resolves.toBeNull();
+    });
+
+    it('ignores a placeholder cached before the check existed', async () => {
+      mockFileStorage.readJSON.mockImplementation(async (path: string) =>
+        path === 'images/artist-images.json'
+          ? {
+              schemaVersion: 1,
+              entries: {
+                artist: {
+                  url: 'https://lastfm-img.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png',
+                  fetchedAt: Date.now(),
+                },
+              },
+            }
+          : null
+      );
+
+      await expect(imageService.getArtistImage('Artist')).resolves.toBeNull();
+      expect(mockLastFmService.getArtistInfo).not.toHaveBeenCalled();
+    });
+
     it('should handle errors gracefully', async () => {
       // Arrange
       mockLastFmService.getArtistInfo.mockRejectedValue(new Error('API Error'));

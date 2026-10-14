@@ -353,12 +353,6 @@
   background-color: var(--surface-sunken);
 }
 
-.lastfm-history-stats {
-  margin-top: 0.75rem;
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-}
-
 .lastfm-history-empty {
   text-align: center;
   padding: 2rem;
@@ -375,90 +369,38 @@
 }
 
 .lastfm-history-list-card {
-  padding: 0;
   position: relative;
 }
 
 .lastfm-history-list-header {
-  display: grid;
-  grid-template-columns: 2fr 2fr 80px 120px;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.lastfm-history-header-btn {
-  background: none;
-  border: none;
-  padding: 0;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--text-secondary);
-  cursor: pointer;
-  text-align: left;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.lastfm-history-header-btn:hover,
-.lastfm-history-header-btn.active {
-  color: var(--text-primary);
-}
-
-.lastfm-history-list {
-  max-height: 540px;
-  overflow-y: auto;
-}
-
-.lastfm-history-item {
-  display: grid;
-  grid-template-columns: 2fr 2fr 80px 120px;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--border-color);
-  align-items: center;
-}
-
-.lastfm-history-item:last-child {
-  border-bottom: none;
-}
-
-.lastfm-history-item:hover {
-  background: var(--bg-secondary);
-}
-
-.lastfm-history-col-artist,
-.lastfm-history-col-album {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-  font-size: var(--text-base);
-  color: var(--text-primary);
-}
-
-.lastfm-history-col-plays {
-  text-align: right;
-  font-weight: 600;
-  font-size: var(--text-base);
-  color: var(--accent-color);
-}
-
-.lastfm-history-col-last {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
-.lastfm-history-col-actions {
   display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.lastfm-history-list-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.lastfm-history-list-summary {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.lastfm-history-separator {
+  color: var(--text-muted);
+}
+
+.lastfm-history-no-album {
+  font-style: italic;
+  color: var(--text-muted);
 }
 
 .lastfm-history-loading-overlay {
@@ -519,50 +461,6 @@
 .lastfm-history-view-btn.active {
   background: var(--accent-color);
   color: white;
-}
-
-/* Track view styles */
-.lastfm-history-track-header {
-  grid-template-columns: 2fr 1.5fr 1.5fr 70px 100px 100px;
-}
-
-.lastfm-history-track-item {
-  grid-template-columns: 2fr 1.5fr 1.5fr 70px 100px 100px;
-}
-
-.lastfm-history-col-track {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-  font-size: var(--text-base);
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.lastfm-history-col-artist-sm,
-.lastfm-history-col-album-sm {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
-/* Artist view styles */
-.lastfm-history-artist-header {
-  grid-template-columns: 2fr 80px 80px 120px;
-}
-
-.lastfm-history-artist-item {
-  grid-template-columns: 2fr 80px 80px 120px;
-}
-
-.lastfm-history-col-albums {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-  text-align: right;
 }
 
 /* Albums view: pointer to plays without album info */

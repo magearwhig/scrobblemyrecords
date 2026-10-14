@@ -273,7 +273,7 @@ Comprehensive listening statistics and visualizations:
 - **Listening Patterns**: Hourly polar chart (24-hour radar) and day-of-week bar chart with personalized insights ("You're an evening listener")
 - **On This Day**: See what you were listening to on this date 1, 2, and 3 years ago
 - **Your Music DNA**: Genre treemap powered by Last.fm artist tags, showing your top genres weighted by listening habits
-- **Top Artists, Albums & Tracks**: Leaderboards with period selection (week/month/year/all-time/custom) with Spotify play buttons. **View All** links open the full list on the History page
+- **Top Artists, Albums & Tracks**: Leaderboards with period selection (week/month/year/all-time/custom) with cover art, "Owned" badges and Spotify play buttons. **View all-time** links open the full all-time list on the History page
 - **Custom Date Range**: Pick specific months or custom date ranges for all stats
 - **Milestone Progress**: Track progress toward scrobble milestones (1K, 5K, 10K, etc.)
 - **Plays Without Album Info**: When some plays have no album, a link to the Unresolved tab shows how many and lets you fix them
@@ -411,7 +411,8 @@ Three-tab view of your listening activity:
 - Play count and last played date for each album
 - **Spotify Integration**: Play button for each track to instantly search and play on Spotify
 - Sync controls to update the history index
-- Full top artists, albums and tracks lists (opened from the Stats page **View All** links)
+- Full all-time artists, albums and tracks lists (opened from the Stats page **View all-time** links), styled like the Stats top lists: rank when sorted by most played, cover art, "Owned" badges, last played and play count
+- Artists without a photo show the cover of one of their records in your collection (Last.fm no longer provides artist photos)
 
 **Unresolved Tab** (plays Last.fm recorded without an album):
 - **Summary**: How many plays have no album, how the stored total compares with Last.fm's, and **Recover missing history** when they differ

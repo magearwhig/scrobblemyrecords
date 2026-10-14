@@ -14,6 +14,16 @@ const ARTIST_IMAGES_CACHE = 'images/artist-images.json';
 // Cache TTL: 30 days in milliseconds
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
+/**
+ * Last.fm's generic "no image" picture (a grey star), returned in place of
+ * artist photos since Last.fm stopped providing them
+ */
+const LASTFM_PLACEHOLDER_IMAGE_ID = '2a96cbd8b46e442fc41c2b86b821562f';
+
+function isLastFmPlaceholder(url: string | null | undefined): boolean {
+  return !!url && url.includes(LASTFM_PLACEHOLDER_IMAGE_ID);
+}
+
 interface ImageCacheEntry {
   url: string | null;
   fetchedAt: number;
@@ -64,7 +74,8 @@ export class ImageService {
 
     // Return cached value if not expired
     if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-      return cached.url;
+      // Entries cached before the placeholder check may hold it
+      return isLastFmPlaceholder(cached.url) ? null : cached.url;
     }
 
     // Fetch from Last.fm
@@ -92,7 +103,8 @@ export class ImageService {
 
     // Return cached value if not expired
     if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-      return cached.url;
+      // Entries cached before the placeholder check may hold it
+      return isLastFmPlaceholder(cached.url) ? null : cached.url;
     }
 
     // Fetch from Last.fm
@@ -365,8 +377,9 @@ export class ImageService {
         const imageUrl =
           extralarge?.['#text'] || large?.['#text'] || medium?.['#text'];
 
-        // Last.fm returns empty string for placeholder images
-        if (imageUrl && imageUrl !== '') {
+        // Last.fm returns an empty string, or its grey star image, when it
+        // has no picture (it no longer provides artist photos at all)
+        if (imageUrl && !isLastFmPlaceholder(imageUrl)) {
           return imageUrl;
         }
       }
@@ -403,8 +416,9 @@ export class ImageService {
         const imageUrl =
           extralarge?.['#text'] || large?.['#text'] || medium?.['#text'];
 
-        // Last.fm returns empty string for placeholder images
-        if (imageUrl && imageUrl !== '') {
+        // Last.fm returns an empty string, or its grey star image, when it
+        // has no picture (it no longer provides artist photos at all)
+        if (imageUrl && !isLastFmPlaceholder(imageUrl)) {
           return imageUrl;
         }
       }
