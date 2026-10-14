@@ -5,6 +5,10 @@ import request from 'supertest';
 
 import createWishlistRouter from '../../../src/backend/routes/wishlist';
 import { AuthService } from '../../../src/backend/services/authService';
+import {
+  WishlistPriceAlertError,
+  WishlistPriceService,
+} from '../../../src/backend/services/wishlistPriceService';
 import { WishlistService } from '../../../src/backend/services/wishlistService';
 import { FileStorage } from '../../../src/backend/utils/fileStorage';
 
@@ -1076,6 +1080,140 @@ describe('Wishlist Routes', () => {
       // Assert
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
+    });
+  });
+  describe('price alerts', () => {
+    let priceService: {
+      enrichItems: jest.Mock;
+      setAlert: jest.Mock;
+      removeAlert: jest.Mock;
+      getStatus: jest.Mock;
+    };
+    let priceApp: express.Application;
+
+    beforeEach(() => {
+      priceService = {
+        enrichItems: jest.fn(async (items: Array<Record<string, unknown>>) =>
+          items.map(i => ({ ...i, lowestListing: null }))
+        ),
+        setAlert: jest.fn(async (masterId: number, maxPrice: number) => ({
+          masterId,
+          priceAlert: { maxPrice, currency: 'USD', triggered: false },
+        })),
+        removeAlert: jest.fn().mockResolvedValue(true),
+        getStatus: jest.fn().mockResolvedValue({
+          pressingsTotal: 3,
+          pressingsFresh: 1,
+          pressingsUnchecked: 1,
+          alertsTriggered: 0,
+          alertsTotal: 1,
+        }),
+      };
+      priceApp = express();
+      priceApp.use(express.json());
+      priceApp.use(
+        '/api/v1/wishlist',
+        createWishlistRouter(
+          mockFileStorage,
+          mockAuthService,
+          mockWishlistService,
+          undefined,
+          priceService as unknown as WishlistPriceService
+        )
+      );
+    });
+
+    it('GET / returns items enriched with prices and alerts', async () => {
+      const response = await request(priceApp).get('/api/v1/wishlist');
+      expect(response.status).toBe(200);
+      expect(priceService.enrichItems).toHaveBeenCalledTimes(1);
+      expect(response.body.data[0].lowestListing).toBeNull();
+      expect(response.body.total).toBe(1);
+    });
+
+    it('GET /price-alerts/status returns the refresh status', async () => {
+      const response = await request(priceApp).get(
+        '/api/v1/wishlist/price-alerts/status'
+      );
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        success: true,
+        data: expect.objectContaining({ pressingsTotal: 3, alertsTotal: 1 }),
+      });
+    });
+
+    it('PUT /price-alerts/:masterId sets the alert and returns the item', async () => {
+      const response = await request(priceApp)
+        .put('/api/v1/wishlist/price-alerts/12345')
+        .send({ maxPrice: 30 });
+      expect(response.status).toBe(200);
+      expect(priceService.setAlert).toHaveBeenCalledWith(12345, 30);
+      expect(response.body.data.priceAlert.maxPrice).toBe(30);
+    });
+
+    it.each([
+      [{ maxPrice: 0 }],
+      [{ maxPrice: -5 }],
+      [{ maxPrice: '30' }],
+      [{}],
+    ])('PUT rejects bad maxPrice %j with 400', async body => {
+      const response = await request(priceApp)
+        .put('/api/v1/wishlist/price-alerts/12345')
+        .send(body);
+      expect(response.status).toBe(400);
+      expect(priceService.setAlert).not.toHaveBeenCalled();
+    });
+
+    it.each(['abc', '0', '1.5', '-3'])(
+      'rejects master id %s with 400',
+      async id => {
+        const put = await request(priceApp)
+          .put(`/api/v1/wishlist/price-alerts/${id}`)
+          .send({ maxPrice: 10 });
+        const del = await request(priceApp).delete(
+          `/api/v1/wishlist/price-alerts/${id}`
+        );
+        expect(put.status).toBe(400);
+        expect(del.status).toBe(400);
+      }
+    );
+
+    it('PUT returns 404 when the record is not on the wishlist', async () => {
+      priceService.setAlert.mockRejectedValue(
+        new WishlistPriceAlertError('not on the wishlist', 'not_found')
+      );
+      const response = await request(priceApp)
+        .put('/api/v1/wishlist/price-alerts/999')
+        .send({ maxPrice: 10 });
+      expect(response.status).toBe(404);
+      expect(response.body.success).toBe(false);
+    });
+
+    it('DELETE /price-alerts/:masterId removes the alert', async () => {
+      const response = await request(priceApp).delete(
+        '/api/v1/wishlist/price-alerts/12345'
+      );
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ success: true });
+      expect(priceService.removeAlert).toHaveBeenCalledWith(12345);
+    });
+
+    it('is not shadowed by the parameterized routes', async () => {
+      await request(priceApp).get('/api/v1/wishlist/price-alerts/status');
+      expect(mockWishlistService.getMasterVersions).not.toHaveBeenCalled();
+      expect(mockWishlistService.getMarketplaceStats).not.toHaveBeenCalled();
+      // The existing param routes still work
+      const versions = await request(priceApp).get(
+        '/api/v1/wishlist/12345/versions'
+      );
+      expect(versions.status).toBe(200);
+    });
+
+    it('returns 503 when the price service is not wired', async () => {
+      const response = await request(app).get(
+        '/api/v1/wishlist/price-alerts/status'
+      );
+      expect(response.status).toBe(503);
     });
   });
 });

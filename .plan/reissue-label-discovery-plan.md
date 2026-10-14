@@ -10,6 +10,11 @@
 > stays in `.plan/` until those are closed or explicitly dropped. The original
 > plan text below is kept for history. Where the code differs from it, the
 > code is the source of truth (see "Deliberate deviations").
+>
+> **Note (2026-10-14):** the marketplace upgrade plan, which was to build a
+> shared scheduler and server-side notifications (its G9, sections 4d–4e),
+> was cancelled ([cancelled/marketplace-upgrade-plan.md](cancelled/marketplace-upgrade-plan.md)).
+> Items 3–5 below must build that plumbing themselves.
 
 ## Completed scope
 

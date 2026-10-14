@@ -160,7 +160,7 @@ A backup restore silently loses these. Found while writing [data-export-plan.md]
 
 **Audit severity**: Medium | **Effort**: Low | **Quick Win**: Yes
 
-`WishlistService` (the marketplace stats fetch) sets `MarketplaceStats.medianPrice` from `/marketplace/price_suggestions` (Very Good Plus, else Very Good), and sets `highestPrice` from an estimate. Neither is sales data, and the Discogs API exposes no sales history. `ValueEstimationSection.tsx` still describes the values as "median sale prices", and `collectionAnalyticsService.ts` uses `medianPrice` for value estimates. Found while re-planning [marketplace-upgrade-plan.md](marketplace-upgrade-plan.md).
+`WishlistService` (the marketplace stats fetch) sets `MarketplaceStats.medianPrice` from `/marketplace/price_suggestions` (Very Good Plus, else Very Good), and sets `highestPrice` from an estimate. Neither is sales data, and the Discogs API exposes no sales history. `ValueEstimationSection.tsx` still describes the values as "median sale prices", and `collectionAnalyticsService.ts` uses `medianPrice` for value estimates. Found while re-planning [cancelled/marketplace-upgrade-plan.md](cancelled/marketplace-upgrade-plan.md).
 
 **Action:**
 - [ ] Change the UI copy to "suggested price (VG+)" or similar, and explain what it is.

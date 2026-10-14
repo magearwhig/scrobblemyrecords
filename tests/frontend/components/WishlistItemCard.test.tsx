@@ -285,4 +285,37 @@ describe('WishlistItemCard', () => {
       expect(screen.queryByText(/From:/)).not.toBeInTheDocument();
     });
   });
+
+  describe('footer and className', () => {
+    it('renders the footer between the details and the actions', () => {
+      const { container } = render(
+        <WishlistItemCard
+          {...defaultProps}
+          footer={<div data-testid='card-footer'>Price info</div>}
+        />
+      );
+
+      const footer = screen.getByTestId('card-footer');
+      const actions = container.querySelector('.wishlist-card-actions');
+      expect(footer.nextElementSibling).toBe(actions);
+      expect(footer.previousElementSibling).toHaveClass(
+        'wishlist-card-content'
+      );
+    });
+
+    it('adds modifier classes to the card root', () => {
+      const { container } = render(
+        <WishlistItemCard {...defaultProps} className='extra-modifier' />
+      );
+
+      expect(container.firstChild).toHaveClass('wishlist-card');
+      expect(container.firstChild).toHaveClass('extra-modifier');
+    });
+
+    it('renders only the base class without a className', () => {
+      const { container } = render(<WishlistItemCard {...defaultProps} />);
+
+      expect(container.firstChild).toHaveAttribute('class', 'wishlist-card');
+    });
+  });
 });

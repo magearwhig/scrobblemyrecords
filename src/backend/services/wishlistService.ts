@@ -768,6 +768,42 @@ export class WishlistService {
   }
 
   /**
+   * Lowest current asking price of one release, in `currency` (one call to
+   * /marketplace/stats, no price suggestions). `lowestPrice` is null when
+   * nothing is for sale. Throws on any error so callers can back off.
+   */
+  async getLowestAskingPrice(
+    releaseId: number,
+    currency: string
+  ): Promise<{
+    lowestPrice: number | null;
+    currency: string;
+    numForSale: number;
+  }> {
+    const headers = await this.getAuthHeaders();
+    const response = await this.axios.get(`/marketplace/stats/${releaseId}`, {
+      headers,
+      params: { curr_abbr: currency },
+    });
+    const data = (response.data ?? {}) as {
+      num_for_sale?: number;
+      lowest_price?: { value?: number; currency?: string } | null;
+    };
+    const value = data.lowest_price?.value;
+    return {
+      lowestPrice:
+        typeof value === 'number' && Number.isFinite(value) ? value : null,
+      currency: data.lowest_price?.currency || currency,
+      numForSale: data.num_for_sale ?? 0,
+    };
+  }
+
+  /** True while a wantlist sync is running */
+  isSyncInProgress(): boolean {
+    return this.syncInProgress;
+  }
+
+  /**
    * Get price suggestions by condition for a release
    * Requires authentication
    */

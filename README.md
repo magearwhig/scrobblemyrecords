@@ -455,9 +455,15 @@ Sync and manage your Discogs wantlist with vinyl availability tracking:
 - **Progressive Checking**: Vinyl availability checked progressively to respect API limits
 - **Refresh All**: Force re-check vinyl status for all items
 
+**Lowest Listing & Price Alerts:**
+- **Lowest Listing**: Each record shows its cheapest current vinyl listing across all pressings (e.g. "Lowest $11.83 · 1988 UK LP · 23 for sale"), linked to that pressing's Discogs marketplace page
+- **Price Alerts**: Set an alert price right on the record. When any vinyl pressing is listed at or below it you get a notification, and the record is marked "Below your price". It alerts again only if the price drops further
+- **Background Price Checks**: Prices are checked in the background a few at a time (records with an alert every 6 hours, others daily), so the first full pass takes a few hours
+- Prices are Discogs asking prices before shipping, from sellers in any country (the Discogs API can't filter by seller location; use the linked page to filter by ships-from)
+
 **Filtering & Sorting:**
 - **Search**: Filter by artist or album (partial, case-insensitive); works with every tab except New Releases
-- **Tabs**: All Items, Has Vinyl, CD Only, Affordable, Monitoring, New Releases
+- **Tabs**: All Items, Has Vinyl, CD Only, Affordable, Price Alerts, Monitoring, New Releases
 - **Sort Options**: Date Added, Price, Artist, Album, Scrobbles (Most Played)
 - **Include Monitored Toggle**: Merge locally monitored albums into main wishlist view
 - **Affordable Filter**: Show items under your price threshold
@@ -798,6 +804,7 @@ Protect your user-generated data with manual and automatic backups:
 - Artist name mappings (scrobbling and discovery)
 - Hidden albums and artists (Discovery page)
 - Local want list and vinyl watch list
+- Wishlist price alerts
 - Monitored sellers list
 - MusicBrainz artist mappings and excluded artists
 - Discard pile items (full history with merge support)

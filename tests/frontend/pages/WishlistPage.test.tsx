@@ -1,15 +1,19 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import '@testing-library/jest-dom';
 
 import { AppProvider } from '../../../src/renderer/context/AppContext';
 import { AuthProvider } from '../../../src/renderer/context/AuthContext';
-import WishlistPage from '../../../src/renderer/pages/WishlistPage';
+import WishlistPage, {
+  PRICE_POLL_MS,
+} from '../../../src/renderer/pages/WishlistPage';
 import {
   AlbumPlayCountResult,
   EnrichedWishlistItem,
   LocalWantItem,
+  WishlistLowestListing,
+  WishlistPriceRefreshStatus,
   WishlistSettings,
   WishlistSyncStatus,
   AuthStatus,
@@ -25,6 +29,10 @@ const mockGetMasterVersions = jest.fn();
 const mockCheckLocalWantListForVinyl = jest.fn();
 const mockRemoveFromLocalWantList = jest.fn();
 const mockGetAlbumPlayCounts = jest.fn();
+const mockSetWishlistPriceAlert = jest.fn();
+const mockRemoveWishlistPriceAlert = jest.fn();
+const mockGetWishlistPriceRefreshStatus = jest.fn();
+const mockShowToast = jest.fn();
 
 // Return a stable instance, matching the real singleton ApiService
 jest.mock('../../../src/renderer/services/api', () => {
@@ -40,9 +48,16 @@ jest.mock('../../../src/renderer/services/api', () => {
       checkLocalWantListForVinyl: mockCheckLocalWantListForVinyl,
       removeFromLocalWantList: mockRemoveFromLocalWantList,
       getAlbumPlayCounts: mockGetAlbumPlayCounts,
+      setWishlistPriceAlert: mockSetWishlistPriceAlert,
+      removeWishlistPriceAlert: mockRemoveWishlistPriceAlert,
+      getWishlistPriceRefreshStatus: mockGetWishlistPriceRefreshStatus,
     });
   return { getApiService: getMockApi };
 });
+
+jest.mock('../../../src/renderer/context/ToastContext', () => ({
+  useToast: () => ({ showToast: mockShowToast }),
+}));
 
 // Mock useNotifications hook
 jest.mock('../../../src/renderer/hooks/useNotifications', () => ({
@@ -142,6 +157,28 @@ const mockSettings: WishlistSettings = {
   notifyOnVinylAvailable: true,
 };
 
+const mockPriceRefreshStatusDone: WishlistPriceRefreshStatus = {
+  pressingsTotal: 843,
+  pressingsFresh: 843,
+  pressingsUnchecked: 0,
+  alertsTriggered: 0,
+  alertsTotal: 0,
+};
+
+const mockListing: WishlistLowestListing = {
+  price: 39.28,
+  currency: 'USD',
+  releaseId: 4242,
+  numForSale: 3,
+  totalForSale: 17,
+  country: 'UK',
+  year: 1987,
+  format: ['Vinyl', 'LP', 'Album'],
+  checkedAt: Date.now() - 2 * 60 * 60 * 1000,
+  pressingsChecked: 5,
+  pressingsTotal: 5,
+};
+
 const createMockAuthContext = (authStatus: AuthStatus) => ({
   authStatus,
   setAuthStatus: jest.fn(),
@@ -178,6 +215,10 @@ describe('WishlistPage', () => {
     mockCheckLocalWantListForVinyl.mockResolvedValue([]);
     mockRemoveFromLocalWantList.mockResolvedValue(true);
     mockGetAlbumPlayCounts.mockResolvedValue({ results: [] });
+    mockGetWishlistPriceRefreshStatus.mockResolvedValue(
+      mockPriceRefreshStatusDone
+    );
+    mockRemoveWishlistPriceAlert.mockResolvedValue(undefined);
     user = userEvent.setup();
   });
 
@@ -336,8 +377,11 @@ describe('WishlistPage', () => {
       expect(screen.getByText('Radiohead')).toBeInTheDocument();
     });
 
-    // Check for price display
-    expect(screen.getByText(/From:/)).toBeInTheDocument();
+    // The lowest-listing line replaces the old "From:" price on wantlist cards
+    expect(screen.queryByText(/From:/)).not.toBeInTheDocument();
+    expect(
+      screen.getAllByText(/Price not checked yet|Lowest|None for sale/).length
+    ).toBeGreaterThan(0);
   });
 
   it('has sort options', async () => {
@@ -1018,6 +1062,428 @@ describe('WishlistPage', () => {
 
       // The mock local item has playCount: 15
       expect(screen.getByText('15 plays')).toBeInTheDocument();
+    });
+  });
+
+  describe('Price alerts', () => {
+    const radioheadWith = (
+      overrides: Partial<EnrichedWishlistItem>
+    ): EnrichedWishlistItem => ({ ...mockWishlistItems[0], ...overrides });
+
+    const getCard = (title: string): HTMLElement =>
+      screen.getByText(title).closest('.wishlist-card') as HTMLElement;
+
+    it('shows "Price not checked yet" when no pressing has been checked', async () => {
+      renderWishlistPage();
+
+      await waitFor(() => {
+        expect(screen.getByText('Radiohead')).toBeInTheDocument();
+      });
+
+      expect(
+        within(getCard('OK Computer')).getByText('Price not checked yet')
+      ).toBeInTheDocument();
+    });
+
+    it('shows "None for sale" when checked and nothing is listed', async () => {
+      mockGetWishlist.mockResolvedValue([
+        radioheadWith({ lowestListing: null }),
+      ]);
+      renderWishlistPage();
+
+      await waitFor(() => {
+        expect(screen.getByText('None for sale')).toBeInTheDocument();
+      });
+    });
+
+    it('shows the lowest listing linked to the Discogs sell page', async () => {
+      mockGetWishlist.mockResolvedValue([
+        radioheadWith({
+          lowestListing: { ...mockListing, pressingsChecked: 2 },
+        }),
+      ]);
+      renderWishlistPage();
+
+      const link = await screen.findByRole('link', {
+        name: /Lowest listing \$39\.28, 1987 UK LP, 3 for sale/,
+      });
+      expect(link).toHaveAttribute(
+        'href',
+        'https://www.discogs.com/sell/release/4242'
+      );
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(link).toHaveTextContent('Lowest $39.28');
+      expect(link).toHaveTextContent('1987 UK LP');
+      expect(link).toHaveTextContent('3 for sale');
+      expect(screen.getByText(/2 of 5 pressings checked/)).toBeInTheDocument();
+      expect(link.parentElement).toHaveAttribute(
+        'title',
+        'Checked 2 hours ago'
+      );
+    });
+
+    it('does not show the price control on monitored-only items', async () => {
+      mockGetLocalWantList.mockResolvedValue(mockLocalWantItems);
+      renderWishlistPage();
+
+      await waitFor(() => {
+        expect(screen.getByText('Radiohead')).toBeInTheDocument();
+      });
+      await user.click(screen.getByLabelText(/Include monitored/));
+
+      await waitFor(() => {
+        expect(screen.getByText('Bon Iver')).toBeInTheDocument();
+      });
+      expect(
+        within(getCard('For Emma, Forever Ago')).queryByRole('button', {
+          name: /Set alert/,
+        })
+      ).not.toBeInTheDocument();
+      expect(
+        within(getCard('OK Computer')).getByRole('button', {
+          name: /Set alert/,
+        })
+      ).toBeInTheDocument();
+    });
+
+    it('sets an alert and updates the card with the returned item', async () => {
+      mockSetWishlistPriceAlert.mockResolvedValue(
+        radioheadWith({
+          lowestListing: mockListing,
+          priceAlert: { maxPrice: 30, currency: 'USD', triggered: false },
+        })
+      );
+      renderWishlistPage();
+
+      await waitFor(() => {
+        expect(screen.getByText('Radiohead')).toBeInTheDocument();
+      });
+
+      const card = getCard('OK Computer');
+      await user.type(
+        within(card).getByLabelText(/Alert price for OK Computer/),
+        '30{Enter}'
+      );
+
+      await waitFor(() => {
+        expect(mockSetWishlistPriceAlert).toHaveBeenCalledWith(12345, 30);
+      });
+      expect(
+        await within(card).findByText(/Alert at \$30\.00/)
+      ).toBeInTheDocument();
+      expect(
+        within(card).queryByLabelText(/Alert price for OK Computer/)
+      ).not.toBeInTheDocument();
+      // Status is reloaded after setting an alert
+      expect(mockGetWishlistPriceRefreshStatus).toHaveBeenCalledTimes(2);
+    });
+
+    it('applies a saved alert to every wanted release of the same master', async () => {
+      const otherPressing: EnrichedWishlistItem = {
+        ...mockWishlistItems[0],
+        id: 3,
+        releaseId: 55555,
+        title: 'OK Computer (Reissue)',
+      };
+      mockGetWishlist.mockResolvedValue([mockWishlistItems[0], otherPressing]);
+      mockSetWishlistPriceAlert.mockResolvedValue(
+        radioheadWith({
+          priceAlert: { maxPrice: 30, currency: 'USD', triggered: false },
+        })
+      );
+      renderWishlistPage();
+
+      await waitFor(() => {
+        expect(screen.getByText('OK Computer (Reissue)')).toBeInTheDocument();
+      });
+      await user.type(
+        within(getCard('OK Computer')).getByLabelText(
+          /Alert price for OK Computer in USD/
+        ),
+        '30{Enter}'
+      );
+
+      await waitFor(() => {
+        expect(screen.getAllByText(/Alert at \$30\.00/)).toHaveLength(2);
+      });
+      // The other release keeps its own identity
+      expect(screen.getByText('OK Computer (Reissue)')).toBeInTheDocument();
+    });
+
+    it('rejects a non-positive price with an inline error', async () => {
+      renderWishlistPage();
+
+      await waitFor(() => {
+        expect(screen.getByText('Radiohead')).toBeInTheDocument();
+      });
+
+      const card = getCard('OK Computer');
+      await user.type(
+        within(card).getByLabelText(/Alert price for OK Computer/),
+        '0'
+      );
+      await user.click(within(card).getByRole('button', { name: /Set alert/ }));
+
+      expect(
+        within(card).getByText('Enter a price greater than 0')
+      ).toBeInTheDocument();
+      expect(mockSetWishlistPriceAlert).not.toHaveBeenCalled();
+    });
+
+    it('shows the server error in a toast when saving fails', async () => {
+      mockSetWishlistPriceAlert.mockRejectedValue(
+        Object.assign(new Error('Request failed with status code 400'), {
+          response: { data: { error: 'maxPrice must be positive' } },
+        })
+      );
+      renderWishlistPage();
+
+      await waitFor(() => {
+        expect(screen.getByText('Radiohead')).toBeInTheDocument();
+      });
+
+      const card = getCard('OK Computer');
+      const input = within(card).getByLabelText(/Alert price for OK Computer/);
+      await user.type(input, '12.5{Enter}');
+
+      await waitFor(() => {
+        expect(mockShowToast).toHaveBeenCalledWith(
+          'error',
+          'maxPrice must be positive'
+        );
+      });
+      // Input stays for a retry
+      expect(input).toHaveValue(12.5);
+      expect(input).not.toBeDisabled();
+    });
+
+    it('edits an existing alert', async () => {
+      mockGetWishlist.mockResolvedValue([
+        radioheadWith({
+          priceAlert: { maxPrice: 30, currency: 'USD', triggered: false },
+        }),
+      ]);
+      mockSetWishlistPriceAlert.mockResolvedValue(
+        radioheadWith({
+          priceAlert: { maxPrice: 25, currency: 'USD', triggered: false },
+        })
+      );
+      renderWishlistPage();
+
+      await user.click(
+        await screen.findByRole('button', {
+          name: 'Edit price alert for OK Computer',
+        })
+      );
+      const input = screen.getByLabelText(/Alert price for OK Computer/);
+      expect(input).toHaveValue(30);
+      await user.clear(input);
+      await user.type(input, '25');
+      await user.click(screen.getByRole('button', { name: /Save/ }));
+
+      await waitFor(() => {
+        expect(mockSetWishlistPriceAlert).toHaveBeenCalledWith(12345, 25);
+      });
+      expect(await screen.findByText(/Alert at \$25\.00/)).toBeInTheDocument();
+    });
+
+    it('removes an alert', async () => {
+      mockGetWishlist.mockResolvedValue([
+        radioheadWith({
+          priceAlert: { maxPrice: 30, currency: 'USD', triggered: true },
+        }),
+      ]);
+      renderWishlistPage();
+
+      await user.click(
+        await screen.findByRole('button', {
+          name: 'Remove price alert for OK Computer',
+        })
+      );
+
+      expect(mockRemoveWishlistPriceAlert).toHaveBeenCalledWith(12345);
+      await waitFor(() => {
+        expect(screen.queryByText(/Alert at/)).not.toBeInTheDocument();
+      });
+      expect(screen.queryByText('Below your price')).not.toBeInTheDocument();
+      expect(
+        screen.getByLabelText(/Alert price for OK Computer/)
+      ).toBeInTheDocument();
+    });
+
+    it('marks triggered alerts with a badge and card highlight', async () => {
+      mockGetWishlist.mockResolvedValue([
+        radioheadWith({
+          lowestListing: mockListing,
+          priceAlert: { maxPrice: 40, currency: 'USD', triggered: true },
+        }),
+        mockWishlistItems[1],
+      ]);
+      renderWishlistPage();
+
+      await waitFor(() => {
+        expect(screen.getByText('Below your price')).toBeInTheDocument();
+      });
+      expect(getCard('OK Computer')).toHaveClass(
+        'wishlist-card-price-triggered'
+      );
+      expect(getCard('Abbey Road')).not.toHaveClass(
+        'wishlist-card-price-triggered'
+      );
+    });
+
+    it('Price alerts tab lists alerted records, triggered first, with count', async () => {
+      const alerted = (
+        id: number,
+        title: string,
+        triggered: boolean,
+        dateAdded: string
+      ): EnrichedWishlistItem => ({
+        ...mockWishlistItems[0],
+        id,
+        masterId: id * 10,
+        title,
+        dateAdded,
+        priceAlert: { maxPrice: 20, currency: 'USD', triggered },
+      });
+      mockGetWishlist.mockResolvedValue([
+        alerted(11, 'Newest Untriggered', false, '2024-03-01'),
+        alerted(12, 'Older Triggered', true, '2024-01-01'),
+        alerted(13, 'Middle Triggered', true, '2024-02-01'),
+        mockWishlistItems[1],
+      ]);
+      renderWishlistPage();
+
+      const tab = await screen.findByRole('button', {
+        name: 'Price alerts (2)',
+      });
+      await user.click(tab);
+
+      const titles = Array.from(
+        document.querySelectorAll('.wishlist-card-title')
+      ).map(el => el.textContent);
+      expect(titles).toEqual([
+        'Middle Triggered',
+        'Older Triggered',
+        'Newest Untriggered',
+      ]);
+
+      // Search applies on this tab too
+      await user.type(screen.getByLabelText('Search wishlist'), 'older');
+      expect(
+        Array.from(document.querySelectorAll('.wishlist-card-title')).map(
+          el => el.textContent
+        )
+      ).toEqual(['Older Triggered']);
+    });
+
+    it('Price alerts tab shows an explanatory empty state', async () => {
+      renderWishlistPage();
+
+      const tab = await screen.findByRole('button', { name: 'Price alerts' });
+      await user.click(tab);
+
+      expect(screen.getByText(/No price alerts yet/)).toBeInTheDocument();
+    });
+
+    it('shows the background price check status while pressings are unchecked', async () => {
+      mockGetWishlistPriceRefreshStatus.mockResolvedValue({
+        ...mockPriceRefreshStatusDone,
+        pressingsFresh: 120,
+        pressingsUnchecked: 723,
+      });
+      renderWishlistPage();
+
+      expect(
+        await screen.findByText(
+          'Checking prices in the background: 120 of 843 pressings checked'
+        )
+      ).toBeInTheDocument();
+    });
+
+    it('re-reads prices quietly while the background check is running', async () => {
+      const setIntervalSpy = jest.spyOn(window, 'setInterval');
+      const clearIntervalSpy = jest.spyOn(window, 'clearInterval');
+      try {
+        mockGetWishlistPriceRefreshStatus
+          .mockResolvedValueOnce({
+            ...mockPriceRefreshStatusDone,
+            pressingsFresh: 120,
+            pressingsUnchecked: 723,
+          })
+          .mockResolvedValue(mockPriceRefreshStatusDone);
+        mockGetWishlist
+          .mockResolvedValueOnce(mockWishlistItems)
+          .mockResolvedValue([
+            radioheadWith({ lowestListing: { ...mockListing } }),
+            ...mockWishlistItems.slice(1),
+          ]);
+        renderWishlistPage();
+        await screen.findByText(/Checking prices in the background/);
+
+        const pollCall = setIntervalSpy.mock.calls.find(
+          call => call[1] === PRICE_POLL_MS
+        );
+        expect(pollCall).toBeDefined();
+        const pollTimer =
+          setIntervalSpy.mock.results[
+            setIntervalSpy.mock.calls.indexOf(pollCall!)
+          ].value;
+        await act(async () => {
+          (pollCall![0] as () => void)();
+        });
+
+        await waitFor(() =>
+          expect(
+            within(getCard('OK Computer')).queryByText('Price not checked yet')
+          ).not.toBeInTheDocument()
+        );
+        // Done checking: the status line goes away and polling stops
+        expect(
+          screen.queryByText(/Checking prices in the background/)
+        ).not.toBeInTheDocument();
+        expect(clearIntervalSpy).toHaveBeenCalledWith(pollTimer);
+      } finally {
+        setIntervalSpy.mockRestore();
+        clearIntervalSpy.mockRestore();
+      }
+    });
+
+    it('asks for each album play count once, even when none come back', async () => {
+      mockGetAlbumPlayCounts.mockResolvedValue({ results: [] });
+      renderWishlistPage();
+      await screen.findByText('Radiohead');
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      expect(mockGetAlbumPlayCounts).toHaveBeenCalledTimes(1);
+    });
+
+    it('says when an alert was set in a different currency', async () => {
+      mockGetWishlist.mockResolvedValue([
+        radioheadWith({
+          priceAlert: { maxPrice: 30, currency: 'EUR', triggered: false },
+        }),
+      ]);
+      renderWishlistPage();
+
+      expect(
+        await screen.findByText(
+          'Set in EUR; save it again to compare USD prices'
+        )
+      ).toBeInTheDocument();
+    });
+
+    it('hides the status line when all pressings are checked or it fails', async () => {
+      mockGetWishlistPriceRefreshStatus.mockRejectedValue(new Error('boom'));
+      renderWishlistPage();
+
+      await waitFor(() => {
+        expect(screen.getByText('Radiohead')).toBeInTheDocument();
+      });
+      expect(
+        screen.queryByText(/Checking prices in the background/)
+      ).not.toBeInTheDocument();
     });
   });
 });
