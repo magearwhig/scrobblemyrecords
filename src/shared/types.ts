@@ -1078,9 +1078,101 @@ export type VinylStatus = 'has_vinyl' | 'cd_only' | 'unknown' | 'checking';
 export interface EnrichedWishlistItem extends WishlistItem {
   vinylStatus: VinylStatus;
   vinylVersions: ReleaseVersion[];
+  /** Lowest current asking price across vinyl pressings (from the price cache) */
   lowestVinylPrice?: number;
   priceCurrency?: string;
   lastChecked?: number; // Unix timestamp
+  /**
+   * Cheapest current vinyl listing across all pressings. Undefined until any
+   * pressing's price has been checked; null when checked and none for sale.
+   */
+  lowestListing?: WishlistLowestListing | null;
+  /** The user's price alert for this record (keyed by master), if set */
+  priceAlert?: WishlistPriceAlertView;
+}
+
+/**
+ * Cheapest current vinyl listing for a wishlist record, from Discogs
+ * marketplace stats (asking prices before shipping, any seller country).
+ */
+export interface WishlistLowestListing {
+  price: number;
+  currency: string;
+  /** Pressing with the lowest price */
+  releaseId: number;
+  /** Copies for sale of that pressing */
+  numForSale: number;
+  /** Copies for sale across all vinyl pressings that have been checked */
+  totalForSale: number;
+  /** Details of the cheapest pressing, for display */
+  country?: string;
+  year?: number;
+  format?: string[];
+  label?: string;
+  /** Oldest price check among this record's vinyl pressings (ms) */
+  checkedAt: number;
+  /** Vinyl pressings with a price check, out of all vinyl pressings */
+  pressingsChecked: number;
+  pressingsTotal: number;
+}
+
+/**
+ * Stored price alert: notify when any vinyl pressing of the master is listed
+ * at or below `maxPrice` (in `currency`, before shipping).
+ */
+export interface WishlistPriceAlert {
+  masterId: number;
+  maxPrice: number;
+  currency: string;
+  createdAt: number;
+  updatedAt: number;
+  /** Price that last produced a notification; re-notify only below it */
+  lastNotifiedPrice?: number;
+  lastNotifiedAt?: number;
+}
+
+export interface WishlistPriceAlertStore {
+  schemaVersion: 1;
+  /** Keyed by master ID (as a string) */
+  alerts: Record<string, WishlistPriceAlert>;
+}
+
+/** Alert as shown with a wishlist item */
+export interface WishlistPriceAlertView {
+  maxPrice: number;
+  currency: string;
+  /** True while the lowest listing is at or below maxPrice */
+  triggered: boolean;
+  lastNotifiedAt?: number;
+}
+
+/** Cached lowest asking price for one pressing (release) */
+export interface PressingPriceEntry {
+  /** Null when nothing is for sale */
+  lowestPrice: number | null;
+  currency: string;
+  numForSale: number;
+  /** When fetched (ms) */
+  fetchedAt: number;
+}
+
+export interface PressingPriceStore {
+  schemaVersion: 1;
+  /** Keyed by release ID (as a string) */
+  prices: Record<string, PressingPriceEntry>;
+}
+
+/** Progress of the background wishlist price refresh */
+export interface WishlistPriceRefreshStatus {
+  pressingsTotal: number;
+  /** Pressings with a price check younger than the refresh interval */
+  pressingsFresh: number;
+  /** Pressings never checked */
+  pressingsUnchecked: number;
+  lastRunAt?: number;
+  /** Records whose alert is currently triggered */
+  alertsTriggered: number;
+  alertsTotal: number;
 }
 
 /**
@@ -1939,6 +2031,8 @@ export interface BackupData {
 
   // Wishlist
   localWantList: LocalWantItem[];
+  /** Price alerts per wishlist master (optional for older backups) */
+  wishlistPriceAlerts?: WishlistPriceAlertStore['alerts'];
 
   // Sellers
   monitoredSellers: MonitoredSeller[];
