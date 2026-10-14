@@ -6,6 +6,7 @@ import {
   ToastProvider,
   useToast,
 } from '../../../src/renderer/context/ToastContext';
+import { HISTORY_SYNCED_EVENT } from '../../../src/renderer/hooks/useHistorySynced';
 import { useJobPoller } from '../../../src/renderer/hooks/useJobPoller';
 
 // Mock the api service
@@ -48,6 +49,34 @@ describe('useJobPoller', () => {
     });
 
     expect(mockGetJobStatuses).toHaveBeenCalledTimes(2);
+  });
+
+  it('announces a finished history sync once, and no other jobs', async () => {
+    const onSynced = jest.fn();
+    window.addEventListener(HISTORY_SYNCED_EVENT, onSynced);
+    const job = (id: string, type: string, status = 'completed') => ({
+      id,
+      type,
+      status,
+      message: 'done',
+      startedAt: Date.now(),
+    });
+    mockGetJobStatuses.mockResolvedValue([
+      job('sync-1', 'sync'),
+      job('sync-2', 'sync', 'running'),
+      job('refresh-1', 'collection-refresh'),
+    ]);
+
+    renderHook(() => useJobPoller(), { wrapper });
+    await act(async () => {
+      jest.advanceTimersByTime(3000);
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(3000);
+    });
+
+    expect(onSynced).toHaveBeenCalledTimes(1);
+    window.removeEventListener(HISTORY_SYNCED_EVENT, onSynced);
   });
 
   it('shows success toast when job completes', async () => {

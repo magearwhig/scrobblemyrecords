@@ -24,6 +24,7 @@ import { ProgressBar } from '../components/ui/ProgressBar';
 import { ReleaseDetailsSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { useHistorySynced } from '../hooks/useHistorySynced';
 import { navigate } from '../routes';
 import { getApiService } from '../services/api';
 import { formatLocalTimeClean, formatRelativeTime } from '../utils/dateUtils';
@@ -147,6 +148,14 @@ const ReleaseDetailsPage: React.FC = () => {
       loadAlbumHistory(release.artist, release.title);
     }
   }, [release?.artist, release?.title, loadAlbumHistory]);
+
+  // Reload per-track play counts when a history sync finishes, e.g. the
+  // automatic one a few seconds after scrobbling from this page
+  useHistorySynced(() => {
+    if (release?.artist && release?.title) {
+      loadAlbumHistory(release.artist, release.title);
+    }
+  });
 
   // Calculate per-track scrobble stats from album history
   const trackScrobbleStats = useMemo((): Map<string, TrackScrobbleStats> => {

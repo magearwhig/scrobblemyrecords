@@ -2,6 +2,7 @@ import { Check, Disc3, Link } from 'lucide-react';
 import React, { useEffect, useState, useCallback } from 'react';
 
 import { useApp } from '../context/AppContext';
+import { useHistorySynced } from '../hooks/useHistorySynced';
 import { useNotifications } from '../hooks/useNotifications';
 import { getApiService } from '../services/api';
 
@@ -55,31 +56,46 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
 
   const api = getApiService(state.serverUrl);
 
-  useEffect(() => {
-    const fetchHistory = async () => {
+  /**
+   * Load the album's history. A quiet reload (after a history sync) keeps
+   * what is shown, without the loading state, and ignores failures.
+   */
+  const fetchHistory = useCallback(
+    async (quiet = false) => {
       try {
-        setLoading(true);
-        setError(null);
+        if (!quiet) {
+          setLoading(true);
+          setError(null);
+        }
         const data = await api.getAlbumHistory(artist, album);
         setHistory(data);
+        setError(null);
       } catch (err) {
         // 404 means never played, which is not an error
         if (err instanceof Error && err.message.includes('404')) {
           setHistory(null);
-        } else {
+        } else if (!quiet) {
           setError(
             err instanceof Error ? err.message : 'Failed to load history'
           );
         }
       } finally {
-        setLoading(false);
+        if (!quiet) setLoading(false);
       }
-    };
+    },
+    [api, artist, album]
+  );
 
+  useEffect(() => {
     if (artist && album) {
       fetchHistory();
     }
-  }, [artist, album, api]);
+  }, [artist, album, fetchHistory]);
+
+  // New scrobbles appear once the history sync that follows them finishes
+  useHistorySynced(() => {
+    if (artist && album) fetchHistory(true);
+  });
 
   const formatDate = (timestamp: number): string => {
     const date = new Date(timestamp * 1000);
