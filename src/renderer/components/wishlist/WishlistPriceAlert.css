@@ -1,0 +1,132 @@
+/* Wishlist price alert: lowest listing line + alert control */
+
+.wishlist-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.wishlist-price-listing {
+  color: var(--text-secondary);
+  background: transparent;
+  line-height: 1.4;
+}
+
+.wishlist-price-muted {
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.wishlist-price-link {
+  color: var(--text-primary);
+  background: transparent;
+  text-decoration: none;
+}
+
+.wishlist-price-link:hover,
+.wishlist-price-link:focus-visible {
+  text-decoration: underline;
+}
+
+.wishlist-price-amount {
+  font-weight: 600;
+  color: var(--status-success);
+}
+
+.wishlist-price-link-icon {
+  margin-left: var(--space-1);
+  vertical-align: middle;
+  color: var(--text-muted);
+}
+
+.wishlist-price-alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+}
+
+.wishlist-price-alert-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.wishlist-price-alert-input-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.wishlist-price-alert-prefix {
+  position: absolute;
+  left: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  pointer-events: none;
+}
+
+.wishlist-price-alert-input {
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-6);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--surface-default);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.wishlist-price-alert-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.2);
+}
+
+.wishlist-price-alert-input[aria-invalid='true'] {
+  border-color: var(--status-error);
+}
+
+.wishlist-price-alert-input:disabled {
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+}
+
+.wishlist-price-alert-set {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-right: auto;
+  color: var(--text-primary);
+  background: transparent;
+  font-weight: 500;
+}
+
+.wishlist-price-alert-error {
+  margin: 0;
+  color: var(--status-error);
+  background: transparent;
+  font-size: var(--text-xs);
+}
+
+/* Card highlight when the lowest listing is at or below the alert price */
+.wishlist-card.wishlist-card-price-triggered {
+  border-color: var(--status-success);
+  box-shadow: 0 0 0 1px var(--status-success);
+}
+
+.wishlist-price-alert-note {
+  flex-basis: 100%;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}

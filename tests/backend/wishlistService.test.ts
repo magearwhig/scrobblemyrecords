@@ -1249,6 +1249,47 @@ describe('WishlistService', () => {
   // getMarketplaceStats
   // ============================================
 
+  describe('getLowestAskingPrice', () => {
+    it('makes one marketplace stats call in the requested currency', async () => {
+      mockAxiosInstance.get.mockResolvedValueOnce({
+        data: {
+          lowest_price: { value: 28.5, currency: 'EUR' },
+          num_for_sale: 4,
+          blocked_from_sale: false,
+        },
+      });
+      const result = await service.getLowestAskingPrice(200, 'EUR');
+      expect(result).toEqual({
+        lowestPrice: 28.5,
+        currency: 'EUR',
+        numForSale: 4,
+      });
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1);
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+        '/marketplace/stats/200',
+        expect.objectContaining({ params: { curr_abbr: 'EUR' } })
+      );
+    });
+
+    it('returns a null price when nothing is for sale', async () => {
+      mockAxiosInstance.get.mockResolvedValueOnce({
+        data: { lowest_price: null, num_for_sale: 0 },
+      });
+      expect(await service.getLowestAskingPrice(200, 'USD')).toEqual({
+        lowestPrice: null,
+        currency: 'USD',
+        numForSale: 0,
+      });
+    });
+
+    it('throws on errors', async () => {
+      mockAxiosInstance.get.mockRejectedValueOnce(new Error('500'));
+      await expect(service.getLowestAskingPrice(200, 'USD')).rejects.toThrow(
+        '500'
+      );
+    });
+  });
+
   describe('getMarketplaceStats', () => {
     it('should fetch and combine stats with price suggestions', async () => {
       // Stats call

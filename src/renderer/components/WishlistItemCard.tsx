@@ -21,6 +21,10 @@ interface WishlistItemCardProps {
   playCount: AlbumPlayCountResult | undefined;
   onOpenVersions: (item: EnrichedWishlistItem) => void;
   onOpenMarketplace: (item: EnrichedWishlistItem) => void;
+  /** Extra content rendered between the details and the action buttons */
+  footer?: React.ReactNode;
+  /** Modifier classes added to the card root */
+  className?: string;
 }
 
 const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
@@ -32,12 +36,14 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
   playCount,
   onOpenVersions,
   onOpenMarketplace,
+  footer,
+  className,
 }) => {
   const plays = playCount?.playCount ?? 0;
   const lastPlayed = playCount?.lastPlayed ?? null;
 
   return (
-    <div className='wishlist-card'>
+    <div className={className ? `wishlist-card ${className}` : 'wishlist-card'}>
       <div className='wishlist-card-image'>
         {item.coverImage ? (
           <img src={item.coverImage} alt={item.title} />
@@ -67,7 +73,8 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
           <span className='wishlist-card-date'>
             Added: {formatDate(item.dateAdded)}
           </span>
-          {item.lowestVinylPrice !== undefined && (
+          {/* Cards with a footer show the lowest listing there instead */}
+          {!footer && item.lowestVinylPrice !== undefined && (
             <span className='wishlist-card-price'>
               From: {formatPrice(item.lowestVinylPrice, item.priceCurrency)}
             </span>
@@ -79,6 +86,7 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
           </div>
         )}
       </div>
+      {footer}
       <div className='wishlist-card-actions'>
         <Button
           variant='secondary'

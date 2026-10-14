@@ -1,5 +1,11 @@
 import { Search, X } from 'lucide-react';
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
 import './WishlistPage.page.css';
 
 import {
@@ -8,6 +14,7 @@ import {
   EnrichedWishlistItem,
   LocalWantItem,
   ReleaseVersion,
+  WishlistPriceRefreshStatus,
   WishlistSettings,
   WishlistSyncStatus,
   VinylStatus,
@@ -21,9 +28,13 @@ import {
   TableRowSkeleton,
 } from '../components/ui/Skeleton';
 import { NewReleasesTab } from '../components/wishlist/NewReleasesTab';
+import WishlistPriceAlert, {
+  formatCheckedAgo,
+} from '../components/wishlist/WishlistPriceAlert';
 import WishlistItemCard from '../components/WishlistItemCard';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import {
   useNotifications,
   createSuccessNotification,
@@ -33,11 +44,27 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('WishlistPage');
 
+/** How often prices are re-read while the background check is still filling them in */
+export const PRICE_POLL_MS = 60 * 1000;
+/** How often prices are re-read once every pressing has been checked */
+export const PRICE_IDLE_POLL_MS = 5 * 60 * 1000;
+/** After setting an alert, when to re-read its record's freshly checked prices */
+const ALERT_PRICE_RECHECK_MS = 30 * 1000;
+
+/** Prefer the server's error message (axios `response.data.error`) */
+function getErrorMessage(err: unknown, fallback: string): string {
+  const serverError = (err as { response?: { data?: { error?: unknown } } })
+    ?.response?.data?.error;
+  if (typeof serverError === 'string' && serverError) return serverError;
+  return err instanceof Error && err.message ? err.message : fallback;
+}
+
 type TabType =
   | 'all'
   | 'vinyl'
   | 'cd_only'
   | 'affordable'
+  | 'price_alerts'
   | 'monitoring'
   | 'new_releases';
 type SortOption = 'date' | 'price' | 'artist' | 'album' | 'scrobbles';
@@ -57,12 +84,15 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
   const { state } = useApp();
   const { authStatus } = useAuth();
   const { addNotification } = useNotifications();
+  const { showToast } = useToast();
   const [items, setItems] = useState<EnrichedWishlistItem[]>([]);
   const [localWantItems, setLocalWantItems] = useState<LocalWantItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<WishlistSyncStatus | null>(null);
   const [settings, setSettings] = useState<WishlistSettings | null>(null);
+  const [priceRefreshStatus, setPriceRefreshStatus] =
+    useState<WishlistPriceRefreshStatus | null>(null);
 
   // Tab and sorting state
   const [activeTab, setActiveTab] = useState<TabType>('all');
@@ -132,6 +162,103 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
     loadData();
   }, [loadData]);
 
+  // Background price refresh progress; purely informational, so fail silently
+  const loadPriceRefreshStatus = useCallback(async () => {
+    try {
+      setPriceRefreshStatus(await api.getWishlistPriceRefreshStatus());
+    } catch (err) {
+      logger.warn('Could not load price refresh status', err);
+    }
+  }, [api]);
+
+  useEffect(() => {
+    loadPriceRefreshStatus();
+  }, [loadPriceRefreshStatus]);
+
+  // Prices are checked in the background; re-read them without a loading
+  // state so new prices and alerts show up while the page is open
+  const refreshPricesQuietly = useCallback(async () => {
+    try {
+      const [wishlistItems, status] = await Promise.all([
+        api.getWishlist(),
+        api.getWishlistPriceRefreshStatus(),
+      ]);
+      setItems(wishlistItems);
+      setPriceRefreshStatus(status);
+    } catch (err) {
+      logger.warn('Could not refresh wishlist prices', err);
+    }
+  }, [api]);
+
+  const pricesPending = (priceRefreshStatus?.pressingsUnchecked ?? 0) > 0;
+  useEffect(() => {
+    const timer = setInterval(
+      refreshPricesQuietly,
+      pricesPending ? PRICE_POLL_MS : PRICE_IDLE_POLL_MS
+    );
+    return () => clearInterval(timer);
+  }, [pricesPending, refreshPricesQuietly]);
+
+  const recheckTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(
+    () => () => recheckTimers.current.forEach(timer => clearTimeout(timer)),
+    []
+  );
+
+  const handleSavePriceAlert = useCallback(
+    async (masterId: number, maxPrice: number) => {
+      try {
+        const updated = await api.setWishlistPriceAlert(masterId, maxPrice);
+        // Several wanted releases can share a master: copy the master-level
+        // price fields onto each rather than replacing the items
+        setItems(prev =>
+          prev.map(item =>
+            item.masterId === masterId
+              ? {
+                  ...item,
+                  priceAlert: updated.priceAlert,
+                  lowestListing: updated.lowestListing,
+                  lowestVinylPrice: updated.lowestVinylPrice,
+                  priceCurrency: updated.priceCurrency,
+                }
+              : item
+          )
+        );
+        loadPriceRefreshStatus();
+        // The server re-checks this record's pressings right after saving
+        recheckTimers.current.push(
+          setTimeout(refreshPricesQuietly, ALERT_PRICE_RECHECK_MS)
+        );
+      } catch (err) {
+        showToast('error', getErrorMessage(err, 'Failed to save price alert'));
+        throw err;
+      }
+    },
+    [api, showToast, loadPriceRefreshStatus, refreshPricesQuietly]
+  );
+
+  const handleRemovePriceAlert = useCallback(
+    async (masterId: number) => {
+      try {
+        await api.removeWishlistPriceAlert(masterId);
+        setItems(prev =>
+          prev.map(item =>
+            item.masterId === masterId
+              ? { ...item, priceAlert: undefined }
+              : item
+          )
+        );
+      } catch (err) {
+        showToast(
+          'error',
+          getErrorMessage(err, 'Failed to remove price alert')
+        );
+        throw err;
+      }
+    },
+    [api, showToast]
+  );
+
   // Helper to create a cache key for play counts
   const getPlayCountKey = useCallback(
     (artist: string, title: string): string => {
@@ -140,31 +267,50 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
     []
   );
 
+  // Albums whose play counts were already requested. Without this, an album
+  // the server returns no result for stays "uncached", and every cache
+  // update would request it again in an endless loop.
+  const requestedPlayCounts = useRef(new Set<string>());
+
   // Fetch play counts when scrobbles sort is selected
   const fetchPlayCounts = useCallback(
     async (albums: AlbumIdentifier[]) => {
       if (albums.length === 0) return;
 
-      // Filter out albums we already have cached
-      const uncachedAlbums = albums.filter(
-        album => !playCounts.has(getPlayCountKey(album.artist, album.title))
-      );
+      // Filter out albums we already have cached or asked for
+      const uncachedAlbums = albums.filter(album => {
+        const key = getPlayCountKey(album.artist, album.title);
+        return !playCounts.has(key) && !requestedPlayCounts.current.has(key);
+      });
 
       if (uncachedAlbums.length === 0) return;
+      for (const album of uncachedAlbums) {
+        requestedPlayCounts.current.add(
+          getPlayCountKey(album.artist, album.title)
+        );
+      }
 
       try {
         setLoadingPlayCounts(true);
         const response = await api.getAlbumPlayCounts(uncachedAlbums);
 
         // Update the cache with new results
-        setPlayCounts(prev => {
-          const newMap = new Map(prev);
-          for (const result of response.results) {
-            newMap.set(getPlayCountKey(result.artist, result.title), result);
-          }
-          return newMap;
-        });
+        if (response.results.length > 0) {
+          setPlayCounts(prev => {
+            const newMap = new Map(prev);
+            for (const result of response.results) {
+              newMap.set(getPlayCountKey(result.artist, result.title), result);
+            }
+            return newMap;
+          });
+        }
       } catch (err) {
+        // Let a later render try these again
+        for (const album of uncachedAlbums) {
+          requestedPlayCounts.current.delete(
+            getPlayCountKey(album.artist, album.title)
+          );
+        }
         logger.error('Error fetching play counts', err);
       } finally {
         setLoadingPlayCounts(false);
@@ -337,6 +483,9 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
           );
         }
         break;
+      case 'price_alerts':
+        filtered = filtered.filter(item => item.priceAlert);
+        break;
     }
 
     filtered = filtered.filter(item => matchesSearch(item.artist, item.title));
@@ -382,6 +531,15 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
         break;
     }
 
+    // Price alerts tab: triggered alerts first, keeping the chosen order within
+    if (activeTab === 'price_alerts') {
+      filtered.sort(
+        (a, b) =>
+          Number(Boolean(b.priceAlert?.triggered)) -
+          Number(Boolean(a.priceAlert?.triggered))
+      );
+    }
+
     return filtered;
   }, [
     items,
@@ -421,6 +579,8 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
       cd_only: cdCount,
       affordable: affordableCount,
       monitoring: localWantItems.length,
+      priceAlerts: items.filter(i => i.priceAlert).length,
+      priceAlertsTriggered: items.filter(i => i.priceAlert?.triggered).length,
     };
   }, [items, settings, localWantItems]);
 
@@ -693,6 +853,37 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
         </div>
       )}
 
+      {priceRefreshStatus &&
+        (priceRefreshStatus.pressingsUnchecked > 0 ||
+          priceRefreshStatus.lastCheckedAt !== undefined) && (
+          <div className='wishlist-price-refresh-status'>
+            {priceRefreshStatus.pressingsUnchecked > 0 ? (
+              <span>
+                Checking prices in the background:{' '}
+                {(
+                  priceRefreshStatus.pressingsTotal -
+                  priceRefreshStatus.pressingsUnchecked
+                ).toLocaleString()}{' '}
+                of {priceRefreshStatus.pressingsTotal.toLocaleString()}{' '}
+                pressings checked
+              </span>
+            ) : (
+              <span>
+                Prices of {priceRefreshStatus.pressingsTotal.toLocaleString()}{' '}
+                pressings are rechecked every 12 hours (every 6 for records with
+                an alert)
+              </span>
+            )}
+            {priceRefreshStatus.lastCheckedAt !== undefined && (
+              <span>
+                {' '}
+                · last check{' '}
+                {formatCheckedAgo(priceRefreshStatus.lastCheckedAt)}
+              </span>
+            )}
+          </div>
+        )}
+
       {error && <div className='error-message'>{error}</div>}
 
       {/* Tabs */}
@@ -703,6 +894,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
             'vinyl',
             'cd_only',
             'affordable',
+            'price_alerts',
             'monitoring',
             'new_releases',
           ] as TabType[]
@@ -716,6 +908,10 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
             {tab === 'vinyl' && `Has Vinyl (${tabCounts.vinyl})`}
             {tab === 'cd_only' && `CD Only (${tabCounts.cd_only})`}
             {tab === 'affordable' && `Affordable (${tabCounts.affordable})`}
+            {tab === 'price_alerts' &&
+              (tabCounts.priceAlertsTriggered > 0
+                ? `Price alerts (${tabCounts.priceAlertsTriggered})`
+                : 'Price alerts')}
             {tab === 'monitoring' && `Monitoring (${tabCounts.monitoring})`}
             {tab === 'new_releases' && (
               <>
@@ -899,6 +1095,15 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
         <>
           {loading ? (
             <AlbumCardSkeleton count={6} />
+          ) : activeTab === 'price_alerts' && tabCounts.priceAlerts === 0 ? (
+            <div className='empty-state'>
+              <p>
+                No price alerts yet. On any record in the All tab, enter the
+                most you would pay in the &quot;Alert at…&quot; box and choose
+                Set alert. You will be notified when any vinyl pressing is
+                listed at or below that price.
+              </p>
+            </div>
           ) : filteredItems.length === 0 ? (
             <div className='empty-state'>
               <p>
@@ -924,6 +1129,22 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
                   )}
                   onOpenVersions={openVersionsModal}
                   onOpenMarketplace={openDiscogsMarketplace}
+                  className={
+                    item.priceAlert?.triggered
+                      ? 'wishlist-card-price-triggered'
+                      : undefined
+                  }
+                  footer={
+                    // Discogs wantlist records only (merged monitored items have negative IDs)
+                    item.id > 0 && item.masterId > 0 ? (
+                      <WishlistPriceAlert
+                        item={item}
+                        currency={settings?.currency ?? 'USD'}
+                        onSave={handleSavePriceAlert}
+                        onRemove={handleRemovePriceAlert}
+                      />
+                    ) : undefined
+                  }
                 />
               ))}
             </div>

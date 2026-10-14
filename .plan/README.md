@@ -25,9 +25,10 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | done/traded-in-archive-plan.md | Complete -- Feature 7 extension, all 3 phases implemented |
 | done/unresolved-listening-history-plan.md | Complete -- 2026-10-11; albumless scrobbles kept and counted in listening stats, backfill (index now matches Last.fm), resolution rules, Unresolved tab, artist exclusion, bulk album fill with Last.fm and Discogs tracklist checks |
 | context-tags-plan.md | Backlog -- Effort F (#18); revised 2026-10-11, nothing implemented; stable tag IDs, multiple tags per session |
-| marketplace-upgrade-plan.md | Backlog -- Effort C (#19 + #20); re-planned 2026-10-11 against the code; not started (Phase 0 API check first) |
-| reissue-label-discovery-plan.md | Mostly shipped (`6be3c73`); reissue dedupe and settings defaults fixed 2026-10-11 -- remaining: label/website auto-scan, new-item notifications |
-| backlog-shark-tank-2026-03-08.md | Reference -- 24 tracked items, 19 done, 5 remaining (#5, #9, #18, #19, #20), each linked to a plan |
+| wishlist-price-alerts-plan.md | Implemented 2026-10-14 (branch feat/wishlist-price-alerts) -- lowest vinyl listing and price alert on each wishlist record, rolling background price checks, toast + Price alerts tab |
+| cancelled/marketplace-upgrade-plan.md | Cancelled 2026-10-14 -- #19 superseded by wishlist-price-alerts-plan; seller-monitoring parts and #20 dropped by the user; verified Discogs API facts kept |
+| reissue-label-discovery-plan.md | Mostly shipped (`6be3c73`); reissue dedupe and settings defaults fixed 2026-10-11 -- remaining: label/website auto-scan, new-item notifications (must build its own scheduler now that the marketplace plan is cancelled) |
+| backlog-shark-tank-2026-03-08.md | Reference -- 24 tracked items, 19 done, 1 dropped (#20), 4 remaining (#5, #9, #18, #19 in progress), each linked to a plan |
 | smart-crates-plan.md | Backlog -- new 2026-10-11; rule-based, auto-updating album crates with manual include/exclude, match explanations, and rotating suggested crates with one-click Add; not started |
 | pocket-list-export-plan.md | Backlog -- new 2026-10-11; offline phone-readable PDF of wishlist/collection; depends on data-export-plan Phase 1 |
 | data-export-plan.md | Backlog -- #9; CSV/JSON data portability plus the shared export row layer used by Pocket List Export; not started |

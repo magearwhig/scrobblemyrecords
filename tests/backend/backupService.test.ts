@@ -3,6 +3,7 @@ import path from 'path';
 
 import { BackupService } from '../../src/backend/services/backupService';
 import { MappingService } from '../../src/backend/services/mappingService';
+import { WishlistPriceService } from '../../src/backend/services/wishlistPriceService';
 import { FileStorage } from '../../src/backend/utils/fileStorage';
 import {
   AlbumMapping,
@@ -594,6 +595,79 @@ describe('BackupService', () => {
       expect(
         (replaced as unknown as { excludedArtists: string[] }).excludedArtists
       ).toEqual(['the onion']);
+    });
+
+    it('backs up and restores wishlist price alerts (merge and replace)', async () => {
+      const alert = (
+        masterId: number,
+        maxPrice: number,
+        updatedAt: number
+      ) => ({
+        masterId,
+        maxPrice,
+        currency: 'USD',
+        createdAt: 1,
+        updatedAt,
+      });
+      await fileStorage.writeJSON('wishlist/price-alerts.json', {
+        schemaVersion: 1,
+        alerts: { '1': alert(1, 30, 10), '2': alert(2, 20, 10) },
+      });
+      // The price cache is regenerable and is not backed up
+      await fileStorage.writeJSON('wishlist/pressing-prices.json', {
+        schemaVersion: 1,
+        prices: {
+          '99': {
+            lowestPrice: 5,
+            currency: 'USD',
+            numForSale: 1,
+            fetchedAt: 1,
+          },
+        },
+      });
+      const backupJson = await service.exportBackup({
+        includeCredentials: false,
+      });
+      const exported = JSON.parse(backupJson).data;
+      expect(Object.keys(exported.wishlistPriceAlerts).sort()).toEqual([
+        '1',
+        '2',
+      ]);
+      expect(JSON.stringify(exported)).not.toContain('pressing');
+
+      // Local changes after the backup: alert 1 edited later, alert 3 added
+      await fileStorage.writeJSON('wishlist/price-alerts.json', {
+        schemaVersion: 1,
+        alerts: { '1': alert(1, 25, 50), '3': alert(3, 40, 50) },
+      });
+      const priceService = new WishlistPriceService(fileStorage, {
+        getWishlistItems: async () => [],
+        getSettings: async () => ({
+          schemaVersion: 1,
+          currency: 'USD',
+          autoSyncInterval: 0,
+          notifyOnVinylAvailable: false,
+        }),
+        getLowestAskingPrice: async () => {
+          throw new Error('unused');
+        },
+        isSyncInProgress: () => false,
+      });
+      expect(Object.keys(await priceService.getAlerts()).sort()).toEqual([
+        '1',
+        '3',
+      ]);
+      service.setAfterImport(async () => priceService.reload());
+
+      await service.importBackup(backupJson, { mode: 'merge' });
+      const merged = await priceService.getAlerts();
+      expect(Object.keys(merged).sort()).toEqual(['1', '2', '3']);
+      expect(merged['1'].maxPrice).toBe(25); // newer local edit kept
+
+      await service.importBackup(backupJson, { mode: 'replace' });
+      const replaced = await priceService.getAlerts();
+      expect(Object.keys(replaced).sort()).toEqual(['1', '2']);
+      expect(replaced['1'].maxPrice).toBe(30);
     });
 
     it('lets a running service see restored data before its next edit (afterImport hook)', async () => {

@@ -3,6 +3,10 @@ import express, { Request, Response } from 'express';
 import { AuthService } from '../services/authService';
 import { jobStatusService } from '../services/jobStatusService';
 import { SellerMonitoringService } from '../services/sellerMonitoringService';
+import {
+  WishlistPriceAlertError,
+  WishlistPriceService,
+} from '../services/wishlistPriceService';
 import { WishlistService } from '../services/wishlistService';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
@@ -18,7 +22,8 @@ export default function createWishlistRouter(
   _fileStorage: FileStorage,
   authService: AuthService,
   wishlistService: WishlistService,
-  sellerMonitoringService?: SellerMonitoringService
+  sellerMonitoringService?: SellerMonitoringService,
+  wishlistPriceService?: WishlistPriceService
 ) {
   const router = express.Router();
   const logger = createLogger('WishlistRoutes');
@@ -35,7 +40,11 @@ export default function createWishlistRouter(
    */
   router.get('/', async (_req: Request, res: Response) => {
     try {
-      const items = await wishlistService.getWishlistItems();
+      const stored = await wishlistService.getWishlistItems();
+      // Add cached vinyl prices and price alerts
+      const items = wishlistPriceService
+        ? await wishlistPriceService.enrichItems(stored)
+        : stored;
 
       res.json({
         success: true,
@@ -50,6 +59,108 @@ export default function createWishlistRouter(
       });
     }
   });
+
+  // ---- Price Alerts ----
+  // Registered before the /:masterId/... and /:releaseId/... routes below.
+
+  /** Positive integer master ID from a route param, or null */
+  const parseMasterId = (value: string): number | null => {
+    if (!/^\d+$/.test(value)) return null;
+    const id = Number(value);
+    return Number.isSafeInteger(id) && id > 0 ? id : null;
+  };
+
+  const priceServiceUnavailable = (res: Response) =>
+    res.status(503).json({
+      success: false,
+      error: 'Wishlist price alerts are not available',
+    });
+
+  /**
+   * GET /api/v1/wishlist/price-alerts/status
+   * Progress of the background price refresh and alert counts
+   */
+  router.get('/price-alerts/status', async (_req: Request, res: Response) => {
+    if (!wishlistPriceService) return priceServiceUnavailable(res);
+    try {
+      const status = await wishlistPriceService.getStatus();
+      res.json({ success: true, data: status });
+    } catch (error) {
+      logger.error('Error getting price refresh status', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * PUT /api/v1/wishlist/price-alerts/:masterId
+   * Body: { maxPrice: number } (in the wishlist currency)
+   * Returns the wishlist item with its updated alert
+   */
+  router.put('/price-alerts/:masterId', async (req: Request, res: Response) => {
+    if (!wishlistPriceService) return priceServiceUnavailable(res);
+    const masterId = parseMasterId(req.params.masterId);
+    if (masterId === null) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Invalid master ID' });
+    }
+    const maxPrice = (req.body as { maxPrice?: unknown } | undefined)?.maxPrice;
+    if (
+      typeof maxPrice !== 'number' ||
+      !Number.isFinite(maxPrice) ||
+      maxPrice <= 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'maxPrice must be a positive number',
+      });
+    }
+    try {
+      const item = await wishlistPriceService.setAlert(masterId, maxPrice);
+      res.json({ success: true, data: item });
+    } catch (error) {
+      if (error instanceof WishlistPriceAlertError) {
+        return res
+          .status(error.code === 'not_found' ? 404 : 400)
+          .json({ success: false, error: error.message });
+      }
+      logger.error('Error setting price alert', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * DELETE /api/v1/wishlist/price-alerts/:masterId
+   * Remove a record's price alert (succeeds if there was none)
+   */
+  router.delete(
+    '/price-alerts/:masterId',
+    async (req: Request, res: Response) => {
+      if (!wishlistPriceService) return priceServiceUnavailable(res);
+      const masterId = parseMasterId(req.params.masterId);
+      if (masterId === null) {
+        return res
+          .status(400)
+          .json({ success: false, error: 'Invalid master ID' });
+      }
+      try {
+        await wishlistPriceService.removeAlert(masterId);
+        res.json({ success: true });
+      } catch (error) {
+        logger.error('Error removing price alert', error);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+  );
 
   // ---- Sync Operations ----
 

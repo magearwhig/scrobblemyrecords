@@ -145,6 +145,7 @@ export class FileStorage {
     'images/album-covers.json',
     'images/artist-images.json',
     'wishlist/versions-cache.json',
+    'wishlist/pressing-prices.json',
     'releases/collection-artists-cache.json',
     'cache/artist-tags.json',
     'collection-analytics/value-cache.json',

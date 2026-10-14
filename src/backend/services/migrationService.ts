@@ -239,6 +239,20 @@ export class MigrationService {
       optional: true,
     });
 
+    this.register('wishlist-pressing-prices', {
+      path: 'wishlist/pressing-prices.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('wishlist-price-alerts', {
+      path: 'wishlist/price-alerts.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
     // Feature 5.5: New Release Tracking Files
     this.register('wishlist-new-releases', {
       path: 'wishlist/new-releases.json',

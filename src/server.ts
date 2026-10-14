@@ -81,6 +81,7 @@ import { TagEnricherService } from './backend/services/tagEnricherService';
 import { TrackMappingService } from './backend/services/trackMappingService';
 import { UnresolvedHistoryService } from './backend/services/unresolvedHistoryService';
 import { WebsiteMonitoringService } from './backend/services/websiteMonitoringService';
+import { WishlistPriceService } from './backend/services/wishlistPriceService';
 import { WishlistService } from './backend/services/wishlistService';
 import { WrappedService } from './backend/services/wrappedService';
 import { sendError } from './backend/utils/apiResponse';
@@ -389,6 +390,12 @@ rankingsService.setMappingService(mappingService);
 const imageService = new ImageService(fileStorage, lastfmService);
 imageService.setMappingService(mappingService);
 const wishlistService = new WishlistService(fileStorage, authService);
+// Cached vinyl prices and price alerts for wishlist records (rolling
+// background refresh; started in startServer outside tests)
+const wishlistPriceService = new WishlistPriceService(
+  fileStorage,
+  wishlistService
+);
 const collectionAnalyticsService = new CollectionAnalyticsService(
   fileStorage,
   authService,
@@ -470,7 +477,8 @@ app.use(
     fileStorage,
     authService,
     wishlistService,
-    sellerMonitoringService
+    sellerMonitoringService,
+    wishlistPriceService
   )
 );
 app.use(
@@ -693,6 +701,8 @@ async function startServer() {
       trackMappingService.clearCache();
       compoundMappingService.clearCache();
       artistMappingService.reload();
+      // Restored wishlist price alerts
+      wishlistPriceService.reload();
       // Restored unresolved-history rules change the derived index
       historyStorage.invalidateCache();
       await artistNameResolver.rebuild();
@@ -920,6 +930,9 @@ async function startServer() {
       server.on('error', error => {
         log.error('Server error', error);
       });
+
+      // Rolling wishlist price refresh (a few pressings every 5 minutes)
+      wishlistPriceService.start();
 
       // Periodic auto-backup check every 6 hours (in addition to startup check)
       // This ensures backups happen even during long-running sessions

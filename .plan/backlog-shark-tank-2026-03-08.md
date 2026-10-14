@@ -2,8 +2,8 @@
 
 Generated via a 7-agent brainstorming session. The session summary recorded 25 accepted items from 39 pitches, but only 24 numbered items (#1–#24) were written down.
 
-**Status (re-verified against code 2026-10-11): 24 tracked items, 19 done, 5 remaining.**
-The remaining items are grouped into 3 open efforts (C, D, F). Efforts A, B and E are done.
+**Status (updated 2026-10-14): 24 tracked items, 19 done, 1 dropped (#20), 4 remaining (#19 in progress).**
+The remaining items are grouped into 3 open efforts (C, D, F). Efforts A, B and E are done. On 2026-10-14 the user narrowed #19 to wishlist price alerts and dropped #20 (seller match auto-scan).
 
 ### Count reconciliation
 
@@ -49,17 +49,17 @@ Follow-ups found during verification. These are not reopened items:
 
 ---
 
-## Remaining Work (5 items, 3 efforts)
+## Remaining Work (4 items, 3 efforts; #20 dropped)
 
 | # | Item | Effort | Plan | Status |
 |---|------|--------|------|--------|
 | 5 | Personal journal / listening notes | D | [listening-notes-plan.md](listening-notes-plan.md) | Planned, not started |
 | 9 | CSV/JSON data export | D | [data-export-plan.md](data-export-plan.md) | Planned, not started |
 | 18 | Context tags | F | [context-tags-plan.md](context-tags-plan.md) | Planned, not started |
-| 19 | Marketplace price trend tracking | C | [marketplace-upgrade-plan.md](marketplace-upgrade-plan.md) | Re-planned 2026-10-11 against current code; not started (Phase 0 API check first) |
-| 20 | Seller match auto-scan | C | [marketplace-upgrade-plan.md](marketplace-upgrade-plan.md) | Re-planned 2026-10-11 against current code; not started (Phase 0 API check first) |
+| 19 | Marketplace price trend tracking → narrowed to wishlist price alerts | C | [wishlist-price-alerts-plan.md](wishlist-price-alerts-plan.md) | In progress (2026-10-14), branch `feat/wishlist-price-alerts` |
+| ~~20~~ | ~~Seller match auto-scan~~ | C | [cancelled/marketplace-upgrade-plan.md](cancelled/marketplace-upgrade-plan.md) | Dropped by the user 2026-10-14 |
 
-Verified 2026-10-11 that none of these has started. There is no notes service or `data/notes/`, no `/api/v1/export` route, no `context` field on `ScrobbleSession`, and no `price-history.json` or scheduled seller scan. The only `setInterval` in `src/server.ts` is the 6-hourly auto-backup check.
+Verified 2026-10-11 that none of these had started (#19 has since started, 2026-10-14). There is no notes service or `data/notes/`, no `/api/v1/export` route, no `context` field on `ScrobbleSession`, and no `price-history.json` or scheduled seller scan. The only `setInterval` in `src/server.ts` is the 6-hourly auto-backup check.
 
 ### ~~Effort A: Stats Performance~~ — DONE
 
@@ -69,9 +69,9 @@ Verified 2026-10-11 that none of these has started. There is no notes service or
 
 ~~#1 Collection ROI Score~~, ~~#10 Album Listening Arc~~, ~~#16 Taste Drift Dashboard~~ (commit `60c0d5a`)
 
-### Effort C: Marketplace Upgrade (#19 + #20) — see [marketplace-upgrade-plan.md](marketplace-upgrade-plan.md)
+### Effort C: Wishlist Price Alerts (#19) — see [wishlist-price-alerts-plan.md](wishlist-price-alerts-plan.md)
 
-Both items extend seller monitoring: #19 adds per-listing price history and alert rules, and #20 adds scheduled background scans with persistent notifications. The full spec lives in the plan. An earlier attempt put the region filter in the wrong place and never wired up version pricing. The plan was re-audited against the code on 2026-10-11 and now separates seller location from shipping, and asking prices from sale prices.
+The original effort ([cancelled/marketplace-upgrade-plan.md](cancelled/marketplace-upgrade-plan.md)) built #19 and #20 on seller monitoring: per-listing price history, alert rules, scheduled seller scans and server-side notifications. On 2026-10-14 the user dropped the seller-monitoring parts and #20, and narrowed #19 to: alert me when any vinyl pressing of a wishlisted record is listed at or below my price, and show the lowest listing next to the alert field on the wishlist page. Prices come from per-pressing `marketplace/stats` (no seller country in the API, so alerts can fire for non-US listings).
 
 ### Effort D: Small Independent Features (#5, #9)
 
@@ -98,7 +98,7 @@ Inline context chips ("late night", "cooking") on the ReleaseDetailsPage scrobbl
 | #5 Listening notes | Choosing the note level, a stable album identity across mappings, new data file plus backup | [listening-notes-plan.md](listening-notes-plan.md) |
 | #9 Data export | Dataset schemas, original vs corrected metadata, the shared row layer used by the Pocket List PDF | [data-export-plan.md](data-export-plan.md) |
 | #18 Context Tags | New data model, tag CRUD, inline UI, analytics queries, new chart | [context-tags-plan.md](context-tags-plan.md) |
-| #19 + #20 Marketplace Upgrade | Per-listing price history (asking prices only; no sales data in the API), alert rules, seller location vs shipping, server-side scheduler, persistent deduplicated notifications | [marketplace-upgrade-plan.md](marketplace-upgrade-plan.md) |
+| #19 Wishlist price alerts | Per-pressing price cache with background refresh (843 pressings at ~1 req/s), alert store with backup, wishlist UI; #20 and the seller-monitoring scope were dropped (see [cancelled/marketplace-upgrade-plan.md](cancelled/marketplace-upgrade-plan.md)) | [wishlist-price-alerts-plan.md](wishlist-price-alerts-plan.md) |
 
 ---
 
@@ -114,4 +114,4 @@ Inline context chips ("late night", "cooking") on the ReleaseDetailsPage scrobbl
 | Feature Scout | 2 | 3 |
 | Integration Explorer | 2 | 4 |
 
-**Recorded total: 25 accepted / 14 declined from 39 pitches. The rows above add up to 23 / 13.** The tracked items are #1–#24: 19 done, 5 remaining.
+**Recorded total: 25 accepted / 14 declined from 39 pitches. The rows above add up to 23 / 13.** The tracked items are #1–#24: 19 done, 1 dropped (#20), 4 remaining.

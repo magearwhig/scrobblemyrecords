@@ -91,6 +91,7 @@ import {
   WishlistSettings,
   WishlistSyncStatus,
   WrappedData,
+  WishlistPriceRefreshStatus,
 } from '../../shared/types';
 import { createLogger } from '../utils/logger';
 
@@ -1457,6 +1458,31 @@ class ApiService {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Set the price alert for a wishlist record (any vinyl pressing of the
+   * master at or below maxPrice, in the wishlist currency). Returns the
+   * record with its updated alert; its prices are re-checked in the
+   * background.
+   */
+  async setWishlistPriceAlert(
+    masterId: number,
+    maxPrice: number
+  ): Promise<EnrichedWishlistItem> {
+    const response = await this.api.put(`/wishlist/price-alerts/${masterId}`, {
+      maxPrice,
+    });
+    return response.data.data;
+  }
+
+  async removeWishlistPriceAlert(masterId: number): Promise<void> {
+    await this.api.delete(`/wishlist/price-alerts/${masterId}`);
+  }
+
+  async getWishlistPriceRefreshStatus(): Promise<WishlistPriceRefreshStatus> {
+    const response = await this.api.get('/wishlist/price-alerts/status');
+    return response.data.data;
   }
 
   async getWishlistSettings(): Promise<WishlistSettings> {

@@ -70,6 +70,8 @@ import {
   TrackMappingsStore,
   UserSettings,
   WebsiteMonitoringSettings,
+  WishlistPriceAlert,
+  WishlistPriceAlertStore,
   WishlistSettings,
 } from '../../shared/types';
 import { atomicWriteFile } from '../utils/atomicWrite';
@@ -99,6 +101,7 @@ const FILE_PATHS = {
   hiddenAlbums: 'discovery/hidden-albums.json',
   hiddenArtists: 'discovery/hidden-artists.json',
   localWantList: 'wishlist/local-want-list.json',
+  wishlistPriceAlerts: 'wishlist/price-alerts.json',
   monitoredSellers: 'sellers/monitored-sellers.json',
   monitoredLabels: 'labels/monitored-labels.json',
   monitoredWebsites: 'websites/monitored-websites.json',
@@ -517,6 +520,59 @@ export class BackupService {
     return store?.items ?? [];
   }
 
+  private async loadWishlistPriceAlerts(): Promise<
+    Record<string, WishlistPriceAlert>
+  > {
+    const store = await this.fileStorage.readJSON<WishlistPriceAlertStore>(
+      FILE_PATHS.wishlistPriceAlerts
+    );
+    return store?.alerts ?? {};
+  }
+
+  /**
+   * Import wishlist price alerts (keyed by master ID). Merge: backup alerts
+   * are added, and replace current ones only if updated more recently.
+   * Replace: the backup's alerts replace the current ones.
+   */
+  private async importWishlistPriceAlerts(
+    backup: Record<string, WishlistPriceAlert>,
+    merge: boolean
+  ): Promise<{ added: number; updated: number }> {
+    const valid = Object.entries(backup).filter(
+      ([key, alert]) =>
+        alert &&
+        typeof alert.maxPrice === 'number' &&
+        alert.maxPrice > 0 &&
+        typeof alert.currency === 'string' &&
+        String(alert.masterId) === key
+    );
+    let added = 0;
+    let updated = 0;
+    let alerts: Record<string, WishlistPriceAlert>;
+    if (merge) {
+      alerts = await this.loadWishlistPriceAlerts();
+      for (const [key, alert] of valid) {
+        const existing = alerts[key];
+        if (!existing) {
+          alerts[key] = alert;
+          added++;
+        } else if ((alert.updatedAt ?? 0) > (existing.updatedAt ?? 0)) {
+          alerts[key] = alert;
+          updated++;
+        }
+      }
+    } else {
+      alerts = Object.fromEntries(valid);
+      added = valid.length;
+    }
+    const store: WishlistPriceAlertStore = { schemaVersion: 1, alerts };
+    await this.fileStorage.writeJSONWithBackup(
+      FILE_PATHS.wishlistPriceAlerts,
+      store
+    );
+    return { added, updated };
+  }
+
   private async loadSavedCollections(): Promise<SavedCollection[]> {
     const store = await this.fileStorage.readJSON<SavedCollectionsStore>(
       FILE_PATHS.savedCollections
@@ -694,6 +750,7 @@ export class BackupService {
     ]);
 
     const unresolvedHistory = await this.loadUnresolvedHistory();
+    const wishlistPriceAlerts = await this.loadWishlistPriceAlerts();
 
     // Build backup data
     let backupData: BackupData = {
@@ -716,6 +773,7 @@ export class BackupService {
       hiddenAlbums,
       hiddenArtists,
       localWantList,
+      wishlistPriceAlerts,
       monitoredSellers,
       monitoredLabels,
       monitoredWebsites,
@@ -1429,6 +1487,22 @@ export class BackupService {
       updated += result.updated;
     } catch (e) {
       errors.push(`Local want list: ${e instanceof Error ? e.message : e}`);
+    }
+
+    // Import wishlist price alerts (optional: older backups lack it)
+    if (data.wishlistPriceAlerts) {
+      try {
+        const result = await this.importWishlistPriceAlerts(
+          data.wishlistPriceAlerts,
+          merge
+        );
+        added += result.added;
+        updated += result.updated;
+      } catch (e) {
+        errors.push(
+          `Wishlist price alerts: ${e instanceof Error ? e.message : e}`
+        );
+      }
     }
 
     // Import monitored sellers
