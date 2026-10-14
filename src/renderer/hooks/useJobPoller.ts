@@ -5,6 +5,8 @@ import { useToast } from '../context/ToastContext';
 import { getApiService } from '../services/api';
 import { createLogger } from '../utils/logger';
 
+import { notifyHistorySynced } from './useHistorySynced';
+
 const logger = createLogger('useJobPoller');
 
 const POLL_INTERVAL = 3000;
@@ -39,6 +41,8 @@ export function useJobPoller(): void {
             seenJobIds.current.add(job.id);
             showToast('success', job.message);
             logger.info(`Job completed: ${job.id} - ${job.message}`);
+            // e.g. the sync after a scrobble: let open pages reload history
+            if (job.type === 'sync') notifyHistorySynced();
           } else if (job.status === 'failed') {
             seenJobIds.current.add(job.id);
             showToast('error', job.error || job.message);
