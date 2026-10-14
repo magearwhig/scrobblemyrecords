@@ -4,7 +4,14 @@ import React from 'react';
 
 import '@testing-library/jest-dom';
 import { TopList } from '../../../../src/renderer/components/stats/TopList';
+import { playArtistOnSpotify } from '../../../../src/renderer/utils/spotifyUtils';
 import { ArtistPlayCount, AlbumPlayCount } from '../../../../src/shared/types';
+
+jest.mock('../../../../src/renderer/utils/spotifyUtils', () => ({
+  playArtistOnSpotify: jest.fn(),
+  playAlbumOnSpotify: jest.fn(),
+  playTrackOnSpotify: jest.fn(),
+}));
 
 describe('TopList', () => {
   const mockOnPeriodChange = jest.fn();
@@ -48,6 +55,61 @@ describe('TopList', () => {
   });
 
   describe('Artists list', () => {
+    it('plays an artist on Spotify', async () => {
+      render(
+        <TopList
+          title='Top Artists'
+          type='artists'
+          data={mockArtists}
+          onPeriodChange={mockOnPeriodChange}
+          currentPeriod='month'
+        />
+      );
+
+      await user.click(
+        screen.getAllByRole('button', { name: 'Play on Spotify' })[1]
+      );
+
+      expect(playArtistOnSpotify).toHaveBeenCalledWith('The Beatles');
+    });
+
+    it('shows lowercased artist names with display casing', () => {
+      render(
+        <TopList
+          title='Top Artists'
+          type='artists'
+          data={[{ artist: 'the go-betweens', playCount: 9 }]}
+          onPeriodChange={mockOnPeriodChange}
+          currentPeriod='month'
+        />
+      );
+
+      expect(screen.getByText('The Go-Betweens')).toBeInTheDocument();
+    });
+
+    it('uses a collection cover when the artist has no photo', () => {
+      render(
+        <TopList
+          title='Top Artists'
+          type='artists'
+          data={mockArtists}
+          onPeriodChange={mockOnPeriodChange}
+          currentPeriod='month'
+          collectionArtistCovers={new Map([['the beatles', 'abbey.jpg']])}
+        />
+      );
+
+      expect(screen.getByRole('img', { name: 'The Beatles' })).toHaveAttribute(
+        'src',
+        'abbey.jpg'
+      );
+      // A real photo still wins
+      expect(screen.getByRole('img', { name: 'Radiohead' })).toHaveAttribute(
+        'src',
+        'https://example.com/radiohead.jpg'
+      );
+    });
+
     it('should render artist list with title', () => {
       render(
         <TopList
@@ -126,7 +188,7 @@ describe('TopList', () => {
       );
 
       // Should have SVG placeholders for artists without images
-      const placeholders = document.querySelectorAll('.top-list-placeholder');
+      const placeholders = document.querySelectorAll('.ranked-row-placeholder');
       expect(placeholders.length).toBeGreaterThan(0);
     });
   });
@@ -195,9 +257,9 @@ describe('TopList', () => {
 
   describe('View all link', () => {
     it.each([
-      ['artists', 'View All Artists'],
-      ['albums', 'View All Albums'],
-      ['tracks', 'View All Tracks'],
+      ['artists', 'View all-time artists'],
+      ['albums', 'View all-time albums'],
+      ['tracks', 'View all-time tracks'],
     ] as const)('links %s to the matching History view', (type, label) => {
       render(
         <TopList

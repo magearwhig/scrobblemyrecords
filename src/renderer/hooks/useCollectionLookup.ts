@@ -14,6 +14,12 @@ interface CollectionLookupResult {
   collectionMap: Map<string, CollectionItem>;
   /** Map from normalized artist name to count of albums in collection */
   collectionArtistCounts: Map<string, number>;
+  /**
+   * Map from normalized artist name to the cover of one of their records in
+   * the collection, used as the artist's picture (Last.fm has no artist
+   * photos)
+   */
+  collectionArtistCovers: Map<string, string>;
   /** Whether the collection is currently loading */
   loading: boolean;
   /** The raw collection items */
@@ -97,7 +103,24 @@ export function useCollectionLookup(): CollectionLookupResult {
     return counts;
   }, [collection]);
 
-  return { collectionMap, collectionArtistCounts, loading, collection };
+  const collectionArtistCovers = useMemo(() => {
+    const covers = new Map<string, string>();
+    for (const item of collection) {
+      const normalizedArtist = normalizeForMatching(item.release.artist);
+      if (item.release.cover_image && !covers.has(normalizedArtist)) {
+        covers.set(normalizedArtist, item.release.cover_image);
+      }
+    }
+    return covers;
+  }, [collection]);
+
+  return {
+    collectionMap,
+    collectionArtistCounts,
+    collectionArtistCovers,
+    loading,
+    collection,
+  };
 }
 
 /**

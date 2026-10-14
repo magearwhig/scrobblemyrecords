@@ -380,6 +380,7 @@ describe('Memory Scrobble Routes', () => {
         items: [
           {
             artist: 'Radiohead',
+            artistName: 'Radiohead',
             album: 'Kid A',
             track: 'Everything In Its Right Place',
             playCount: 10,
@@ -410,6 +411,7 @@ describe('Memory Scrobble Routes', () => {
         items: [
           {
             artist: 'Radiohead',
+            artistName: 'Radiohead',
             album: 'Kid A',
             track: 'Everything In Its Right Place',
             playCount: 10,

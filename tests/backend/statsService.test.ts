@@ -4178,7 +4178,7 @@ describe('StatsService', () => {
       expect(result.albums[0].inCollection).toBe(true);
       expect(result.albums[0].collectionReleaseId).toBe(555);
       expect(result.topTracks[0]).toMatchObject({
-        track: 'Cattle And Cane',
+        track: 'Cattle and Cane',
         album: 'Before Hollywood',
         playCount: 43,
       });
@@ -4300,7 +4300,7 @@ describe('StatsService', () => {
       expect(result.playCount).toBe(3);
       expect(result.lastPlayed).toBe(now);
       expect(result.tracks[0]).toMatchObject({
-        track: 'Cattle And Cane',
+        track: 'Cattle and Cane',
         playCount: 3,
       });
       expect(result.arc.reduce((sum, b) => sum + b.playCount, 0)).toBe(3);
@@ -4637,7 +4637,7 @@ describe('StatsService', () => {
       expect(result.appearsOn).toHaveLength(2);
       const okComputer = result.appearsOn.find(a => a.album === 'Ok Computer');
       const live = result.appearsOn.find(
-        a => a.album === 'Live At Glastonbury'
+        a => a.album === 'Live at Glastonbury'
       );
       expect(okComputer?.inCollection).toBe(true);
       expect(live?.inCollection).toBe(false);
@@ -5057,7 +5057,7 @@ describe('StatsService', () => {
 
         expect(artists).toEqual([
           { artist: 'Radiohead', playCount: 5 },
-          { artist: 'Boards Of Canada', playCount: 3 },
+          { artist: 'Boards of Canada', playCount: 3 },
         ]);
       });
 
@@ -5096,7 +5096,7 @@ describe('StatsService', () => {
         expect(UNKNOWN_ALBUM_LABEL).toBe('Unknown album');
         expect(tracks[0]).toEqual(
           expect.objectContaining({
-            artist: 'Boards Of Canada',
+            artist: 'Boards of Canada',
             album: 'Unknown album',
             track: 'Roygbiv',
             playCount: 3,
@@ -5135,7 +5135,7 @@ describe('StatsService', () => {
 
         expect(tracks).toEqual([
           expect.objectContaining({
-            artist: 'Boards Of Canada',
+            artist: 'Boards of Canada',
             album: 'Unknown album',
             track: 'Roygbiv',
             allTimePlayCount: 3,
@@ -5211,7 +5211,7 @@ describe('StatsService', () => {
         expect(
           result.albums.map(a => [a.artist, a.album, a.playCount])
         ).toEqual([
-          ['Boards Of Canada', 'Unknown album', 3],
+          ['Boards of Canada', 'Unknown album', 3],
           ['Radiohead', 'Ok Computer', 1],
           ['Radiohead', 'Unknown album', 1],
         ]);
@@ -5224,7 +5224,7 @@ describe('StatsService', () => {
         expect(result.years[0].totalScrobbles).toBe(5);
         expect(result.years[0].albums).toContainEqual(
           expect.objectContaining({
-            artist: 'Boards Of Canada',
+            artist: 'Boards of Canada',
             album: 'Unknown album',
             playCount: 3,
           })

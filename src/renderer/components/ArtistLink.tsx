@@ -5,6 +5,8 @@ import { ROUTES, navigate } from '../routes';
 interface ArtistLinkProps {
   artist: string;
   className?: string;
+  /** Text to show instead of the name, e.g. with display casing */
+  label?: string;
 }
 
 /**
@@ -12,7 +14,11 @@ interface ArtistLinkProps {
  * Stores 'selectedArtist' in localStorage and passes the current page as a
  * `?from=` query param so the detail page can render a correct back link.
  */
-const ArtistLink: React.FC<ArtistLinkProps> = ({ artist, className = '' }) => {
+const ArtistLink: React.FC<ArtistLinkProps> = ({
+  artist,
+  className = '',
+  label,
+}) => {
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -44,9 +50,9 @@ const ArtistLink: React.FC<ArtistLinkProps> = ({ artist, className = '' }) => {
       onKeyDown={handleKeyDown}
       role='link'
       tabIndex={0}
-      aria-label={`View artist details for ${artist}`}
+      aria-label={`View artist details for ${label ?? artist}`}
     >
-      {artist}
+      {label ?? artist}
     </span>
   );
 };

@@ -949,6 +949,7 @@ class ApiService {
   ): Promise<{
     items: Array<{
       artist: string;
+      artistName?: string;
       album: string;
       playCount: number;
       lastPlayed: number;
@@ -990,7 +991,9 @@ class ApiService {
   ): Promise<{
     items: Array<{
       artist: string;
+      artistName?: string;
       album: string;
+      albumUnknown?: boolean;
       track: string;
       playCount: number;
       lastPlayed: number;

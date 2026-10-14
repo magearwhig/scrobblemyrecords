@@ -1,7 +1,8 @@
-import { Play } from 'lucide-react';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 import { CollectionItem } from '../../shared/types';
+import { stripDiscogsSuffix } from '../../shared/utils/albumMapping';
+import { toDisplayName } from '../../shared/utils/displayName';
 import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import { useApp } from '../context/AppContext';
 import {
@@ -10,16 +11,27 @@ import {
 } from '../hooks/useCollectionLookup';
 import { navigate, ROUTES } from '../routes';
 import { getApiService } from '../services/api';
-import { playTrackOnSpotify } from '../utils/spotifyUtils';
+import { imagesApi } from '../services/statsApi';
+import { createLogger } from '../utils/logger';
+import {
+  playAlbumOnSpotify,
+  playArtistOnSpotify,
+  playTrackOnSpotify,
+} from '../utils/spotifyUtils';
 
 import AlbumLink from './AlbumLink';
 import ArtistLink from './ArtistLink';
+import { RankedRow } from './RankedRow';
 import TrackLink from './TrackLink';
 import { Badge } from './ui/Badge';
-import { Button, IconButton } from './ui/Button';
+import { Button } from './ui/Button';
+
+const logger = createLogger('LastFmHistoryTab');
 
 interface AlbumHistoryItem {
   artist: string;
+  /** Artist with display casing from the server's name mappings */
+  artistName?: string;
   album: string;
   playCount: number;
   lastPlayed: number;
@@ -27,7 +39,10 @@ interface AlbumHistoryItem {
 
 interface TrackHistoryItem {
   artist: string;
+  artistName?: string;
   album: string;
+  /** Plays without album info; `album` is only a placeholder label */
+  albumUnknown?: boolean;
   track: string;
   playCount: number;
   lastPlayed: number;
@@ -62,12 +77,58 @@ const getViewFromUrl = (): ViewMode | null => {
   return null;
 };
 
+const VIEW_LABELS: Record<ViewMode, string> = {
+  albums: 'Albums',
+  artists: 'Artists',
+  tracks: 'Tracks',
+};
+
+/** Keys the image endpoints use for their results */
+const albumImageKey = (artist: string, album: string): string =>
+  `${artist.toLowerCase().trim()}|${album.toLowerCase().trim()}`;
+
+const sameText = (a: string, b: string): boolean =>
+  a.toLowerCase().trim() === b.toLowerCase().trim();
+
+/**
+ * History stores names lowercased. Prefer the collection's spelling when it
+ * is the same name, then the server's mapped name, then title casing.
+ */
+const displayArtist = (
+  artist: string,
+  mappedName: string | undefined,
+  collectionItem: CollectionItem | undefined
+): string => {
+  const owned = collectionItem
+    ? stripDiscogsSuffix(collectionItem.release.artist)
+    : undefined;
+  if (owned && sameText(owned, artist)) return owned;
+  return toDisplayName(mappedName ?? artist);
+};
+
+const displayAlbum = (
+  album: string,
+  collectionItem: CollectionItem | undefined
+): string => {
+  const owned = collectionItem?.release.title;
+  if (owned && sameText(owned, album)) return owned;
+  return toDisplayName(album);
+};
+
+const formatDate = (timestamp: number): string =>
+  new Date(timestamp * 1000).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+
 const LastFmHistoryTab: React.FC = () => {
   const { state } = useApp();
   const api = getApiService(state.serverUrl);
 
   // Collection lookup for "In Collection" badges
-  const { collectionMap, collectionArtistCounts } = useCollectionLookup();
+  const { collectionMap, collectionArtistCounts, collectionArtistCovers } =
+    useCollectionLookup();
 
   // Plays without album info aren't in the Albums view; point to them
   const [unresolvedCount, setUnresolvedCount] = useState(0);
@@ -85,7 +146,6 @@ const LastFmHistoryTab: React.FC = () => {
       cancelled = true;
     };
   }, [api]);
-  const hasCollection = collectionMap.size > 0;
 
   // Navigate to a collection item's release details page
   const navigateToAlbum = (item: CollectionItem) => {
@@ -222,36 +282,6 @@ const LastFmHistoryTab: React.FC = () => {
     }
   }, [viewMode, loadAlbums, loadTracks, loadArtists]);
 
-  const handleAlbumSortChange = (newSortBy: AlbumSortBy) => {
-    if (newSortBy === albumSortBy) {
-      setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
-    } else {
-      setAlbumSortBy(newSortBy);
-      setSortOrder('desc');
-    }
-    setPage(1);
-  };
-
-  const handleTrackSortChange = (newSortBy: TrackSortBy) => {
-    if (newSortBy === trackSortBy) {
-      setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
-    } else {
-      setTrackSortBy(newSortBy);
-      setSortOrder('desc');
-    }
-    setPage(1);
-  };
-
-  const handleArtistSortChange = (newSortBy: ArtistSortBy) => {
-    if (newSortBy === artistSortBy) {
-      setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
-    } else {
-      setArtistSortBy(newSortBy);
-      setSortOrder('desc');
-    }
-    setPage(1);
-  };
-
   const formatLastPlayed = (timestamp: number): string => {
     const date = new Date(timestamp * 1000);
     const now = new Date();
@@ -260,25 +290,12 @@ const LastFmHistoryTab: React.FC = () => {
 
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-    return `${Math.floor(diffDays / 365)} years ago`;
-  };
-
-  const getAlbumSortIndicator = (field: AlbumSortBy) => {
-    if (albumSortBy !== field) return null;
-    return sortOrder === 'desc' ? ' ↓' : ' ↑';
-  };
-
-  const getTrackSortIndicator = (field: TrackSortBy) => {
-    if (trackSortBy !== field) return null;
-    return sortOrder === 'desc' ? ' ↓' : ' ↑';
-  };
-
-  const getArtistSortIndicator = (field: ArtistSortBy) => {
-    if (artistSortBy !== field) return null;
-    return sortOrder === 'desc' ? ' ↓' : ' ↑';
+    const ago = (count: number, unit: string) =>
+      `${count} ${unit}${count === 1 ? '' : 's'} ago`;
+    if (diffDays < 7) return ago(diffDays, 'day');
+    if (diffDays < 30) return ago(Math.floor(diffDays / 7), 'week');
+    if (diffDays < 365) return ago(Math.floor(diffDays / 30), 'month');
+    return ago(Math.floor(diffDays / 365), 'year');
   };
 
   const items =
@@ -290,8 +307,106 @@ const LastFmHistoryTab: React.FC = () => {
         ? 'tracks'
         : 'artists';
 
-  // Enriched class modifier when collection data is available
-  const enrichedClass = hasCollection ? ' lastfm-history-enriched' : '';
+  // Ranks only make sense for the full list ordered by most played
+  const activeSortBy =
+    viewMode === 'albums'
+      ? albumSortBy
+      : viewMode === 'tracks'
+        ? trackSortBy
+        : artistSortBy;
+  const isRanked =
+    activeSortBy === 'playCount' && sortOrder === 'desc' && !debouncedSearch;
+  const rankOf = (index: number): number | undefined =>
+    isRanked ? (page - 1) * perPage + index + 1 : undefined;
+  const firstShown = (page - 1) * perPage + 1;
+
+  // Cover art: collection covers first, then the image endpoint for the rest
+  // of the page (results are kept across pages)
+  const imageCache = useRef(new Map<string, string | null>());
+  const imageRequestSeq = useRef(0);
+  const [images, setImages] = useState<Map<string, string | null>>(
+    () => new Map()
+  );
+
+  useEffect(() => {
+    const cache = imageCache.current;
+    const seq = ++imageRequestSeq.current;
+    const missingAlbums = new Map<string, { artist: string; album: string }>();
+    const addAlbum = (artist: string, album: string) => {
+      const key = albumImageKey(artist, album);
+      if (
+        !cache.has(key) &&
+        !lookupInCollection(collectionMap, artist, album)?.release.cover_image
+      ) {
+        missingAlbums.set(key, { artist, album });
+      }
+    };
+
+    let request: Promise<Record<string, string | null> | undefined> | null =
+      null;
+    let requestedKeys: string[] = [];
+    if (viewMode === 'albums') {
+      albums.forEach(a => addAlbum(a.artist, a.album));
+    } else if (viewMode === 'tracks') {
+      tracks.forEach(t => {
+        if (!t.albumUnknown) addAlbum(t.artist, t.album);
+      });
+    }
+    // Artists use a cover from the collection instead: Last.fm no longer
+    // has artist photos, so asking it for 50 artists would be wasted calls
+    if (missingAlbums.size > 0) {
+      requestedKeys = [...missingAlbums.keys()];
+      request = imagesApi
+        .batchGetAlbumCovers([...missingAlbums.values()])
+        .then(res => (res.success ? res.data : undefined));
+    }
+
+    if (!request) {
+      // Nothing to fetch; only re-render if an earlier request added images
+      setImages(prev => (prev.size === cache.size ? prev : new Map(cache)));
+      return;
+    }
+    request
+      .then(data => {
+        if (!data) return;
+        for (const key of requestedKeys) {
+          // An overlapping request may already have found this cover
+          if (!cache.get(key)) cache.set(key, data[key] ?? null);
+        }
+        // A later page or view has replaced this one; it renders the cache
+        if (seq === imageRequestSeq.current) setImages(new Map(cache));
+      })
+      .catch(err => logger.warn('Failed to load list images', err));
+  }, [viewMode, albums, tracks, collectionMap]);
+
+  const albumCover = (
+    artist: string,
+    album: string,
+    collectionItem: CollectionItem | undefined
+  ): string | null =>
+    collectionItem?.release.cover_image ||
+    images.get(albumImageKey(artist, album)) ||
+    null;
+
+  const ownedBadge = (collectionItem: CollectionItem, name: string) => (
+    <button
+      type='button'
+      className='enrichment-collection-link'
+      onClick={() => navigateToAlbum(collectionItem)}
+      title='View in Collection'
+      aria-label={`View ${name} in your collection`}
+    >
+      <Badge variant='success' size='small'>
+        Owned
+      </Badge>
+    </button>
+  );
+
+  const lastPlayedMeta = (timestamp: number) => (
+    <span title={`Last played ${formatDate(timestamp)}`}>
+      {formatLastPlayed(timestamp)}
+    </span>
+  );
 
   return (
     <div className='lastfm-history-tab'>
@@ -403,6 +518,8 @@ const LastFmHistoryTab: React.FC = () => {
                 <option value='lastPlayed-asc'>Oldest Played</option>
                 <option value='artist-asc'>Artist (A-Z)</option>
                 <option value='artist-desc'>Artist (Z-A)</option>
+                <option value='album-asc'>Album (A-Z)</option>
+                <option value='album-desc'>Album (Z-A)</option>
                 <option value='track-asc'>Track (A-Z)</option>
                 <option value='track-desc'>Track (Z-A)</option>
               </select>
@@ -432,13 +549,6 @@ const LastFmHistoryTab: React.FC = () => {
             )}
           </div>
         </div>
-
-        {total > 0 && (
-          <div className='lastfm-history-stats'>
-            Showing {items.length} of {total.toLocaleString()} {itemType}
-            {debouncedSearch && ` matching "${debouncedSearch}"`}
-          </div>
-        )}
       </div>
 
       {/* Error state */}
@@ -500,298 +610,192 @@ const LastFmHistoryTab: React.FC = () => {
         </div>
       )}
 
-      {/* Album list */}
-      {viewMode === 'albums' && albums.length > 0 && (
-        <div className='card lastfm-history-list-card'>
-          {/* Scrollable container with sticky header */}
-          <div className='lastfm-history-list'>
-            <div className={`lastfm-history-list-header${enrichedClass}`}>
-              <button
-                className={`lastfm-history-header-btn lastfm-history-col-artist ${albumSortBy === 'artist' ? 'active' : ''}`}
-                onClick={() => handleAlbumSortChange('artist')}
-              >
-                Artist{getAlbumSortIndicator('artist')}
-              </button>
-              <button
-                className={`lastfm-history-header-btn lastfm-history-col-album ${albumSortBy === 'album' ? 'active' : ''}`}
-                onClick={() => handleAlbumSortChange('album')}
-              >
-                Album{getAlbumSortIndicator('album')}
-              </button>
-              <button
-                className={`lastfm-history-header-btn lastfm-history-col-plays ${albumSortBy === 'playCount' ? 'active' : ''}`}
-                onClick={() => handleAlbumSortChange('playCount')}
-              >
-                Plays{getAlbumSortIndicator('playCount')}
-              </button>
-              <button
-                className={`lastfm-history-header-btn lastfm-history-col-last ${albumSortBy === 'lastPlayed' ? 'active' : ''}`}
-                onClick={() => handleAlbumSortChange('lastPlayed')}
-              >
-                Last Played{getAlbumSortIndicator('lastPlayed')}
-              </button>
-              {hasCollection && (
-                <div className='lastfm-history-col-collection'>Collection</div>
-              )}
-            </div>
-            {albums.map((album, index) => {
-              const collectionItem = lookupInCollection(
-                collectionMap,
-                album.artist,
-                album.album
-              );
-              return (
-                <div
-                  key={`${album.artist}-${album.album}-${index}`}
-                  className={`lastfm-history-item${enrichedClass}`}
-                >
-                  <div
-                    className='lastfm-history-col-artist'
-                    title={album.artist}
-                  >
-                    <ArtistLink artist={album.artist} />
-                  </div>
-                  <div className='lastfm-history-col-album' title={album.album}>
-                    <AlbumLink artist={album.artist} album={album.album} />
-                  </div>
-                  <div className='lastfm-history-col-plays'>
-                    {album.playCount.toLocaleString()}
-                  </div>
-                  <div className='lastfm-history-col-last'>
-                    {formatLastPlayed(album.lastPlayed)}
-                  </div>
-                  {hasCollection && (
-                    <div className='lastfm-history-col-collection'>
-                      {collectionItem && (
-                        <button
-                          className='enrichment-collection-link'
-                          onClick={() => navigateToAlbum(collectionItem)}
-                          title='View in Collection'
-                          aria-label={`View ${album.album} in your collection`}
-                        >
-                          <Badge variant='success' size='small'>
-                            In Collection
-                          </Badge>
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+      {items.length > 0 && (
+        <section
+          className='card lastfm-history-list-card'
+          aria-labelledby='lastfm-history-list-title'
+          aria-busy={loading}
+        >
+          <div className='lastfm-history-list-header'>
+            <h3
+              id='lastfm-history-list-title'
+              className='lastfm-history-list-title'
+            >
+              All-time {VIEW_LABELS[viewMode].toLowerCase()}
+            </h3>
+            <p className='lastfm-history-list-summary'>
+              {items.length === total
+                ? `${total.toLocaleString()} ${itemType}`
+                : `${firstShown.toLocaleString()}–${(firstShown + items.length - 1).toLocaleString()} of ${total.toLocaleString()} ${itemType}`}
+              {debouncedSearch && ` matching "${debouncedSearch}"`}
+            </p>
           </div>
 
-          {/* Loading overlay for pagination */}
-          {loading && albums.length > 0 && (
-            <div className='lastfm-history-loading-overlay'>
-              <div className='spinner'></div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Track list */}
-      {viewMode === 'tracks' && tracks.length > 0 && (
-        <div className='card lastfm-history-list-card'>
-          {/* Scrollable container with sticky header */}
-          <div className='lastfm-history-list'>
-            <div
-              className={`lastfm-history-list-header lastfm-history-track-header${enrichedClass}`}
-            >
-              <button
-                className={`lastfm-history-header-btn lastfm-history-col-track ${trackSortBy === 'track' ? 'active' : ''}`}
-                onClick={() => handleTrackSortChange('track')}
-              >
-                Track{getTrackSortIndicator('track')}
-              </button>
-              <button
-                className={`lastfm-history-header-btn lastfm-history-col-artist-sm ${trackSortBy === 'artist' ? 'active' : ''}`}
-                onClick={() => handleTrackSortChange('artist')}
-              >
-                Artist{getTrackSortIndicator('artist')}
-              </button>
-              <button
-                className={`lastfm-history-header-btn lastfm-history-col-album-sm ${trackSortBy === 'album' ? 'active' : ''}`}
-                onClick={() => handleTrackSortChange('album')}
-              >
-                Album{getTrackSortIndicator('album')}
-              </button>
-              <button
-                className={`lastfm-history-header-btn lastfm-history-col-plays ${trackSortBy === 'playCount' ? 'active' : ''}`}
-                onClick={() => handleTrackSortChange('playCount')}
-              >
-                Plays{getTrackSortIndicator('playCount')}
-              </button>
-              <button
-                className={`lastfm-history-header-btn lastfm-history-col-last ${trackSortBy === 'lastPlayed' ? 'active' : ''}`}
-                onClick={() => handleTrackSortChange('lastPlayed')}
-              >
-                Last Played{getTrackSortIndicator('lastPlayed')}
-              </button>
-              <div className='lastfm-history-col-actions'>
-                {hasCollection && 'Collection'}
-              </div>
-            </div>
-            {tracks.map((track, index) => {
-              const collectionItem = lookupInCollection(
-                collectionMap,
-                track.artist,
-                track.album
-              );
-              return (
-                <div
-                  key={`${track.artist}-${track.album}-${track.track}-${index}`}
-                  className={`lastfm-history-item lastfm-history-track-item${enrichedClass}`}
-                >
-                  <div className='lastfm-history-col-track' title={track.track}>
-                    <TrackLink
-                      artist={track.artist}
-                      track={track.track}
-                      album={track.album}
-                    />
-                  </div>
-                  <div
-                    className='lastfm-history-col-artist-sm'
-                    title={track.artist}
-                  >
-                    <ArtistLink artist={track.artist} />
-                  </div>
-                  <div
-                    className='lastfm-history-col-album-sm'
-                    title={track.album}
-                  >
-                    <AlbumLink artist={track.artist} album={track.album} />
-                  </div>
-                  <div className='lastfm-history-col-plays'>
-                    {track.playCount.toLocaleString()}
-                  </div>
-                  <div className='lastfm-history-col-last'>
-                    {formatLastPlayed(track.lastPlayed)}
-                  </div>
-                  <div className='lastfm-history-col-actions'>
-                    {collectionItem ? (
-                      <button
-                        className='enrichment-collection-link'
-                        onClick={() => navigateToAlbum(collectionItem)}
-                        title='View in Collection'
-                        aria-label={`View ${track.album} in your collection`}
-                      >
-                        <Badge variant='success' size='small'>
-                          In Collection
-                        </Badge>
-                      </button>
-                    ) : (
-                      <IconButton
-                        icon={<Play size={14} aria-hidden='true' />}
-                        aria-label='Play on Spotify'
-                        variant='outline'
-                        size='small'
-                        onClick={() =>
-                          playTrackOnSpotify(
-                            track.artist,
-                            track.track,
-                            track.album
-                          )
-                        }
-                        title='Play on Spotify'
-                      />
+          <ol className='ranked-list' aria-label={`All-time ${itemType}`}>
+            {viewMode === 'albums' &&
+              albums.map((album, index) => {
+                const collectionItem = lookupInCollection(
+                  collectionMap,
+                  album.artist,
+                  album.album
+                );
+                const albumName = displayAlbum(album.album, collectionItem);
+                return (
+                  <RankedRow
+                    key={`${album.artist}|${album.album}`}
+                    rank={rankOf(index)}
+                    imageKind='album'
+                    imageUrl={albumCover(
+                      album.artist,
+                      album.album,
+                      collectionItem
                     )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                    imageAlt={`${albumName} cover`}
+                    title={
+                      <AlbumLink
+                        artist={album.artist}
+                        album={album.album}
+                        label={albumName}
+                      />
+                    }
+                    badge={
+                      collectionItem && ownedBadge(collectionItem, albumName)
+                    }
+                    subtitle={
+                      <ArtistLink
+                        artist={album.artist}
+                        label={displayArtist(
+                          album.artist,
+                          album.artistName,
+                          collectionItem
+                        )}
+                      />
+                    }
+                    meta={lastPlayedMeta(album.lastPlayed)}
+                    onPlay={() => playAlbumOnSpotify(album.artist, album.album)}
+                    playCount={album.playCount}
+                  />
+                );
+              })}
 
-          {/* Loading overlay for pagination */}
-          {loading && tracks.length > 0 && (
-            <div className='lastfm-history-loading-overlay'>
-              <div className='spinner'></div>
-            </div>
-          )}
-        </div>
-      )}
+            {viewMode === 'tracks' &&
+              tracks.map((track, index) => {
+                const collectionItem = track.albumUnknown
+                  ? undefined
+                  : lookupInCollection(
+                      collectionMap,
+                      track.artist,
+                      track.album
+                    );
+                const albumName = track.albumUnknown
+                  ? undefined
+                  : displayAlbum(track.album, collectionItem);
+                return (
+                  <RankedRow
+                    key={`${track.artist}|${track.album}|${track.track}|${index}`}
+                    rank={rankOf(index)}
+                    imageKind='album'
+                    imageUrl={
+                      track.albumUnknown
+                        ? null
+                        : albumCover(track.artist, track.album, collectionItem)
+                    }
+                    imageAlt={albumName ? `${albumName} cover` : ''}
+                    title={
+                      <TrackLink
+                        artist={track.artist}
+                        track={track.track}
+                        album={track.albumUnknown ? undefined : track.album}
+                      />
+                    }
+                    badge={
+                      collectionItem &&
+                      albumName &&
+                      ownedBadge(collectionItem, albumName)
+                    }
+                    subtitle={
+                      <>
+                        <ArtistLink
+                          artist={track.artist}
+                          label={displayArtist(
+                            track.artist,
+                            track.artistName,
+                            collectionItem
+                          )}
+                        />
+                        <span className='lastfm-history-separator'>
+                          {' · '}
+                        </span>
+                        {albumName ? (
+                          <AlbumLink
+                            artist={track.artist}
+                            album={track.album}
+                            label={albumName}
+                          />
+                        ) : (
+                          <span className='lastfm-history-no-album'>
+                            No album info
+                          </span>
+                        )}
+                      </>
+                    }
+                    meta={lastPlayedMeta(track.lastPlayed)}
+                    onPlay={() =>
+                      playTrackOnSpotify(
+                        track.artist,
+                        track.track,
+                        track.albumUnknown ? undefined : track.album
+                      )
+                    }
+                    playCount={track.playCount}
+                  />
+                );
+              })}
 
-      {/* Artist list */}
-      {viewMode === 'artists' && artists.length > 0 && (
-        <div className='card lastfm-history-list-card'>
-          {/* Scrollable container with sticky header */}
-          <div className='lastfm-history-list'>
-            <div
-              className={`lastfm-history-list-header lastfm-history-artist-header${enrichedClass}`}
-            >
-              <button
-                className={`lastfm-history-header-btn lastfm-history-col-artist ${artistSortBy === 'artist' ? 'active' : ''}`}
-                onClick={() => handleArtistSortChange('artist')}
-              >
-                Artist{getArtistSortIndicator('artist')}
-              </button>
-              <button
-                className={`lastfm-history-header-btn lastfm-history-col-albums ${artistSortBy === 'albumCount' ? 'active' : ''}`}
-                onClick={() => handleArtistSortChange('albumCount')}
-              >
-                Albums{getArtistSortIndicator('albumCount')}
-              </button>
-              <button
-                className={`lastfm-history-header-btn lastfm-history-col-plays ${artistSortBy === 'playCount' ? 'active' : ''}`}
-                onClick={() => handleArtistSortChange('playCount')}
-              >
-                Plays{getArtistSortIndicator('playCount')}
-              </button>
-              <button
-                className={`lastfm-history-header-btn lastfm-history-col-last ${artistSortBy === 'lastPlayed' ? 'active' : ''}`}
-                onClick={() => handleArtistSortChange('lastPlayed')}
-              >
-                Last Played{getArtistSortIndicator('lastPlayed')}
-              </button>
-              {hasCollection && (
-                <div className='lastfm-history-col-collection'>Owned</div>
-              )}
-            </div>
-            {artists.map((artist, index) => {
-              const ownedCount = collectionArtistCounts.get(
-                normalizeForMatching(artist.artist)
-              );
-              return (
-                <div
-                  key={`${artist.artist}-${index}`}
-                  className={`lastfm-history-item lastfm-history-artist-item${enrichedClass}`}
-                >
-                  <div
-                    className='lastfm-history-col-artist'
-                    title={artist.artist}
-                  >
-                    <ArtistLink artist={artist.artist} />
-                  </div>
-                  <div className='lastfm-history-col-albums'>
-                    {artist.albumCount.toLocaleString()}
-                  </div>
-                  <div className='lastfm-history-col-plays'>
-                    {artist.playCount.toLocaleString()}
-                  </div>
-                  <div className='lastfm-history-col-last'>
-                    {formatLastPlayed(artist.lastPlayed)}
-                  </div>
-                  {hasCollection && (
-                    <div className='lastfm-history-col-collection'>
-                      {ownedCount && ownedCount > 0 && (
+            {viewMode === 'artists' &&
+              artists.map((artist, index) => {
+                const ownedCount = collectionArtistCounts.get(
+                  normalizeForMatching(artist.artist)
+                );
+                return (
+                  <RankedRow
+                    key={artist.artist}
+                    rank={rankOf(index)}
+                    imageKind='artist'
+                    imageUrl={collectionArtistCovers.get(
+                      normalizeForMatching(artist.artist)
+                    )}
+                    imageAlt={artist.artist}
+                    title={
+                      <ArtistLink
+                        artist={artist.artist}
+                        label={toDisplayName(artist.artist)}
+                      />
+                    }
+                    badge={
+                      !!ownedCount &&
+                      ownedCount > 0 && (
                         <Badge variant='success' size='small'>
                           {ownedCount} owned
                         </Badge>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                      )
+                    }
+                    subtitle={`${artist.albumCount.toLocaleString()} ${artist.albumCount === 1 ? 'album' : 'albums'}`}
+                    meta={lastPlayedMeta(artist.lastPlayed)}
+                    onPlay={() => playArtistOnSpotify(artist.artist)}
+                    playCount={artist.playCount}
+                  />
+                );
+              })}
+          </ol>
 
           {/* Loading overlay for pagination */}
-          {loading && artists.length > 0 && (
+          {loading && (
             <div className='lastfm-history-loading-overlay'>
               <div className='spinner'></div>
             </div>
           )}
-        </div>
+        </section>
       )}
 
       {/* Pagination */}

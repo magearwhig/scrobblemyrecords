@@ -1,0 +1,121 @@
+/* Ranked list row (Stats top lists, History full lists) */
+.ranked-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ranked-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+}
+
+.ranked-row-rank {
+  width: 2rem;
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.ranked-row-cover {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.ranked-row-cover--artist {
+  border-radius: var(--radius-full);
+}
+
+.ranked-row-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ranked-row-placeholder {
+  width: 100%;
+  height: 100%;
+}
+
+.ranked-row-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ranked-row-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+}
+
+.ranked-row-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Badges (or a badge inside a button) keep their size; the name truncates */
+.ranked-row-name > :not(.ranked-row-name-text) {
+  flex-shrink: 0;
+}
+
+.ranked-row-subtitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.ranked-row-meta {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.ranked-row-play-btn {
+  flex-shrink: 0;
+}
+
+.ranked-row-count {
+  min-width: 2.5rem;
+  flex-shrink: 0;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--text-primary);
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 640px) {
+  .ranked-row-meta {
+    display: none;
+  }
+}

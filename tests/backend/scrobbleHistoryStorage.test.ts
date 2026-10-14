@@ -1681,6 +1681,56 @@ describe('ScrobbleHistoryStorage', () => {
   });
 
   describe('getTracksPaginated', () => {
+    it('adds artist display names and flags plays without album info', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      await fileStorage.writeJSON(
+        'history/scrobble-history-index.json',
+        createMockIndex({
+          albums: {
+            'radiohead|kid a': {
+              lastPlayed: now,
+              playCount: 1,
+              plays: [{ timestamp: now, track: 'Kid A' }],
+            },
+          },
+          unresolved: {
+            radiohead: {
+              lastPlayed: now - 10,
+              playCount: 1,
+              plays: [{ timestamp: now - 10, track: 'Spooks' }],
+            },
+          },
+        })
+      );
+      storage.setArtistNameResolver({
+        resolveArtist: (name: string) => name,
+        resolveArtistMulti: (name: string) => [name],
+        getDisplayName: (name: string) =>
+          name === 'radiohead' ? 'Radiohead' : name,
+      } as unknown as Parameters<typeof storage.setArtistNameResolver>[0]);
+
+      const tracks = await storage.getTracksPaginated(1, 50, 'track', 'asc');
+      const albums = await storage.getAlbumsPaginated();
+
+      expect(tracks.items).toEqual([
+        expect.objectContaining({
+          track: 'Kid A',
+          artistName: 'Radiohead',
+          album: 'kid a',
+        }),
+        expect.objectContaining({
+          track: 'Spooks',
+          artistName: 'Radiohead',
+          albumUnknown: true,
+        }),
+      ]);
+      expect(tracks.items[0].albumUnknown).toBeUndefined();
+      expect(albums.items[0]).toMatchObject({
+        artist: 'radiohead',
+        artistName: 'Radiohead',
+      });
+    });
+
     it('should return empty result when no index exists', async () => {
       // Act
       const result = await storage.getTracksPaginated();
@@ -2280,6 +2330,7 @@ describe('ScrobbleHistoryStorage', () => {
         expect.arrayContaining([
           {
             artist: 'radiohead',
+            artistName: 'radiohead',
             album: 'kid a',
             track: 'Idioteque',
             playCount: 2,
@@ -2287,7 +2338,9 @@ describe('ScrobbleHistoryStorage', () => {
           },
           {
             artist: 'radiohead',
+            artistName: 'radiohead',
             album: 'Unknown album',
+            albumUnknown: true,
             track: 'Idioteque',
             playCount: 1,
             lastPlayed: satAt22,
@@ -2296,7 +2349,9 @@ describe('ScrobbleHistoryStorage', () => {
       );
       expect(result.items.find(i => i.track === 'B-Side')).toEqual({
         artist: 'singles only',
+        artistName: 'singles only',
         album: 'Unknown album',
+        albumUnknown: true,
         track: 'B-Side',
         playCount: 2,
         lastPlayed: sunAt23,

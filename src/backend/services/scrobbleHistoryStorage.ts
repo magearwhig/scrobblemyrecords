@@ -914,6 +914,13 @@ export class ScrobbleHistoryStorage {
     return days;
   }
 
+  /** Artist name with display casing from the alias mappings, if any */
+  private artistDisplayName(artist: string): string {
+    return this.artistNameResolver
+      ? this.artistNameResolver.getDisplayName(artist)
+      : artist;
+  }
+
   /**
    * Get paginated albums with sorting and search
    */
@@ -926,6 +933,8 @@ export class ScrobbleHistoryStorage {
   ): Promise<{
     items: Array<{
       artist: string;
+      /** Artist name with display casing, where a mapping provides one */
+      artistName: string;
       album: string;
       playCount: number;
       lastPlayed: number;
@@ -977,6 +986,7 @@ export class ScrobbleHistoryStorage {
     return {
       items: paginatedItems.map(({ artist, album, history }) => ({
         artist,
+        artistName: this.artistDisplayName(artist),
         album,
         playCount: history.playCount,
         lastPlayed: history.lastPlayed,
@@ -1133,7 +1143,11 @@ export class ScrobbleHistoryStorage {
   ): Promise<{
     items: Array<{
       artist: string;
+      /** Artist name with display casing, where a mapping provides one */
+      artistName: string;
       album: string;
+      /** True for plays without album info (album is a placeholder label) */
+      albumUnknown?: boolean;
       track: string;
       playCount: number;
       lastPlayed: number;
@@ -1153,6 +1167,7 @@ export class ScrobbleHistoryStorage {
       {
         artist: string;
         album: string;
+        albumUnknown?: boolean;
         track: string;
         playCount: number;
         lastPlayed: number;
@@ -1179,6 +1194,7 @@ export class ScrobbleHistoryStorage {
         trackMap.set(trackKey, {
           artist,
           album,
+          ...(albumOrNull === null ? { albumUnknown: true } : {}),
           track: play.track,
           playCount: 1,
           lastPlayed: play.timestamp,
@@ -1230,7 +1246,10 @@ export class ScrobbleHistoryStorage {
     const paginatedItems = tracks.slice(startIndex, endIndex);
 
     return {
-      items: paginatedItems,
+      items: paginatedItems.map(item => ({
+        ...item,
+        artistName: this.artistDisplayName(item.artist),
+      })),
       total,
       totalPages,
       page,
