@@ -967,6 +967,19 @@ describe('ReleaseTrackingService', () => {
             title: 'Upcoming Album',
             artistName: 'Artist',
             artistMbid: 'artist-mbid',
+            releaseDate: '2099-06-15',
+            releaseType: 'album',
+            vinylStatus: 'unknown',
+            firstSeen: Date.now(),
+            isUpcoming: true,
+            inWishlist: false,
+          },
+          {
+            // Saved as upcoming at sync time; the date has since passed
+            mbid: 'rg-3',
+            title: 'Already Out',
+            artistName: 'Artist',
+            artistMbid: 'artist-mbid',
             releaseDate: '2025-06-15',
             releaseType: 'album',
             vinylStatus: 'unknown',
@@ -982,10 +995,11 @@ describe('ReleaseTrackingService', () => {
       const releases = await service.getFilteredReleases({
         upcomingOnly: true,
       });
+      const all = await service.getFilteredReleases({});
 
       // Assert
-      expect(releases).toHaveLength(1);
-      expect(releases[0].isUpcoming).toBe(true);
+      expect(releases.map(r => r.mbid)).toEqual(['rg-2']);
+      expect(all.find(r => r.mbid === 'rg-3')?.isUpcoming).toBe(false);
     });
 
     it('should sort by release date descending', async () => {

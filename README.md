@@ -561,6 +561,7 @@ Track new and upcoming releases from artists in your collection using MusicBrain
 - Lazy loading with 30-day caching
 
 **Filtering & Tabs:**
+- Shows releases from the last 2 months plus upcoming ones; "Upcoming" is judged from today's date
 - All Releases, Upcoming Only, Recent Only, Vinyl Available
 - Filter by release type (album, EP, single, compilation)
 - Hide releases already in wishlist

@@ -10,6 +10,13 @@ import {
   ReleaseTrackingSyncStatus,
   HiddenRelease,
 } from '../../shared/types';
+import {
+  RELEASE_WINDOW_MONTHS,
+  formatReleaseDate,
+  isInReleaseWindow,
+  isUpcomingRelease,
+  toDateString,
+} from '../../shared/utils/releaseWindow';
 import ReleaseCard from '../components/ReleaseCard';
 import { Modal, ModalFooter } from '../components/ui';
 import { Button } from '../components/ui/Button';
@@ -33,6 +40,32 @@ interface DisambiguationModalState {
   searchResults: MusicBrainzArtistMatch[];
   loading: boolean;
   searchQuery: string;
+}
+
+/**
+ * Today's local date (YYYY-MM-DD), updated at midnight and whenever the
+ * window regains focus, so a page left open overnight moves its cutoff.
+ */
+function useToday(): string {
+  const [today, setToday] = useState(() => toDateString(new Date()));
+  useEffect(() => {
+    const update = () => setToday(toDateString(new Date()));
+    const now = new Date();
+    const nextMidnight = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1
+    );
+    const timer = setTimeout(update, nextMidnight.getTime() - now.getTime());
+    window.addEventListener('focus', update);
+    document.addEventListener('visibilitychange', update);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('focus', update);
+      document.removeEventListener('visibilitychange', update);
+    };
+  }, [today]);
+  return today;
 }
 
 interface NewReleasesPageProps {
@@ -198,10 +231,25 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
     }
   };
 
+  // Only releases from the last few months and upcoming ones are shown.
+  // "Upcoming" is worked out from today's date: the stored flag is set at
+  // sync time and goes stale once the release date passes.
+  const today = useToday();
+  const recentReleases = useMemo(() => {
+    const [year, month, day] = today.split('-').map(Number);
+    const now = new Date(year, month - 1, day);
+    return releases
+      .filter(r => isInReleaseWindow(r.releaseDate, now))
+      .map(r => {
+        const isUpcoming = isUpcomingRelease(r.releaseDate, now);
+        return isUpcoming === r.isUpcoming ? r : { ...r, isUpcoming };
+      });
+  }, [releases, today]);
+
   // Filter releases based on active tab (excluding hidden)
   const filteredReleases = useMemo(() => {
     // First filter out hidden releases
-    let filtered = releases.filter(r => !hiddenReleases.has(r.mbid));
+    let filtered = recentReleases.filter(r => !hiddenReleases.has(r.mbid));
 
     switch (activeTab) {
       case 'upcoming':
@@ -247,7 +295,14 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
     });
 
     return filtered;
-  }, [releases, hiddenReleases, activeTab, sortBy, sortOrder, artistFilter]);
+  }, [
+    recentReleases,
+    hiddenReleases,
+    activeTab,
+    sortBy,
+    sortOrder,
+    artistFilter,
+  ]);
 
   // Build a release-group → original first-release-date lookup so reissue
   // cards can show "Orig. 2003 → Reissue 2026" without a backend round-trip.
@@ -267,7 +322,7 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
 
   // Distinct artists in current tab — used for an artist filter datalist.
   const artistOptions = useMemo(() => {
-    let pool = releases.filter(r => !hiddenReleases.has(r.mbid));
+    let pool = recentReleases.filter(r => !hiddenReleases.has(r.mbid));
     if (activeTab === 'reissues') pool = pool.filter(r => r.isReissue === true);
     else if (activeTab === 'upcoming') pool = pool.filter(r => r.isUpcoming);
     else if (activeTab === 'recent') pool = pool.filter(r => !r.isUpcoming);
@@ -276,7 +331,7 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
     return Array.from(new Set(pool.map(r => r.artistName))).sort((a, b) =>
       a.localeCompare(b)
     );
-  }, [releases, hiddenReleases, activeTab]);
+  }, [recentReleases, hiddenReleases, activeTab]);
 
   // Open disambiguation modal
   const openDisambiguationModal = (
@@ -495,17 +550,6 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
     }
   };
 
-  // Format date for display
-  const formatReleaseDate = (dateStr: string | null): string => {
-    if (!dateStr) return 'Unknown';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
   // Get vinyl status badge
   const getVinylBadge = (status: TrackedRelease['vinylStatus']) => {
     switch (status) {
@@ -673,35 +717,40 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
           className={`tab ${activeTab === 'all' ? 'active' : ''}`}
           onClick={() => setActiveTab('all')}
         >
-          All ({releases.length})
+          All ({recentReleases.length})
         </button>
         <button
           className={`tab ${activeTab === 'upcoming' ? 'active' : ''}`}
           onClick={() => setActiveTab('upcoming')}
         >
-          Upcoming ({releases.filter(r => r.isUpcoming).length})
+          Upcoming ({recentReleases.filter(r => r.isUpcoming).length})
         </button>
         <button
           className={`tab ${activeTab === 'recent' ? 'active' : ''}`}
           onClick={() => setActiveTab('recent')}
         >
-          Recent ({releases.filter(r => !r.isUpcoming).length})
+          Recent ({recentReleases.filter(r => !r.isUpcoming).length})
         </button>
         <button
           className={`tab ${activeTab === 'vinyl' ? 'active' : ''}`}
           onClick={() => setActiveTab('vinyl')}
         >
           Vinyl Available (
-          {releases.filter(r => r.vinylStatus === 'available').length})
+          {recentReleases.filter(r => r.vinylStatus === 'available').length})
         </button>
         <button
           className={`tab ${activeTab === 'reissues' ? 'active' : ''}`}
           onClick={() => setActiveTab('reissues')}
           title='Reissues and repressings of older release groups detected via MusicBrainz /release endpoint'
         >
-          Reissues ({releases.filter(r => r.isReissue === true).length})
+          Reissues ({recentReleases.filter(r => r.isReissue === true).length})
         </button>
       </div>
+
+      <p className='new-releases-window-note'>
+        Showing releases from the last {RELEASE_WINDOW_MONTHS} months and
+        upcoming ones
+      </p>
 
       {/* Filters */}
       <div className='filters'>
@@ -798,6 +847,11 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
                 Click "Sync Releases" to scan your collection for new releases.
               </p>
             </>
+          ) : recentReleases.length === 0 ? (
+            <p>
+              No releases from the last {RELEASE_WINDOW_MONTHS} months or coming
+              up.
+            </p>
           ) : (
             <p>No releases match the current filters.</p>
           )}
