@@ -3427,3 +3427,323 @@ export interface AlbumTracklistMatch {
   /** Unresolved tracks of the artist that weren't on the album */
   unmatchedCount: number;
 }
+
+// ============================================
+// Smart Crates (see .plan/smart-crates-plan.md)
+// ============================================
+
+/** What a rule does when the data it needs is missing */
+export type CrateUnknownPolicy = 'exclude' | 'include';
+
+export type CratePeriod =
+  | { kind: 'calendarYear' }
+  | { kind: 'lastDays'; days: number }
+  /** ISO yyyy-mm-dd */
+  | { kind: 'since'; date: string };
+
+interface CrateRuleBase {
+  /** Stable within the crate */
+  id: string;
+}
+
+export type CrateRule = CrateRuleBase &
+  (
+    | { field: 'format'; op: 'anyOf' | 'noneOf'; values: string[] }
+    | { field: 'artist'; op: 'anyOf'; values: string[] }
+    | {
+        field: 'genre' | 'style';
+        op: 'anyOf' | 'noneOf';
+        values: string[];
+        ifUnknown?: CrateUnknownPolicy;
+      }
+    | {
+        field: 'pressingYear';
+        op: 'between';
+        from?: number;
+        to?: number;
+        ifUnknown?: CrateUnknownPolicy;
+      }
+    | { field: 'dateAdded'; op: 'withinDays' | 'olderThanDays'; days: number }
+    | { field: 'dateAdded'; op: 'between'; from?: string; to?: string }
+    | {
+        field: 'rating';
+        op: 'atLeast';
+        value: number;
+        ifUnknown?: CrateUnknownPolicy;
+      }
+    | { field: 'rating'; op: 'isUnrated' }
+    | {
+        field: 'runtime';
+        op: 'atMost' | 'atLeast';
+        minutes: number;
+        ifUnknown?: CrateUnknownPolicy;
+      }
+    | {
+        field: 'runtime';
+        op: 'between';
+        minMinutes: number;
+        maxMinutes: number;
+        ifUnknown?: CrateUnknownPolicy;
+      }
+    | { field: 'discardPile'; op: 'exclude' | 'only' }
+    | { field: 'scrobbleCount'; op: 'atLeast' | 'atMost'; value: number }
+    | { field: 'scrobbleCount'; op: 'topPercent'; percent: number }
+    | { field: 'scrobblesInPeriod'; period: CratePeriod; op: 'none' }
+    | {
+        field: 'scrobblesInPeriod';
+        period: CratePeriod;
+        op: 'atLeast' | 'atMost';
+        value: number;
+      }
+    | {
+        field: 'lastRecordedPlay';
+        op: 'olderThanDays';
+        days: number;
+        includeNoRecordedPlays: boolean;
+      }
+    | { field: 'lastRecordedPlay'; op: 'withinDays'; days: number }
+    | { field: 'playsSinceAdded'; op: 'none' }
+    | { field: 'playsSinceAdded'; op: 'atLeast'; value: number }
+  );
+
+export type CrateRuleField = CrateRule['field'];
+
+export interface CrateOverride {
+  id: string;
+  action: 'include' | 'exclude';
+  /** Release IDs of the album's copies when the choice was made */
+  releaseIds: number[];
+  snapshot: { artist: string; title: string; coverUrl?: string };
+  /** ms */
+  createdAt: number;
+}
+
+export type CrateSort =
+  | 'artist'
+  | 'lastPlayedAsc'
+  | 'scrobblesDesc'
+  | 'scrobblesAsc'
+  | 'dateAddedDesc'
+  | 'runtimeAsc';
+
+export interface Crate {
+  /** crypto.randomUUID() */
+  id: string;
+  /** 1-80 chars, unique (case-insensitive) */
+  name: string;
+  description?: string;
+  /** ANDed; at most 20 */
+  rules: CrateRule[];
+  overrides: CrateOverride[];
+  sort: CrateSort;
+  pinnedToWhatToPlay: boolean;
+  templateId?: string;
+  /** Set when created from a suggested crate */
+  sourceSuggestionKey?: string;
+  /** ms */
+  createdAt: number;
+  /** ms */
+  updatedAt: number;
+}
+
+export interface CratesStore extends VersionedStore {
+  schemaVersion: 1;
+  crates: Crate[];
+}
+
+export type CrateRuleOutcome = 'match' | 'noMatch' | 'unknown';
+
+export interface CrateRuleResult {
+  ruleId: string;
+  outcome: CrateRuleOutcome;
+  evidence: {
+    /** Copy that satisfied (or was judged for) a copy-level rule */
+    releaseId?: number;
+    value?: number | string | string[];
+    knownSeconds?: number;
+    tracksWithDuration?: number;
+    trackCount?: number;
+    scrobbles?: number;
+    rank?: number;
+    rankOf?: number;
+    /** seconds */
+    lastPlayed?: number | null;
+    /** For playsSinceAdded */
+    playsBeforeAdded?: number;
+    /** seconds; set when a period starts before the history does */
+    historyFrom?: number;
+    /** ISO date for dateAdded evidence */
+    dateAdded?: string;
+  };
+}
+
+export interface CrateAlbumCopy {
+  releaseId: number;
+  title: string;
+  artist: string;
+  year?: number;
+  format: string[];
+  dateAdded: string;
+  /** Number of collection entries with this release ID */
+  copyCount: number;
+  coverUrl?: string;
+}
+
+export interface CrateAlbumResult {
+  /** albumGroupKey (display/debug only; not persisted) */
+  albumKey: string;
+  artist: string;
+  album: string;
+  coverUrl?: string;
+  copies: CrateAlbumCopy[];
+  /** Copy satisfying all copy-level rules; the "Open release" target */
+  witnessReleaseId: number;
+  membership: 'rules' | 'included' | 'includedAndRules' | 'excluded';
+  listening: {
+    scrobbleCount: number;
+    /** seconds */
+    lastPlayed: number | null;
+    matchType: 'exact' | 'fuzzy' | 'none';
+    matchedKeys: string[];
+  };
+  /** When some copy's runtime is complete */
+  runtimeSeconds?: number;
+  results: CrateRuleResult[];
+  /** When this album was included/excluded by hand (ms) */
+  overrideAt?: number;
+}
+
+export interface CrateCoverage {
+  totalAlbums: number;
+  totalReleases: number;
+  /** seconds (index.oldestScrobbleDate) */
+  historyFrom: number | null;
+  /** ms (newest scrobble, not sync time) */
+  newestScrobbleAt: number | null;
+  /** ms (null for older indexes) */
+  lastSyncCompletedAt: number | null;
+  hasHistory: boolean;
+  collection: {
+    complete: boolean;
+    pagesRead: number;
+    pagesExpected: number | null;
+  };
+  runtimeKnownAlbums: number;
+  genreKnownAlbums: number;
+  ratedAlbums: number;
+}
+
+export interface CrateEvaluation {
+  /** null for an unsaved preview */
+  crateId: string | null;
+  /** ms */
+  evaluatedAt: number;
+  /** Members, sorted per the crate's sort */
+  albums: CrateAlbumResult[];
+  /** Albums excluded by hand that are still owned */
+  excluded: CrateAlbumResult[];
+  /** Albums kept out only by missing data, per rule */
+  unknownOnly: { ruleId: string; count: number; sample: CrateAlbumResult[] }[];
+  staleOverrides: CrateOverride[];
+  coverage: CrateCoverage;
+}
+
+export interface CrateSummary {
+  id: string;
+  name: string;
+  description?: string;
+  pinnedToWhatToPlay: boolean;
+  count: number;
+  unknownCount: number;
+  staleOverrideCount: number;
+  /** Up to 4 release IDs' covers for the card */
+  sampleCovers: string[];
+  updatedAt: number;
+}
+
+export interface CrateTemplate {
+  id: string;
+  name: string;
+  description: string;
+  rules: CrateRule[];
+  sort: CrateSort;
+}
+
+/** Input to create a crate */
+export interface CrateInput {
+  name: string;
+  description?: string;
+  rules: CrateRule[];
+  sort?: CrateSort;
+  pinnedToWhatToPlay?: boolean;
+  templateId?: string;
+  sourceSuggestionKey?: string;
+}
+
+/** Fields that can change on an existing crate */
+export type CratePatch = Partial<
+  Pick<Crate, 'name' | 'description' | 'rules' | 'sort' | 'pinnedToWhatToPlay'>
+>;
+
+// ---- Suggested crates ----
+
+export type CrateSuggestionRecipe =
+  | 'style-quiet'
+  | 'artist'
+  | 'decade-quiet'
+  | 'top-quiet'
+  | 'added-quiet'
+  | 'short'
+  | 'template';
+
+export interface CrateSuggestionRecord {
+  candidateKey: string;
+  status: 'active' | 'dismissed' | 'added';
+  /** local YYYY-MM-DD */
+  lastShownDay?: string;
+  /** Distinct days shown (informational) */
+  daysShown: number;
+  /** ms */
+  dismissedAt?: number;
+  /** ms */
+  addedAt?: number;
+  addedCrateId?: string;
+  /** ms; backup merge keeps the newer record */
+  updatedAt: number;
+}
+
+export interface CrateSuggestionBatch {
+  /** local YYYY-MM-DD */
+  day: string;
+  /** Current batch, display order */
+  keys: string[];
+  /** Every key shown today: batch, rerolls, backfills */
+  shownToday: string[];
+  /** Last batch served on the previous day it was built */
+  previousKeys: string[];
+}
+
+export interface CrateSuggestionStore extends VersionedStore {
+  schemaVersion: 1;
+  records: CrateSuggestionRecord[];
+  batch?: CrateSuggestionBatch;
+}
+
+export interface CrateSuggestion {
+  candidateKey: string;
+  recipe: CrateSuggestionRecipe;
+  name: string;
+  description: string;
+  /** Why it was suggested, from the reviewed copy */
+  reason: string;
+  rules: CrateRule[];
+  sort: CrateSort;
+  count: number;
+  sampleCovers: string[];
+}
+
+export interface CrateSuggestionsResponse {
+  suggestions: CrateSuggestion[];
+  exhausted: boolean;
+  reason?: 'collectionLoading' | 'noCandidates';
+}
