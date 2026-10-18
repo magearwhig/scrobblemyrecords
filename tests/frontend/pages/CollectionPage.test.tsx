@@ -1491,4 +1491,45 @@ describe('CollectionPage', () => {
       expect(sortSelect).toHaveValue('scrobbles');
     });
   });
+
+  describe('Save as crate', () => {
+    afterEach(() => {
+      window.sessionStorage.clear();
+      window.location.hash = '';
+    });
+
+    it('is hidden without active filters', async () => {
+      renderWithProviders(<CollectionPage />);
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+      expect(
+        screen.queryByRole('button', { name: /save as crate/i })
+      ).not.toBeInTheDocument();
+    });
+
+    it('turns the active filters into crate rules and opens the editor', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<CollectionPage />);
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      await user.selectOptions(screen.getByLabelText('Format:'), 'Vinyl');
+      await user.selectOptions(screen.getByLabelText(/Added:/), 'month');
+      await user.click(screen.getByRole('button', { name: /save as crate/i }));
+
+      expect(window.location.hash).toBe('#crates?new=1&from=collection');
+      const stored = JSON.parse(
+        window.sessionStorage.getItem('crates.pendingRulesFromCollection') ??
+          '[]'
+      );
+      expect(
+        stored.map(({ id: _id, ...rule }: { id: string }) => rule)
+      ).toEqual([
+        { field: 'format', op: 'anyOf', values: ['Vinyl'] },
+        { field: 'dateAdded', op: 'withinDays', days: 30 },
+      ]);
+    });
+  });
 });

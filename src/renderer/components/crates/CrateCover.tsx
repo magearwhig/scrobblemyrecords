@@ -7,7 +7,7 @@ interface CrateCoverProps {
   url?: string;
   /** Album title, for the alt text */
   title: string;
-  size?: 'small' | 'medium';
+  size?: 'small' | 'medium' | 'large';
 }
 
 /** Album cover with a neutral placeholder when there is no image */

@@ -372,6 +372,9 @@ export const CRATE_PHRASES = {
   'suggestion.reason.template.other':
     '{count} of your albums match this starter crate.',
   'suggestion.exhausted': "That's all the suggestions for today.",
+  'suggestion.collectionLoading':
+    'Suggestions appear once your collection has finished loading.',
+  'suggestion.added': 'Crate added. Edit its rules any time.',
 } as const;
 
 export type CratePhraseKey = keyof typeof CRATE_PHRASES;

@@ -18,6 +18,7 @@ import {
 import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import AlbumScrobbleHistory from '../components/AlbumScrobbleHistory';
 import ArtistLink from '../components/ArtistLink';
+import AddToCrateMenu from '../components/crates/AddToCrateMenu';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { ProgressBar } from '../components/ui/ProgressBar';
@@ -1034,6 +1035,16 @@ const ReleaseDetailsPage: React.FC = () => {
                     <Package size={14} aria-hidden='true' /> Add to Discard Pile
                   </Button>
                 )}
+              </div>
+            )}
+
+            {/* Crates hold owned albums only */}
+            {collectionItemId && (
+              <div className='release-details-button-container'>
+                <AddToCrateMenu
+                  releaseIds={[collectionItemId]}
+                  albumTitle={release.title}
+                />
               </div>
             )}
           </div>

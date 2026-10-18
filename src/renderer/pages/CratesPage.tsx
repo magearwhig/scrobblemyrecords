@@ -31,6 +31,9 @@ import CrateExcludedSection from '../components/crates/CrateExcludedSection';
 import CrateMightMatch from '../components/crates/CrateMightMatch';
 import { apiErrorInfo } from '../components/crates/crateRuleModel';
 import CrateStaleOverrides from '../components/crates/CrateStaleOverrides';
+import CrateSuggestionHistoryReset from '../components/crates/CrateSuggestionHistoryReset';
+import CrateSuggestions from '../components/crates/CrateSuggestions';
+import { openCrateRelease } from '../components/crates/openCrateRelease';
 import { Button, EmptyState } from '../components/ui';
 import { ErrorState } from '../components/ui/EmptyState';
 import { Skeleton } from '../components/ui/Skeleton';
@@ -44,6 +47,7 @@ import {
 } from '../hooks/useNotifications';
 import { ROUTES, navigate } from '../routes';
 import { getApiService } from '../services/api';
+import { readCrateRulesFromCollection } from '../utils/collectionFiltersToCrateRules';
 import { createLogger } from '../utils/logger';
 
 import './CratesPage.page.css';
@@ -52,7 +56,7 @@ const logger = createLogger('CratesPage');
 
 type CratesView =
   | { kind: 'list' }
-  | { kind: 'new'; templateId?: string }
+  | { kind: 'new'; templateId?: string; fromCollection?: boolean }
   | { kind: 'detail'; id: string }
   | { kind: 'edit'; id: string };
 
@@ -71,7 +75,11 @@ export function readCratesView(): CratesView {
   }
   if (params.get('new') === '1') {
     const templateId = params.get('template') ?? undefined;
-    return { kind: 'new', ...(templateId ? { templateId } : {}) };
+    return {
+      kind: 'new',
+      ...(templateId ? { templateId } : {}),
+      ...(params.get('from') === 'collection' ? { fromCollection: true } : {}),
+    };
   }
   return { kind: 'list' };
 }
@@ -129,6 +137,7 @@ const CratesPage: React.FC = () => {
   const [templates, setTemplates] = useState<CrateTemplate[]>([]);
   const [listError, setListError] = useState<string | null>(null);
   const [pinBusy, setPinBusy] = useState<ReadonlySet<string>>(new Set());
+  const [suggestionsKey, setSuggestionsKey] = useState(0);
 
   // Detail
   const [detail, setDetail] = useState<CrateDetail | null>(null);
@@ -328,23 +337,10 @@ const CratesPage: React.FC = () => {
     }
   }, [api, detail, loadDetail, notifyError]);
 
-  const openRelease = useCallback((album: CrateAlbumResult) => {
-    const witness =
-      album.copies.find(copy => copy.releaseId === album.witnessReleaseId) ??
-      album.copies[0];
-    const releaseId = witness?.releaseId ?? album.witnessReleaseId;
-    // ReleaseDetailsPage reads the release from localStorage (as on Album Detail)
-    localStorage.setItem(
-      'selectedRelease',
-      JSON.stringify({
-        id: releaseId,
-        title: witness?.title ?? album.album,
-        artist: witness?.artist ?? album.artist,
-      })
-    );
-    localStorage.setItem('selectedCollectionItemId', String(releaseId));
-    navigate(ROUTES.RELEASE_DETAILS, { from: ROUTES.CRATES });
-  }, []);
+  const openRelease = useCallback(
+    (album: CrateAlbumResult) => openCrateRelease(album, ROUTES.CRATES),
+    []
+  );
 
   const handleSaved = useCallback(
     (crate: Crate) => {
@@ -629,9 +625,14 @@ const CratesPage: React.FC = () => {
             <h1>New crate</h1>
           </header>
           <CrateEditor
-            key={view.templateId ?? 'blank'}
+            key={
+              view.fromCollection ? 'collection' : (view.templateId ?? 'blank')
+            }
             api={api}
             initialTemplateId={view.templateId}
+            initialRules={
+              view.fromCollection ? readCrateRulesFromCollection() : undefined
+            }
             onSaved={handleSaved}
             onCancel={() => navigate(ROUTES.CRATES)}
           />
@@ -674,13 +675,26 @@ const CratesPage: React.FC = () => {
                 Saved rules that keep a selection of your collection up to date.
               </p>
             </div>
-            <Button
-              iconLeft={<Plus size={16} aria-hidden='true' />}
-              onClick={() => navigate(ROUTES.CRATES, { new: '1' })}
-            >
-              New crate
-            </Button>
+            <div className='crates-header-actions'>
+              <CrateSuggestionHistoryReset
+                api={api}
+                onReset={() => setSuggestionsKey(key => key + 1)}
+              />
+              <Button
+                iconLeft={<Plus size={16} aria-hidden='true' />}
+                onClick={() => navigate(ROUTES.CRATES, { new: '1' })}
+              >
+                New crate
+              </Button>
+            </div>
           </header>
+          {summaries && !listError && (
+            <CrateSuggestions
+              api={api}
+              refreshKey={suggestionsKey}
+              onAdded={crate => navigate(ROUTES.CRATES, { id: crate.id })}
+            />
+          )}
           {renderList()}
         </>
       ) : (

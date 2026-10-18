@@ -25,6 +25,13 @@
   color: var(--text-primary);
 }
 
+.crates-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .crates-subtitle {
   margin: var(--space-1) 0 0;
   font-size: var(--text-sm);

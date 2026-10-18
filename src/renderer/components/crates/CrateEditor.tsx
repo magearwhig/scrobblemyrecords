@@ -27,6 +27,8 @@ export interface CrateEditorProps {
   crate?: Crate;
   /** Template to start a new crate from */
   initialTemplateId?: string;
+  /** Rules to start a new crate from (e.g. Collection "Save as crate") */
+  initialRules?: CrateRule[];
   onSaved: (crate: Crate) => void;
   onCancel: () => void;
 }
@@ -38,6 +40,7 @@ const CrateEditor: React.FC<CrateEditorProps> = ({
   api,
   crate,
   initialTemplateId,
+  initialRules,
   onSaved,
   onCancel,
 }) => {
@@ -47,7 +50,9 @@ const CrateEditor: React.FC<CrateEditorProps> = ({
 
   const [name, setName] = useState(crate?.name ?? '');
   const [description, setDescription] = useState(crate?.description ?? '');
-  const [rules, setRules] = useState<CrateRule[]>(crate?.rules ?? []);
+  const [rules, setRules] = useState<CrateRule[]>(
+    () => crate?.rules ?? initialRules ?? []
+  );
   const [sort, setSort] = useState<CrateSort>(crate?.sort ?? 'artist');
   const [templateId, setTemplateId] = useState<string>(BLANK);
   const [templates, setTemplates] = useState<CrateTemplate[]>([]);

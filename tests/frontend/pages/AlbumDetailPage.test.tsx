@@ -76,6 +76,7 @@ const setSelectedAlbum = (
 const mockCreateAlbumMappingsBatch = jest.fn();
 const mockRemoveDiscoveryAlbumMapping = jest.fn();
 const mockAddNotification = jest.fn();
+const mockGetCratesForRelease = jest.fn();
 
 jest.mock('../../../src/renderer/context/AppContext', () => ({
   useApp: () => ({ state: { serverUrl: 'http://localhost:3001' } }),
@@ -89,12 +90,16 @@ jest.mock('../../../src/renderer/services/api', () => ({
   getApiService: () => ({
     createAlbumMappingsBatch: mockCreateAlbumMappingsBatch,
     removeDiscoveryAlbumMapping: mockRemoveDiscoveryAlbumMapping,
+    getCrates: jest.fn().mockResolvedValue([]),
+    getCratesForRelease: mockGetCratesForRelease,
+    setCrateOverride: jest.fn(),
   }),
 }));
 
 describe('AlbumDetailPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetCratesForRelease.mockResolvedValue([]);
     setSelectedAlbum({ artist: 'Radiohead', album: 'Kid A' });
     mockStatsApi.getAlbumDetail.mockResolvedValue({
       success: true,
@@ -256,6 +261,10 @@ describe('AlbumDetailPage', () => {
     expect(
       screen.queryByRole('button', { name: /view in collection/i })
     ).not.toBeInTheDocument();
+    // Crates only hold owned albums
+    expect(
+      screen.queryByRole('button', { name: /to a crate/i })
+    ).not.toBeInTheDocument();
   });
 
   it('prefers collectionArtist for visible casing when in collection', async () => {
@@ -340,6 +349,12 @@ describe('AlbumDetailPage', () => {
     expect(
       screen.getByRole('button', { name: /view release details/i })
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Add Kid A to a crate' })
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mockGetCratesForRelease).toHaveBeenCalledWith(12345)
+    );
   });
 
   it('back button navigates to the ?from= page', async () => {

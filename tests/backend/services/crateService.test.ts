@@ -357,6 +357,14 @@ describe('CrateService', () => {
     it('after a split, changing one half keeps the other half', async () => {
       const crate = await service.createCrate({ name: 'C', rules: [] });
       await service.setOverride(crate.id, [103, 104], 'include');
+      // A mapping is removed: the two copies become separate albums
+      const [one, two, three] = currentTable.albums;
+      currentTable = table([
+        one,
+        two,
+        album('a|three', [three.copies[0]]),
+        album('a|three alt', [three.copies[1]]),
+      ]);
       const updated = await service.setOverride(crate.id, [103], 'exclude');
       expect(updated.overrides.map(o => [o.action, o.releaseIds])).toEqual([
         ['include', [104]],
@@ -366,6 +374,26 @@ describe('CrateService', () => {
       expect(reset.overrides.map(o => [o.action, o.releaseIds])).toEqual([
         ['exclude', [103]],
       ]);
+    });
+
+    it('an include on one copy replaces an exclude on another copy of the album', async () => {
+      const crate = await service.createCrate({ name: 'C', rules: [] });
+      await service.setOverride(crate.id, [104], 'exclude');
+      const updated = await service.setOverride(crate.id, [103], 'include');
+      expect(updated.overrides.map(o => [o.action, o.releaseIds])).toEqual([
+        ['include', [103, 104]],
+      ]);
+      const { evaluation } = await service.evaluate(crate.id);
+      expect(evaluation.albums.find(a => a.album === 'Three')?.membership).toBe(
+        'included'
+      );
+    });
+
+    it('reset on one copy clears the whole album', async () => {
+      const crate = await service.createCrate({ name: 'C', rules: [] });
+      await service.setOverride(crate.id, [103, 104], 'exclude');
+      const reset = await service.clearOverrides(crate.id, [104]);
+      expect(reset.overrides).toEqual([]);
     });
 
     it('rejects releases that are not owned and bad input', async () => {

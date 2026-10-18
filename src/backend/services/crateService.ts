@@ -262,13 +262,17 @@ export class CrateService {
       );
     }
 
+    // Cover every copy the album has now, so an earlier choice on another
+    // copy of the same album can't outrank this one
+    const groupIds = expandToAlbumCopies(table, ids);
+
     return this.update(store => {
       const crate = store.crates.find(c => c.id === id);
       if (!crate) throw new CrateError('Crate not found', 404);
       const override: CrateOverride = {
         id: crypto.randomUUID(),
         action,
-        releaseIds: ids,
+        releaseIds: groupIds,
         snapshot: {
           artist: album.artist,
           title: album.album,
@@ -276,7 +280,10 @@ export class CrateService {
         },
         createdAt: this.now().getTime(),
       };
-      crate.overrides = [...subtractReleaseIds(crate.overrides, ids), override];
+      crate.overrides = [
+        ...subtractReleaseIds(crate.overrides, groupIds),
+        override,
+      ];
       crate.updatedAt = this.now().getTime();
       return crate;
     });
@@ -284,7 +291,10 @@ export class CrateService {
 
   /** Reset these albums to the rules (subtracts their release IDs) */
   async clearOverrides(id: string, releaseIds: unknown): Promise<Crate> {
-    const ids = this.validateReleaseIds(releaseIds);
+    const ids = expandToAlbumCopies(
+      await this.getTable(),
+      this.validateReleaseIds(releaseIds)
+    );
     return this.update(store => {
       const crate = store.crates.find(c => c.id === id);
       if (!crate) throw new CrateError('Crate not found', 404);
@@ -521,4 +531,22 @@ export function subtractReleaseIds(
     );
   }
   return result;
+}
+
+/**
+ * The given release IDs plus every other copy of the albums they belong to.
+ * IDs that are no longer owned are kept as they are.
+ */
+export function expandToAlbumCopies(
+  table: Pick<CrateAlbumTable, 'albums'>,
+  releaseIds: number[]
+): number[] {
+  const wanted = new Set(releaseIds);
+  const result = new Set(releaseIds);
+  for (const album of table.albums) {
+    if (album.copies.some(copy => wanted.has(copy.releaseId))) {
+      album.copies.forEach(copy => result.add(copy.releaseId));
+    }
+  }
+  return Array.from(result);
 }

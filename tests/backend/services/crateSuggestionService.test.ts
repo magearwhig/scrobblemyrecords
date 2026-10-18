@@ -370,6 +370,22 @@ describe('mineCandidates', () => {
     );
   });
 
+  it('names an artist shelf as Discogs spells the artist, not the matching key', () => {
+    const built = build(richCollection());
+    for (const album of built.table.albums) {
+      for (const copy of album.copies) {
+        copy.resolvedArtist = copy.resolvedArtist.toLowerCase();
+      }
+    }
+    const shelf = mineCandidates(built.table, built.facts, START).find(
+      c => c.candidateKey === 'artist:the wedding present'
+    );
+    expect(shelf?.copy).toEqual({
+      recipe: 'artist',
+      artist: 'The Wedding Present',
+    });
+  });
+
   it('maps exactly: every candidate is a valid crate with the same members once saved', async () => {
     const built = build(richCollection());
     const h = harness(built);

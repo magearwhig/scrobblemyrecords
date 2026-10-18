@@ -26,7 +26,16 @@ const mockApi = {
   setCrateOverride: jest.fn(),
   clearCrateOverrides: jest.fn(),
   removeStaleCrateOverrides: jest.fn(),
+  getCrateSuggestions: jest.fn(),
+  rerollCrateSuggestions: jest.fn(),
+  dismissCrateSuggestion: jest.fn(),
+  resetCrateSuggestionHistory: jest.fn(),
 };
+
+const mockShowToast = jest.fn();
+jest.mock('../../../src/renderer/context/ToastContext', () => ({
+  useToast: () => ({ showToast: mockShowToast }),
+}));
 
 jest.mock('../../../src/renderer/services/api', () => ({
   getApiService: () => mockApi,
@@ -108,6 +117,11 @@ describe('CratesPage', () => {
     mockApi.setCrateOverride.mockResolvedValue(makeCrate());
     mockApi.clearCrateOverrides.mockResolvedValue(makeCrate());
     mockApi.removeStaleCrateOverrides.mockResolvedValue(makeCrate());
+    mockApi.getCrateSuggestions.mockResolvedValue({
+      suggestions: [],
+      exhausted: false,
+      reason: 'noCandidates',
+    });
   });
 
   afterEach(() => {
@@ -208,6 +222,66 @@ describe('CratesPage', () => {
       );
       await waitFor(() =>
         expect(window.location.hash).toBe('#crates?new=1&template=dusty-shelf')
+      );
+    });
+
+    it('shows suggestions next to templates when there are no crates', async () => {
+      mockApi.getCrates.mockResolvedValue([]);
+      mockApi.getCrateSuggestions.mockResolvedValue({
+        suggestions: [
+          {
+            candidateKey: 'artist:the wedding present',
+            recipe: 'artist',
+            name: 'The Wedding Present shelf',
+            description: 'Albums you own by The Wedding Present.',
+            reason: 'You own 7 albums by The Wedding Present.',
+            rules: [
+              {
+                id: 'a',
+                field: 'artist',
+                op: 'anyOf',
+                values: ['The Wedding Present'],
+              },
+            ],
+            sort: 'lastPlayedAsc',
+            count: 7,
+            sampleCovers: [],
+          },
+        ],
+        exhausted: false,
+      });
+      renderPage();
+      expect(await screen.findByText('No crates yet')).toBeInTheDocument();
+      expect(
+        await screen.findByText('The Wedding Present shelf')
+      ).toBeInTheDocument();
+      expect(screen.getByText('Start from a template')).toBeInTheDocument();
+    });
+
+    it('hides the suggestions row when there is nothing to suggest', async () => {
+      renderPage();
+      expect(await screen.findByText('Dusty shelf')).toBeInTheDocument();
+      await waitFor(() =>
+        expect(mockApi.getCrateSuggestions).toHaveBeenCalledWith(3)
+      );
+      expect(screen.queryByText('Suggested crates')).not.toBeInTheDocument();
+    });
+
+    it('keeps Reset suggestion history in the header and refetches after it', async () => {
+      const user = userEvent.setup();
+      mockApi.resetCrateSuggestionHistory.mockResolvedValue(undefined);
+      renderPage();
+      expect(await screen.findByText('Dusty shelf')).toBeInTheDocument();
+      await waitFor(() =>
+        expect(mockApi.getCrateSuggestions).toHaveBeenCalledTimes(1)
+      );
+      await user.click(
+        screen.getByRole('button', { name: /reset suggestion history/i })
+      );
+      const dialog = await screen.findByRole('dialog');
+      await user.click(within(dialog).getByRole('button', { name: 'Reset' }));
+      await waitFor(() =>
+        expect(mockApi.getCrateSuggestions).toHaveBeenCalledTimes(2)
       );
     });
 

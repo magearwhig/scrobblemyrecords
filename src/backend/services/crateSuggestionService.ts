@@ -299,7 +299,9 @@ export function mineCandidates(
             // The evaluator resolves rule values the way the table resolved
             // the copy's artist, so the copy's own name always matches
             ruleValue: copy.artist,
-            display: stripDiscogsSuffix(copy.resolvedArtist).trim(),
+            // resolvedArtist is the resolver's matching key (lower case);
+            // show the name as Discogs spells it
+            display: stripDiscogsSuffix(copy.artist).trim(),
             count: 1,
           });
         }

@@ -17,6 +17,9 @@ const mockApiService = {
   getScrobbleProgress: jest.fn(),
   getReleaseDetails: jest.fn(),
   getMarketplaceStats: jest.fn().mockResolvedValue(null),
+  getCrates: jest.fn().mockResolvedValue([]),
+  getCratesForRelease: jest.fn().mockResolvedValue([]),
+  setCrateOverride: jest.fn(),
 };
 
 jest.mock('../../../src/renderer/services/api', () => ({
@@ -361,6 +364,24 @@ describe('ReleaseDetailsPage Side Selection', () => {
     expect(await screen.findByText(/Add to Discard Pile/)).toBeInTheDocument();
   });
 
+  it('shows Add to crate and In crates chips for an owned release', async () => {
+    mockLocalStorage.setItem('selectedRelease', JSON.stringify(mockRelease));
+    mockLocalStorage.setItem('selectedCollectionItemId', '123');
+    mockApiService.getReleaseDetails.mockResolvedValue(mockRelease);
+    mockApiService.getCratesForRelease.mockResolvedValue([
+      { id: 'c1', name: 'Short jazz' },
+    ]);
+    renderWithProviders(<ReleaseDetailsPage />);
+
+    expect(
+      await screen.findByRole('button', { name: /add .* to a crate/i })
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'Short jazz' })
+    ).toHaveAttribute('href', '#crates?id=c1');
+    expect(mockApiService.getCratesForRelease).toHaveBeenCalledWith(123);
+  });
+
   it('should ignore a stale collection item id left by a previous release', async () => {
     mockLocalStorage.setItem('selectedRelease', JSON.stringify(mockRelease));
     mockLocalStorage.setItem('selectedCollectionItemId', '999');
@@ -371,6 +392,9 @@ describe('ReleaseDetailsPage Side Selection', () => {
       expect(screen.getByText('Test Album')).toBeInTheDocument();
     });
     expect(screen.queryByText(/Add to Discard Pile/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /add .* to a crate/i })
+    ).not.toBeInTheDocument();
   });
 
   it('should not show side selection buttons for single-side albums', async () => {

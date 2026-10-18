@@ -1,0 +1,114 @@
+.crate-suggestion-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  color: var(--text-primary);
+}
+
+@media (min-width: 900px) {
+  .crate-suggestion-preview {
+    grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr);
+  }
+}
+
+.crate-suggestion-preview-side,
+.crate-suggestion-preview-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.crate-suggestion-preview-description {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-normal);
+}
+
+.crate-suggestion-preview-heading {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.crate-suggestion-preview-rules {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.crate-suggestion-preview-sort,
+.crate-suggestion-preview-note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.crate-suggestion-preview-count {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--text-primary);
+}
+
+.crate-suggestion-preview-count strong {
+  font-size: var(--text-2xl);
+  color: var(--text-accent);
+}
+
+.crate-suggestion-preview-coverage {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.crate-suggestion-preview-albums {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-2);
+}
+
+.crate-suggestion-preview-albums li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.crate-suggestion-preview-album {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.crate-suggestion-preview-title,
+.crate-suggestion-preview-artist {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crate-suggestion-preview-title {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.crate-suggestion-preview-artist {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
