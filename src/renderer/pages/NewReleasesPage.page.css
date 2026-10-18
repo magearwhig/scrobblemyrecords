@@ -155,6 +155,14 @@
 }
 
 /* Filters */
+/* Release date window explanation, above the filters */
+.new-releases-window-note {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  background: transparent;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;

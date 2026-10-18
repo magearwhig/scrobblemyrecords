@@ -144,13 +144,20 @@ jest.mock('../../../src/renderer/components/ui/ProgressBar', () => ({
   ),
 }));
 
+/** YYYY-MM-DD for a day relative to today (negative = past) */
+const daysFromToday = (days: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 const mockReleases: TrackedRelease[] = [
   {
     mbid: 'release-1',
     title: 'New Album',
     artistName: 'Test Artist',
     artistMbid: 'artist-1',
-    releaseDate: '2024-06-15',
+    releaseDate: daysFromToday(-20),
     releaseType: 'album',
     vinylStatus: 'available',
     firstSeen: Date.now() - 86400000,
@@ -162,7 +169,7 @@ const mockReleases: TrackedRelease[] = [
     title: 'Upcoming EP',
     artistName: 'Another Artist',
     artistMbid: 'artist-2',
-    releaseDate: '2025-12-01',
+    releaseDate: daysFromToday(40),
     releaseType: 'ep',
     vinylStatus: 'unknown',
     firstSeen: Date.now() - 172800000,
@@ -174,7 +181,7 @@ const mockReleases: TrackedRelease[] = [
     title: 'CD Only Album',
     artistName: 'Test Artist',
     artistMbid: 'artist-1',
-    releaseDate: '2024-03-10',
+    releaseDate: daysFromToday(-30),
     releaseType: 'album',
     vinylStatus: 'cd-only',
     firstSeen: Date.now() - 259200000,
@@ -345,6 +352,53 @@ describe('NewReleasesPage', () => {
     expect(screen.getByText(/Upcoming \(1\)/)).toBeInTheDocument();
     expect(screen.getByText(/Recent \(2\)/)).toBeInTheDocument();
     expect(screen.getByText(/Vinyl Available/)).toBeInTheDocument();
+  });
+
+  it('leaves out releases older than two months and fixes stale upcoming flags', async () => {
+    mockGetTrackedReleases.mockResolvedValue({
+      releases: [
+        ...mockReleases,
+        {
+          ...mockReleases[0],
+          mbid: 'release-old',
+          title: 'Old Album',
+          releaseDate: daysFromToday(-90),
+        },
+        {
+          ...mockReleases[1],
+          mbid: 'release-stale',
+          title: 'Already Out',
+          // Flagged upcoming at sync time; the date has since passed
+          releaseDate: daysFromToday(-5),
+          isUpcoming: true,
+        },
+      ],
+    });
+    renderNewReleasesPage();
+
+    await screen.findByText('Already Out');
+    expect(screen.queryByText('Old Album')).not.toBeInTheDocument();
+    expect(screen.getByText(/All \(4\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Upcoming \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Recent \(3\)/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Showing releases from the last 2 months and upcoming ones'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('says when no release falls within the last two months', async () => {
+    mockGetTrackedReleases.mockResolvedValue({
+      releases: [{ ...mockReleases[0], releaseDate: daysFromToday(-90) }],
+    });
+    renderNewReleasesPage();
+
+    expect(
+      await screen.findByText(
+        'No releases from the last 2 months or coming up.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('filters releases by Upcoming tab', async () => {
