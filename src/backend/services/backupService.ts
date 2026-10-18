@@ -63,6 +63,10 @@ import {
   ReleaseTrackingSettings,
   SavedCollection,
   SavedCollectionsStore,
+  Crate,
+  CratesStore,
+  CrateSuggestionRecord,
+  CrateSuggestionStore,
   SellerMonitoringSettings,
   SuggestionSettings,
   SyncSettings,
@@ -110,6 +114,8 @@ const FILE_PATHS = {
   excludedArtists: 'releases/excluded-artists.json',
   discardPile: 'collections/discard-pile.json',
   savedCollections: 'collections/saved-collections.json',
+  crates: 'collections/crates.json',
+  crateSuggestions: 'collections/crate-suggestions.json',
   backupSettings: 'settings/backup-settings.json',
 } as const;
 
@@ -573,6 +579,21 @@ export class BackupService {
     return { added, updated };
   }
 
+  /** Suggestion records only; the daily batch is a same-day cache */
+  private async loadCrateSuggestions(): Promise<CrateSuggestionRecord[]> {
+    const store = await this.fileStorage.readJSON<CrateSuggestionStore>(
+      FILE_PATHS.crateSuggestions
+    );
+    return store?.records ?? [];
+  }
+
+  private async loadCrates(): Promise<Crate[]> {
+    const store = await this.fileStorage.readJSON<CratesStore>(
+      FILE_PATHS.crates
+    );
+    return store?.crates ?? [];
+  }
+
   private async loadSavedCollections(): Promise<SavedCollection[]> {
     const store = await this.fileStorage.readJSON<SavedCollectionsStore>(
       FILE_PATHS.savedCollections
@@ -644,6 +665,11 @@ export class BackupService {
       this.loadSavedCollections(),
     ]);
     const unresolvedHistory = await this.loadUnresolvedHistory();
+    const [crates, crateSuggestions, wishlistPriceAlerts] = await Promise.all([
+      this.loadCrates(),
+      this.loadCrateSuggestions(),
+      this.loadWishlistPriceAlerts(),
+    ]);
 
     return {
       hasUserSettings: userSettings !== null,
@@ -673,6 +699,9 @@ export class BackupService {
       excludedArtistsCount: excludedArtists.length,
       discardPileItemsCount: discardPileItems.length,
       savedCollectionsCount: savedCollections.length,
+      cratesCount: crates.length,
+      crateSuggestionsCount: crateSuggestions.length,
+      wishlistPriceAlertsCount: Object.keys(wishlistPriceAlerts).length,
     };
   }
 
@@ -751,6 +780,8 @@ export class BackupService {
 
     const unresolvedHistory = await this.loadUnresolvedHistory();
     const wishlistPriceAlerts = await this.loadWishlistPriceAlerts();
+    const crates = await this.loadCrates();
+    const crateSuggestions = await this.loadCrateSuggestions();
 
     // Build backup data
     let backupData: BackupData = {
@@ -782,6 +813,8 @@ export class BackupService {
       excludedArtists,
       discardPileItems,
       savedCollections,
+      crates,
+      crateSuggestions,
     };
 
     // Encrypt credentials if included
@@ -899,6 +932,8 @@ export class BackupService {
       currentExcludedArtists,
       currentDiscardPileItems,
       currentSavedCollections,
+      currentCrates,
+      currentCrateSuggestions,
     ] = await Promise.all([
       this.loadAlbumMappings(),
       this.loadArtistMappings(),
@@ -917,6 +952,8 @@ export class BackupService {
       this.loadExcludedArtists(),
       this.loadDiscardPile(),
       this.loadSavedCollections(),
+      this.loadCrates(),
+      this.loadCrateSuggestions(),
     ]);
 
     // Calculate summary
@@ -1011,6 +1048,16 @@ export class BackupService {
         currentSavedCollections,
         (c: SavedCollection) => c.id
       ),
+      crates: this.compareMappings(
+        backup.data.crates ?? [],
+        currentCrates,
+        (c: Crate) => c.id
+      ),
+      crateSuggestions: this.compareMappings(
+        backup.data.crateSuggestions ?? [],
+        currentCrateSuggestions,
+        (r: CrateSuggestionRecord) => r.candidateKey
+      ),
       settingsWillMerge: true,
     };
 
@@ -1044,6 +1091,8 @@ export class BackupService {
       excludedArtists: { new: 0, existing: 0 },
       discardPileItems: { new: 0, existing: 0 },
       savedCollections: { new: 0, existing: 0 },
+      crates: { new: 0, existing: 0 },
+      crateSuggestions: { new: 0, existing: 0 },
       settingsWillMerge: false,
     };
   }
@@ -1640,6 +1689,67 @@ export class BackupService {
         updated += result.updated;
       } catch (e) {
         errors.push(`Saved collections: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+
+    // Import Smart Crates. crates.json holds only { schemaVersion, crates },
+    // which is what mergeAndSave writes back
+    if (data.crates) {
+      try {
+        if (!merge && data.crates.length === 0) {
+          // mergeAndSave skips empty lists; a replace still clears crates
+          await this.fileStorage.writeJSONWithBackup(FILE_PATHS.crates, {
+            schemaVersion: 1,
+            crates: [],
+          });
+        }
+        const result = await this.mergeAndSave(
+          FILE_PATHS.crates,
+          data.crates,
+          (c: Crate) => c.id,
+          'crates',
+          merge,
+          (a, b) => (a.updatedAt > b.updatedAt ? a : b)
+        );
+        added += result.added;
+        updated += result.updated;
+      } catch (e) {
+        errors.push(`Crates: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+
+    // Import crate suggestion records. Only { schemaVersion, records } is
+    // written back, so the daily batch is dropped and rebuilt from the
+    // restored records on the next request. crates.json is not touched.
+    if (data.crateSuggestions) {
+      try {
+        if (data.crateSuggestions.length === 0) {
+          // mergeAndSave skips empty lists; a replace still clears the
+          // records, and a merge still drops the stale daily batch
+          const current = merge
+            ? await this.fileStorage.readJSON<CrateSuggestionStore>(
+                FILE_PATHS.crateSuggestions
+              )
+            : null;
+          if (!merge || current?.batch) {
+            await this.fileStorage.writeJSONWithBackup(
+              FILE_PATHS.crateSuggestions,
+              { schemaVersion: 1, records: current?.records ?? [] }
+            );
+          }
+        }
+        const result = await this.mergeAndSave(
+          FILE_PATHS.crateSuggestions,
+          data.crateSuggestions,
+          (r: CrateSuggestionRecord) => r.candidateKey,
+          'records',
+          merge,
+          (a, b) => (a.updatedAt > b.updatedAt ? a : b)
+        );
+        added += result.added;
+        updated += result.updated;
+      } catch (e) {
+        errors.push(`Crate suggestions: ${e instanceof Error ? e.message : e}`);
       }
     }
 

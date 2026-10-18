@@ -80,7 +80,7 @@ A crate answers "what should I pull off the shelf?" for a mood or situation the 
 
 ### 2.2 Workflows
 
-1. **Start from a template.** Crates > New crate > pick "Recently added, no scrobbles since". The builder shows the rules (added to Discogs within 90 days AND no scrobbles recorded since added), a live count ("14 albums") and the first few matches. Save.
+1. **Start from a template.** Crates > New crate > pick "Recently added to Discogs, no scrobbles since". The builder shows the rules (added to Discogs within 90 days AND no scrobbles recorded since added), a live count ("14 albums") and the first few matches. Save.
 2. **Build from scratch.** Add rule "Genre is any of Jazz" and rule "Runtime at most 40 min". The live preview shows "9 albums match · 31 more Jazz albums have no Discogs track durations". The user can check "Include albums with unknown runtime" on the runtime rule, or leave them out.
 3. **Use a crate.** What to Play > Crates shows pinned crates with counts. "Pick one" chooses a random member and shows its cover, the "why" line and buttons to open Release Details for the copy that matched (its witness copy, section 4.3, to scrobble) or Album Detail.
 4. **Curate.** In the crate view, "Exclude" removes an album the rules caught but the user doesn't want (e.g. a box set in the 40-minute crate whose runtime is per disc). Excluded albums go to a collapsed "Excluded by you" section with "Restore". From Release Details, "Add to crate…" includes a record that no rule catches.
@@ -158,7 +158,7 @@ Deferred rule types (Phase 4+): album completeness (share of tracklist scrobbled
 | Template (`id`) | Rules | Sort |
 |-----------------|-------|------|
 | Most scrobbled, none this year (`top-quiet-year`) | `scrobbleCount topPercent 20` AND `scrobblesInPeriod calendarYear none` AND `discardPile exclude` | `scrobblesDesc` |
-| Recently added, no scrobbles since (`added-no-scrobbles`) | `dateAdded withinDays 90` AND `playsSinceAdded none` AND `discardPile exclude` | `dateAddedDesc` |
+| Recently added to Discogs, no scrobbles since (`added-no-scrobbles`) | `dateAdded withinDays 90` AND `playsSinceAdded none` AND `discardPile exclude` | `dateAddedDesc` |
 | Jazz in 40 minutes (`jazz-40`) | `genre anyOf [Jazz]` AND `runtime atMost 40 (ifUnknown: exclude)` AND `discardPile exclude` | `runtimeAsc` |
 | Dusty shelf (`dusty-shelf`) | `lastRecordedPlay olderThanDays 365 (includeNoRecordedPlays: true)` AND `discardPile exclude` | `lastPlayedAsc` |
 
@@ -838,6 +838,7 @@ Smart Crates ships and works fully without context tags. When `.plan/context-tag
 | Collection sync emits no change events; removals untracked | — | Fingerprinting + stale overrides | Hook `markAsOrphaned` and crates into a collection-sync event |
 | Collection cache pages are written one at a time, not as a snapshot | A partial cache looks like "records left the collection" | Completeness check (section 7.1); no stale overrides or suggestions while incomplete | Write pages to a temp prefix and swap, or write a manifest last |
 | No sync-completion time in the history index | Sync age can't be shown for inactive listeners | New `lastSyncCompletedAt` (section 8.1); older indexes say "newest scrobble" | — |
+| A single collection page refetched after records were both added and removed can leave page totals that still add up (e.g. `[X,A]` + stale `[C,D]`), so the snapshot looks complete while a record is missing | That record's overrides can show as stale | Removing stale overrides is a user action that lists the records first; nothing is removed automatically | Write collection pages as one snapshot (temp prefix + swap, or a manifest written last). A stricter timestamp-order check was rejected: pages expire after 24 h and are refetched one at a time during normal browsing, so it would mark the cache incomplete most of the time |
 | Album Detail looks plays up by one name | Crate and Album Detail counts can differ for multi-title groups | Narrowed guarantee + fixtures (section 5.3) | Album Detail adopts the group resolver (open decision 17.11) |
 
 Hard dependencies: none beyond existing services. Soft: an initialised `artistNameResolver` (before it is ready, crates fall back to the identity resolver, the same as `createAlbumCanonicalizer`'s default).

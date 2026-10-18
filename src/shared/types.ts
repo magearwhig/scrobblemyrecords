@@ -2057,6 +2057,11 @@ export interface BackupData {
 
   // Saved Collections (Memory Scrobble)
   savedCollections: SavedCollection[];
+
+  // Smart Crates (optional so older backups still validate)
+  crates?: Crate[];
+  /** Suggestion records only; the daily batch is never backed up */
+  crateSuggestions?: CrateSuggestionRecord[];
 }
 
 /**
@@ -2105,6 +2110,9 @@ export interface BackupPreview {
   excludedArtistsCount: number;
   discardPileItemsCount: number;
   savedCollectionsCount: number;
+  cratesCount?: number;
+  crateSuggestionsCount?: number;
+  wishlistPriceAlertsCount?: number;
 }
 
 /**
@@ -2144,6 +2152,8 @@ export interface BackupImportPreview {
     excludedArtists: ImportCategorySummary;
     discardPileItems: ImportCategorySummary;
     savedCollections: ImportCategorySummary;
+    crates?: ImportCategorySummary;
+    crateSuggestions?: ImportCategorySummary;
     settingsWillMerge: boolean;
   };
 }
@@ -3628,8 +3638,9 @@ export interface CrateCoverage {
     pagesRead: number;
     pagesExpected: number | null;
   };
-  runtimeKnownAlbums: number;
-  genreKnownAlbums: number;
+  /** null when release details weren't loaded (no genre/style/runtime rule) */
+  runtimeKnownAlbums: number | null;
+  genreKnownAlbums: number | null;
   ratedAlbums: number;
 }
 
@@ -3644,6 +3655,8 @@ export interface CrateEvaluation {
   excluded: CrateAlbumResult[];
   /** Albums kept out only by missing data, per rule */
   unknownOnly: { ruleId: string; count: number; sample: CrateAlbumResult[] }[];
+  /** Albums kept out only by missing data, each counted once */
+  unknownOnlyAlbums: number;
   staleOverrides: CrateOverride[];
   coverage: CrateCoverage;
 }

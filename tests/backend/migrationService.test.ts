@@ -72,6 +72,16 @@ describe('MigrationService', () => {
       expect(files).toContain('user-settings');
     });
 
+    it('registers the crates file as optional', () => {
+      expect(migrationService.getRegisteredFiles()).toContain('crates');
+    });
+
+    it('registers the crate suggestions file', () => {
+      expect(migrationService.getRegisteredFiles()).toContain(
+        'crate-suggestions'
+      );
+    });
+
     it('should include all expected categories', () => {
       // Act
       const files = migrationService.getRegisteredFiles();

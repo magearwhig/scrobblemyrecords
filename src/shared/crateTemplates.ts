@@ -48,7 +48,7 @@ export const CRATE_TEMPLATES: CrateTemplate[] = [
   },
   {
     id: 'added-no-scrobbles',
-    name: 'Recently added, no scrobbles since',
+    name: 'Recently added to Discogs, no scrobbles since',
     description:
       'Added to Discogs in the last 90 days, with no scrobbles recorded since. Added to Discogs is not always when you got a record: some days you may have catalogued many at once.',
     rules: [

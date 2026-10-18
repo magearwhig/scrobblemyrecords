@@ -135,3 +135,51 @@ export function createCollectionNameResolver(
     return names;
   };
 }
+
+/**
+ * Build a resolver from an album group (owned copies sharing one
+ * createAlbumCanonicalizer key) to every name its plays may be recorded under:
+ * each copy's names from createCollectionNameResolver, plus both names (source
+ * and target) of every mapping, linked or not, that canonicalizes to the
+ * group's key. The second part catches unlinked mappings into a collection
+ * name, which the collection resolver alone misses, and plays recorded under a
+ * mapping's target when only its source title is owned. Names are deduped case-insensitively.
+ */
+export function createAlbumGroupNameResolver(
+  mappings: AlbumMapping[] | null | undefined,
+  resolveArtist?: (artist: string) => string
+): (
+  copies: Array<{ artist: string; title: string }>,
+  groupKey: string
+) => AlbumName[] {
+  const collectionNames = createCollectionNameResolver(mappings);
+  const canonicalize = createAlbumCanonicalizer(mappings, resolveArtist);
+
+  const mappedByGroupKey = new Map<string, AlbumName[]>();
+  for (const mapping of mappings ?? []) {
+    const { key } = canonicalize(mapping.historyArtist, mapping.historyAlbum);
+    const names = mappedByGroupKey.get(key) ?? [];
+    // Both ends: plays can be recorded under the mapping's source or target
+    names.push(
+      { artist: mapping.historyArtist, album: mapping.historyAlbum },
+      { artist: mapping.collectionArtist, album: mapping.collectionAlbum }
+    );
+    mappedByGroupKey.set(key, names);
+  }
+
+  return (copies, groupKey) => {
+    const names: AlbumName[] = [];
+    const seen = new Set<string>();
+    const add = (name: AlbumName) => {
+      const key = albumNameKey(name.artist, name.album);
+      if (seen.has(key)) return;
+      seen.add(key);
+      names.push(name);
+    };
+    for (const copy of copies) {
+      collectionNames(copy.artist, copy.title).forEach(add);
+    }
+    (mappedByGroupKey.get(groupKey) ?? []).forEach(add);
+    return names;
+  };
+}
