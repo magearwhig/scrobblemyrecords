@@ -1,0 +1,150 @@
+.crate-album-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+}
+
+.crate-album-row--included {
+  border-color: var(--border-accent);
+  box-shadow: inset 3px 0 0 var(--accent-color);
+}
+
+.crate-album-row--excluded {
+  background: var(--surface-sunken);
+}
+
+.crate-album-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.crate-album-names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.crate-album-title {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crate-album-artist {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crate-album-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.crate-album-meta > span:not(.badge) + span:not(.badge)::before {
+  content: '·';
+  margin-right: var(--space-2);
+  color: var(--text-muted);
+}
+
+.crate-album-reasons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.crate-album-reasons li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  line-height: var(--leading-normal);
+}
+
+.crate-reason-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+.crate-reason-icon--match {
+  color: var(--status-success);
+}
+
+.crate-reason-icon--nomatch {
+  color: var(--status-error);
+}
+
+.crate-reason-icon--unknown {
+  color: var(--status-warning);
+}
+
+.crate-album-why {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--space-1);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-accent);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+
+.crate-album-why:hover {
+  text-decoration: underline;
+}
+
+.crate-album-why:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.crate-album-why-list {
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+.crate-album-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Narrow rows: actions drop below the text */
+@container crate-albums (max-width: 459px) {
+  .crate-album-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .crate-album-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}

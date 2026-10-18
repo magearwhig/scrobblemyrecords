@@ -1,0 +1,334 @@
+/* Crate rule builder: rules on the left, live preview on the right when wide */
+
+.crate-rule-builder-container {
+  container: crate-builder / inline-size;
+}
+
+.crate-rule-builder {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@container crate-builder (min-width: 880px) {
+  .crate-rule-builder {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  }
+
+  .crate-preview {
+    position: sticky;
+    top: var(--space-4);
+  }
+}
+
+.crate-rule-builder-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.crate-rule-builder-header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.crate-rule-builder-header h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--text-primary);
+}
+
+.crate-rule-builder-hint {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.crate-rule-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.crate-rule-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+}
+
+.crate-rule-row--error {
+  border-color: var(--status-error);
+}
+
+.crate-rule-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.crate-rule-controls .form-select,
+.crate-rule-controls .form-input {
+  width: auto;
+}
+
+.crate-rule-field {
+  flex: 0 1 220px;
+  min-width: 160px;
+}
+
+.crate-rule-op {
+  flex: 0 1 170px;
+  min-width: 130px;
+}
+
+.crate-rule-op-static {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  padding: 0 var(--space-1);
+}
+
+.crate-rule-value {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.crate-rule-remove {
+  margin-left: auto;
+}
+
+.crate-rule-number {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.crate-rule-number .form-input {
+  width: 7rem;
+}
+
+.crate-rule-suffix {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.crate-rule-range,
+.crate-rule-period {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.crate-rule-controls .crate-rule-date {
+  width: 11rem;
+}
+
+.crate-rule-help {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: var(--leading-normal);
+}
+
+.crate-rule-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+.crate-rule-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.crate-rule-errors {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--status-error);
+  background: transparent;
+}
+
+.crate-rule-errors li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Multi-value chips */
+.crate-chip-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+}
+
+.crate-chip .badge-content {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.crate-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.crate-chip-remove:hover,
+.crate-chip-remove:focus-visible {
+  background: var(--bg-hover);
+}
+
+.crate-rule-controls .crate-chip-text {
+  flex: 1 1 140px;
+  min-width: 120px;
+}
+
+.crate-rule-builder-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.crate-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.crate-sort .form-select {
+  width: auto;
+  min-width: 220px;
+}
+
+/* Live preview */
+.crate-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  transition: opacity 0.15s;
+}
+
+.crate-preview--loading {
+  opacity: 0.6;
+}
+
+.crate-preview-title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.crate-preview-count {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--text-primary);
+}
+
+.crate-preview-count strong {
+  font-size: var(--text-2xl);
+  color: var(--text-accent);
+}
+
+.crate-preview-note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.crate-preview-note--error {
+  color: var(--status-error);
+}
+
+.crate-preview-coverage {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.crate-preview-sample {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-2);
+}
+
+.crate-preview-sample li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.crate-preview-sample-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.crate-preview-sample-album,
+.crate-preview-sample-artist {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crate-preview-sample-album {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.crate-preview-sample-artist {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}

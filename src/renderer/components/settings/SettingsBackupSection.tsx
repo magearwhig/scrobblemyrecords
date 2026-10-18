@@ -285,6 +285,14 @@ const SettingsBackupSection: React.FC<SettingsBackupSectionProps> = ({
                   {preview.excludedArtistsCount} excluded artists
                 </li>
               )}
+              {(preview.cratesCount ?? 0) > 0 && (
+                <li>{preview.cratesCount} crates</li>
+              )}
+              {(preview.wishlistPriceAlertsCount ?? 0) > 0 && (
+                <li>
+                  {preview.wishlistPriceAlertsCount} wishlist price alerts
+                </li>
+              )}
               {(preview.hasUserSettings ||
                 preview.hasSuggestionSettings ||
                 preview.hasAiSettings) && <li>All preference settings</li>}

@@ -21,6 +21,7 @@ export const ROUTES = {
   ALBUM_DETAIL: 'album',
   RECOMMENDATIONS: 'recommendations',
   MEMORY_SCROBBLE: 'memory-scrobble',
+  CRATES: 'crates',
 } as const;
 
 /**

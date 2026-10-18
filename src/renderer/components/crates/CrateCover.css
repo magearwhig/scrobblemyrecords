@@ -1,0 +1,25 @@
+.crate-cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  aspect-ratio: 1;
+}
+
+.crate-cover--small {
+  width: 40px;
+}
+
+.crate-cover--medium {
+  width: 64px;
+}
+
+.crate-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
