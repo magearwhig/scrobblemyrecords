@@ -1,6 +1,6 @@
 # Smart Crates Plan
 
-**Status:** Backlog -- not started. Written 2026-10-11 against the current code (branch `feat/album-version-merging`) and revised the same day after a second peer review (suggestion rotation and lifecycle, witness copies, override subtraction, cache completeness, sync-completion time, honest copy, performance). Nothing in this plan exists yet. Section 1 lists what it builds on.
+**Status:** Implemented 2026-10-18 on branch `feat/smart-crates` (committed locally, not pushed): Phases 1, 2, 2b and 3. Decisions taken with the user: own Library > Crates page plus a What to Play tab (17.1), Dusty Corners kept as is (17.3). Deviations from this text: the template "Recently added, no scrobbles since" is named "Recently added to Discogs, no scrobbles since"; include/exclude/reset expand to every current copy of the album; `CrateCoverage.runtimeKnownAlbums`/`genreKnownAlbums` are null when release details weren't loaded; `CrateEvaluation.unknownOnlyAlbums` counts each "might match" album once. Known limitations: section 14 (mixed collection snapshot) and a backup restore can be overwritten by a crate or suggestion save already in progress (same as other services).
 
 ## Summary
 

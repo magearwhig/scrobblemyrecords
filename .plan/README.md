@@ -29,7 +29,7 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | cancelled/marketplace-upgrade-plan.md | Cancelled 2026-10-14 -- #19 superseded by wishlist-price-alerts-plan; seller-monitoring parts and #20 dropped by the user; verified Discogs API facts kept |
 | reissue-label-discovery-plan.md | Mostly shipped (`6be3c73`); reissue dedupe and settings defaults fixed 2026-10-11 -- remaining: label/website auto-scan, new-item notifications (must build its own scheduler now that the marketplace plan is cancelled) |
 | backlog-shark-tank-2026-03-08.md | Reference -- 24 tracked items, 19 done, 1 dropped (#20), 4 remaining (#5, #9, #18, #19 in progress), each linked to a plan |
-| smart-crates-plan.md | Backlog -- new 2026-10-11; rule-based, auto-updating album crates with manual include/exclude, match explanations, and rotating suggested crates with one-click Add; not started |
+| smart-crates-plan.md | Implemented 2026-10-18 on branch feat/smart-crates (not pushed) -- all phases 1-3 incl. suggested crates; known limitation on mixed collection snapshots in section 14 |
 | pocket-list-export-plan.md | Backlog -- new 2026-10-11; offline phone-readable PDF of wishlist/collection; depends on data-export-plan Phase 1 |
 | data-export-plan.md | Backlog -- #9; CSV/JSON data portability plus the shared export row layer used by Pocket List Export; not started |
 | listening-notes-plan.md | Backlog -- #5; album-level notes MVP; not started |
