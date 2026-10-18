@@ -9,7 +9,7 @@
 export const RELEASE_WINDOW_MONTHS = 2;
 
 /** Local calendar date as YYYY-MM-DD */
-function toDateString(date: Date): string {
+export function toDateString(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${date.getFullYear()}-${month}-${day}`;
@@ -31,8 +31,18 @@ function latestDay(releaseDate: string): string {
 
 /** First day of the window: today minus RELEASE_WINDOW_MONTHS */
 export function releaseWindowStart(now: Date = new Date()): string {
-  const start = new Date(now);
-  start.setMonth(start.getMonth() - RELEASE_WINDOW_MONTHS);
+  // Day 1 of the target month first, so 31 August gives 30 June, not 1 July
+  const start = new Date(
+    now.getFullYear(),
+    now.getMonth() - RELEASE_WINDOW_MONTHS,
+    1
+  );
+  const lastDay = new Date(
+    start.getFullYear(),
+    start.getMonth() + 1,
+    0
+  ).getDate();
+  start.setDate(Math.min(now.getDate(), lastDay));
   return toDateString(start);
 }
 
@@ -55,4 +65,25 @@ export function isUpcomingRelease(
 ): boolean {
   if (!releaseDate) return false;
   return earliestDay(releaseDate) > toDateString(now);
+}
+
+/**
+ * Display a (possibly partial) release date in the viewer's locale, keeping
+ * its precision: "2026", "Oct 2026" or "Oct 19, 2026". Built from local date
+ * parts so a date-only value never shifts a day through UTC parsing.
+ */
+export function formatReleaseDate(
+  releaseDate: string | null | undefined
+): string {
+  if (!releaseDate) return 'Unknown';
+  const [year, month, day] = releaseDate.split('-').map(Number);
+  if (!year) return releaseDate;
+  if (!month) return String(year);
+  const date = new Date(year, month - 1, day || 1);
+  if (Number.isNaN(date.getTime())) return releaseDate;
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    ...(day ? { day: 'numeric' } : {}),
+  });
 }

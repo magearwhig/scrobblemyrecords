@@ -10,6 +10,13 @@ import {
   ReleaseTrackingSyncStatus,
   HiddenRelease,
 } from '../../shared/types';
+import {
+  RELEASE_WINDOW_MONTHS,
+  formatReleaseDate,
+  isInReleaseWindow,
+  isUpcomingRelease,
+  toDateString,
+} from '../../shared/utils/releaseWindow';
 import ReleaseCard from '../components/ReleaseCard';
 import { Modal, ModalFooter } from '../components/ui';
 import { Button } from '../components/ui/Button';
@@ -23,11 +30,6 @@ import {
   createAlertNotification,
 } from '../hooks/useNotifications';
 import { getApiService } from '../services/api';
-import {
-  RELEASE_WINDOW_MONTHS,
-  isInReleaseWindow,
-  isUpcomingRelease,
-} from '../utils/releaseWindow';
 
 type TabType = 'all' | 'upcoming' | 'recent' | 'vinyl' | 'reissues';
 type SortOption = 'releaseDate' | 'artistName' | 'title' | 'firstSeen';
@@ -38,6 +40,32 @@ interface DisambiguationModalState {
   searchResults: MusicBrainzArtistMatch[];
   loading: boolean;
   searchQuery: string;
+}
+
+/**
+ * Today's local date (YYYY-MM-DD), updated at midnight and whenever the
+ * window regains focus, so a page left open overnight moves its cutoff.
+ */
+function useToday(): string {
+  const [today, setToday] = useState(() => toDateString(new Date()));
+  useEffect(() => {
+    const update = () => setToday(toDateString(new Date()));
+    const now = new Date();
+    const nextMidnight = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1
+    );
+    const timer = setTimeout(update, nextMidnight.getTime() - now.getTime());
+    window.addEventListener('focus', update);
+    document.addEventListener('visibilitychange', update);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('focus', update);
+      document.removeEventListener('visibilitychange', update);
+    };
+  }, [today]);
+  return today;
 }
 
 interface NewReleasesPageProps {
@@ -206,15 +234,17 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
   // Only releases from the last few months and upcoming ones are shown.
   // "Upcoming" is worked out from today's date: the stored flag is set at
   // sync time and goes stale once the release date passes.
+  const today = useToday();
   const recentReleases = useMemo(() => {
-    const now = new Date();
+    const [year, month, day] = today.split('-').map(Number);
+    const now = new Date(year, month - 1, day);
     return releases
       .filter(r => isInReleaseWindow(r.releaseDate, now))
       .map(r => {
         const isUpcoming = isUpcomingRelease(r.releaseDate, now);
         return isUpcoming === r.isUpcoming ? r : { ...r, isUpcoming };
       });
-  }, [releases]);
+  }, [releases, today]);
 
   // Filter releases based on active tab (excluding hidden)
   const filteredReleases = useMemo(() => {
@@ -518,17 +548,6 @@ const NewReleasesPage: React.FC<NewReleasesPageProps> = ({
         createAlertNotification('Error', 'Could not exclude artist')
       );
     }
-  };
-
-  // Format date for display
-  const formatReleaseDate = (dateStr: string | null): string => {
-    if (!dateStr) return 'Unknown';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
   };
 
   // Get vinyl status badge

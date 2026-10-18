@@ -15,6 +15,7 @@ import {
   TrackedRelease,
   TrackedReleasesStore,
 } from '../../shared/types';
+import { isUpcomingRelease } from '../../shared/utils/releaseWindow';
 import { normalizeArtistName as sharedNormalizeArtistName } from '../../shared/utils/trackNormalization';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
@@ -751,13 +752,7 @@ export class ReleaseTrackingService {
     mbRelease: MusicBrainzRelease,
     coverArtUrl?: string
   ): TrackedRelease {
-    const now = new Date();
-    let isUpcoming = false;
-
-    if (mbRelease.releaseDate) {
-      const releaseDate = new Date(mbRelease.releaseDate);
-      isUpcoming = releaseDate > now;
-    }
+    const isUpcoming = isUpcomingRelease(mbRelease.releaseDate);
 
     return {
       mbid: mbRelease.mbid,
@@ -831,16 +826,7 @@ export class ReleaseTrackingService {
    * `releaseGroupMbid` so the UI can group reissues by album.
    */
   private toReissueTrackedRelease(r: MBReleaseLite): TrackedRelease {
-    const now = new Date();
-    let isUpcoming = false;
-
-    if (r.date) {
-      const releaseDate = new Date(r.date);
-      // new Date(YYYY) and new Date(YYYY-MM) parse to valid dates
-      if (!Number.isNaN(releaseDate.getTime())) {
-        isUpcoming = releaseDate > now;
-      }
-    }
+    const isUpcoming = isUpcomingRelease(r.date);
 
     return {
       mbid: r.mbid,
@@ -1604,7 +1590,12 @@ export class ReleaseTrackingService {
     sortOrder?: 'asc' | 'desc';
     limit?: number;
   }): Promise<TrackedRelease[]> {
-    let releases = await this.getTrackedReleases();
+    // The saved isUpcoming is from sync time; work it out for today
+    const now = new Date();
+    let releases = (await this.getTrackedReleases()).map(r => {
+      const isUpcoming = isUpcomingRelease(r.releaseDate, now);
+      return isUpcoming === r.isUpcoming ? r : { ...r, isUpcoming };
+    });
 
     // Filter out releases from excluded artists
     if (this.hiddenReleasesService) {
