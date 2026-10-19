@@ -38,6 +38,12 @@ jest.mock(
   }
 );
 
+jest.mock('../../../src/renderer/components/whattoplay/CratesContainer', () => {
+  return function MockCratesContainer() {
+    return <div data-testid='crates-container'>Crates Container</div>;
+  };
+});
+
 // Mock tabUtils - dynamically parse the hash for tab value
 jest.mock('../../../src/renderer/utils/tabUtils', () => ({
   getTabFromUrl: jest.fn((_validTabs: string[], defaultTab: string) => {
@@ -92,6 +98,32 @@ describe('WhatToPlayPage', () => {
     expect(
       screen.getByRole('tab', { name: 'Dusty Corners' })
     ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Crates' })).toBeInTheDocument();
+  });
+
+  it('switches to the Crates tab when clicked', async () => {
+    render(<WhatToPlayPage />);
+
+    await user.click(screen.getByRole('tab', { name: 'Crates' }));
+
+    expect(screen.getByTestId('crates-container')).toBeInTheDocument();
+    expect(screen.queryByTestId('suggestions-page')).not.toBeInTheDocument();
+    expect(window.location.hash).toBe('#what-to-play?tab=crates');
+    expect(screen.getByRole('tabpanel')).toHaveAttribute(
+      'id',
+      'what-to-play-panel-crates'
+    );
+  });
+
+  it('opens the Crates tab from the URL', () => {
+    window.location.hash = '#what-to-play?tab=crates';
+    render(<WhatToPlayPage />);
+
+    expect(screen.getByRole('tab', { name: 'Crates' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.getByTestId('crates-container')).toBeInTheDocument();
   });
 
   it('renders tablist with correct aria label', () => {

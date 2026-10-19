@@ -5,6 +5,7 @@ import './AlbumDetailPage.page.css';
 
 import { AlbumDetailResponse } from '../../shared/types';
 import ArtistLink from '../components/ArtistLink';
+import AddToCrateMenu from '../components/crates/AddToCrateMenu';
 import { AlbumListeningArc } from '../components/stats/AlbumListeningArc';
 import TrackLink from '../components/TrackLink';
 import { Button, IconButton } from '../components/ui/Button';
@@ -381,6 +382,12 @@ const AlbumDetailPage: React.FC = () => {
               >
                 View in Collection
               </Button>
+            )}
+            {data.inCollection && data.collectionReleaseId && (
+              <AddToCrateMenu
+                releaseIds={[data.collectionReleaseId]}
+                albumTitle={data.album}
+              />
             )}
           </div>
         </div>

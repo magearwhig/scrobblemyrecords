@@ -18,6 +18,8 @@ import createBackupRouter from './backend/routes/backup';
 import createCollectionRouter from './backend/routes/collection';
 import createCollectionAnalyticsRouter from './backend/routes/collectionAnalytics';
 import { createCompoundArtistRouter } from './backend/routes/compoundArtists';
+import createCratesRouter from './backend/routes/crates';
+import { registerCrateSuggestionRoutes } from './backend/routes/crateSuggestions';
 import createDiscardPileRouter from './backend/routes/discardPile';
 import { createEmbeddingsRouter } from './backend/routes/embeddings';
 import createImagesRouter from './backend/routes/images';
@@ -45,6 +47,9 @@ import { CleanupService } from './backend/services/cleanupService';
 import { CollectionAnalyticsService } from './backend/services/collectionAnalyticsService';
 import { CollectionIndexerService } from './backend/services/collectionIndexerService';
 import { CompoundArtistMappingService } from './backend/services/compoundArtistMappingService';
+import { CrateAlbumTableBuilder } from './backend/services/crateAlbumTable';
+import { CrateService } from './backend/services/crateService';
+import { CrateSuggestionService } from './backend/services/crateSuggestionService';
 import { DiscardPileService } from './backend/services/discardPileService';
 import { DiscogsGenreEnricherService } from './backend/services/discogsGenreEnricherService';
 import { DiscogsService } from './backend/services/discogsService';
@@ -426,6 +431,22 @@ const releaseTrackingService = new ReleaseTrackingService(
 const backupService = new BackupService(fileStorage, resolveDataDir());
 const discardPileService = new DiscardPileService(fileStorage);
 const savedCollectionService = new SavedCollectionService(fileStorage);
+const crateTableBuilder = new CrateAlbumTableBuilder(
+  fileStorage,
+  historyStorage,
+  mappingService,
+  discardPileService
+);
+const crateService = new CrateService(
+  fileStorage,
+  crateTableBuilder,
+  authService
+);
+const crateSuggestionService = new CrateSuggestionService(
+  fileStorage,
+  crateService
+);
+crateService.setSuggestionHook(crateSuggestionService);
 const durationLookupService = new DurationLookupService(
   fileStorage,
   lastfmService,
@@ -507,6 +528,12 @@ app.use(
     historyStorage
   )
 );
+app.use(
+  '/api/v1/crates',
+  createCratesRouter(crateService, router =>
+    registerCrateSuggestionRoutes(router, crateSuggestionService)
+  )
+);
 app.use('/api/v1/wrapped', createWrappedRouter(wrappedService));
 app.use(
   '/api/v1/collection-analytics',
@@ -538,6 +565,7 @@ app.get('/api/v1', (req, res) => {
       backup: '/api/v1/backup',
       discardPile: '/api/v1/discard-pile',
       memoryScrobble: '/api/v1/memory-scrobble',
+      crates: '/api/v1/crates',
       wrapped: '/api/v1/wrapped',
       collectionAnalytics: '/api/v1/collection-analytics',
       jobs: '/api/v1/jobs',
@@ -693,6 +721,7 @@ async function startServer() {
     wrappedService.setArtistNameResolver(artistNameResolver);
     rankingsService.setArtistNameResolver(artistNameResolver);
     analyticsService.setArtistNameResolver(artistNameResolver);
+    crateTableBuilder.setArtistNameResolver(artistNameResolver);
 
     // A backup restore rewrites mapping files; reload everything that keeps
     // them in memory so the restore takes effect without a restart
@@ -703,6 +732,11 @@ async function startServer() {
       artistMappingService.reload();
       // Restored wishlist price alerts
       wishlistPriceService.reload();
+      // Restored crates, discard pile and history rules all feed crates
+      await crateService.reload();
+      await crateSuggestionService.reload();
+      discardPileService.clearCache();
+      crateService.invalidate();
       // Restored unresolved-history rules change the derived index
       historyStorage.invalidateCache();
       await artistNameResolver.rebuild();
@@ -769,7 +803,17 @@ async function startServer() {
       createUnresolvedHistoryRouter(
         unresolvedHistoryService,
         historyStorage,
-        statsService,
+        {
+          // Resolution and exclusion rules change album plays without
+          // touching the index file, so crates can't see them by mtime
+          invalidateStatsCache: async () => {
+            crateService.invalidate();
+            await statsService.invalidateStatsCache();
+          },
+          warmCache: () => statsService.warmCache(),
+          clearForgottenFavoritesCache: () =>
+            statsService.clearForgottenFavoritesCache(),
+        },
         () => artist => artistNameResolver.getDisplayName(artist),
         {
           getSameArtist: () => (a, b) => artistNameResolver.areSameArtist(a, b),

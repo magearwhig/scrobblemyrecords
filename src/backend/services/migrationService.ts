@@ -453,6 +453,20 @@ export class MigrationService {
       optional: true,
     });
 
+    this.register('crates', {
+      path: 'collections/crates.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('crate-suggestions', {
+      path: 'collections/crate-suggestions.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
     // ============================================
     // Embedding & Recommendation Files
     // ============================================

@@ -322,7 +322,7 @@ Click any artist or track name throughout the app to navigate to a dedicated det
 - Album cards throughout the collection
 
 ### 🎲 What to Play
-A hub for deciding what to spin next, with three tabs: **Play Suggestions**, **Forgotten Favorites**, and **Dusty Corners**.
+A hub for deciding what to spin next, with four tabs: **Play Suggestions**, **Forgotten Favorites**, **Dusty Corners**, and **Crates**.
 
 #### Play Suggestions
 Intelligent album recommendations based on 9 weighted factors:
@@ -756,6 +756,21 @@ A Spotify Wrapped-style interactive slideshow summarizing your listening activit
 - Most-played new addition -- when Discogs connected
 - Vinyl vs digital listening breakdown -- when Discogs connected
 - Listening activity heatmap
+
+#### Crates
+Crates you pin show here with **Pick one**, which chooses a random album from the crate and shows why it's there, with **Open release** and **Pick another**.
+
+### 🗂️ Smart Crates
+Library > Crates: saved groups of albums you own that keep themselves up to date. Rules decide what's in a crate, and you can include or exclude albums by hand.
+
+- **Rules** (all must match): format, pressing year, added to Discogs, artist, genre/style, Discogs rating, runtime, discard pile, scrobble count (including top N%), scrobbles in a period, last recorded scrobble, scrobbles since added
+- **Templates**: Most scrobbled with none this year, Recently added to Discogs with no scrobbles since, Jazz in 40 minutes, Dusty shelf
+- **Why it's there**: every album shows a reason per rule; copy-level rules (format, year, runtime…) must all be met by one copy you own
+- **Missing data is counted, not hidden**: albums without a runtime or genre on Discogs are left out by default and shown as "might match", per rule you can include them instead
+- **Manual choices**: include or exclude any album; choices follow the records, not their names, and records you no longer own are listed so you can remove them
+- **Suggested crates**: up to three crates a day mined from your own collection and scrobbles (quiet styles, artist shelves, quiet decades, top albums gone quiet, recently added, short records), with Add, Preview and Not interested
+- **Elsewhere**: pin crates to What to Play, "Add to crate" on Release Details and Album Detail, "Save as crate" from Collection filters
+- Listening rules use Last.fm scrobbles from any source, so crates talk about scrobbles recorded, never about records played. Crates and suggestion history are included in backups
 
 ### 📦 Discard Pile
 Track records you want to sell, gift, trade in, or remove from your collection:

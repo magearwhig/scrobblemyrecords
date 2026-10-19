@@ -19,6 +19,15 @@ import {
   BackupImportResult,
   BackupPreview,
   BackupSettings,
+  Crate,
+  CrateEvaluation,
+  CrateInput,
+  CratePatch,
+  CrateRule,
+  CrateSort,
+  CrateSuggestionsResponse,
+  CrateSummary,
+  CrateTemplate,
   CollectionArtist,
   CollectionFilterPreset,
   CollectionItem,
@@ -2736,6 +2745,107 @@ class ApiService {
       tracks,
     });
     return response.data;
+  }
+
+  // ============================================
+  // Smart Crates
+  // ============================================
+
+  async getCrates(): Promise<CrateSummary[]> {
+    const response = await this.api.get('/crates');
+    return response.data.data;
+  }
+
+  async getCrateTemplates(): Promise<CrateTemplate[]> {
+    const response = await this.api.get('/crates/templates');
+    return response.data.data;
+  }
+
+  async getCrate(
+    id: string
+  ): Promise<{ crate: Crate; evaluation: CrateEvaluation }> {
+    const response = await this.api.get(`/crates/${id}`);
+    return response.data.data;
+  }
+
+  async createCrate(input: CrateInput): Promise<Crate> {
+    const response = await this.api.post('/crates', input);
+    return response.data.data;
+  }
+
+  async updateCrate(id: string, patch: CratePatch): Promise<Crate> {
+    const response = await this.api.put(`/crates/${id}`, patch);
+    return response.data.data;
+  }
+
+  async deleteCrate(id: string): Promise<void> {
+    await this.api.delete(`/crates/${id}`);
+  }
+
+  async previewCrate(
+    rules: CrateRule[],
+    sort?: CrateSort
+  ): Promise<CrateEvaluation> {
+    const response = await this.api.post('/crates/preview', { rules, sort });
+    return response.data.data;
+  }
+
+  async setCrateOverride(
+    id: string,
+    releaseIds: number[],
+    action: 'include' | 'exclude'
+  ): Promise<Crate> {
+    const response = await this.api.post(`/crates/${id}/overrides`, {
+      releaseIds,
+      action,
+    });
+    return response.data.data;
+  }
+
+  async clearCrateOverrides(id: string, releaseIds: number[]): Promise<Crate> {
+    const response = await this.api.delete(`/crates/${id}/overrides`, {
+      data: { releaseIds },
+    });
+    return response.data.data;
+  }
+
+  async removeStaleCrateOverrides(id: string): Promise<Crate> {
+    const response = await this.api.delete(`/crates/${id}/overrides/stale`);
+    return response.data.data;
+  }
+
+  async getCratesForRelease(
+    releaseId: number
+  ): Promise<Array<{ id: string; name: string }>> {
+    const response = await this.api.get(`/crates/for-release/${releaseId}`);
+    return response.data.data;
+  }
+
+  async getCrateSuggestions(
+    limit: 1 | 3 = 3
+  ): Promise<CrateSuggestionsResponse> {
+    const response = await this.api.get('/crates/suggestions', {
+      params: { limit },
+    });
+    return response.data.data;
+  }
+
+  async rerollCrateSuggestions(): Promise<CrateSuggestionsResponse> {
+    const response = await this.api.post('/crates/suggestions/reroll');
+    return response.data.data;
+  }
+
+  async dismissCrateSuggestion(
+    candidateKey: string
+  ): Promise<CrateSuggestionsResponse> {
+    const response = await this.api.post(
+      `/crates/suggestions/${encodeURIComponent(candidateKey)}/dismiss`
+    );
+    return response.data.data;
+  }
+
+  async resetCrateSuggestionHistory(): Promise<void> {
+    await this.api.delete('/crates/suggestions/history');
   }
 
   // Update base URL (for when server URL changes)

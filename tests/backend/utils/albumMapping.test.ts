@@ -2,6 +2,7 @@ import { AlbumMapping } from '../../../src/shared/types';
 import {
   albumGroupKey,
   createAlbumCanonicalizer,
+  createAlbumGroupNameResolver,
   createCollectionNameResolver,
   isCollectionLinked,
 } from '../../../src/shared/utils/albumMapping';
@@ -157,6 +158,95 @@ describe('albumMapping utils', () => {
       ]);
 
       expect(namesFor('The Go-Betweens', 'Tallulah')).toHaveLength(1);
+    });
+  });
+  describe('createAlbumGroupNameResolver', () => {
+    it('unions every copy name with linked and unlinked mapped names', () => {
+      const mappings = [
+        mapping({}),
+        // Unlinked mapping into the collection name: not reached by the
+        // collection resolver, but its plays belong to the album
+        mapping({ historyAlbum: 'tallulah (live)', collectionId: 0 }),
+        mapping({ historyAlbum: 'other', collectionAlbum: 'Other' }),
+      ];
+      const namesFor = createAlbumGroupNameResolver(mappings);
+      const groupKey = createAlbumCanonicalizer(mappings)(
+        'The Go-Betweens',
+        'Tallulah'
+      ).key;
+
+      expect(
+        namesFor(
+          [
+            { artist: 'The Go-Betweens', title: 'Tallulah' },
+            { artist: 'The Go-Betweens', title: 'TALLULAH' },
+            { artist: 'The Go-Betweens', title: 'Tallulah.' },
+          ],
+          groupKey
+        )
+      ).toEqual([
+        { artist: 'The Go-Betweens', album: 'Tallulah' },
+        { artist: 'the go-betweens', album: 'tallulah (remastered)' },
+        { artist: 'The Go-Betweens', album: 'Tallulah.' },
+        { artist: 'the go-betweens', album: 'tallulah (live)' },
+      ]);
+    });
+
+    it('matches mappings through the artist resolver', () => {
+      const mappings = [
+        mapping({
+          historyArtist: 'go-betweens',
+          collectionArtist: 'Go-Betweens',
+          collectionId: 0,
+        }),
+      ];
+      const resolveArtist = (name: string) =>
+        name.toLowerCase() === 'go-betweens' ? 'The Go-Betweens' : name;
+      const namesFor = createAlbumGroupNameResolver(mappings, resolveArtist);
+      const groupKey = createAlbumCanonicalizer(mappings, resolveArtist)(
+        'The Go-Betweens',
+        'Tallulah'
+      ).key;
+
+      expect(
+        namesFor([{ artist: 'The Go-Betweens', title: 'Tallulah' }], groupKey)
+      ).toEqual([
+        { artist: 'The Go-Betweens', album: 'Tallulah' },
+        { artist: 'go-betweens', album: 'tallulah (remastered)' },
+        { artist: 'Go-Betweens', album: 'Tallulah' },
+      ]);
+    });
+
+    it("includes a mapping's target when only its source title is owned", () => {
+      // Owned as the alternate title, merged into the canonical one, with
+      // the scrobbles recorded under the canonical title
+      const mappings = [
+        mapping({
+          historyArtist: 'The Go-Betweens',
+          historyAlbum: 'Tallulah (Alternate)',
+          collectionAlbum: 'Tallulah',
+          collectionId: 0,
+        }),
+      ];
+      const owned = {
+        artist: 'The Go-Betweens',
+        title: 'Tallulah (Alternate)',
+      };
+      const groupKey = createAlbumCanonicalizer(mappings)(
+        owned.artist,
+        owned.title
+      ).key;
+
+      expect(
+        createAlbumGroupNameResolver(mappings)([owned], groupKey)
+      ).toContainEqual({ artist: 'The Go-Betweens', album: 'Tallulah' });
+    });
+
+    it('returns only the copy names when no mapping targets the group', () => {
+      const namesFor = createAlbumGroupNameResolver(null);
+      expect(namesFor([{ artist: 'A', title: 'B' }], 'a|b')).toEqual([
+        { artist: 'A', album: 'B' },
+      ]);
     });
   });
 });

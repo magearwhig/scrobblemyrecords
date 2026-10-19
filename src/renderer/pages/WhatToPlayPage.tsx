@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 import './WhatToPlayPage.page.css';
 
+import CratesContainer from '../components/whattoplay/CratesContainer';
 import DustyCornersContainer from '../components/whattoplay/DustyCornersContainer';
 import ForgottenFavoritesContainer from '../components/whattoplay/ForgottenFavoritesContainer';
 import { useTabKeyNavigation } from '../hooks/useTabKeyNavigation';
@@ -10,14 +11,20 @@ import { getTabFromUrl } from '../utils/tabUtils';
 
 import SuggestionsPage from './SuggestionsPage';
 
-type WhatToPlayTab = 'suggestions' | 'forgotten' | 'dusty';
+type WhatToPlayTab = 'suggestions' | 'forgotten' | 'dusty' | 'crates';
 
-const VALID_TABS: WhatToPlayTab[] = ['suggestions', 'forgotten', 'dusty'];
+const VALID_TABS: WhatToPlayTab[] = [
+  'suggestions',
+  'forgotten',
+  'dusty',
+  'crates',
+];
 
 const TAB_LABELS: Record<WhatToPlayTab, string> = {
   suggestions: 'Play Suggestions',
   forgotten: 'Forgotten Favorites',
   dusty: 'Dusty Corners',
+  crates: 'Crates',
 };
 
 const WhatToPlayPage: React.FC = () => {
@@ -77,6 +84,7 @@ const WhatToPlayPage: React.FC = () => {
         {activeTab === 'suggestions' && <SuggestionsPage embedded />}
         {activeTab === 'forgotten' && <ForgottenFavoritesContainer />}
         {activeTab === 'dusty' && <DustyCornersContainer />}
+        {activeTab === 'crates' && <CratesContainer />}
       </div>
     </div>
   );

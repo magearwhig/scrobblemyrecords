@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Boxes,
   Brain,
   ChevronLeft,
   ChevronRight,
@@ -95,6 +96,13 @@ const Sidebar: React.FC<SidebarProps> = ({
           id: ROUTES.COLLECTION,
           label: 'Browse Collection',
           icon: <Disc3 size={18} aria-hidden='true' />,
+          enabled: authStatus.discogs.authenticated,
+          disabledReason: discogsReason,
+        },
+        {
+          id: ROUTES.CRATES,
+          label: 'Crates',
+          icon: <Boxes size={18} aria-hidden='true' />,
           enabled: authStatus.discogs.authenticated,
           disabledReason: discogsReason,
         },

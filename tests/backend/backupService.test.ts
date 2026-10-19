@@ -670,6 +670,334 @@ describe('BackupService', () => {
       expect(replaced['1'].maxPrice).toBe(30);
     });
 
+    it('backs up and restores crates, and counts them in the preview', async () => {
+      const crate = (id: string, name: string, updatedAt: number) => ({
+        id,
+        name,
+        rules: [],
+        overrides: [],
+        sort: 'artist',
+        pinnedToWhatToPlay: false,
+        createdAt: 1,
+        updatedAt,
+      });
+      await fileStorage.writeJSON('collections/crates.json', {
+        schemaVersion: 1,
+        crates: [crate('a', 'Jazz', 10), crate('b', 'Short', 10)],
+      });
+      await fileStorage.writeJSON('wishlist/price-alerts.json', {
+        schemaVersion: 1,
+        alerts: {
+          '1': {
+            masterId: 1,
+            maxPrice: 30,
+            currency: 'USD',
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+      });
+
+      const preview = await service.getBackupPreview();
+      expect(preview.cratesCount).toBe(2);
+      expect(preview.wishlistPriceAlertsCount).toBe(1);
+
+      const backupJson = await service.exportBackup({
+        includeCredentials: false,
+      });
+      expect(
+        JSON.parse(backupJson).data.crates.map((c: { id: string }) => c.id)
+      ).toEqual(['a', 'b']);
+
+      // After the backup: crate a renamed later, crate c added
+      await fileStorage.writeJSON('collections/crates.json', {
+        schemaVersion: 1,
+        crates: [crate('a', 'Jazz shelf', 50), crate('c', 'New', 50)],
+      });
+      const importPreview = await service.previewImport(backupJson);
+      expect(importPreview.summary.crates).toEqual({ new: 1, existing: 1 });
+
+      await service.importBackup(backupJson, { mode: 'merge' });
+      let store = await fileStorage.readJSON<{
+        crates: Array<{ id: string; name: string }>;
+      }>('collections/crates.json');
+      expect(store!.crates.map(c => [c.id, c.name]).sort()).toEqual([
+        ['a', 'Jazz shelf'],
+        ['b', 'Short'],
+        ['c', 'New'],
+      ]);
+
+      await service.importBackup(backupJson, { mode: 'replace' });
+      store = await fileStorage.readJSON('collections/crates.json');
+      expect(store!.crates.map(c => [c.id, c.name])).toEqual([
+        ['a', 'Jazz'],
+        ['b', 'Short'],
+      ]);
+    });
+
+    it('a replace restore of a backup with no crates clears them', async () => {
+      const backupJson = await service.exportBackup({
+        includeCredentials: false,
+      });
+      expect(JSON.parse(backupJson).data.crates).toEqual([]);
+      await fileStorage.writeJSON('collections/crates.json', {
+        schemaVersion: 1,
+        crates: [{ id: 'later', name: 'Later', updatedAt: 1 }],
+      });
+
+      await service.importBackup(backupJson, { mode: 'merge' });
+      let store = await fileStorage.readJSON<{ crates: unknown[] }>(
+        'collections/crates.json'
+      );
+      expect(store!.crates).toHaveLength(1);
+
+      await service.importBackup(backupJson, { mode: 'replace' });
+      store = await fileStorage.readJSON('collections/crates.json');
+      expect(store!.crates).toEqual([]);
+    });
+
+    it('imports an older backup without crates and leaves crates alone', async () => {
+      await fileStorage.writeJSON('collections/crates.json', {
+        schemaVersion: 1,
+        crates: [
+          {
+            id: 'keep',
+            name: 'Keep',
+            rules: [],
+            overrides: [],
+            sort: 'artist',
+            pinnedToWhatToPlay: false,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        ],
+      });
+      const backupJson = await service.exportBackup({
+        includeCredentials: false,
+      });
+      const backup = JSON.parse(backupJson);
+      delete backup.data.crates;
+      const { checksum: _checksum, ...rest } = backup;
+      void _checksum;
+      const legacy = JSON.stringify({
+        ...rest,
+        checksum: (
+          service as unknown as { computeChecksum(d: object): string }
+        ).computeChecksum(backup.data),
+      });
+
+      const result = await service.importBackup(legacy, { mode: 'replace' });
+      expect(result.errors).toEqual([]);
+      const store = await fileStorage.readJSON<{ crates: unknown[] }>(
+        'collections/crates.json'
+      );
+      expect(store!.crates).toHaveLength(1);
+    });
+
+    describe('crate suggestion records', () => {
+      const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+      const SUGGESTIONS = 'collections/crate-suggestions.json';
+      const CRATES = 'collections/crates.json';
+      const rec = (
+        candidateKey: string,
+        status: 'active' | 'dismissed' | 'added',
+        updatedAt: number
+      ) => ({
+        candidateKey,
+        status,
+        daysShown: 1,
+        lastShownDay: '2026-10-18',
+        updatedAt,
+      });
+      const batch = {
+        day: '2026-10-18',
+        keys: ['artist:a'],
+        shownToday: ['artist:a'],
+        previousKeys: [],
+      };
+      const crateStore = {
+        schemaVersion: 1,
+        crates: [
+          {
+            id: 'keep',
+            name: 'Keep',
+            rules: [],
+            overrides: [],
+            sort: 'artist',
+            pinnedToWhatToPlay: false,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        ],
+      };
+      /** Re-sign a backup after editing its data */
+      const resign = (backup: { data: object; checksum?: string }) =>
+        JSON.stringify({
+          ...backup,
+          checksum: (
+            service as unknown as { computeChecksum(d: object): string }
+          ).computeChecksum(backup.data),
+        });
+
+      it('backs up records only, merges by newer updatedAt and drops the batch on restore', async () => {
+        await fileStorage.writeJSON(SUGGESTIONS, {
+          schemaVersion: 1,
+          records: [
+            rec('artist:a', 'active', 10),
+            rec('artist:b', 'dismissed', 10),
+          ],
+          batch,
+        });
+
+        const preview = await service.getBackupPreview();
+        expect(preview.crateSuggestionsCount).toBe(2);
+        const backupJson = await service.exportBackup({
+          includeCredentials: false,
+        });
+        const exported = JSON.parse(backupJson).data;
+        expect(exported.crateSuggestions).toEqual([
+          rec('artist:a', 'active', 10),
+          rec('artist:b', 'dismissed', 10),
+        ]);
+        expect(JSON.stringify(exported)).not.toContain('shownToday');
+
+        // After the backup: a dismissed (newer than the backup), b gone,
+        // c added
+        await fileStorage.writeJSON(SUGGESTIONS, {
+          schemaVersion: 1,
+          records: [
+            rec('artist:a', 'dismissed', 50),
+            rec('artist:c', 'added', 50),
+          ],
+          batch,
+        });
+        const importPreview = await service.previewImport(backupJson);
+        expect(importPreview.summary.crateSuggestions).toEqual({
+          new: 1,
+          existing: 1,
+        });
+
+        await service.importBackup(backupJson, { mode: 'merge' });
+        let store = await fileStorage.readJSON<{
+          records: Array<{ candidateKey: string; status: string }>;
+          batch?: unknown;
+        }>(SUGGESTIONS);
+        expect(
+          store!.records.map(r => [r.candidateKey, r.status]).sort()
+        ).toEqual([
+          ['artist:a', 'dismissed'], // newer local tombstone kept
+          ['artist:b', 'dismissed'], // restored tombstone
+          ['artist:c', 'added'],
+        ]);
+        expect(store!.batch).toBeUndefined();
+
+        await fileStorage.writeJSON(SUGGESTIONS, {
+          schemaVersion: 1,
+          records: [rec('artist:z', 'active', 99)],
+          batch,
+        });
+        await service.importBackup(backupJson, { mode: 'replace' });
+        store = await fileStorage.readJSON(SUGGESTIONS);
+        expect(store!.records.map(r => [r.candidateKey, r.status])).toEqual([
+          ['artist:a', 'active'],
+          ['artist:b', 'dismissed'],
+        ]);
+        expect(store!.batch).toBeUndefined();
+      });
+
+      it('restoring crates leaves suggestion state untouched and vice versa', async () => {
+        await fileStorage.writeJSON(CRATES, crateStore);
+        await fileStorage.writeJSON(SUGGESTIONS, {
+          schemaVersion: 1,
+          records: [rec('artist:a', 'dismissed', 10)],
+        });
+        const backup = JSON.parse(
+          await service.exportBackup({ includeCredentials: false })
+        );
+
+        // Local state after the backup
+        const laterSuggestions = {
+          schemaVersion: 1,
+          records: [rec('artist:later', 'added', 20)],
+          batch,
+        };
+        const laterCrates = { schemaVersion: 1, crates: [] };
+
+        // A crates-only backup does not touch crate-suggestions.json
+        await fileStorage.writeJSON(SUGGESTIONS, laterSuggestions);
+        const cratesOnly = clone(backup);
+        delete cratesOnly.data.crateSuggestions;
+        for (const mode of ['merge', 'replace'] as const) {
+          const result = await service.importBackup(resign(cratesOnly), {
+            mode,
+          });
+          expect(result.errors).toEqual([]);
+          expect(await fileStorage.readJSON(SUGGESTIONS)).toEqual(
+            laterSuggestions
+          );
+        }
+
+        // A suggestions-only backup does not touch crates.json
+        await fileStorage.writeJSON(CRATES, laterCrates);
+        const suggestionsOnly = clone(backup);
+        delete suggestionsOnly.data.crates;
+        for (const mode of ['merge', 'replace'] as const) {
+          const result = await service.importBackup(resign(suggestionsOnly), {
+            mode,
+          });
+          expect(result.errors).toEqual([]);
+          expect(await fileStorage.readJSON(CRATES)).toEqual(laterCrates);
+        }
+      });
+
+      it('a merge of an empty suggestion list keeps records but drops the batch', async () => {
+        const backupJson = await service.exportBackup({
+          includeCredentials: false,
+        });
+        expect(JSON.parse(backupJson).data.crateSuggestions).toEqual([]);
+        await fileStorage.writeJSON(SUGGESTIONS, {
+          schemaVersion: 1,
+          records: [rec('artist:a', 'dismissed', 10)],
+          batch,
+        });
+        await service.importBackup(backupJson, { mode: 'merge' });
+        expect(await fileStorage.readJSON(SUGGESTIONS)).toEqual({
+          schemaVersion: 1,
+          records: [rec('artist:a', 'dismissed', 10)],
+        });
+        await service.importBackup(backupJson, { mode: 'replace' });
+        expect(await fileStorage.readJSON(SUGGESTIONS)).toEqual({
+          schemaVersion: 1,
+          records: [],
+        });
+      });
+
+      it('imports an older backup without suggestion records and leaves them alone', async () => {
+        const local = {
+          schemaVersion: 1,
+          records: [rec('artist:a', 'dismissed', 10)],
+          batch,
+        };
+        const backup = JSON.parse(
+          await service.exportBackup({ includeCredentials: false })
+        );
+        delete backup.data.crateSuggestions;
+        await fileStorage.writeJSON(SUGGESTIONS, local);
+
+        const importPreview = await service.previewImport(resign(backup));
+        expect(importPreview.valid).toBe(true);
+        expect(importPreview.summary.crateSuggestions).toEqual({
+          new: 0,
+          existing: 0,
+        });
+        const result = await service.importBackup(resign(backup), {
+          mode: 'replace',
+        });
+        expect(result.errors).toEqual([]);
+        expect(await fileStorage.readJSON(SUGGESTIONS)).toEqual(local);
+      });
+    });
+
     it('lets a running service see restored data before its next edit (afterImport hook)', async () => {
       // A backup that contains mapping A
       const mappingA = createAlbumMapping({

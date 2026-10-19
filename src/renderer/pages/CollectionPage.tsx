@@ -1,4 +1,4 @@
-import { AlertTriangle, Bookmark, X } from 'lucide-react';
+import { AlertTriangle, Bookmark, Boxes, X } from 'lucide-react';
 import React, {
   useState,
   useEffect,
@@ -32,8 +32,12 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
-import { navigate } from '../routes';
+import { ROUTES, navigate } from '../routes';
 import { getApiService } from '../services/api';
+import {
+  collectionFiltersToCrateRules,
+  stashCrateRulesFromCollection,
+} from '../utils/collectionFiltersToCrateRules';
 import {
   clearCollectionViewSnapshot,
   readCollectionViewSnapshotForReturn,
@@ -392,6 +396,21 @@ const CollectionPage: React.FC = () => {
     setNewPresetName('');
     setSavingPreset(false);
     showToast('success', `Preset "${newPreset.name}" saved`);
+  };
+
+  // Turn the active filters into crate rules and open the crate editor
+  const handleSaveAsCrate = () => {
+    const rules = collectionFiltersToCrateRules({
+      format: filterFormat,
+      yearFrom: filterYearFrom,
+      yearTo: filterYearTo,
+      dateAdded: filterDateAdded,
+    });
+    if (!stashCrateRulesFromCollection(rules)) {
+      showToast('error', 'Could not pass the filters to the crate editor');
+      return;
+    }
+    navigate(ROUTES.CRATES, { new: '1', from: 'collection' });
   };
 
   const handleDeletePreset = async (presetId: string) => {
@@ -1383,6 +1402,10 @@ const CollectionPage: React.FC = () => {
             >
               <Bookmark size={14} aria-hidden='true' />
               Save as Preset
+            </Button>
+            <Button variant='ghost' size='small' onClick={handleSaveAsCrate}>
+              <Boxes size={14} aria-hidden='true' />
+              Save as crate
             </Button>
           </div>
         )}

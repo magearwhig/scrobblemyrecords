@@ -1,0 +1,42 @@
+.crate-might-match {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.crate-might-match-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  background: transparent;
+}
+
+.crate-might-match-line svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--status-warning);
+}
+
+.crate-might-match-sample {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.crate-might-match-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.crate-might-match-total {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+}
