@@ -15,10 +15,12 @@ import React, {
   useState,
 } from 'react';
 
+import { CRATE_SORTS } from '../../shared/crateTemplates';
 import {
   Crate,
   CrateAlbumResult,
   CrateEvaluation,
+  CrateSort,
   CrateSummary,
   CrateTemplate,
 } from '../../shared/types';
@@ -29,6 +31,7 @@ import CrateCoverageNotice from '../components/crates/CrateCoverageNotice';
 import CrateEditor from '../components/crates/CrateEditor';
 import CrateExcludedSection from '../components/crates/CrateExcludedSection';
 import CrateMightMatch from '../components/crates/CrateMightMatch';
+import { sortLabel } from '../components/crates/CrateRuleBuilder';
 import { apiErrorInfo } from '../components/crates/crateRuleModel';
 import CrateStaleOverrides from '../components/crates/CrateStaleOverrides';
 import CrateSuggestionHistoryReset from '../components/crates/CrateSuggestionHistoryReset';
@@ -293,6 +296,30 @@ const CratesPage: React.FC = () => {
       }
     },
     [api, confirm, addNotification, notifyError]
+  );
+
+  const [sortBusy, setSortBusy] = useState(false);
+
+  /** Save a new sort and reload the crate in that order */
+  const changeSort = useCallback(
+    async (id: string, sort: CrateSort) => {
+      setSortBusy(true);
+      setDetail(prev =>
+        prev && prev.crate.id === id
+          ? { ...prev, crate: { ...prev.crate, sort } }
+          : prev
+      );
+      try {
+        await api.updateCrate(id, { sort });
+        await loadDetail(id);
+      } catch (err) {
+        notifyError('Could not change the sort', err);
+        await loadDetail(id);
+      } finally {
+        setSortBusy(false);
+      }
+    },
+    [api, loadDetail, notifyError]
   );
 
   const runOverride = useCallback(
@@ -579,6 +606,26 @@ const CratesPage: React.FC = () => {
           </aside>
 
           <div className='crates-detail-main'>
+            {count > 1 && (
+              <div className='crates-detail-toolbar'>
+                <label htmlFor='crate-detail-sort'>Sort by</label>
+                <select
+                  id='crate-detail-sort'
+                  className='form-select'
+                  value={crate.sort}
+                  disabled={sortBusy}
+                  onChange={e =>
+                    changeSort(crate.id, e.target.value as CrateSort)
+                  }
+                >
+                  {CRATE_SORTS.map(option => (
+                    <option key={option} value={option}>
+                      {sortLabel(option)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             {count === 0 ? (
               <EmptyState
                 size='small'

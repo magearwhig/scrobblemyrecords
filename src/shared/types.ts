@@ -3530,11 +3530,17 @@ export interface CrateOverride {
 
 export type CrateSort =
   | 'artist'
+  | 'album'
   | 'lastPlayedAsc'
+  | 'lastPlayedDesc'
   | 'scrobblesDesc'
   | 'scrobblesAsc'
   | 'dateAddedDesc'
-  | 'runtimeAsc';
+  | 'dateAddedAsc'
+  | 'yearAsc'
+  | 'yearDesc'
+  | 'runtimeAsc'
+  | 'runtimeDesc';
 
 export interface Crate {
   /** crypto.randomUUID() */

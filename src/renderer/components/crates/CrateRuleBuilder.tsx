@@ -1,7 +1,7 @@
 import { AlertCircle, Plus, Trash2, X } from 'lucide-react';
 import React, { useEffect, useId, useRef, useState } from 'react';
 
-import { CRATE_MAX_RULES } from '../../../shared/crateTemplates';
+import { CRATE_MAX_RULES, CRATE_SORTS } from '../../../shared/crateTemplates';
 import {
   CrateEvaluation,
   CratePeriod,
@@ -33,15 +33,6 @@ import {
   supportsIfUnknown,
 } from './crateRuleModel';
 import './CrateRuleBuilder.css';
-
-export const CRATE_SORTS: CrateSort[] = [
-  'artist',
-  'lastPlayedAsc',
-  'scrobblesDesc',
-  'scrobblesAsc',
-  'dateAddedDesc',
-  'runtimeAsc',
-];
 
 export function sortLabel(sort: CrateSort): string {
   return phrase(`builder.sort.${sort}` as CratePhraseKey);

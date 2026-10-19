@@ -328,6 +328,47 @@ describe('CratesPage', () => {
       ).toBeInTheDocument();
     });
 
+    it('changes the sort from the crate page and reloads in that order', async () => {
+      const user = userEvent.setup();
+      const twoAlbums = makeEvaluation({
+        albums: [
+          makeAlbum(),
+          makeAlbum({ albumKey: 'other', album: 'Other Album' }),
+        ],
+      });
+      mockApi.getCrate.mockResolvedValue({
+        crate: makeCrate(),
+        evaluation: twoAlbums,
+      });
+      renderPage();
+      const select = await screen.findByLabelText('Sort by');
+      expect(
+        within(select).getByRole('option', {
+          name: 'Pressing year, newest first',
+        })
+      ).toBeInTheDocument();
+
+      mockApi.getCrate.mockClear();
+      mockApi.getCrate.mockResolvedValue({
+        crate: makeCrate({ sort: 'yearDesc' }),
+        evaluation: twoAlbums,
+      });
+      await user.selectOptions(select, 'yearDesc');
+      expect(mockApi.updateCrate).toHaveBeenCalledWith('crate-1', {
+        sort: 'yearDesc',
+      });
+      await waitFor(() =>
+        expect(mockApi.getCrate).toHaveBeenCalledWith('crate-1')
+      );
+      expect(select).toHaveValue('yearDesc');
+    });
+
+    it('hides the sort menu when there is at most one album', async () => {
+      renderPage();
+      expect(await screen.findByText('Format is Vinyl')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Sort by')).not.toBeInTheDocument();
+    });
+
     it('shows the unique might-match total when several rules have gaps', async () => {
       mockApi.getCrate.mockResolvedValue({
         crate: makeCrate(),

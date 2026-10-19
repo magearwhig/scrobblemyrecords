@@ -308,6 +308,12 @@ export const CRATE_PHRASES = {
   'builder.sort.scrobblesAsc': 'Fewest scrobbles first',
   'builder.sort.dateAddedDesc': 'Most recently added to Discogs first',
   'builder.sort.runtimeAsc': 'Shortest runtime first',
+  'builder.sort.album': 'Album title, A to Z',
+  'builder.sort.lastPlayedDesc': 'Last scrobble, newest first',
+  'builder.sort.dateAddedAsc': 'Earliest added to Discogs first',
+  'builder.sort.yearAsc': 'Pressing year, oldest first',
+  'builder.sort.yearDesc': 'Pressing year, newest first',
+  'builder.sort.runtimeDesc': 'Longest runtime first',
 
   // ---- Suggested crates: names ----
   'suggestion.styleQuiet.name': '{style} with no scrobbles in {span}',
@@ -474,6 +480,8 @@ export const CRATE_PHRASE_TOPICS: Partial<
   'builder.sort.scrobblesDesc': ['listening'],
   'builder.sort.scrobblesAsc': ['listening'],
   'builder.sort.dateAddedDesc': ['dateAdded'],
+  'builder.sort.lastPlayedDesc': ['listening'],
+  'builder.sort.dateAddedAsc': ['dateAdded'],
   'suggestion.styleQuiet.name': ['listening'],
   'suggestion.decadeQuiet.name': ['listening'],
   'suggestion.topQuiet.name': ['listening'],

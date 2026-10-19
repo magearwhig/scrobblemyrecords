@@ -1025,6 +1025,54 @@ describe('crateEvaluator', () => {
       expect(evaluation.albums.map(a => a.artist)).toEqual(['Old', 'Mid']);
     });
 
+    it('album sorts by title, then artist', () => {
+      expect(
+        order('album', [mk('A', 'Zed'), mk('C', 'beta'), mk('B', 'Beta')])
+      ).toEqual(['B/Beta', 'C/beta', 'A/Zed']);
+    });
+
+    it('lastPlayedDesc puts the newest first and none recorded last', () => {
+      expect(
+        order('lastPlayedDesc', [
+          mk('C', '1'),
+          mk('B', '1', { plays: [sec(daysAgo(100))] }),
+          mk('A', '1', { plays: [sec(daysAgo(1))] }),
+        ])
+      ).toEqual(['A/1', 'B/1', 'C/1']);
+    });
+
+    it('dateAddedAsc uses the earliest copy', () => {
+      expect(
+        order('dateAddedAsc', [
+          mk('A', '1', { added: daysAgo(10).getTime() }),
+          mk('B', '1', { added: daysAgo(500).getTime() }),
+        ])
+      ).toEqual(['B/1', 'A/1']);
+    });
+
+    it('pressing year either way, unknown year last', () => {
+      const items = () => {
+        const list = [mk('A', '1'), mk('B', '1'), mk('C', '1')];
+        list[0].c.year = 1999;
+        list[1].c.year = 1972;
+        list[2].c.year = undefined;
+        return list;
+      };
+      expect(order('yearAsc', items())).toEqual(['B/1', 'A/1', 'C/1']);
+      expect(order('yearDesc', items())).toEqual(['A/1', 'B/1', 'C/1']);
+    });
+
+    it('runtimeDesc puts the longest first and unknown last', () => {
+      expect(
+        order('runtimeDesc', [
+          mk('A', '1'),
+          mk('B', '1', { runtimeSec: 1200 }),
+          mk('C', '1', { runtimeSec: 3000 }),
+        ])
+      ).toEqual(['C/1', 'B/1', 'A/1']);
+      expect(crateNeedsFacts([], 'runtimeDesc')).toBe(true);
+    });
+
     it('runtimeAsc puts unknown runtime last', () => {
       expect(
         order('runtimeAsc', [

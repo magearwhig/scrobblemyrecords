@@ -41,7 +41,7 @@ export interface CrateEvalInput {
  * a runtime sort (which shows nothing useful without runtimes)
  */
 export function crateNeedsFacts(rules: CrateRule[], sort?: CrateSort): boolean {
-  if (sort === 'runtimeAsc') return true;
+  if (sort === 'runtimeAsc' || sort === 'runtimeDesc') return true;
   return rules.some(
     rule =>
       rule.field === 'genre' ||
@@ -510,11 +510,38 @@ export function compareCrateAlbums(
   const latestAdded = (a: CrateAlbumResult) =>
     latestAddedOf?.(a) ??
     Math.max(...a.copies.map(c => Date.parse(c.dateAdded) || 0));
+  const earliestAdded = (a: CrateAlbumResult) =>
+    Math.min(...a.copies.map(c => Date.parse(c.dateAdded) || Infinity));
+  /** Pressing year of the witness copy; undefined when Discogs has none */
+  const pressingYear = (a: CrateAlbumResult) =>
+    (a.copies.find(c => c.releaseId === a.witnessReleaseId) ?? a.copies[0])
+      ?.year || undefined;
+  /** Ascending order with missing values last, in either direction */
+  const missingLast = (
+    va: number | undefined | null,
+    vb: number | undefined | null,
+    descending: boolean
+  ) => {
+    const ma = va === undefined || va === null;
+    const mb = vb === undefined || vb === null;
+    if (ma || mb) return ma === mb ? 0 : ma ? 1 : -1;
+    if (va === vb) return 0;
+    return (va < vb ? -1 : 1) * (descending ? -1 : 1);
+  };
 
   const primary = (a: CrateAlbumResult, b: CrateAlbumResult): number => {
     switch (sort) {
       case 'artist':
         return 0;
+      case 'album':
+        return compareText(a.album, b.album);
+      case 'lastPlayedDesc':
+        // Newest scrobble first; none recorded last
+        return missingLast(
+          a.listening.lastPlayed,
+          b.listening.lastPlayed,
+          true
+        );
       case 'lastPlayedAsc': {
         // No recorded scrobbles first
         const la = a.listening.lastPlayed ?? -Infinity;
@@ -527,6 +554,14 @@ export function compareCrateAlbums(
         return a.listening.scrobbleCount - b.listening.scrobbleCount;
       case 'dateAddedDesc':
         return latestAdded(b) - latestAdded(a);
+      case 'dateAddedAsc':
+        return earliestAdded(a) - earliestAdded(b);
+      case 'yearAsc':
+        return missingLast(pressingYear(a), pressingYear(b), false);
+      case 'yearDesc':
+        return missingLast(pressingYear(a), pressingYear(b), true);
+      case 'runtimeDesc':
+        return missingLast(a.runtimeSeconds, b.runtimeSeconds, true);
       case 'runtimeAsc': {
         // Unknown runtime last
         const ra = a.runtimeSeconds ?? Infinity;

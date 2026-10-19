@@ -1,4 +1,4 @@
-import { CrateRuleField, CrateTemplate } from './types';
+import { CrateRuleField, CrateSort, CrateTemplate } from './types';
 
 /**
  * Copy-level fields describe one owned copy. All copy-level rules of a crate
@@ -23,6 +23,22 @@ export const CRATE_LISTENING_FIELDS: ReadonlySet<CrateRuleField> = new Set([
   'lastRecordedPlay',
   'playsSinceAdded',
 ]);
+
+/** Every sort a crate can have, in the order the sort menus list them */
+export const CRATE_SORTS: readonly CrateSort[] = [
+  'artist',
+  'album',
+  'scrobblesDesc',
+  'scrobblesAsc',
+  'lastPlayedAsc',
+  'lastPlayedDesc',
+  'dateAddedDesc',
+  'dateAddedAsc',
+  'yearAsc',
+  'yearDesc',
+  'runtimeAsc',
+  'runtimeDesc',
+];
 
 export const CRATE_MAX_RULES = 20;
 export const CRATE_NAME_MAX_LENGTH = 80;

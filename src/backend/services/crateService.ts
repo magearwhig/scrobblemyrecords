@@ -11,6 +11,7 @@ import crypto from 'crypto';
 import {
   CRATE_MAX_RULES,
   CRATE_NAME_MAX_LENGTH,
+  CRATE_SORTS,
 } from '../../shared/crateTemplates';
 import {
   Crate,
@@ -36,14 +37,6 @@ import { CrateAlbumTable, CrateEvalContext } from './crateTableTypes';
 
 export const CRATES_FILE = 'collections/crates.json';
 
-const CRATE_SORTS: readonly CrateSort[] = [
-  'artist',
-  'lastPlayedAsc',
-  'scrobblesDesc',
-  'scrobblesAsc',
-  'dateAddedDesc',
-  'runtimeAsc',
-];
 const MAX_OVERRIDE_RELEASE_IDS = 50;
 const MAX_DESCRIPTION_LENGTH = 500;
 
