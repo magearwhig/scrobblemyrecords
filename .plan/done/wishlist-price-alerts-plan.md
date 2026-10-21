@@ -1,9 +1,9 @@
 # Wishlist Price Alerts Plan (#19, narrowed)
 
 Backlog item #19 from `.plan/backlog-shark-tank-2026-03-08.md`. Replaces the
-#19 part of [cancelled/marketplace-upgrade-plan.md](cancelled/marketplace-upgrade-plan.md).
+#19 part of [cancelled/marketplace-upgrade-plan.md](../cancelled/marketplace-upgrade-plan.md).
 
-> **Status: Implemented (2026-10-14) on branch `feat/wishlist-price-alerts`, not yet merged.**
+> **Status: Complete. Merged 2026-10-14 (PR #13, `e1adf29`).**
 > Backend: `WishlistPriceService` (price cache, rolling refresh, alerts,
 > notifications via the job toast), routes under `/wishlist/price-alerts`,
 > backup of alerts. Frontend: lowest listing and alert control on each

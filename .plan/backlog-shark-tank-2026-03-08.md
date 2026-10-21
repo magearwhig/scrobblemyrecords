@@ -2,8 +2,8 @@
 
 Generated via a 7-agent brainstorming session. The session summary recorded 25 accepted items from 39 pitches, but only 24 numbered items (#1–#24) were written down.
 
-**Status (updated 2026-10-14): 24 tracked items, 19 done, 1 dropped (#20), 4 remaining (#19 in progress).**
-The remaining items are grouped into 3 open efforts (C, D, F). Efforts A, B and E are done. On 2026-10-14 the user narrowed #19 to wishlist price alerts and dropped #20 (seller match auto-scan).
+**Status (updated 2026-10-21): 24 tracked items, 20 done, 1 dropped (#20), 3 remaining.**
+The remaining items are grouped into 2 open efforts (D, F). Efforts A, B, C and E are done. #19 shipped 2026-10-14 (PR #13). On 2026-10-14 the user narrowed #19 to wishlist price alerts and dropped #20 (seller match auto-scan).
 
 ### Count reconciliation
 
@@ -17,7 +17,7 @@ Earlier revisions of this file contradicted each other. The header said "16 comp
 
 ---
 
-## Completed Items (19)
+## Completed Items (20)
 
 The evidence column lists the symbol or file that proves each item exists in the current code.
 
@@ -38,6 +38,7 @@ The evidence column lists the symbol or file that proves each item exists in the
 | 15 | Batch Collection Lookup | A | `ScrobbleHistoryStorage.batchLookup()` |
 | 16 | Taste Drift Dashboard | B | `TasteDriftChart` on `StatsPage`; taste-drift method in `genreAnalysisService` |
 | 17 | Stats Cache Warming | A | `ScrobbleHistorySyncService.setStatsWarmer()` calls `warmCache()` after each sync |
+| 19 | Wishlist price alerts (narrowed from marketplace price trends) | C | `WishlistPriceService`, `WishlistPriceAlert.tsx`; PR #13 |
 | 21 | useAsync Hook | — | `src/renderer/hooks/useAsync.ts` exists, but **nothing calls it yet** |
 | 22 | Saved Filter Presets | — | `CollectionFilterPreset` save/load on `CollectionPage` |
 | 23 | History Tab Default | — | `historyDefaultTab` preference in `SettingsPreferencesSection`, read by `HistoryPage` |
@@ -49,17 +50,16 @@ Follow-ups found during verification. These are not reopened items:
 
 ---
 
-## Remaining Work (4 items, 3 efforts; #20 dropped)
+## Remaining Work (3 items, 2 efforts; #20 dropped)
 
 | # | Item | Effort | Plan | Status |
 |---|------|--------|------|--------|
 | 5 | Personal journal / listening notes | D | [listening-notes-plan.md](listening-notes-plan.md) | Planned, not started |
 | 9 | CSV/JSON data export | D | [data-export-plan.md](data-export-plan.md) | Planned, not started |
 | 18 | Context tags | F | [context-tags-plan.md](context-tags-plan.md) | Planned, not started |
-| 19 | Marketplace price trend tracking → narrowed to wishlist price alerts | C | [wishlist-price-alerts-plan.md](wishlist-price-alerts-plan.md) | In progress (2026-10-14), branch `feat/wishlist-price-alerts` |
 | ~~20~~ | ~~Seller match auto-scan~~ | C | [cancelled/marketplace-upgrade-plan.md](cancelled/marketplace-upgrade-plan.md) | Dropped by the user 2026-10-14 |
 
-Verified 2026-10-11 that none of these had started (#19 has since started, 2026-10-14). There is no notes service or `data/notes/`, no `/api/v1/export` route, no `context` field on `ScrobbleSession`, and no `price-history.json` or scheduled seller scan. The only `setInterval` in `src/server.ts` is the 6-hourly auto-backup check.
+Verified 2026-10-11 that none of these had started (#19 has since shipped, 2026-10-14). There is no notes service or `data/notes/`, no `/api/v1/export` route, no `context` field on `ScrobbleSession`, and no `price-history.json` or scheduled seller scan. The only `setInterval` in `src/server.ts` is the 6-hourly auto-backup check.
 
 ### ~~Effort A: Stats Performance~~ — DONE
 
@@ -69,7 +69,7 @@ Verified 2026-10-11 that none of these had started (#19 has since started, 2026-
 
 ~~#1 Collection ROI Score~~, ~~#10 Album Listening Arc~~, ~~#16 Taste Drift Dashboard~~ (commit `60c0d5a`)
 
-### Effort C: Wishlist Price Alerts (#19) — see [wishlist-price-alerts-plan.md](wishlist-price-alerts-plan.md)
+### ~~Effort C: Wishlist Price Alerts (#19)~~ — DONE, see [done/wishlist-price-alerts-plan.md](done/wishlist-price-alerts-plan.md)
 
 The original effort ([cancelled/marketplace-upgrade-plan.md](cancelled/marketplace-upgrade-plan.md)) built #19 and #20 on seller monitoring: per-listing price history, alert rules, scheduled seller scans and server-side notifications. On 2026-10-14 the user dropped the seller-monitoring parts and #20, and narrowed #19 to: alert me when any vinyl pressing of a wishlisted record is listed at or below my price, and show the lowest listing next to the alert field on the wishlist page. Prices come from per-pressing `marketplace/stats` (no seller country in the API, so alerts can fire for non-US listings).
 
@@ -98,7 +98,7 @@ Inline context chips ("late night", "cooking") on the ReleaseDetailsPage scrobbl
 | #5 Listening notes | Choosing the note level, a stable album identity across mappings, new data file plus backup | [listening-notes-plan.md](listening-notes-plan.md) |
 | #9 Data export | Dataset schemas, original vs corrected metadata, the shared row layer used by the Pocket List PDF | [data-export-plan.md](data-export-plan.md) |
 | #18 Context Tags | New data model, tag CRUD, inline UI, analytics queries, new chart | [context-tags-plan.md](context-tags-plan.md) |
-| #19 Wishlist price alerts | Per-pressing price cache with background refresh (843 pressings at ~1 req/s), alert store with backup, wishlist UI; #20 and the seller-monitoring scope were dropped (see [cancelled/marketplace-upgrade-plan.md](cancelled/marketplace-upgrade-plan.md)) | [wishlist-price-alerts-plan.md](wishlist-price-alerts-plan.md) |
+| #19 Wishlist price alerts | Per-pressing price cache with background refresh (843 pressings at ~1 req/s), alert store with backup, wishlist UI; #20 and the seller-monitoring scope were dropped (see [cancelled/marketplace-upgrade-plan.md](cancelled/marketplace-upgrade-plan.md)) | [done/wishlist-price-alerts-plan.md](done/wishlist-price-alerts-plan.md) |
 
 ---
 
@@ -114,4 +114,4 @@ Inline context chips ("late night", "cooking") on the ReleaseDetailsPage scrobbl
 | Feature Scout | 2 | 3 |
 | Integration Explorer | 2 | 4 |
 
-**Recorded total: 25 accepted / 14 declined from 39 pitches. The rows above add up to 23 / 13.** The tracked items are #1–#24: 19 done, 1 dropped (#20), 4 remaining.
+**Recorded total: 25 accepted / 14 declined from 39 pitches. The rows above add up to 23 / 13.** The tracked items are #1–#24: 20 done, 1 dropped (#20), 3 remaining.

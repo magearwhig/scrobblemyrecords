@@ -252,7 +252,7 @@ Show a small "Often together" list of the top tag pairs by shared sessions, unde
 
 ## 6. Future: Context Tags as a Smart Crates input
 
-Smart Crates is planned separately in [smart-crates-plan.md](smart-crates-plan.md). Context tags must **not** be a prerequisite: Smart Crates ships and works fully without this feature. The integration is one optional rule type that appears only when context tags exist.
+Smart Crates is planned separately in [done/smart-crates-plan.md](done/smart-crates-plan.md). Context tags must **not** be a prerequisite: Smart Crates ships and works fully without this feature. The integration is one optional rule type that appears only when context tags exist.
 
 **Example rule:** "Albums I usually play while *working*."
 

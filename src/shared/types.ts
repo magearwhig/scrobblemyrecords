@@ -3439,7 +3439,7 @@ export interface AlbumTracklistMatch {
 }
 
 // ============================================
-// Smart Crates (see .plan/smart-crates-plan.md)
+// Smart Crates (see .plan/done/smart-crates-plan.md)
 // ============================================
 
 /** What a rule does when the data it needs is missing */

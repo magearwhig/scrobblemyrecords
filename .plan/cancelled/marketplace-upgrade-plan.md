@@ -2,7 +2,7 @@
 
 > **Status: Cancelled (2026-10-14).**
 > #19 (price alerts) is superseded by
-> [../wishlist-price-alerts-plan.md](../wishlist-price-alerts-plan.md), which
+> [../done/wishlist-price-alerts-plan.md](../done/wishlist-price-alerts-plan.md), which
 > covers only wishlist price alerts. The seller-monitoring parts of this plan
 > and #20 (seller match auto-scan) were dropped at the user's request on
 > 2026-10-14 ("i dont want the seller monitoring, thats different"). The
