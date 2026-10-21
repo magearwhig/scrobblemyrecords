@@ -772,6 +772,16 @@ Library > Crates: saved groups of albums you own that keep themselves up to date
 - **Elsewhere**: pin crates to What to Play, "Add to crate" on Release Details and Album Detail, "Save as crate" from Collection filters
 - Listening rules use Last.fm scrobbles from any source, so crates talk about scrobbles recorded, never about records played. Crates and suggestion history are included in backups
 
+### 📱 Pocket List (offline PDF)
+A phone-sized PDF of your wishlist, your collection, or both, to read offline in a record shop. Click **Pocket List** on the Wishlist or Collection page, download, and move the file to your phone (AirDrop, email, a cloud drive).
+
+- **A–Z by artist, then album**: a leading "The" is ignored, letter sections with a tappable index on page 1 and PDF bookmarks, artist headings repeat when a block runs onto the next page
+- **Owned and wanted together**: pressings and copies of one album are grouped, so you can see "have the 1994 pressing, want the reissue" at a glance
+- **Honest owned flags on wanted albums**: "OWNED: this pressing", "OWNED: another version", or "Possibly owned" when only the title matches
+- **Options**: Discogs and/or monitored wants, format, pressing (year, label), wishlist notes
+- Built from cached data only: no Discogs or Last.fm calls, nothing saved on the server. The cover shows when the wishlist and collection were last synced, so sync first for an up-to-date list
+- Rendered with Chromium via `playwright-core`. If the browser is missing (e.g. a fresh headless install), run `npx playwright install chromium`
+
 ### 📦 Discard Pile
 Track records you want to sell, gift, trade in, or remove from your collection:
 
@@ -1044,6 +1054,8 @@ See also: [TEST_STYLE_GUIDE.md](TEST_STYLE_GUIDE.md) | [TESTING_GUIDE.md](TESTIN
 ## 📄 License
 
 MIT License - See [LICENSE](LICENSE) file for details.
+
+Third-party notices: the Pocket List PDF embeds Noto Sans (via `@fontsource/noto-sans`), © The Noto Project Authors, licensed under the SIL Open Font License 1.1 (see `node_modules/@fontsource/noto-sans/LICENSE`).
 
 ---
 

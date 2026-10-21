@@ -1,13 +1,13 @@
 # Data Export Plan: CSV/JSON Data Portability (Backlog #9)
 
 Backlog Effort D from [backlog-shark-tank-2026-03-08.md](backlog-shark-tank-2026-03-08.md).
-Companion plan: [pocket-list-export-plan.md](pocket-list-export-plan.md), the offline PDF shopping reference. Both plans share one backend data-preparation layer, which **this plan defines** (see [Shared export data layer](#shared-export-data-layer-contract)).
+Companion plan: [done/pocket-list-export-plan.md](done/pocket-list-export-plan.md), the offline PDF shopping reference. Both plans share one backend data-preparation layer, which **this plan defines** (see [Shared export data layer](#shared-export-data-layer-contract)).
 
 ## Status
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| Phase 1: Shared export data layer (`exportDataService`) | Not started | Pocket List depends on this |
+| Phase 1: Shared export data layer (`exportDataService`) | Done 2026-10-21 (branch `feat/pocket-list`) | `ExportDataService` takes `FileStorage`, `WishlistService` and `ScrobbleHistoryStorage`; it reads `discogs.username` straight from `settings/user-settings.json` because `AuthService.getUserSettings()` can write defaults and decrypts tokens. `ownedCollectionLinks` lists every matching row from every tier, strongest first. A local want with no master has `masterIdSource: null`. `relatedWishlistLinks` are computed against both wishlist sources even when `getWishlistRows({ sources })` asks for one, so links can name rows outside the result (provenance). `dateAdded`/`dateAddedUnix` are null when the Discogs date can't be parsed (`dateAddedRaw` keeps it) |
 | Phase 2: Collection + wishlist file export (CSV/JSON) + Settings UI | Not started | |
 | Phase 3: Plays + mappings datasets | Not started | |
 | Phase 4: Collection/want cache fidelity (catno, instance id, formats) | Not started | Optional; improves row completeness |
@@ -20,7 +20,7 @@ Let users take their data out of Listenography in documented, machine-readable f
 
 ### Purpose, compared with the Pocket List and backups
 
-| | **Data export (this plan)** | **Pocket List** ([plan](pocket-list-export-plan.md)) | **Backup** (`backupService.ts`) |
+| | **Data export (this plan)** | **Pocket List** ([plan](done/pocket-list-export-plan.md)) | **Backup** (`backupService.ts`) |
 |---|---|---|---|
 | Purpose | Data portability, for use in *other* tools | Readable offline shopping reference | Restore *this app's* own state |
 | Audience | Machines and power users | A person in a record store | Listenography itself |
@@ -86,7 +86,7 @@ Exports are read-only. They have no import path, and they are never used to rest
 
 ## Shared export data layer (contract)
 
-**Owner: this plan.** The [Pocket List plan](pocket-list-export-plan.md) consumes these rows and owns readable collation, sorting, grouping, field selection and the PDF layout. Neither consumer re-reads raw caches for collection or wishlist data.
+**Owner: this plan.** The [Pocket List plan](done/pocket-list-export-plan.md) consumes these rows and owns readable collation, sorting, grouping, field selection and the PDF layout. Neither consumer re-reads raw caches for collection or wishlist data.
 
 ### Location
 - `src/backend/services/exportDataService.ts` (new). It has no Express dependencies and is constructed with `FileStorage`, `AuthService` (for the Discogs username only), `WishlistService`, `MappingService` and `ArtistNameResolver`.

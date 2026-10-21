@@ -1,6 +1,11 @@
 import MockAdapter from 'axios-mock-adapter';
 
 import ApiService from '../../../src/renderer/services/api';
+import {
+  clearApiToken,
+  setApiToken,
+} from '../../../src/renderer/services/apiToken';
+import { PocketListOptions } from '../../../src/shared/types';
 
 // Sentinel payload returned as `data` in the standard envelope
 const DATA = { marker: 'payload' };
@@ -1302,6 +1307,13 @@ const specs: EndpointSpec[] = [
     expected: RESOLVES,
   },
   {
+    name: 'getExportMeta',
+    verb: 'get',
+    url: '/export/meta',
+    call: api => api.getExportMeta(),
+    expected: DATA,
+  },
+  {
     name: 'previewBackupImport',
     verb: 'post',
     url: '/backup/import/preview',
@@ -1667,5 +1679,112 @@ describe('ApiService endpoint coverage', () => {
     mock.onGet('/sellers').reply(500, { success: false, error: 'boom' });
 
     await expect(api.getSellers()).rejects.toThrow();
+  });
+});
+
+describe('ApiService.exportPocketList', () => {
+  let api: ApiService;
+  let mock: MockAdapter;
+
+  const options: PocketListOptions = {
+    lists: ['wishlist', 'collection'],
+    wishlistSources: ['discogs-want', 'local-want'],
+    details: { format: true, pressing: false, notes: true },
+    flagOwnedVersions: true,
+  };
+
+  const pdf = () => new Blob(['%PDF-1.7'], { type: 'application/pdf' });
+  const jsonBlob = (body: unknown) =>
+    new Blob([JSON.stringify(body)], { type: 'application/json' });
+
+  beforeEach(() => {
+    window.sessionStorage.clear();
+    clearApiToken();
+    api = new ApiService('http://localhost:3001');
+    mock = new MockAdapter((api as any).api);
+  });
+
+  afterEach(() => {
+    mock.restore();
+    clearApiToken();
+  });
+
+  it('GETs a blob on the shared instance with a 90s timeout and the token header', async () => {
+    setApiToken('secret-token');
+    mock.onGet('/export/pocket-list').reply(200, pdf(), {
+      'content-disposition':
+        'attachment; filename="listenography-pocket-list-wishlist-collection-2026-10-20.pdf"',
+    });
+
+    const result = await api.exportPocketList(options);
+
+    expect(mock.history.get).toHaveLength(1);
+    const request = mock.history.get[0];
+    expect(request.responseType).toBe('blob');
+    expect(request.timeout).toBe(90000);
+    expect(request.headers?.Authorization).toBe('Bearer secret-token');
+    expect(request.params).toEqual({
+      lists: 'wishlist,collection',
+      sources: 'discogs-want,local-want',
+      details: 'format,notes',
+      flagOwned: 'true',
+    });
+    expect(result.blob).toBeInstanceOf(Blob);
+    expect(result.filename).toBe(
+      'listenography-pocket-list-wishlist-collection-2026-10-20.pdf'
+    );
+  });
+
+  it('omits sources for a collection-only export and allows empty details', async () => {
+    mock.onGet('/export/pocket-list').reply(200, pdf());
+
+    const result = await api.exportPocketList({
+      lists: ['collection'],
+      wishlistSources: ['discogs-want'],
+      details: { format: false, pressing: false, notes: false },
+      flagOwnedVersions: false,
+    });
+
+    expect(mock.history.get[0].params).toEqual({
+      lists: 'collection',
+      details: '',
+      flagOwned: 'false',
+    });
+    // No readable Content-Disposition (e.g. not CORS-exposed): fall back
+    expect(result.filename).toMatch(
+      /^listenography-pocket-list-collection-\d{4}-\d{2}-\d{2}\.pdf$/
+    );
+  });
+
+  it.each([
+    [409, 'Sync your collection first'],
+    [422, 'Nothing to export'],
+    [503, 'PDF renderer unavailable'],
+    [504, 'PDF took too long'],
+  ])(
+    'rejects with the server message from a %i JSON blob',
+    async (status, error) => {
+      mock
+        .onGet('/export/pocket-list')
+        .reply(status, jsonBlob({ success: false, error }));
+
+      await expect(api.exportPocketList(options)).rejects.toThrow(error);
+    }
+  );
+
+  it('falls back to a status message when the error body is not JSON', async () => {
+    mock.onGet('/export/pocket-list').reply(500, new Blob(['<html>oops']));
+
+    await expect(api.exportPocketList(options)).rejects.toThrow(
+      'Pocket List export failed (HTTP 500)'
+    );
+  });
+
+  it('reports a client-side timeout', async () => {
+    mock.onGet('/export/pocket-list').timeout();
+
+    await expect(api.exportPocketList(options)).rejects.toThrow(
+      'The PDF took too long to generate. Please try again.'
+    );
   });
 });

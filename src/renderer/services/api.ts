@@ -43,6 +43,7 @@ import {
   EntireCollectionResponse,
   ExcludedArtistResponse,
   ExcludedHistoryArtist,
+  ExportSnapshotMeta,
   ExclusionSuggestion,
   ForgottenTrack,
   HiddenAlbum,
@@ -64,6 +65,7 @@ import {
   MonitoredSeller,
   MonitoredWebsite,
   MusicBrainzArtistMatch,
+  PocketListOptions,
   NewReleaseSyncStatus,
   RecommendationResult,
   RecommendationSettings,
@@ -102,6 +104,10 @@ import {
   WrappedData,
   WishlistPriceRefreshStatus,
 } from '../../shared/types';
+import {
+  filenameFromContentDisposition,
+  readBlobText,
+} from '../utils/downloadBlob';
 import { createLogger } from '../utils/logger';
 
 import { getApiToken } from './apiToken';
@@ -2297,6 +2303,60 @@ class ApiService {
     return response.data;
   }
 
+  // ============================================
+  // Export (see .plan/done/pocket-list-export-plan.md)
+  // ============================================
+
+  /**
+   * Snapshot freshness of the cached data the exports read from
+   * (wishlist sync time, collection cache completeness).
+   */
+  async getExportMeta(): Promise<ExportSnapshotMeta> {
+    const response = await this.api.get('/export/meta');
+    return response.data.data;
+  }
+
+  /**
+   * Generate the Pocket List PDF. Goes through the shared axios instance (as a
+   * blob, like `exportBackup`) so the API-token header is attached; a plain
+   * `<a href>` would not send it. Rendering can take a while, hence the longer
+   * per-request timeout. Error bodies arrive as a JSON blob, so the server's
+   * message is read out of it and rethrown as the Error message.
+   */
+  async exportPocketList(
+    options: PocketListOptions,
+    signal?: AbortSignal
+  ): Promise<{ blob: Blob; filename: string }> {
+    const includesWishlist = options.lists.includes('wishlist');
+    const params: Record<string, string> = {
+      lists: options.lists.join(','),
+      details: (['format', 'pressing', 'notes'] as const)
+        .filter(key => options.details[key])
+        .join(','),
+      flagOwned: String(options.flagOwnedVersions),
+    };
+    if (includesWishlist) {
+      params.sources = options.wishlistSources.join(',');
+    }
+
+    try {
+      const response = await this.api.get('/export/pocket-list', {
+        params,
+        responseType: 'blob',
+        timeout: 90000,
+        signal,
+      });
+      const header = response.headers?.['content-disposition'];
+      const filename =
+        filenameFromContentDisposition(
+          typeof header === 'string' ? header : null
+        ) ?? defaultPocketListFilename(options.lists);
+      return { blob: response.data, filename };
+    } catch (error) {
+      throw new Error(await pocketListErrorMessage(error));
+    }
+  }
+
   /**
    * Preview what would happen if a backup was imported.
    */
@@ -2853,6 +2913,51 @@ class ApiService {
     this.baseUrl = baseUrl;
     this.api.defaults.baseURL = `${baseUrl}/api/v1`;
   }
+}
+
+/** Fallback when `Content-Disposition` isn't readable (e.g. not CORS-exposed) */
+function defaultPocketListFilename(lists: PocketListOptions['lists']): string {
+  const kinds = (['wishlist', 'collection'] as const).filter(kind =>
+    lists.includes(kind)
+  );
+  const date = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const ymd = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return `listenography-pocket-list-${kinds.join('-')}-${ymd}.pdf`;
+}
+
+/**
+ * The server's error message for a failed blob request. The body of an error
+ * response is a Blob holding `{ success: false, error }`.
+ */
+async function pocketListErrorMessage(error: unknown): Promise<string> {
+  const err = error as {
+    code?: string;
+    message?: string;
+    response?: { status?: number; data?: unknown };
+  };
+  const data = err?.response?.data;
+  let body: unknown = data;
+  try {
+    if (typeof Blob !== 'undefined' && data instanceof Blob) {
+      body = JSON.parse(await readBlobText(data));
+    } else if (typeof data === 'string') {
+      body = JSON.parse(data);
+    }
+  } catch {
+    body = undefined;
+  }
+  const serverError = (body as { error?: unknown } | undefined)?.error;
+  if (typeof serverError === 'string' && serverError) return serverError;
+  if (err?.code === 'ECONNABORTED') {
+    return 'The PDF took too long to generate. Please try again.';
+  }
+  if (err?.response?.status) {
+    return `Pocket List export failed (HTTP ${err.response.status})`;
+  }
+  return error instanceof Error && error.message
+    ? error.message
+    : 'Pocket List export failed';
 }
 
 // Create a singleton instance

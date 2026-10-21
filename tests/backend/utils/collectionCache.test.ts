@@ -1,4 +1,7 @@
-import { getAllCachedCollectionItems } from '../../../src/backend/utils/collectionCache';
+import {
+  getAllCachedCollectionItems,
+  readCollectionCacheSnapshot,
+} from '../../../src/backend/utils/collectionCache';
 import { FileStorage } from '../../../src/backend/utils/fileStorage';
 import { CollectionItem } from '../../../src/shared/types';
 
@@ -271,5 +274,148 @@ describe('getAllCachedCollectionItems', () => {
         'collections/userB-page-1.json'
       );
     });
+  });
+});
+
+describe('readCollectionCacheSnapshot', () => {
+  let mockFileStorage: jest.Mocked<FileStorage>;
+  let files: Record<string, unknown>;
+
+  const page = (
+    ids: number[],
+    timestamp: number,
+    pagination: { pages: number; items: number } | undefined
+  ) => ({
+    success: true,
+    data: ids.map(createCollectionItem),
+    ...(pagination ? { pagination } : {}),
+    timestamp,
+  });
+
+  beforeEach(() => {
+    files = {};
+    mockFileStorage = new MockedFileStorage('test') as jest.Mocked<FileStorage>;
+    mockFileStorage.readJSON = jest.fn(
+      async (path: string) => (files[path] ?? null) as never
+    );
+  });
+
+  it('reports a complete cache with the oldest and newest page times', async () => {
+    // Arrange
+    const pagination = { pages: 2, items: 3 };
+    files['collections/u-page-1.json'] = page(
+      [1, 2],
+      Date.parse('2026-10-21T04:00:16.349Z'),
+      pagination
+    );
+    files['collections/u-page-2.json'] = page(
+      [3],
+      Date.parse('2026-10-21T03:56:40.000Z'),
+      pagination
+    );
+
+    // Act
+    const { items, info } = await readCollectionCacheSnapshot(
+      'u',
+      mockFileStorage
+    );
+
+    // Assert
+    expect(items.map(i => i.id)).toEqual([1, 2, 3]);
+    expect(info).toEqual({
+      status: 'complete',
+      pagesExpected: 2,
+      pagesRead: 2,
+      itemsExpected: 3,
+      itemsRead: 3,
+      oldestPageAt: '2026-10-21T03:56:40Z',
+      newestPageAt: '2026-10-21T04:00:16Z',
+    });
+  });
+
+  it('reports partial and stops at a missing middle page', async () => {
+    const pagination = { pages: 3, items: 3 };
+    files['collections/u-page-1.json'] = page([1], 1000, pagination);
+    files['collections/u-page-3.json'] = page([3], 3000, pagination);
+
+    const { items, info } = await readCollectionCacheSnapshot(
+      'u',
+      mockFileStorage
+    );
+
+    expect(items.map(i => i.id)).toEqual([1]);
+    expect(info).toMatchObject({
+      status: 'partial',
+      pagesExpected: 3,
+      pagesRead: 1,
+      itemsRead: 1,
+    });
+  });
+
+  it('reports partial when the item count differs', async () => {
+    files['collections/u-page-1.json'] = page([1, 2], 1000, {
+      pages: 1,
+      items: 4,
+    });
+
+    const { info } = await readCollectionCacheSnapshot('u', mockFileStorage);
+
+    expect(info.status).toBe('partial');
+  });
+
+  it('reports partial when a page with data has no pagination', async () => {
+    files['collections/u-page-1.json'] = page([1], 1000, {
+      pages: 2,
+      items: 2,
+    });
+    files['collections/u-page-2.json'] = page([2], 1000, undefined);
+
+    const { info } = await readCollectionCacheSnapshot('u', mockFileStorage);
+
+    expect(info.status).toBe('partial');
+    expect(info.pagesRead).toBe(2);
+  });
+
+  it('reports missing when there is no page 1', async () => {
+    const { items, info } = await readCollectionCacheSnapshot(
+      'u',
+      mockFileStorage
+    );
+
+    expect(items).toEqual([]);
+    expect(info).toEqual({
+      status: 'missing',
+      pagesExpected: null,
+      pagesRead: 0,
+      itemsExpected: null,
+      itemsRead: 0,
+      oldestPageAt: null,
+      newestPageAt: null,
+    });
+  });
+
+  it('reports an empty collection as complete', async () => {
+    files['collections/u-page-1.json'] = page([], 1000, { pages: 1, items: 0 });
+
+    const { info } = await readCollectionCacheSnapshot('u', mockFileStorage);
+
+    expect(info).toEqual({
+      status: 'complete',
+      pagesExpected: 1,
+      pagesRead: 1,
+      itemsExpected: 0,
+      itemsRead: 0,
+      oldestPageAt: '1970-01-01T00:00:01Z',
+      newestPageAt: '1970-01-01T00:00:01Z',
+    });
+  });
+
+  it('reports partial when page 1 is empty but items are expected', async () => {
+    files['collections/u-page-1.json'] = page([], 1000, { pages: 2, items: 9 });
+
+    const { info } = await readCollectionCacheSnapshot('u', mockFileStorage);
+
+    expect(info.status).toBe('partial');
+    expect(info.pagesRead).toBe(1);
   });
 });

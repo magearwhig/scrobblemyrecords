@@ -27,6 +27,17 @@ export function stripDiscogsSuffix(artist: string): string {
 }
 
 /**
+ * Remove the Discogs disambiguation suffix from every artist in a joined
+ * artist string, e.g. "Turnstile (2), Someone (3)" -> "Turnstile, Someone".
+ * Only "(N)" before a comma or at the end counts, so names with their own
+ * parentheses ("Sunn O)))") are left alone. For display and sorting only:
+ * suffixes tell apart different artists (see discogsArtistIdentityKey).
+ */
+export function stripDiscogsSuffixes(artist: string): string {
+  return artist.replace(/\s*\(\d+\)(?=\s*(?:,|$))/g, '');
+}
+
+/**
  * Key for grouping album names that differ only in spelling. Ignores case,
  * accents, punctuation, spacing and Discogs artist disambiguation suffixes
  * like "(2)", so "The Format (2)|Dog Problems" groups with
@@ -34,22 +45,43 @@ export function stripDiscogsSuffix(artist: string): string {
  * those versions are merged only by album mappings.
  */
 export function albumGroupKey(artist: string, album: string): string {
-  const simplify = (s: string) => {
-    const lower = s.toLowerCase().trim();
-    const simplified = lower
-      .normalize('NFKD')
-      .replace(/[\u0300-\u036f]/g, '')
-      // Variation selectors only pick a glyph style (e.g. emoji); left
-      // behind without their base symbol, they would make "♥️" equal "☀️"
-      .replace(/[\u{FE00}-\u{FE0F}\u{E0100}-\u{E01EF}]/gu, '')
-      // Keep combining marks: Latin accents are already gone, and in other
-      // scripts (e.g. Devanagari vowel signs) marks distinguish words
-      .replace(/[^\p{L}\p{N}\p{M}]/gu, '');
-    // Names made only of punctuation keep their own spelling rather than
-    // all simplifying to ""
-    return simplified || lower;
-  };
-  return `${simplify(stripDiscogsSuffix(artist))}|${simplify(album)}`;
+  return `${simplifyName(stripDiscogsSuffix(artist))}|${simplifyName(album)}`;
+}
+
+/** Case, accent, punctuation and spacing-insensitive form of one name */
+function simplifyName(s: string): string {
+  const lower = s.toLowerCase().trim();
+  const simplified = lower
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    // Variation selectors only pick a glyph style (e.g. emoji); left
+    // behind without their base symbol, they would make "♥️" equal "☀️"
+    .replace(/[\u{FE00}-\u{FE0F}\u{E0100}-\u{E01EF}]/gu, '')
+    // Keep combining marks: Latin accents are already gone, and in other
+    // scripts (e.g. Devanagari vowel signs) marks distinguish words
+    .replace(/[^\p{L}\p{N}\p{M}]/gu, '');
+  // Names made only of punctuation keep their own spelling rather than
+  // all simplifying to ""
+  return simplified || lower;
+}
+
+/**
+ * Identity key for a joined Discogs artist string. Each artist is simplified
+ * like albumGroupKey but keeps its "(N)" suffix, because Discogs uses the
+ * suffix to tell apart different artists with the same name:
+ * "Turnstile (2), Someone (3)" -> "turnstile#2,someone#3", and "Artist",
+ * "Artist (2)" and "Artist (3)" are three identities.
+ */
+export function discogsArtistIdentityKey(artistRaw: string): string {
+  return artistRaw
+    .split(',')
+    .map(part => {
+      const match = part.match(/^(.*?)\s*\((\d+)\)\s*$/);
+      return match
+        ? `${simplifyName(match[1])}#${match[2]}`
+        : simplifyName(part);
+    })
+    .join(',');
 }
 
 /**

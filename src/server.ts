@@ -22,10 +22,12 @@ import createCratesRouter from './backend/routes/crates';
 import { registerCrateSuggestionRoutes } from './backend/routes/crateSuggestions';
 import createDiscardPileRouter from './backend/routes/discardPile';
 import { createEmbeddingsRouter } from './backend/routes/embeddings';
+import createExportRouter from './backend/routes/export';
 import createImagesRouter from './backend/routes/images';
 import jobsRouter from './backend/routes/jobs';
 import createLabelsRouter from './backend/routes/labels';
 import { createMemoryScrobbleRouter } from './backend/routes/memoryScrobble';
+import { registerPocketListRoute } from './backend/routes/pocketListRoute';
 import { createRecommendationsRouter } from './backend/routes/recommendations';
 import createReleasesRouter from './backend/routes/releases';
 import createScrobbleRouter from './backend/routes/scrobble';
@@ -55,6 +57,7 @@ import { DiscogsGenreEnricherService } from './backend/services/discogsGenreEnri
 import { DiscogsService } from './backend/services/discogsService';
 import { DurationLookupService } from './backend/services/durationLookupService';
 import { EmbeddingStorageService } from './backend/services/embeddingStorageService';
+import { ExportDataService } from './backend/services/exportDataService';
 import { GenreAnalysisService } from './backend/services/genreAnalysisService';
 import { HiddenItemService } from './backend/services/hiddenItemService';
 import { HiddenReleasesService } from './backend/services/hiddenReleasesService';
@@ -69,6 +72,8 @@ import { MusicBrainzGenreEnricherService } from './backend/services/musicbrainzG
 import { MusicBrainzService } from './backend/services/musicbrainzService';
 import { OllamaEmbedderService } from './backend/services/ollamaEmbedderService';
 import { OllamaService } from './backend/services/ollamaService';
+import { ChromiumPdfRenderer } from './backend/services/pocketList/pocketListPdfRenderer';
+import { PocketListService } from './backend/services/pocketList/pocketListService';
 import { ProfileBuilderService } from './backend/services/profileBuilderService';
 import { RankingsService } from './backend/services/rankingsService';
 import { RecommendationLogService } from './backend/services/recommendationLogService';
@@ -258,6 +263,8 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    // Lets the frontend read download filenames (Pocket List PDF)
+    exposedHeaders: ['Content-Disposition'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     optionsSuccessStatus: 200, // Some legacy browsers choke on 204
   })
@@ -447,6 +454,17 @@ const crateSuggestionService = new CrateSuggestionService(
   crateService
 );
 crateService.setSuggestionHook(crateSuggestionService);
+// Read-only rows for data exports and the Pocket List (Backlog #9)
+const exportDataService = new ExportDataService(
+  fileStorage,
+  wishlistService,
+  historyStorage
+);
+// Offline PDF of the wishlist/collection; Chromium launches on first export
+const pocketListService = new PocketListService(
+  exportDataService,
+  new ChromiumPdfRenderer()
+);
 const durationLookupService = new DurationLookupService(
   fileStorage,
   lastfmService,
@@ -535,6 +553,13 @@ app.use(
   )
 );
 app.use('/api/v1/wrapped', createWrappedRouter(wrappedService));
+// Pocket List routes join this router through the extraRoutes callback
+app.use(
+  '/api/v1/export',
+  createExportRouter(exportDataService, router =>
+    registerPocketListRoute(router, pocketListService)
+  )
+);
 app.use(
   '/api/v1/collection-analytics',
   createCollectionAnalyticsRouter(
@@ -567,6 +592,7 @@ app.get('/api/v1', (req, res) => {
       memoryScrobble: '/api/v1/memory-scrobble',
       crates: '/api/v1/crates',
       wrapped: '/api/v1/wrapped',
+      export: '/api/v1/export',
       collectionAnalytics: '/api/v1/collection-analytics',
       jobs: '/api/v1/jobs',
       recommendations: '/api/v1/recommendations',

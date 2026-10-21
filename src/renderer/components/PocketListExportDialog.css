@@ -1,0 +1,174 @@
+/* Pocket List export dialog (see .plan/done/pocket-list-export-plan.md) */
+
+.pocket-list-dialog .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  color: var(--text-primary);
+  background-color: var(--card-bg);
+}
+
+.pocket-list-intro {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.pocket-list-fieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.pocket-list-legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.pocket-list-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+}
+
+.pocket-list-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.pocket-list-option input {
+  margin: 0;
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+.pocket-list-option input:disabled,
+.pocket-list-option input:disabled + * {
+  cursor: not-allowed;
+}
+
+.pocket-list-option input:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.pocket-list-field-hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--status-error);
+}
+
+.pocket-list-freshness {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.pocket-list-freshness-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.pocket-list-freshness-line--warning {
+  color: var(--text-primary);
+}
+
+.pocket-list-freshness-line--warning svg {
+  flex-shrink: 0;
+  color: var(--accent-warning);
+}
+
+.pocket-list-freshness-hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.pocket-list-result {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  color: var(--text-primary);
+}
+
+.pocket-list-result > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.pocket-list-result--success {
+  border-color: var(--status-success);
+  background-color: color-mix(in srgb, var(--status-success) 12%, transparent);
+}
+
+.pocket-list-result--success > svg {
+  color: var(--status-success);
+}
+
+.pocket-list-result--error {
+  align-items: center;
+  border-color: var(--status-error);
+  background-color: color-mix(in srgb, var(--status-error) 12%, transparent);
+}
+
+.pocket-list-result--error > svg {
+  color: var(--status-error);
+}
+
+.pocket-list-result--error .pocket-list-result-text {
+  flex: 1;
+}
+
+.pocket-list-result-title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  word-break: break-all;
+}
+
+.pocket-list-result-text {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.pocket-list-status:focus {
+  outline: none;
+}
+
+.pocket-list-status:empty {
+  display: none;
+}
+
+.pocket-list-status-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 480px) {
+  .pocket-list-result--error {
+    flex-wrap: wrap;
+  }
+}
+
+/* Entry-point button: keep it compact next to page titles */
+.pocket-list-button {
+  flex-shrink: 0;
+}

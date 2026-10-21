@@ -1,4 +1,4 @@
-import { Search, X } from 'lucide-react';
+import { FileDown, Search, X } from 'lucide-react';
 import React, {
   useEffect,
   useState,
@@ -19,6 +19,7 @@ import {
   WishlistSyncStatus,
   VinylStatus,
 } from '../../shared/types';
+import PocketListExportDialog from '../components/PocketListExportDialog';
 import { Modal } from '../components/ui';
 import { Button } from '../components/ui/Button';
 import { ProgressBar } from '../components/ui/ProgressBar';
@@ -89,6 +90,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
   const [localWantItems, setLocalWantItems] = useState<LocalWantItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pocketListOpen, setPocketListOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<WishlistSyncStatus | null>(null);
   const [settings, setSettings] = useState<WishlistSettings | null>(null);
   const [priceRefreshStatus, setPriceRefreshStatus] =
@@ -768,6 +770,15 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
             >
               Refresh All
             </Button>
+            <Button
+              variant='secondary'
+              className='pocket-list-button'
+              onClick={() => setPocketListOpen(true)}
+              iconLeft={<FileDown size={16} aria-hidden='true' />}
+              title='Download an offline PDF checklist of your wishlist'
+            >
+              Pocket List
+            </Button>
           </div>
         </div>
       )}
@@ -799,6 +810,15 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
             title='Re-check vinyl availability for all items (slower, makes more API calls)'
           >
             Refresh All
+          </Button>
+          <Button
+            variant='secondary'
+            className='pocket-list-button'
+            onClick={() => setPocketListOpen(true)}
+            iconLeft={<FileDown size={16} aria-hidden='true' />}
+            title='Download an offline PDF checklist of your wishlist'
+          >
+            Pocket List
           </Button>
         </div>
       )}
@@ -1230,6 +1250,12 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
           )}
         </Modal>
       )}
+
+      <PocketListExportDialog
+        isOpen={pocketListOpen}
+        onClose={() => setPocketListOpen(false)}
+        initialList='wishlist'
+      />
     </div>
   );
 };

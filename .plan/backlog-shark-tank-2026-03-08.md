@@ -55,7 +55,7 @@ Follow-ups found during verification. These are not reopened items:
 | # | Item | Effort | Plan | Status |
 |---|------|--------|------|--------|
 | 5 | Personal journal / listening notes | D | [listening-notes-plan.md](listening-notes-plan.md) | Planned, not started |
-| 9 | CSV/JSON data export | D | [data-export-plan.md](data-export-plan.md) | Planned, not started |
+| 9 | CSV/JSON data export | D | [data-export-plan.md](data-export-plan.md) | In progress: Phase 1 (shared row layer) done 2026-10-21 with the Pocket List PDF; file exports not started |
 | 18 | Context tags | F | [context-tags-plan.md](context-tags-plan.md) | Planned, not started |
 | ~~20~~ | ~~Seller match auto-scan~~ | C | [cancelled/marketplace-upgrade-plan.md](cancelled/marketplace-upgrade-plan.md) | Dropped by the user 2026-10-14 |
 
@@ -79,7 +79,7 @@ The original effort ([cancelled/marketplace-upgrade-plan.md](cancelled/marketpla
 The original pitch was a per-album textarea on ReleaseDetailsPage. The plan separates three kinds of note: notes about the album, notes about a specific copy, and notes about a listening session. It recommends album-level notes as the MVP. Those notes are stored locally, backed up, and shown on both the Album Detail and Release Details pages.
 
 **#9 CSV/JSON data export** — see [data-export-plan.md](data-export-plan.md).
-The plan defines machine-readable exports of the collection, wishlist (Discogs wants plus local wants), plays and mappings, with a documented, stable schema. It also defines the shared `exportDataService` row layer that the [Pocket List Export](pocket-list-export-plan.md) PDF reuses.
+The plan defines machine-readable exports of the collection, wishlist (Discogs wants plus local wants), plays and mappings, with a documented, stable schema. It also defines the shared `exportDataService` row layer that the [Pocket List Export](done/pocket-list-export-plan.md) (shipped 2026-10-21) PDF reuses.
 
 ### ~~Effort E: Build Infrastructure~~ — DONE
 

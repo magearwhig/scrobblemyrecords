@@ -19,6 +19,7 @@
 
 .collection-header-stats {
   display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
   align-items: center;
   font-size: var(--text-base);

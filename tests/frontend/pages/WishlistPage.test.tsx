@@ -33,6 +33,7 @@ const mockSetWishlistPriceAlert = jest.fn();
 const mockRemoveWishlistPriceAlert = jest.fn();
 const mockGetWishlistPriceRefreshStatus = jest.fn();
 const mockShowToast = jest.fn();
+const mockGetExportMeta = jest.fn();
 
 // Return a stable instance, matching the real singleton ApiService
 jest.mock('../../../src/renderer/services/api', () => {
@@ -51,6 +52,7 @@ jest.mock('../../../src/renderer/services/api', () => {
       setWishlistPriceAlert: mockSetWishlistPriceAlert,
       removeWishlistPriceAlert: mockRemoveWishlistPriceAlert,
       getWishlistPriceRefreshStatus: mockGetWishlistPriceRefreshStatus,
+      getExportMeta: mockGetExportMeta,
     });
   return { getApiService: getMockApi };
 });
@@ -219,7 +221,37 @@ describe('WishlistPage', () => {
       mockPriceRefreshStatusDone
     );
     mockRemoveWishlistPriceAlert.mockResolvedValue(undefined);
+    mockGetExportMeta.mockReturnValue(new Promise(() => {}));
     user = userEvent.setup();
+  });
+
+  describe('Pocket List', () => {
+    it.each([
+      ['standalone', false],
+      ['embedded', true],
+    ])(
+      'opens the Pocket List dialog preselected to the wishlist (%s)',
+      async (_label, embedded) => {
+        render(
+          <AppProvider>
+            <AuthProvider value={createMockAuthContext(defaultAuthStatus)}>
+              <WishlistPage embedded={embedded} />
+            </AuthProvider>
+          </AppProvider>
+        );
+
+        await waitFor(() => {
+          expect(screen.getByText('Radiohead')).toBeInTheDocument();
+        });
+        await user.click(screen.getByRole('button', { name: /Pocket List/ }));
+
+        const dialog = await screen.findByRole('dialog', {
+          name: 'Pocket List PDF',
+        });
+        expect(within(dialog).getByLabelText('Wishlist')).toBeChecked();
+        expect(mockGetExportMeta).toHaveBeenCalled();
+      }
+    );
   });
 
   it('renders loading state initially', async () => {
