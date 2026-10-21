@@ -48,6 +48,16 @@ interface AlbumHistoryData {
   plays: Array<{ timestamp: number; track?: string }>;
 }
 
+/**
+ * Vinyl side of a track position: "A1", "A1a" or a bare "C" (a one-track
+ * side) give the letter. Positions like "CD-01" for a bundled CD are not
+ * sides, so they don't get pulled into side C.
+ */
+const vinylSideOf = (position: string): string | null => {
+  const match = position.trim().match(/^([A-Z])(?:\d|$)/);
+  return match ? match[1] : null;
+};
+
 const ReleaseDetailsPage: React.FC = () => {
   const { authStatus } = useAuth();
   const { state } = useApp();
@@ -360,12 +370,15 @@ const ReleaseDetailsPage: React.FC = () => {
     setSelectedTracks(newSelected);
   };
 
+  // Indices of real tracks (section headings have no position)
+  const getActualTrackIndices = (): number[] =>
+    release?.tracklist
+      ?.map((track, index) => ({ track, index }))
+      .filter(({ track }) => track.position && track.position.trim() !== '')
+      .map(({ index }) => index) || [];
+
   const handleSelectAllTracks = () => {
-    const actualTrackIndices =
-      release?.tracklist
-        ?.map((track, index) => ({ track, index }))
-        .filter(({ track }) => track.position && track.position.trim() !== '')
-        .map(({ index }) => index) || [];
+    const actualTrackIndices = getActualTrackIndices();
 
     if (selectedTracks.size === actualTrackIndices.length) {
       setSelectedTracks(new Set());
@@ -381,14 +394,9 @@ const ReleaseDetailsPage: React.FC = () => {
     const sides: string[] = [];
     const discs: { [key: string]: string[] } = {};
 
-    release.tracklist.forEach((track, _index) => {
-      const position = track.position.trim();
-
-      // Check for letter-number format (A1, B1, C1, etc.) OR just a single letter (C, D, etc.)
-      // Single letter means the entire side is one track
-      const letterMatch = position.match(/^([A-Z])(\d*)$/);
-      if (letterMatch) {
-        const side = letterMatch[1];
+    release.tracklist.forEach(track => {
+      const side = vinylSideOf(track.position);
+      if (side) {
         if (!sides.includes(side)) {
           sides.push(side);
         }
@@ -421,7 +429,7 @@ const ReleaseDetailsPage: React.FC = () => {
 
     return release.tracklist
       .map((track, index) => ({ track, index }))
-      .filter(({ track }) => track.position.startsWith(side))
+      .filter(({ track }) => vinylSideOf(track.position) === side)
       .map(({ index }) => index);
   };
 
@@ -1156,7 +1164,7 @@ const ReleaseDetailsPage: React.FC = () => {
                 onClick={handleSelectAllTracks}
                 disabled={!release.tracklist?.length}
               >
-                {selectedTracks.size === (release.tracklist?.length || 0)
+                {selectedTracks.size === getActualTrackIndices().length
                   ? 'Deselect All'
                   : 'Select All'}
               </Button>

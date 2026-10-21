@@ -475,6 +475,64 @@ describe('ReleaseDetailsPage Side Selection', () => {
     });
   });
 
+  it('keeps bonus CD tracks out of side C', async () => {
+    const withBonusCd = {
+      ...mockMultiSideRelease,
+      tracklist: [
+        { position: 'A1', title: 'Side A Track 1', duration: '3:30' },
+        { position: 'B1', title: 'Side B Track 1', duration: '2:45' },
+        { position: 'C1', title: 'Side C Track 1', duration: '3:45' },
+        { position: 'C2', title: 'Side C Track 2', duration: '4:30' },
+        { position: 'CD-01', title: 'Demo 1', duration: '3:00' },
+        { position: 'CD-02', title: 'Demo 2', duration: '2:30' },
+      ],
+    };
+    mockLocalStorage.setItem('selectedRelease', JSON.stringify(withBonusCd));
+    mockApiService.getReleaseDetails.mockResolvedValue(withBonusCd);
+    renderWithProviders(<ReleaseDetailsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Tracks (6 selected)')).toBeInTheDocument();
+    });
+
+    const sideCButton = screen.getByRole('button', {
+      name: 'Deselect side C with 2 tracks',
+    });
+    await user.click(sideCButton);
+
+    // Only C1 and C2 are deselected; the CD tracks stay selected
+    await waitFor(() => {
+      expect(screen.getByText('Tracks (4 selected)')).toBeInTheDocument();
+    });
+  });
+
+  it('offers Deselect All when a section heading is in the tracklist', async () => {
+    const withHeading = {
+      ...mockMultiSideRelease,
+      tracklist: [
+        { position: 'A1', title: 'Side A Track 1', duration: '3:30' },
+        { position: 'C1', title: 'Side C Track 1', duration: '3:45' },
+        { position: '', title: 'Bonus CD', duration: '' },
+        { position: 'CD-01', title: 'Demo 1', duration: '3:00' },
+      ],
+    };
+    mockLocalStorage.setItem('selectedRelease', JSON.stringify(withHeading));
+    mockApiService.getReleaseDetails.mockResolvedValue(withHeading);
+    renderWithProviders(<ReleaseDetailsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Tracks (3 selected)')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Deselect All' }));
+    expect(screen.getByText('Tracks (0 selected)')).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Select side C with 1 track' })
+    );
+    expect(screen.getByText('Tracks (1 selected)')).toBeInTheDocument();
+  });
+
   it('should select/deselect tracks when disc button is clicked', async () => {
     mockLocalStorage.setItem(
       'selectedRelease',
