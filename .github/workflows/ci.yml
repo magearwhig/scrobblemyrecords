@@ -90,7 +90,8 @@ jobs:
           path: dist/
 
   e2e:
-    runs-on: ubuntu-latest
+    # Pinned: Playwright cannot install chromium on ubuntu 26.04 (ubuntu-latest)
+    runs-on: ubuntu-24.04
     needs: build
 
     env:
