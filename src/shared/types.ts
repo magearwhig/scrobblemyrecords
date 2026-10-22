@@ -1587,6 +1587,8 @@ export interface MigrationReport {
 export interface MusicBrainzArtistMatch {
   mbid: string; // MusicBrainz artist ID
   name: string; // Artist name
+  sortName?: string; // e.g. "Smith, Elliott"; record-store filing
+  type?: string | null; // "Person", "Group", …
   disambiguation?: string; // Disambiguation text (e.g., "UK rock band")
   country?: string; // Country of origin
   beginYear?: number; // Year artist started
@@ -2062,6 +2064,9 @@ export interface BackupData {
   crates?: Crate[];
   /** Suggestion records only; the daily batch is never backed up */
   crateSuggestions?: CrateSuggestionRecord[];
+
+  /** Record-store "file under" overrides (optional for older backups) */
+  artistFilingOverrides?: ArtistFilingOverride[];
 }
 
 /**
@@ -2113,6 +2118,7 @@ export interface BackupPreview {
   cratesCount?: number;
   crateSuggestionsCount?: number;
   wishlistPriceAlertsCount?: number;
+  artistFilingOverridesCount?: number;
 }
 
 /**
@@ -2154,6 +2160,7 @@ export interface BackupImportPreview {
     savedCollections: ImportCategorySummary;
     crates?: ImportCategorySummary;
     crateSuggestions?: ImportCategorySummary;
+    artistFilingOverrides?: ImportCategorySummary;
     settingsWillMerge: boolean;
   };
 }
@@ -3975,4 +3982,119 @@ export interface PocketListOptions {
   details: { format: boolean; pressing: boolean; notes: boolean };
   /** Default true */
   flagOwnedVersions: boolean;
+}
+
+// ============================================
+// Record-Store Filing Types
+// See .plan/done/record-store-filing-plan.md
+// ============================================
+
+/** One MusicBrainz lookup result, keyed by filing name key */
+export type ArtistFilingCacheEntry =
+  | {
+      /** Name as looked up */
+      name: string;
+      status: 'found';
+      /** MusicBrainz sort-name, e.g. "Smith, Elliott" */
+      sortName: string;
+      /** MusicBrainz artist type, e.g. "Person", "Group"; null when unset */
+      type: string | null;
+      /** null when several agreeing candidates matched */
+      mbid: string | null;
+      via: 'mbid-map' | 'search';
+      /** ms */
+      fetchedAt: number;
+    }
+  | {
+      name: string;
+      /**
+       * not-found: no candidate with this exact name; ambiguous: exact
+       * candidates disagree; none: the user chose "none of these" in
+       * release tracking
+       */
+      status: 'not-found' | 'ambiguous' | 'none';
+      /** ms */
+      fetchedAt: number;
+      /** The tracker mbid this result was based on ('none' only) */
+      mbid?: null;
+    };
+
+export interface ArtistFilingCacheStore {
+  schemaVersion: 1;
+  entries: Record<string, ArtistFilingCacheEntry>;
+}
+
+export interface MasterYearCacheStore {
+  schemaVersion: 1;
+  /** Keyed by Discogs master id; year null when Discogs has none */
+  entries: Record<string, { year: number | null; fetchedAt: number }>;
+}
+
+/** A user's "file under" for one artist name */
+export interface ArtistFilingOverride {
+  /** filingNameKey(artist) */
+  key: string;
+  /** Spelling the user saw when saving */
+  artist: string;
+  /** Sort name, e.g. "Cooper, Alice" */
+  fileUnder: string;
+  /** ms */
+  updatedAt: number;
+}
+
+export interface ArtistFilingOverridesStore {
+  schemaVersion: 1;
+  overrides: ArtistFilingOverride[];
+}
+
+export type ArtistFilingSource = 'override' | 'musicbrainz' | 'default';
+
+/** One artist credit as the Pocket List files it (Settings list) */
+export interface ArtistFilingRow {
+  /** Credit as shown, e.g. "Elliott Smith" */
+  artist: string;
+  key: string;
+  /** Sort name in effect, e.g. "Smith, Elliott" */
+  fileUnder: string;
+  /** Section label it lands in, e.g. "S", "#", "Various Artists" */
+  section: string;
+  source: ArtistFilingSource;
+  /** Set when a collaboration files under its first artist */
+  filedAs: string | null;
+  /** Cached MusicBrainz status for the credit; 'missing' when not fetched */
+  lookup: ArtistFilingCacheEntry['status'] | 'missing';
+  /** MusicBrainz type when found */
+  type: string | null;
+  override: string | null;
+  /** Rows in the collection and wishlist with this credit */
+  count: number;
+}
+
+export interface RecordStoreFilingJobStatus {
+  running: boolean;
+  startedAt: number | null;
+  finishedAt: number | null;
+  artistsDone: number;
+  artistsTotal: number;
+  mastersDone: number;
+  mastersTotal: number;
+  /** Lookups that failed (network) and will be retried next run */
+  failures: number;
+  cancelled: boolean;
+  error: string | null;
+}
+
+export interface RecordStoreFilingStatus {
+  artists: {
+    /** Distinct credits in the collection and wishlist (Various excluded) */
+    total: number;
+    musicbrainz: number;
+    override: number;
+    /** Looked up, but filed by today's rule (not found, ambiguous, none) */
+    unmatched: number;
+    /** Not looked up yet, or due for a retry */
+    missing: number;
+  };
+  masters: { total: number; cached: number; missing: number };
+  job: RecordStoreFilingJobStatus;
 }

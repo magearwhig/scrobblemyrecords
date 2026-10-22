@@ -31,6 +31,7 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | backlog-shark-tank-2026-03-08.md | Reference -- 24 tracked items, 20 done, 1 dropped (#20), 3 remaining (#5, #9, #18), each linked to a plan |
 | done/smart-crates-plan.md | Complete -- merged 2026-10-19 (PR #15); all phases 1-3 incl. suggested crates; known limitation on mixed collection snapshots in section 14 |
 | done/pocket-list-export-plan.md | Complete -- 2026-10-21 (branch feat/pocket-list); offline 4x8 in PDF of wishlist/collection from the Wishlist and Collection pages; phone checks left to the user |
+| done/record-store-filing-plan.md | Complete -- 2026-10-22 (branch feat/pocket-list); Pocket List filed like a record store: MusicBrainz sort names, "file under" overrides in Settings, original-year album order, spelled numbers, Various Artists and Soundtracks sections; 107 of 590 artists change bins on real data |
 | data-export-plan.md | In progress -- #9; Phase 1 (shared export row layer, `GET /api/v1/export/meta`) done 2026-10-21 with the Pocket List; Phases 2-4 (CSV/JSON files, Settings card, plays/mappings, cache fidelity) not started |
 | listening-notes-plan.md | Backlog -- #5; album-level notes MVP; not started |
 | done/embedding-rec-system-plan.md | Complete -- embedding recommendation system implemented |

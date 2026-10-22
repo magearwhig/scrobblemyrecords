@@ -51,7 +51,7 @@ describe('pocketListHtml', () => {
       ...html.matchAll(/<span class="cell cell-empty[^"]*">([^<]+)<\/span>/g),
     ].map(m => m[1]);
     expect(emptyCells).toEqual(empty.map(b => b.label));
-    expect(links.length + emptyCells.length).toBe(28);
+    expect(links.length + emptyCells.length).toBe(30);
   });
 
   it('gives every section an Index link back to the index', () => {

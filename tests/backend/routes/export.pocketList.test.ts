@@ -3,6 +3,7 @@ import request from 'supertest';
 
 import { requireApiToken } from '../../../src/backend/middleware/requireApiToken';
 import { registerPocketListRoute } from '../../../src/backend/routes/pocketListRoute';
+import { EMPTY_FILING_SNAPSHOT } from '../../../src/backend/services/filing/filingRules';
 import {
   PdfRenderError,
   PocketListPdfRenderer,
@@ -153,13 +154,35 @@ describe('GET /api/v1/export/pocket-list', () => {
           flagOwnedVersions: true,
         },
         snapshotMeta(),
-        NOW
+        NOW,
+        EMPTY_FILING_SNAPSHOT
       );
       expect(dataSource.getWishlistRows).toHaveBeenCalledWith({
         sources: ['discogs-want', 'local-want'],
       });
       // Wishlist-only still reads the collection to name owned copies
       expect(dataSource.getCollectionRows).toHaveBeenCalled();
+    });
+
+    it('passes the record-store filing snapshot to the model', async () => {
+      const filing = {
+        artists: {},
+        overrides: new Map(),
+        masterYears: { '1': { year: 1987 } },
+      };
+      const getSnapshot = jest.fn().mockResolvedValue(filing);
+      await request(makeApp({ filing: { getSnapshot } }))
+        .get('/api/v1/export/pocket-list')
+        .expect(200);
+      expect(buildModel.mock.calls[0][5]).toBe(filing);
+    });
+
+    it('still exports, filing by name, when the filing data is unreadable', async () => {
+      const getSnapshot = jest.fn().mockRejectedValue(new Error('corrupt'));
+      await request(makeApp({ filing: { getSnapshot } }))
+        .get('/api/v1/export/pocket-list')
+        .expect(200);
+      expect(buildModel.mock.calls[0][5]).toBe(EMPTY_FILING_SNAPSHOT);
     });
 
     it('parses explicit options', async () => {

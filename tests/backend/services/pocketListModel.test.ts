@@ -1,4 +1,8 @@
 import {
+  FilingSnapshot,
+  filingNameKey,
+} from '../../../src/backend/services/filing/filingRules';
+import {
   buildPocketListModel,
   ownedFlagFor,
   truncateNotes,
@@ -494,8 +498,9 @@ describe('buildPocketListModel', () => {
       const formatOff = build([cd, box, vinyl], [], {
         details: { format: false, pressing: true, notes: false },
       });
+      // Oldest first; the undated box set last
       const texts = albums(formatOff).map(g => g.versions[0].text);
-      expect(texts).toEqual(['1999 · CD', 'Box/mixed', '2000']);
+      expect(texts).toEqual(['1999 · CD', '2000', 'Box/mixed']);
 
       const allOff = build([cd, vinyl], [], {
         details: { format: false, pressing: false, notes: false },
@@ -853,13 +858,16 @@ describe('buildPocketListModel', () => {
           coll('कबीर', 'X'),
           coll('The Beatles', 'Abbey Road'),
           coll('2Pac', 'Me Against the World'),
+          coll('!!!', 'Myth Takes'),
           coll('Björk', 'Post'),
         ],
         []
       );
+      // 2Pac is spelled "Two Pac"; only symbols stay under #
       expect(model.sections.map(s => [s.id, s.label])).toEqual([
         ['sec-num', '#'],
         ['sec-b', 'B'],
+        ['sec-t', 'T'],
         ['sec-other', 'Other'],
       ]);
       expect(model.sections[1].artists.map(a => a.displayArtist)).toEqual([
@@ -953,5 +961,206 @@ describe('buildPocketListModel', () => {
       expect(model.meta.collectionCachedAt).toBe('2026-10-11T08:00:00Z');
       expect(model.meta.collectionCache.status).toBe('complete');
     });
+  });
+});
+
+describe('buildPocketListModel record-store filing', () => {
+  function filing(o: {
+    found?: Record<string, string>;
+    notFound?: string[];
+    overrides?: Record<string, string>;
+    masterYears?: Record<number, number | null>;
+  }): FilingSnapshot {
+    const artists: FilingSnapshot['artists'] = {};
+    for (const [name, sortName] of Object.entries(o.found ?? {})) {
+      artists[filingNameKey(name)] = {
+        name,
+        status: 'found',
+        sortName,
+        type: 'Person',
+        mbid: null,
+        via: 'search',
+        fetchedAt: 0,
+      };
+    }
+    for (const name of o.notFound ?? []) {
+      artists[filingNameKey(name)] = {
+        name,
+        status: 'not-found',
+        fetchedAt: 0,
+      };
+    }
+    return {
+      artists,
+      overrides: new Map(
+        Object.entries(o.overrides ?? {}).map(([artist, fileUnder]) => [
+          filingNameKey(artist),
+          { key: filingNameKey(artist), artist, fileUnder, updatedAt: 0 },
+        ])
+      ),
+      masterYears: Object.fromEntries(
+        Object.entries(o.masterYears ?? {}).map(([id, year]) => [id, { year }])
+      ),
+    };
+  }
+
+  const buildFiled = (
+    collection: ExportCollectionRow[],
+    wishlist: ExportWishlistRow[],
+    snapshot: FilingSnapshot
+  ) =>
+    buildPocketListModel(
+      collection,
+      wishlist,
+      options(),
+      meta(),
+      NOW,
+      snapshot
+    );
+
+  const layout = (model: PocketListModel) =>
+    model.sections.map(s => [s.label, s.artists.map(a => a.displayArtist)]);
+
+  it('files people by MusicBrainz surname and keeps the natural heading', () => {
+    const model = buildFiled(
+      [
+        coll('Elliott Smith', 'XO'),
+        coll('Modest Mouse', 'Moon & Antarctica'),
+        coll('The Smiths', 'The Queen Is Dead'),
+        coll('Sleater-Kinney', 'Dig Me Out'),
+      ],
+      [],
+      filing({
+        found: {
+          'Elliott Smith': 'Smith, Elliott',
+          'Modest Mouse': 'Modest Mouse',
+          'The Smiths': 'Smiths, The',
+        },
+      })
+    );
+    expect(layout(model)).toEqual([
+      ['M', ['Modest Mouse']],
+      ['S', ['Sleater-Kinney', 'Elliott Smith', 'The Smiths']],
+    ]);
+  });
+
+  it('lets an override beat MusicBrainz, and matches it ignoring Discogs suffixes', () => {
+    const model = buildFiled(
+      [coll('Alice Cooper (2)', 'Killer'), coll('Bob Dylan', 'Desire')],
+      [],
+      filing({
+        found: { 'Alice Cooper': 'Alice Cooper', 'Bob Dylan': 'Dylan, Bob' },
+        overrides: { 'alice cooper': 'Cooper, Alice' },
+      })
+    );
+    expect(layout(model)).toEqual([
+      ['C', ['Alice Cooper']],
+      ['D', ['Bob Dylan']],
+    ]);
+  });
+
+  it('files a not-found collaboration under its first artist, after the solo records', () => {
+    const model = buildFiled(
+      [
+        coll('Lou Reed, John Cale', 'Songs for Drella'),
+        coll('Lou Reed', 'Transformer'),
+        coll('Rancid', 'And Out Come the Wolves'),
+      ],
+      [],
+      filing({
+        found: { 'Lou Reed': 'Reed, Lou' },
+        notFound: ['Lou Reed, John Cale'],
+      })
+    );
+    expect(layout(model)).toEqual([
+      ['R', ['Rancid', 'Lou Reed', 'Lou Reed, John Cale']],
+    ]);
+  });
+
+  it('keeps a credit whole when its lookup has not run', () => {
+    const model = buildFiled(
+      [coll('Lou Reed, John Cale', 'Songs for Drella')],
+      [],
+      filing({ found: { 'Lou Reed': 'Reed, Lou' } })
+    );
+    expect(layout(model)).toEqual([['L', ['Lou Reed, John Cale']]]);
+  });
+
+  it('orders albums by original year and prints it on the album line', () => {
+    const model = buildFiled(
+      [
+        coll('The Wedding Present', 'George Best', { masterId: 1, year: 2019 }),
+        coll('The Wedding Present', 'Seamonsters', { masterId: 2, year: 1991 }),
+        coll('The Wedding Present', 'Bizarro', { masterId: 3, year: 1989 }),
+        coll('The Wedding Present', 'Demo', { year: null }),
+      ],
+      [],
+      filing({ masterYears: { 1: 1987, 2: null } })
+    );
+    expect(albums(model).map(a => [a.title, a.year])).toEqual([
+      ['George Best', 1987],
+      ['Bizarro', 1989],
+      ['Seamonsters', 1991],
+      ['Demo', null],
+    ]);
+    // Version lines keep the pressing year
+    expect(albums(model)[0].versions[0].text).toMatch(/^2019/);
+  });
+
+  it("never uses a local want's search-guess master for the original year", () => {
+    const model = buildFiled(
+      [],
+      [local('Band', 'Guess', { masterId: 9, year: 2015 })],
+      filing({ masterYears: { 9: 1970 } })
+    );
+    expect(albums(model).map(a => a.year)).toEqual([2015]);
+  });
+
+  it('moves Various releases to Various Artists and Soundtracks, by title', () => {
+    const model = buildFiled(
+      [
+        coll('Various', 'Nuggets', { masterId: 1, year: 1972 }),
+        coll('Various', 'Murder Was The Case', {
+          masterId: 2,
+          styles: ['Soundtrack', 'Gangsta'],
+        }),
+        coll('Various', 'The Big Lebowski', {
+          masterId: 3,
+          styles: ['Soundtrack'],
+        }),
+        coll('Prince And The Revolution', 'Purple Rain', {
+          styles: ['Soundtrack', 'Funk'],
+        }),
+        coll('Various', 'A Christmas Gift For You', { masterId: 4 }),
+      ],
+      [local('Various Artists', 'Pebbles')],
+      filing({})
+    );
+    expect(model.sections.map(s => s.id)).toEqual([
+      'sec-p',
+      'sec-various',
+      'sec-soundtracks',
+    ]);
+    const titles = (id: string) =>
+      model.sections
+        .find(s => s.id === id)
+        ?.artists.flatMap(a => a.albums.map(g => g.title));
+    expect(titles('sec-various')).toEqual([
+      'A Christmas Gift For You',
+      'Nuggets',
+      'Pebbles',
+    ]);
+    expect(titles('sec-soundtracks')).toEqual([
+      'The Big Lebowski',
+      'Murder Was The Case',
+    ]);
+    const various = model.sections[1].artists;
+    expect(various).toHaveLength(1);
+    expect(various[0].displayArtist).toBe('Various');
+    expect(various[0].disambiguation).toBeNull();
+    expect(model.sections[2].artists[0].disambiguation).toBeNull();
+    // "Various Artists" is not a different credit from "Various"
+    const pebbles = various[0].albums.find(a => a.title === 'Pebbles');
+    expect(pebbles?.versions[0].credited).toBeNull();
   });
 });

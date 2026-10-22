@@ -14,6 +14,7 @@ import {
   SettingsApiTokenSection,
   SettingsConnectionsSection,
   SettingsIntegrationsSection,
+  SettingsFilingSection,
   SettingsMappingsSection,
   SettingsFiltersSection,
   SettingsWishlistSection,
@@ -184,7 +185,12 @@ const SettingsPage: React.FC = () => {
       case 'integrations':
         return <SettingsIntegrationsSection api={api} />;
       case 'mappings':
-        return <SettingsMappingsSection api={api} />;
+        return (
+          <>
+            <SettingsMappingsSection api={api} />
+            <SettingsFilingSection api={api} />
+          </>
+        );
       case 'filters':
         return <SettingsFiltersSection api={api} />;
       case 'wishlist':

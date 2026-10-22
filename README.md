@@ -775,11 +775,12 @@ Library > Crates: saved groups of albums you own that keep themselves up to date
 ### 📱 Pocket List (offline PDF)
 A phone-sized PDF of your wishlist, your collection, or both, to read offline in a record shop. Click **Pocket List** on the Wishlist or Collection page, download, and move the file to your phone (AirDrop, email, a cloud drive).
 
-- **A–Z by artist, then album**: a leading "The" is ignored, letter sections with a tappable index on page 1 and PDF bookmarks, artist headings repeat when a block runs onto the next page
+- **Filed like a record store**: people by surname (Elliott Smith under S), bands by name, a leading "The", "A" or "An" ignored, numbers spelled out (10,000 Maniacs under T), albums oldest to newest, Various Artists and Soundtracks sections at the end. Letter sections have a tappable index on page 1 and PDF bookmarks; artist headings repeat when a block runs onto the next page
+- **Filing data**: sort names come from MusicBrainz and original years from Discogs, fetched once with **Fetch filing data** (in the Pocket List dialog or Settings → Mappings → Record-Store Filing) and cached; artists not yet looked up file by their own name. Change where any artist goes with "File under" in that Settings card (overrides are included in backups)
 - **Owned and wanted together**: pressings and copies of one album are grouped, so you can see "have the 1994 pressing, want the reissue" at a glance
 - **Honest owned flags on wanted albums**: "OWNED: this pressing", "OWNED: another version", or "Possibly owned" when only the title matches
 - **Options**: Discogs and/or monitored wants, format, pressing (year, label), wishlist notes
-- Built from cached data only: no Discogs or Last.fm calls, nothing saved on the server. The cover shows when the wishlist and collection were last synced, so sync first for an up-to-date list
+- The export itself is built from cached data only: no Discogs, MusicBrainz or Last.fm calls, nothing saved on the server. The cover shows when the wishlist and collection were last synced, so sync first for an up-to-date list
 - Rendered with Chromium via `playwright-core`. If the browser is missing (e.g. a fresh headless install), run `npx playwright install chromium`
 
 ### 📦 Discard Pile

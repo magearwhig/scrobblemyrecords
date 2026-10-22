@@ -63,6 +63,8 @@ import {
   ReleaseTrackingSettings,
   SavedCollection,
   SavedCollectionsStore,
+  ArtistFilingOverride,
+  ArtistFilingOverridesStore,
   Crate,
   CratesStore,
   CrateSuggestionRecord,
@@ -116,6 +118,7 @@ const FILE_PATHS = {
   savedCollections: 'collections/saved-collections.json',
   crates: 'collections/crates.json',
   crateSuggestions: 'collections/crate-suggestions.json',
+  artistFilingOverrides: 'mappings/artist-filing-overrides.json',
   backupSettings: 'settings/backup-settings.json',
 } as const;
 
@@ -587,6 +590,14 @@ export class BackupService {
     return store?.records ?? [];
   }
 
+  /** Record-store "file under" overrides (Pocket List filing) */
+  private async loadArtistFilingOverrides(): Promise<ArtistFilingOverride[]> {
+    const store = await this.fileStorage.readJSON<ArtistFilingOverridesStore>(
+      FILE_PATHS.artistFilingOverrides
+    );
+    return store?.overrides ?? [];
+  }
+
   private async loadCrates(): Promise<Crate[]> {
     const store = await this.fileStorage.readJSON<CratesStore>(
       FILE_PATHS.crates
@@ -665,10 +676,16 @@ export class BackupService {
       this.loadSavedCollections(),
     ]);
     const unresolvedHistory = await this.loadUnresolvedHistory();
-    const [crates, crateSuggestions, wishlistPriceAlerts] = await Promise.all([
+    const [
+      crates,
+      crateSuggestions,
+      wishlistPriceAlerts,
+      artistFilingOverrides,
+    ] = await Promise.all([
       this.loadCrates(),
       this.loadCrateSuggestions(),
       this.loadWishlistPriceAlerts(),
+      this.loadArtistFilingOverrides(),
     ]);
 
     return {
@@ -702,6 +719,7 @@ export class BackupService {
       cratesCount: crates.length,
       crateSuggestionsCount: crateSuggestions.length,
       wishlistPriceAlertsCount: Object.keys(wishlistPriceAlerts).length,
+      artistFilingOverridesCount: artistFilingOverrides.length,
     };
   }
 
@@ -782,6 +800,7 @@ export class BackupService {
     const wishlistPriceAlerts = await this.loadWishlistPriceAlerts();
     const crates = await this.loadCrates();
     const crateSuggestions = await this.loadCrateSuggestions();
+    const artistFilingOverrides = await this.loadArtistFilingOverrides();
 
     // Build backup data
     let backupData: BackupData = {
@@ -815,6 +834,7 @@ export class BackupService {
       savedCollections,
       crates,
       crateSuggestions,
+      artistFilingOverrides,
     };
 
     // Encrypt credentials if included
@@ -934,6 +954,7 @@ export class BackupService {
       currentSavedCollections,
       currentCrates,
       currentCrateSuggestions,
+      currentArtistFilingOverrides,
     ] = await Promise.all([
       this.loadAlbumMappings(),
       this.loadArtistMappings(),
@@ -954,6 +975,7 @@ export class BackupService {
       this.loadSavedCollections(),
       this.loadCrates(),
       this.loadCrateSuggestions(),
+      this.loadArtistFilingOverrides(),
     ]);
 
     // Calculate summary
@@ -1058,6 +1080,11 @@ export class BackupService {
         currentCrateSuggestions,
         (r: CrateSuggestionRecord) => r.candidateKey
       ),
+      artistFilingOverrides: this.compareMappings(
+        backup.data.artistFilingOverrides ?? [],
+        currentArtistFilingOverrides,
+        (o: ArtistFilingOverride) => o.key
+      ),
       settingsWillMerge: true,
     };
 
@@ -1093,6 +1120,7 @@ export class BackupService {
       savedCollections: { new: 0, existing: 0 },
       crates: { new: 0, existing: 0 },
       crateSuggestions: { new: 0, existing: 0 },
+      artistFilingOverrides: { new: 0, existing: 0 },
       settingsWillMerge: false,
     };
   }
@@ -1750,6 +1778,33 @@ export class BackupService {
         updated += result.updated;
       } catch (e) {
         errors.push(`Crate suggestions: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+
+    // Import record-store filing overrides ({ schemaVersion, overrides })
+    if (data.artistFilingOverrides) {
+      try {
+        if (!merge && data.artistFilingOverrides.length === 0) {
+          // mergeAndSave skips empty lists; a replace still clears them
+          await this.fileStorage.writeJSONWithBackup(
+            FILE_PATHS.artistFilingOverrides,
+            { schemaVersion: 1, overrides: [] }
+          );
+        }
+        const result = await this.mergeAndSave(
+          FILE_PATHS.artistFilingOverrides,
+          data.artistFilingOverrides,
+          (o: ArtistFilingOverride) => o.key,
+          'overrides',
+          merge,
+          (a, b) => (a.updatedAt > b.updatedAt ? a : b)
+        );
+        added += result.added;
+        updated += result.updated;
+      } catch (e) {
+        errors.push(
+          `Artist filing overrides: ${e instanceof Error ? e.message : e}`
+        );
       }
     }
 

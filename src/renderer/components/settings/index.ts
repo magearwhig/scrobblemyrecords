@@ -1,6 +1,7 @@
 export { default as SettingsConnectionsSection } from './SettingsConnectionsSection';
 export { default as SettingsIntegrationsSection } from './SettingsIntegrationsSection';
 export { default as SettingsMappingsSection } from './SettingsMappingsSection';
+export { default as SettingsFilingSection } from './SettingsFilingSection';
 export { default as SettingsFiltersSection } from './SettingsFiltersSection';
 export { default as SettingsWishlistSection } from './SettingsWishlistSection';
 export { default as SettingsBackupSection } from './SettingsBackupSection';

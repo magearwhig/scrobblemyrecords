@@ -15,6 +15,7 @@ import { formatLocalDateOnly } from '../utils/dateUtils';
 import { downloadBlob } from '../utils/downloadBlob';
 import { createLogger } from '../utils/logger';
 
+import RecordStoreFilingStatus from './RecordStoreFilingStatus';
 import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
 
@@ -420,6 +421,8 @@ const PocketListExportDialog: React.FC<PocketListExportDialogProps> = ({
           Sync first for an up-to-date list.
         </p>
       </div>
+
+      <RecordStoreFilingStatus />
 
       <div
         ref={statusRef}

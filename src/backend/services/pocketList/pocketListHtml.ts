@@ -22,6 +22,7 @@ import {
   PocketListModel,
   PocketListSection,
   PocketListVersionLine,
+  PocketSectionBucket,
 } from './pocketListTypes';
 
 /** `@font-face` rules with `data:` URLs, from loadPocketListFonts() */
@@ -219,14 +220,23 @@ function renderLegend(): string {
   ).join('\n');
   return `<ul class="legend">\n${items}\n</ul>
 <p class="legend-note">${text(
-    'Sorted by artist, then album. A leading “The” is ignored; “Various” is under V. # holds numbers and symbols, Other holds non-Latin scripts.'
+    'Filed like a record store: people by surname, bands by name, a leading “The”, “A” or “An” ignored, numbers spelled out (10,000 Maniacs under T). Albums run oldest to newest. Compilations and soundtracks are at the end, by title. # holds symbols, Other holds non-Latin scripts.'
   )}</p>`;
 }
+
+/** Index cells wider than one letter: Various Artists and Soundtracks share the last row */
+const INDEX_SPANS: Partial<Record<PocketSectionBucket['id'], number>> = {
+  'sec-various': 3,
+  'sec-soundtracks': 4,
+};
 
 function renderIndex(sections: PocketListSection[]): string {
   const present = new Set(sections.map(s => s.id));
   const cells = POCKET_SECTION_BUCKETS.map(bucket => {
-    const wide = bucket.label.length > 1 ? ' cell-wide' : '';
+    const span = INDEX_SPANS[bucket.id];
+    const wide =
+      (bucket.label.length > 1 ? ' cell-wide' : '') +
+      (span ? ` cell-span-${span}` : '');
     if (present.has(bucket.id)) {
       return `<a class="cell${wide}" href="#${bucket.id}">${text(bucket.label)}</a>`;
     }
@@ -376,6 +386,8 @@ a { color: var(--ink); text-decoration: none; }
   background: var(--paper);
 }
 .cell-wide { font-size: var(--size-small); }
+.cell-span-3 { grid-column: span 3; width: auto; }
+.cell-span-4 { grid-column: span 4; width: auto; }
 .cell-empty { color: var(--faint); border-color: var(--faint); font-weight: 400; }
 
 .letter { break-before: page; }

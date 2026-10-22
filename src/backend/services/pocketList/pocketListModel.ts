@@ -8,6 +8,11 @@
  *
  * Pass all collection rows even for a wishlist-only export: they are not
  * listed then, but they name the owned copy in owned-version notes.
+ *
+ * Filing (which bin an artist goes in, album order, Various and Soundtracks
+ * sections) follows .plan/done/record-store-filing-plan.md and reads only the
+ * FilingSnapshot passed in; with an empty snapshot every artist files by its
+ * own name.
  */
 
 import {
@@ -21,12 +26,21 @@ import {
 } from '../../../shared/types';
 import { albumGroupKey } from '../../../shared/utils/albumMapping';
 import { createLogger } from '../../utils/logger';
+import {
+  EMPTY_FILING_SNAPSHOT,
+  FilingSnapshot,
+  SOUNDTRACK_STYLES,
+  isVariousCredit,
+  masterYearOf,
+  resolveArtistFiling,
+} from '../filing/filingRules';
 
 import {
-  POCKET_ARTICLES,
+  PocketAlbumSortFields,
   PocketArtistSortFields,
+  SOUNDTRACKS_BUCKET,
+  VARIOUS_BUCKET,
   albumSortKey,
-  artistSortKey,
   compareAlbumFields,
   compareArtistFields,
   compareCodePoints,
@@ -34,11 +48,14 @@ import {
   compareYears,
   createPocketCollator,
   discogsSuffixNumbers,
+  filingParts,
+  filingText,
   sectionFor,
 } from './pocketListCollation';
 import {
   POCKET_SECTION_BUCKETS,
   PocketBadge,
+  PocketSectionBucket,
   PocketListAlbumGroup,
   PocketListArtistBlock,
   PocketListCounts,
@@ -298,6 +315,28 @@ function earliestYear(rows: AnyRow[]): number | null {
 }
 
 /**
+ * Original year of a group: the lower of its confirmed master's cached year
+ * and its earliest row year. Name-only groups (master null, which includes
+ * every local want's search guess) use the row years alone.
+ */
+function originalYear(work: WorkGroup, filing: FilingSnapshot): number | null {
+  const rowYear = earliestYear(work.rows);
+  const masterYear =
+    work.master !== null ? masterYearOf(work.master, filing) : null;
+  if (masterYear === null) return rowYear;
+  return rowYear === null ? masterYear : Math.min(masterYear, rowYear);
+}
+
+/** A Various group with any owned copy styled as a soundtrack or score */
+function isSoundtrackGroup(work: WorkGroup): boolean {
+  return work.rows.some(
+    row =>
+      isCollectionRow(row) &&
+      (row.styles ?? []).some(style => SOUNDTRACK_STYLES.has(style))
+  );
+}
+
+/**
  * Artist blocks by identity, each with its conservative album groups. Local
  * wants join the one Discogs identity with the same name, else their own
  * block. Groups are reconciled inside each identity block first; then a
@@ -444,7 +483,7 @@ function buildGroups(rows: AnyRow[]): WorkGroup[] {
 
 interface BuiltGroup {
   group: PocketListAlbumGroup;
-  sort: { sortKey: string; year: number | null; firstRowId: string };
+  sort: PocketAlbumSortFields;
   flags: OwnedTier[];
 }
 
@@ -454,6 +493,7 @@ interface ModelContext {
   wants: Map<string, WantInfo>;
   collectionById: Map<string, ExportCollectionRow>;
   collator: Intl.Collator;
+  filing: FilingSnapshot;
 }
 
 function versionText(
@@ -475,14 +515,19 @@ function versionText(
 function buildGroup(
   work: WorkGroup,
   heading: string,
-  ctx: ModelContext
+  ctx: ModelContext,
+  albumOrder: 'year' | 'title' = 'year'
 ): BuiltGroup {
   const owned = work.rows.filter(isCollectionRow);
   const wanted = work.rows.filter(
     (r): r is ExportWishlistRow => !isCollectionRow(r)
   );
+  // "Various" and "Various Artists" are one heading
   const credited = (row: AnyRow) =>
-    row.artistDisplay !== heading ? `credited: ${row.artistDisplay}` : null;
+    row.artistDisplay !== heading &&
+    !(isVariousCredit(row.artistDisplay) && isVariousCredit(heading))
+      ? `credited: ${row.artistDisplay}`
+      : null;
   const ambiguousNote = work.ambiguous ? 'possibly another version' : null;
 
   const lines: Array<
@@ -615,7 +660,7 @@ function buildGroup(
   }
 
   const title = albumTitleFor(work.rows);
-  const year = earliestYear(work.rows);
+  const year = originalYear(work, ctx.filing);
   return {
     group: {
       title,
@@ -628,7 +673,7 @@ function buildGroup(
       badges,
     },
     sort: {
-      sortKey: albumSortKey(title),
+      sortKey: albumOrder === 'title' ? filingText(title) : albumSortKey(title),
       year,
       firstRowId: minRowId(work.rows),
     },
@@ -768,7 +813,8 @@ export function buildPocketListModel(
   wishlistRows: ExportWishlistRow[],
   options: PocketListOptions,
   meta: ExportSnapshotMeta,
-  now: Date = new Date()
+  now: Date = new Date(),
+  filing: FilingSnapshot = EMPTY_FILING_SNAPSHOT
 ): PocketListModel {
   const counts: PocketListCounts = {
     albums: 0,
@@ -800,18 +846,53 @@ export function buildPocketListModel(
     wants,
     collectionById: new Map(collectionRows.map(r => [r.rowId, r])),
     collator: createPocketCollator(),
+    filing,
   };
 
   const rows: AnyRow[] = [...owned, ...[...wants.values()].map(w => w.row)];
-  const blocks = buildBlocks(rows).map(block => {
+
+  type SortedBlock = {
+    displayArtist: string;
+    sort: PocketArtistSortFields & { key: string };
+    albums: BuiltGroup[];
+    /** Various and Soundtracks blocks: no same-name disambiguation */
+    special: boolean;
+  };
+  const blocks: SortedBlock[] = [];
+  // Various groups, by destination section; each section gets one block
+  const specialGroups = new Map<
+    PocketSectionBucket,
+    Array<{ work: WorkGroup; identityKey: string | null; heading: string }>
+  >();
+
+  for (const block of buildBlocks(rows)) {
     const displayArtist = headingFor(block.rows, block.identityKey);
+    if (isVariousCredit(displayArtist)) {
+      for (const work of block.groups) {
+        const bucket = isSoundtrackGroup(work)
+          ? SOUNDTRACKS_BUCKET
+          : VARIOUS_BUCKET;
+        const list = specialGroups.get(bucket) ?? [];
+        list.push({
+          work,
+          identityKey: block.identityKey,
+          heading: displayArtist,
+        });
+        specialGroups.set(bucket, list);
+      }
+      continue;
+    }
+
     const ownCredit = block.rows.find(
       r => r.artistIdentityKey === block.identityKey
     );
-    const sortKey = artistSortKey(displayArtist, POCKET_ARTICLES);
+    const resolved = resolveArtistFiling(displayArtist, filing);
+    const { head, tail } = filingParts(resolved.sortName);
     const sort: PocketArtistSortFields & { key: string } = {
-      section: sectionFor(sortKey),
-      sortKey,
+      section: sectionFor(head),
+      head,
+      tail,
+      collaboration: resolved.collaboration,
       suffixes:
         block.identityKey !== null && ownCredit
           ? discogsSuffixNumbers(ownCredit.artistRaw)
@@ -822,8 +903,38 @@ export function buildPocketListModel(
     const albums = block.groups
       .map(group => buildGroup(group, displayArtist, ctx))
       .sort((a, b) => compareAlbumFields(a.sort, b.sort, ctx.collator));
-    return { displayArtist, sort, albums };
-  });
+    blocks.push({ displayArtist, sort, albums, special: false });
+  }
+
+  for (const [bucket, list] of specialGroups) {
+    // Heading: the Discogs spelling when there is one ("Various")
+    const withIdentity = list.filter(g => g.identityKey !== null);
+    const pool = withIdentity.length > 0 ? withIdentity : list;
+    const heading = [...pool].map(g => g.heading).sort(compareCodePoints)[0];
+    const identityKey =
+      withIdentity
+        .map(g => g.identityKey as string)
+        .sort(compareCodePoints)[0] ?? null;
+    const albums = list
+      .map(g => buildGroup(g.work, heading, ctx, 'title'))
+      .sort((a, b) =>
+        compareAlbumFields(a.sort, b.sort, ctx.collator, 'title')
+      );
+    blocks.push({
+      displayArtist: heading,
+      sort: {
+        section: bucket,
+        head: '',
+        tail: '',
+        collaboration: null,
+        suffixes: [],
+        identityKey,
+        key: bucket.id,
+      },
+      albums,
+      special: true,
+    });
+  }
 
   blocks.sort(
     (a, b) =>
@@ -837,7 +948,7 @@ export function buildPocketListModel(
   for (const block of blocks) {
     const name = artistNameKey(block.displayArtist);
     let disambiguation: string | null = null;
-    if (seenNames.has(name)) {
+    if (!block.special && seenNames.has(name)) {
       const number = block.sort.suffixes.find(n => n > 0);
       disambiguation =
         block.sort.identityKey === null
@@ -846,7 +957,7 @@ export function buildPocketListModel(
             ? `another artist named ${block.displayArtist} · Discogs #${number}`
             : `another artist named ${block.displayArtist}`;
     }
-    seenNames.add(name);
+    if (!block.special) seenNames.add(name);
 
     const artist: PocketListArtistBlock = {
       identityKey: block.sort.identityKey,

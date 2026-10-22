@@ -44,6 +44,10 @@ import {
   ExcludedArtistResponse,
   ExcludedHistoryArtist,
   ExportSnapshotMeta,
+  ArtistFilingOverride,
+  ArtistFilingRow,
+  RecordStoreFilingJobStatus,
+  RecordStoreFilingStatus,
   ExclusionSuggestion,
   ForgottenTrack,
   HiddenAlbum,
@@ -2355,6 +2359,43 @@ class ApiService {
     } catch (error) {
       throw new Error(await pocketListErrorMessage(error));
     }
+  }
+
+  /**
+   * Record-store filing (Pocket List order): cache coverage and the
+   * background refresh's progress
+   */
+  async getFilingStatus(): Promise<RecordStoreFilingStatus> {
+    const response = await this.api.get('/filing/status');
+    return response.data.data;
+  }
+
+  /** Start fetching missing MusicBrainz sort names and Discogs master years */
+  async startFilingRefresh(full = false): Promise<RecordStoreFilingJobStatus> {
+    const response = await this.api.post('/filing/refresh', { full });
+    return response.data.data;
+  }
+
+  async cancelFilingRefresh(): Promise<void> {
+    await this.api.post('/filing/cancel');
+  }
+
+  /** Every artist in the collection and wishlist, in filing order */
+  async getFilingArtists(): Promise<ArtistFilingRow[]> {
+    const response = await this.api.get('/filing/artists');
+    return response.data.data;
+  }
+
+  /** Set "file under" for an artist; an empty value removes the override */
+  async setFilingOverride(
+    artist: string,
+    fileUnder: string
+  ): Promise<ArtistFilingOverride | null> {
+    const response = await this.api.put('/filing/overrides', {
+      artist,
+      fileUnder,
+    });
+    return response.data.data;
   }
 
   /**

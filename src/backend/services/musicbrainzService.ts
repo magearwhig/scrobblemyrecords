@@ -16,6 +16,8 @@ const MAX_BACKOFF_MS = 30000;
 interface MBArtistSearchResult {
   id: string;
   name: string;
+  'sort-name'?: string;
+  type?: string | null;
   disambiguation?: string;
   country?: string;
   'life-span'?: {
@@ -137,19 +139,18 @@ export class MusicBrainzService {
   }
 
   /**
-   * Ensure we respect MusicBrainz rate limits (1 req/sec)
+   * Ensure we respect MusicBrainz rate limits (1 req/sec). Each caller
+   * reserves the next free slot before waiting, so concurrent callers (release
+   * tracking and record-store filing) queue up instead of firing together.
    */
   private async enforceRateLimit(): Promise<void> {
     const now = Date.now();
-    const elapsed = now - this.lastRequestTime;
+    const slot = Math.max(now, this.lastRequestTime + MUSICBRAINZ_DELAY_MS);
+    this.lastRequestTime = slot;
 
-    if (elapsed < MUSICBRAINZ_DELAY_MS) {
-      await new Promise(resolve =>
-        setTimeout(resolve, MUSICBRAINZ_DELAY_MS - elapsed)
-      );
+    if (slot > now) {
+      await new Promise(resolve => setTimeout(resolve, slot - now));
     }
-
-    this.lastRequestTime = Date.now();
   }
 
   /**
@@ -194,6 +195,8 @@ export class MusicBrainzService {
         );
         await new Promise(resolve => setTimeout(resolve, delay));
         delay = Math.min(delay * 2, MAX_BACKOFF_MS);
+        // A retry is another request: it takes its own rate-limit slot
+        await this.enforceRateLimit();
       }
     }
 
@@ -208,22 +211,42 @@ export class MusicBrainzService {
     name: string,
     limit: number = 10
   ): Promise<MusicBrainzArtistMatch[]> {
+    return (await this.searchArtistWithCount(name, limit)).artists;
+  }
+
+  /**
+   * Search for artists by name, with the total hit count so callers can tell
+   * when results were cut off at `limit`
+   */
+  async searchArtistWithCount(
+    name: string,
+    limit: number = 10
+  ): Promise<{ artists: MusicBrainzArtistMatch[]; count: number }> {
     await this.enforceRateLimit();
 
     return this.executeWithBackoff(async () => {
       this.logger.debug(`Searching for artist: ${name}`);
 
+      // Inside a quoted Lucene phrase only \ and " need escaping
+      const phrase = name.replace(/[\\"]/g, '\\$&');
       const response = await this.axios.get('/artist', {
         params: {
-          query: `artist:"${name}"`,
+          query: `artist:"${phrase}"`,
           limit,
           fmt: 'json',
         },
       });
 
       const artists: MBArtistSearchResult[] = response.data.artists || [];
+      const count =
+        typeof response.data.count === 'number'
+          ? response.data.count
+          : artists.length;
 
-      return artists.map(artist => this.mapArtistResult(artist));
+      return {
+        artists: artists.map(artist => this.mapArtistResult(artist)),
+        count,
+      };
     }, `searchArtist(${name})`);
   }
 
@@ -247,6 +270,8 @@ export class MusicBrainzService {
     return {
       mbid: artist.id,
       name: artist.name,
+      sortName: artist['sort-name'],
+      type: artist.type,
       disambiguation: artist.disambiguation,
       country: artist.country,
       beginYear,
@@ -668,6 +693,8 @@ export class MusicBrainzService {
         return {
           mbid: artist.id,
           name: artist.name,
+          sortName: artist['sort-name'],
+          type: artist.type,
           disambiguation: artist.disambiguation,
           country: artist.country,
           beginYear,

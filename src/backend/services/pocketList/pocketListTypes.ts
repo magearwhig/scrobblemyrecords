@@ -43,19 +43,24 @@ export type PocketSectionId =
       | 'Y'
       | 'Z'
     >}`
-  | 'sec-other';
+  | 'sec-other'
+  | 'sec-various'
+  | 'sec-soundtracks';
 
 export interface PocketSectionBucket {
   id: PocketSectionId;
-  /** "#", "A"…"Z", "Other" */
+  /** "#", "A"…"Z", "Other", "Various Artists", "Soundtracks" */
   label: string;
-  /** 0 for "#", 1–26 for A–Z, 27 for Other */
+  /** 0 for "#", 1–26 for A–Z, 27 for Other, 28 Various Artists, 29 Soundtracks */
   rank: number;
 }
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
-/** All 28 buckets in order: #, A–Z, Other */
+/**
+ * All 30 buckets in order: #, A–Z, Other, then the title-sorted Various
+ * Artists and Soundtracks sections (.plan/done/record-store-filing-plan.md)
+ */
 export const POCKET_SECTION_BUCKETS: PocketSectionBucket[] = [
   { id: 'sec-num', label: '#', rank: 0 },
   ...LETTERS.map((letter, i) => ({
@@ -64,6 +69,8 @@ export const POCKET_SECTION_BUCKETS: PocketSectionBucket[] = [
     rank: i + 1,
   })),
   { id: 'sec-other', label: 'Other', rank: 27 },
+  { id: 'sec-various', label: 'Various Artists', rank: 28 },
+  { id: 'sec-soundtracks', label: 'Soundtracks', rank: 29 },
 ];
 
 /** A text marker drawn as a bordered badge; meaning never relies on color */
@@ -100,7 +107,10 @@ export interface PocketListVersionLine {
 export interface PocketListAlbumGroup {
   /** Album line title */
   title: string;
-  /** Earliest non-null year in the group */
+  /**
+   * Original year: the cached Discogs master year of a confirmed master, or
+   * the earliest row year when lower or when no master year is cached
+   */
   year: number | null;
   /** Empty when version lines are turned off (format, pressing and notes all off) */
   versions: PocketListVersionLine[];

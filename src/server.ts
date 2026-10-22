@@ -23,6 +23,7 @@ import { registerCrateSuggestionRoutes } from './backend/routes/crateSuggestions
 import createDiscardPileRouter from './backend/routes/discardPile';
 import { createEmbeddingsRouter } from './backend/routes/embeddings';
 import createExportRouter from './backend/routes/export';
+import createFilingRouter from './backend/routes/filing';
 import createImagesRouter from './backend/routes/images';
 import jobsRouter from './backend/routes/jobs';
 import createLabelsRouter from './backend/routes/labels';
@@ -58,6 +59,7 @@ import { DiscogsService } from './backend/services/discogsService';
 import { DurationLookupService } from './backend/services/durationLookupService';
 import { EmbeddingStorageService } from './backend/services/embeddingStorageService';
 import { ExportDataService } from './backend/services/exportDataService';
+import { RecordStoreFilingService } from './backend/services/filing/recordStoreFilingService';
 import { GenreAnalysisService } from './backend/services/genreAnalysisService';
 import { HiddenItemService } from './backend/services/hiddenItemService';
 import { HiddenReleasesService } from './backend/services/hiddenReleasesService';
@@ -460,10 +462,20 @@ const exportDataService = new ExportDataService(
   wishlistService,
   historyStorage
 );
+// Record-store filing for the Pocket List: MusicBrainz sort names, Discogs
+// master years and the user's overrides; fetched only by its refresh job
+const recordStoreFilingService = new RecordStoreFilingService(
+  fileStorage,
+  exportDataService,
+  musicBrainzService,
+  wishlistService,
+  releaseTrackingService
+);
 // Offline PDF of the wishlist/collection; Chromium launches on first export
 const pocketListService = new PocketListService(
   exportDataService,
-  new ChromiumPdfRenderer()
+  new ChromiumPdfRenderer(),
+  { filing: recordStoreFilingService }
 );
 const durationLookupService = new DurationLookupService(
   fileStorage,
@@ -560,6 +572,7 @@ app.use(
     registerPocketListRoute(router, pocketListService)
   )
 );
+app.use('/api/v1/filing', createFilingRouter(recordStoreFilingService));
 app.use(
   '/api/v1/collection-analytics',
   createCollectionAnalyticsRouter(

@@ -19,6 +19,7 @@ import {
   PocketListWishlistSource,
 } from '../../../shared/types';
 import { createLogger } from '../../utils/logger';
+import { EMPTY_FILING_SNAPSHOT, FilingSnapshot } from '../filing/filingRules';
 
 import {
   PocketListFonts,
@@ -45,12 +46,18 @@ export interface PocketListDataSource {
   getSnapshotMeta(): Promise<ExportSnapshotMeta>;
 }
 
+/** Record-store filing data; implemented by RecordStoreFilingService */
+export interface PocketListFilingSource {
+  getSnapshot(): Promise<FilingSnapshot>;
+}
+
 export type PocketListModelBuilder = (
   collectionRows: ExportCollectionRow[],
   wishlistRows: ExportWishlistRow[],
   options: PocketListOptions,
   meta: ExportSnapshotMeta,
-  now?: Date
+  now?: Date,
+  filing?: FilingSnapshot
 ) => PocketListModel;
 
 export type PocketListErrorStatus = 400 | 409 | 422 | 499 | 500 | 503 | 504;
@@ -82,6 +89,8 @@ export const POCKET_LIST_MESSAGES = {
 
 export interface PocketListServiceOptions {
   buildModel?: PocketListModelBuilder;
+  /** Filing caches; without one every artist files by its own name */
+  filing?: PocketListFilingSource;
   loadFonts?: () => PocketListFonts;
   /** End-to-end budget per export (default 60 s) */
   deadlineMs?: number;
@@ -120,6 +129,7 @@ export function pocketListFilename(
 export class PocketListService {
   private running = false;
   private readonly buildModel: PocketListModelBuilder;
+  private readonly filing: PocketListFilingSource | null;
   private readonly loadFonts: () => PocketListFonts;
   private readonly deadlineMs: number;
   private readonly minRetryBudgetMs: number;
@@ -132,6 +142,7 @@ export class PocketListService {
     options: PocketListServiceOptions = {}
   ) {
     this.buildModel = options.buildModel ?? buildPocketListModel;
+    this.filing = options.filing ?? null;
     this.loadFonts = options.loadFonts ?? loadPocketListFonts;
     this.deadlineMs = options.deadlineMs ?? DEFAULT_DEADLINE_MS;
     this.minRetryBudgetMs =
@@ -190,7 +201,7 @@ export class PocketListService {
     // export still needs the collection rows: the model applies
     // options.lists itself and names the owned copy in
     // "OWNED: another version (1994 · Vinyl)".
-    const [meta, collectionRows, wishlistRows] = await Promise.all([
+    const [meta, collectionRows, wishlistRows, filing] = await Promise.all([
       this.dataSource.getSnapshotMeta(),
       wantsCollection || wantsWishlist
         ? this.dataSource.getCollectionRows()
@@ -198,6 +209,7 @@ export class PocketListService {
       wantsWishlist
         ? this.dataSource.getWishlistRows({ sources: options.wishlistSources })
         : Promise.resolve([]),
+      this.readFiling(),
     ]);
 
     if (
@@ -213,12 +225,26 @@ export class PocketListService {
       wishlistRows,
       options,
       meta,
-      now
+      now,
+      filing
     );
     if (model.sections.length === 0) {
       throw new PocketListError(POCKET_LIST_MESSAGES.empty, 422);
     }
     return renderPocketListHtml(model, this.loadFonts());
+  }
+
+  /** A filing read failure only costs the record-store order, never the export */
+  private async readFiling(): Promise<FilingSnapshot> {
+    if (!this.filing) return EMPTY_FILING_SNAPSHOT;
+    try {
+      return await this.filing.getSnapshot();
+    } catch (error) {
+      log.warn('Filing data unreadable; filing artists by name', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return EMPTY_FILING_SNAPSHOT;
+    }
   }
 
   private checkBudget(deadline: number, signal: AbortSignal | undefined) {
