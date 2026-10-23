@@ -1308,6 +1308,83 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
   });
 });
 
+describe('ReleaseDetailsPage tracks with parts', () => {
+  const liveRelease = {
+    ...mockRelease,
+    id: 1187012,
+    title: 'Rock N Roll Animal',
+    artist: 'Lou Reed',
+    tracklist: [
+      {
+        position: 'A1',
+        title: 'Intro / Sweet Jane',
+        duration: '7:55',
+        subTracks: [
+          { position: 'A1a', title: 'Intro' },
+          { position: 'A1b', title: 'Sweet Jane' },
+        ],
+      },
+      { position: 'A2', title: 'Heroin', duration: '13:11' },
+      { position: 'B1', title: 'White Light/White Heat', duration: '5:15' },
+    ],
+  };
+  let user: ReturnType<typeof userEvent.setup>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    user = userEvent.setup();
+    mockLocalStorage.clear();
+    mockLocalStorage.setItem('selectedRelease', JSON.stringify(liveRelease));
+    mockApiService.getReleaseDetails.mockResolvedValue(liveRelease);
+    mockApiService.getAlbumHistory.mockResolvedValue({
+      success: true,
+      data: { found: false, plays: [] },
+    });
+    mockApiService.prepareTracksFromRelease.mockResolvedValue({ tracks: [] });
+    mockApiService.scrobbleBatch.mockResolvedValue({ sessionId: 's' });
+    mockApiService.getScrobbleProgress.mockResolvedValue({
+      status: 'completed',
+      progress: { current: 0, total: 0, success: 0, failed: 0, ignored: 0 },
+    });
+  });
+
+  it('shows a track with parts as a selectable track in its side', async () => {
+    renderWithProviders(<ReleaseDetailsPage />);
+    await waitFor(() => {
+      expect(screen.getByText(/A1 Intro \/ Sweet Jane/)).toBeInTheDocument();
+    });
+    expect(screen.getByText('Parts: Intro / Sweet Jane')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Scrobble 3 Tracks/ })
+    ).toBeInTheDocument();
+  });
+
+  it('scrobbles a split track as its parts and remembers the choice', async () => {
+    renderWithProviders(<ReleaseDetailsPage />);
+    await waitFor(() => {
+      expect(screen.getByText(/A1 Intro \/ Sweet Jane/)).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /Split/ }));
+    expect(
+      screen.getByText('Scrobbled as Intro / Sweet Jane')
+    ).toBeInTheDocument();
+    expect(mockLocalStorage.getItem('listenography.splitTracks.1187012')).toBe(
+      '[0]'
+    );
+
+    await user.click(screen.getByRole('button', { name: /Scrobble 4 Tracks/ }));
+    await waitFor(() => {
+      expect(mockApiService.prepareTracksFromRelease).toHaveBeenCalledWith(
+        liveRelease,
+        [0, 1, 2],
+        expect.any(Number),
+        [0]
+      );
+    });
+  });
+});
+
 describe('ReleaseDetailsPage per-track play counts', () => {
   beforeEach(() => {
     jest.clearAllMocks();

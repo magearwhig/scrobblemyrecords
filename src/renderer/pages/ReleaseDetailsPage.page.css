@@ -451,6 +451,12 @@
   color: var(--text-secondary);
 }
 
+/* Parts of a track Discogs lists separately */
+.release-details-track-parts {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
 /* Track duration */
 .release-details-track-duration {
   font-size: var(--text-sm);

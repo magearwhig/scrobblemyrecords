@@ -7,6 +7,8 @@ import {
   ScrobbleTrack,
   ScrobbleProgress,
 } from '../../shared/types';
+import { parseDurationSeconds } from '../../shared/utils/releaseRuntime';
+import { tracksToScrobble } from '../../shared/utils/tracklist';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { ProgressBar } from '../components/ui/ProgressBar';
@@ -92,15 +94,17 @@ const ScrobblePage: React.FC = () => {
               ? new Date(customTimestamp).getTime() / 1000
               : undefined;
 
-          const albumTracks = releaseDetails.tracklist.map((track, _index) => ({
+          // Every track, headings skipped; tracks with parts count as one
+          const albumTracks = tracksToScrobble(
+            releaseDetails.tracklist,
+            releaseDetails.tracklist.keys()
+          ).map(track => ({
             artist: track.artist || releaseDetails.artist,
             track: track.title,
             album: releaseDetails.title,
             albumCover: album.release.cover_image || releaseDetails.cover_image,
             timestamp: trackTimestamp,
-            duration: track.duration
-              ? parseInt(track.duration.replace(':', ''))
-              : undefined,
+            duration: parseDurationSeconds(track.duration) ?? undefined,
           }));
 
           allTracks.push(...albumTracks);

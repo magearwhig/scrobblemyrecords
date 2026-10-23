@@ -12,13 +12,21 @@ export interface DiscogsRelease {
   cover_image?: string;
   resource_url: string;
   tracklist?: Track[];
+  /** TRACKLIST_VERSION the tracklist was saved with; absent means 1 */
+  tracklistVersion?: number;
 }
 
 export interface Track {
+  /** Empty for a heading ("Side A") */
   position: string;
   title: string;
   duration?: string;
   artist?: string;
+  /**
+   * Parts of one track that Discogs lists separately ("Intro", "Sweet
+   * Jane"); scrobbled as one track unless split. See shared/utils/tracklist.
+   */
+  subTracks?: Track[];
 }
 
 /**
@@ -2610,7 +2618,9 @@ export interface DiscogsRawTrack {
   title: string;
   duration: string;
   artists?: DiscogsRawArtist[];
+  /** "track", "heading" or "index" (a track made of sub_tracks) */
   type_?: string;
+  sub_tracks?: DiscogsRawTrack[];
 }
 
 /**

@@ -4,6 +4,7 @@ import {
   ExternalLink,
   Package,
   Play,
+  Split,
   XCircle,
 } from 'lucide-react';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -14,7 +15,13 @@ import {
   DiscardReason,
   AddDiscardPileItemRequest,
   MarketplaceStats,
+  Track,
 } from '../../shared/types';
+import {
+  isTracklistHeading,
+  trackSeconds,
+  tracksToScrobble,
+} from '../../shared/utils/tracklist';
 import { trackMatchKey } from '../../shared/utils/trackNormalization';
 import AlbumScrobbleHistory from '../components/AlbumScrobbleHistory';
 import ArtistLink from '../components/ArtistLink';
@@ -58,9 +65,42 @@ interface AlbumHistoryData {
  * sides, so they don't get pulled into side C.
  */
 const vinylSideOf = (position: string): string | null => {
-  const match = position.trim().match(/^([A-Z])(?:\d|$)/);
+  // "AI.1" (side A, part I) counts too
+  const match = position.trim().match(/^([A-Z])(?:\d|[IVX]+\.|$)/);
   return match ? match[1] : null;
 };
+
+/** localStorage key of a release's split tracks (convenience only) */
+const splitTracksKey = (releaseId: number) =>
+  `listenography.splitTracks.${releaseId}`;
+
+function readSplitTracks(releaseId: number): Set<number> {
+  try {
+    const parsed: unknown = JSON.parse(
+      localStorage.getItem(splitTracksKey(releaseId)) ?? '[]'
+    );
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((n): n is number => Number.isInteger(n))
+        : []
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function writeSplitTracks(releaseId: number, split: Set<number>): void {
+  try {
+    if (split.size === 0) localStorage.removeItem(splitTracksKey(releaseId));
+    else
+      localStorage.setItem(
+        splitTracksKey(releaseId),
+        JSON.stringify(Array.from(split))
+      );
+  } catch {
+    // Storage unavailable: the choice just isn't remembered
+  }
+}
 
 const ReleaseDetailsPage: React.FC = () => {
   const { authStatus } = useAuth();
@@ -69,6 +109,8 @@ const ReleaseDetailsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [scrobbling, setScrobbling] = useState(false);
   const [selectedTracks, setSelectedTracks] = useState<Set<number>>(new Set());
+  // Tracks with parts to scrobble as their parts, remembered per release
+  const [splitTracks, setSplitTracks] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string>('');
   const [scrobbleResult, setScrobbleResult] = useState<{
     success: number;
@@ -213,6 +255,41 @@ const ReleaseDetailsPage: React.FC = () => {
     return trackScrobbleStats.get(aliased) || null;
   };
 
+  // Stats for a tracklist row: a track with parts also counts plays of its
+  // parts (e.g. scrobbled from a service that lists them separately)
+  const getRowStats = (track: Track): TrackScrobbleStats | null => {
+    const titles = [track.title, ...(track.subTracks ?? []).map(p => p.title)];
+    const seen = new Set<TrackScrobbleStats>();
+    let combined: TrackScrobbleStats | null = null;
+    for (const title of titles) {
+      const stats = getTrackStats(title);
+      if (!stats || seen.has(stats)) continue;
+      seen.add(stats);
+      combined = combined
+        ? {
+            count: combined.count + stats.count,
+            lastPlayed:
+              Math.max(combined.lastPlayed ?? 0, stats.lastPlayed ?? 0) || null,
+          }
+        : stats;
+    }
+    return combined;
+  };
+
+  // Scrobbles the selection makes: a split track counts once per part
+  const scrobbleCount = release
+    ? tracksToScrobble(release.tracklist, selectedTracks, splitTracks).length
+    : 0;
+
+  const toggleSplit = (index: number) => {
+    if (!release) return;
+    const next = new Set(splitTracks);
+    if (next.has(index)) next.delete(index);
+    else next.add(index);
+    setSplitTracks(next);
+    writeSplitTracks(release.id, next);
+  };
+
   const loadReleaseDetails = async () => {
     try {
       setLoading(true);
@@ -272,9 +349,10 @@ const ReleaseDetailsPage: React.FC = () => {
       const actualTrackIndices =
         fullRelease.tracklist
           ?.map((track, index) => ({ track, index }))
-          .filter(({ track }) => track.position && track.position.trim() !== '')
+          .filter(({ track }) => !isTracklistHeading(track))
           .map(({ index }) => index) || [];
       setSelectedTracks(new Set(actualTrackIndices));
+      setSplitTracks(readSplitTracks(fullRelease.id));
 
       // Check if this release is in the discard pile
       try {
@@ -382,7 +460,7 @@ const ReleaseDetailsPage: React.FC = () => {
   const getActualTrackIndices = (): number[] =>
     release?.tracklist
       ?.map((track, index) => ({ track, index }))
-      .filter(({ track }) => track.position && track.position.trim() !== '')
+      .filter(({ track }) => !isTracklistHeading(track))
       .map(({ index }) => index) || [];
 
   const handleSelectAllTracks = () => {
@@ -504,18 +582,18 @@ const ReleaseDetailsPage: React.FC = () => {
     if (!release || selectedTracks.size === 0) return [];
 
     const artists = new Set<string>();
-    const selectedIndices = Array.from(selectedTracks);
-
-    selectedIndices.forEach(index => {
-      const track = release.tracklist?.[index];
-      if (track) {
-        // Use track artist if available, otherwise release artist
-        const artist = track.artist || release.artist;
-        if (artist) {
-          artists.add(artist);
-        }
+    // The tracks actually scrobbled, so split parts' own artists count
+    for (const track of tracksToScrobble(
+      release.tracklist,
+      selectedTracks,
+      splitTracks
+    )) {
+      // Use track artist if available, otherwise release artist
+      const artist = track.artist || release.artist;
+      if (artist) {
+        artists.add(artist);
       }
-    });
+    }
 
     return Array.from(artists);
   };
@@ -594,16 +672,12 @@ const ReleaseDetailsPage: React.FC = () => {
         startTimestamp = Math.floor(date.getTime() / 1000);
       } else {
         // Default to current time minus total duration of selected tracks
-        const selectedTrackIndices = Array.from(selectedTracks);
-        const selectedTracksList = selectedTrackIndices
-          .map(i => release.tracklist?.[i])
-          .filter(Boolean);
-        const totalDuration = selectedTracksList.reduce((total, track) => {
-          const duration = track?.duration
-            ? parseTrackDuration(track.duration)
-            : 180;
-          return total + duration + 1; // +1 for gap between tracks
-        }, 0);
+        // +1 s gap between tracks
+        const totalDuration = tracksToScrobble(
+          release.tracklist,
+          selectedTracks,
+          splitTracks
+        ).reduce((total, track) => total + trackSeconds(track) + 1, 0);
         startTimestamp = Math.floor(Date.now() / 1000) - totalDuration;
       }
 
@@ -612,7 +686,8 @@ const ReleaseDetailsPage: React.FC = () => {
       const result = await api.prepareTracksFromRelease(
         release,
         selectedTrackIndices,
-        startTimestamp
+        startTimestamp,
+        Array.from(splitTracks)
       );
 
       logger.info(
@@ -674,24 +749,6 @@ const ReleaseDetailsPage: React.FC = () => {
     }
   };
 
-  // Helper function to parse track duration
-  const parseTrackDuration = (duration: string): number => {
-    if (typeof duration === 'number') {
-      return duration;
-    }
-
-    if (typeof duration === 'string') {
-      const parts = duration.split(':');
-      if (parts.length === 2) {
-        const minutes = parseInt(parts[0]);
-        const seconds = parseInt(parts[1]);
-        return minutes * 60 + seconds;
-      }
-    }
-
-    return 180; // Default 3 minutes
-  };
-
   // Handle auto timing button - calculates timing so tracks end at current time
   const handleAutoTiming = () => {
     if (selectedTracks.size === 0) {
@@ -700,16 +757,12 @@ const ReleaseDetailsPage: React.FC = () => {
     }
 
     // Calculate total duration of selected tracks
-    const selectedTrackIndices = Array.from(selectedTracks);
-    const selectedTracksList = selectedTrackIndices
-      .map(i => release?.tracklist?.[i])
-      .filter(Boolean);
-    const totalDuration = selectedTracksList.reduce((total, track) => {
-      const duration = track?.duration
-        ? parseTrackDuration(track.duration)
-        : 180;
-      return total + duration + 1; // +1 for gap between tracks
-    }, 0);
+    // +1 s gap between tracks
+    const totalDuration = tracksToScrobble(
+      release?.tracklist,
+      selectedTracks,
+      splitTracks
+    ).reduce((total, track) => total + trackSeconds(track) + 1, 0);
 
     // Calculate start time so that scrobbles end at current time
     const now = new Date();
@@ -1187,7 +1240,7 @@ const ReleaseDetailsPage: React.FC = () => {
               >
                 {scrobbling
                   ? 'Scrobbling...'
-                  : `Scrobble ${selectedTracks.size} Track${selectedTracks.size !== 1 ? 's' : ''}`}
+                  : `Scrobble ${scrobbleCount} Track${scrobbleCount !== 1 ? 's' : ''}`}
               </Button>
             </div>
           </div>
@@ -1449,10 +1502,7 @@ const ReleaseDetailsPage: React.FC = () => {
 
         <div className='release-details-tracklist'>
           {release.tracklist?.map((track, index) => {
-            const isSectionHeader =
-              !track.position || track.position.trim() === '';
-
-            if (isSectionHeader) {
+            if (isTracklistHeading(track)) {
               // Render section header as non-selectable informational item
               return (
                 <div key={index} className='release-details-section-header'>
@@ -1464,7 +1514,9 @@ const ReleaseDetailsPage: React.FC = () => {
             }
 
             // Render actual track as selectable item
-            const trackStats = getTrackStats(track.title);
+            const trackStats = getRowStats(track);
+            const parts = track.subTracks ?? [];
+            const isSplit = parts.length > 0 && splitTracks.has(index);
 
             return (
               <div
@@ -1488,12 +1540,38 @@ const ReleaseDetailsPage: React.FC = () => {
                       {track.artist}
                     </div>
                   )}
+                  {parts.length > 0 && (
+                    <div className='release-details-track-parts'>
+                      {isSplit ? 'Scrobbled as ' : 'Parts: '}
+                      {parts.map(p => p.title).join(' / ')}
+                    </div>
+                  )}
                   {track.duration && (
                     <div className='release-details-track-duration'>
                       {track.duration}
                     </div>
                   )}
                 </div>
+
+                {parts.length > 0 && (
+                  <Button
+                    variant={isSplit ? 'secondary' : 'ghost'}
+                    size='small'
+                    onClick={e => {
+                      e.stopPropagation();
+                      toggleSplit(index);
+                    }}
+                    aria-pressed={isSplit}
+                    title={
+                      isSplit
+                        ? 'Scrobble as one track'
+                        : `Scrobble as ${parts.length} separate tracks`
+                    }
+                    iconLeft={<Split size={14} aria-hidden='true' />}
+                  >
+                    {isSplit ? `${parts.length} parts` : 'Split'}
+                  </Button>
+                )}
 
                 {/* Spotify play button */}
                 <Button

@@ -20,7 +20,12 @@ import {
   WishlistSettings,
   WishlistStore,
   WishlistSyncStatus,
+  DiscogsRawTrack,
 } from '../../shared/types';
+import {
+  fromDiscogsTracklist,
+  tracklistMatchTitles,
+} from '../../shared/utils/tracklist';
 import { getDiscogsAxios } from '../utils/discogsAxios';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
@@ -994,18 +999,13 @@ export class WishlistService {
       const data = response.data as {
         title?: string;
         artists?: Array<{ name?: string }>;
-        tracklist?: Array<{
-          position?: string;
-          title?: string;
-          type_?: string;
-        }>;
+        tracklist?: DiscogsRawTrack[];
         images?: Array<{ type?: string; uri?: string; uri150?: string }>;
         uri?: string;
       };
       if (!data?.title) return null;
-      const tracks = (data.tracklist ?? [])
-        .filter(t => t.title && t.type_ !== 'heading' && t.position !== '')
-        .map(t => ({ position: t.position ?? '', title: t.title as string }));
+      // Tracks and the parts of tracks that have them, headings skipped
+      const tracks = tracklistMatchTitles(fromDiscogsTracklist(data.tracklist));
       const image =
         data.images?.find(i => i.type === 'primary') ?? data.images?.[0];
       return {
