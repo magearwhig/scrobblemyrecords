@@ -199,6 +199,131 @@ describe('MusicBrainzService', () => {
     });
   });
 
+  describe('record-store filing fields', () => {
+    it('maps sort-name and type from search results and returns the hit count', async () => {
+      mockMusicBrainzAxios.get.mockResolvedValue({
+        data: {
+          count: 42,
+          artists: [
+            {
+              id: 'mbid-es',
+              name: 'Elliott Smith',
+              'sort-name': 'Smith, Elliott',
+              type: 'Person',
+              score: 100,
+            },
+          ],
+        },
+      });
+
+      const { artists, count } = await service.searchArtistWithCount(
+        'Elliott Smith',
+        25
+      );
+
+      expect(count).toBe(42);
+      expect(artists[0]).toMatchObject({
+        mbid: 'mbid-es',
+        sortName: 'Smith, Elliott',
+        type: 'Person',
+      });
+    });
+
+    it('falls back to the result length when MusicBrainz sends no count', async () => {
+      mockMusicBrainzAxios.get.mockResolvedValue({
+        data: { artists: [{ id: 'a', name: 'A', score: 100 }] },
+      });
+      const { count } = await service.searchArtistWithCount('A');
+      expect(count).toBe(1);
+    });
+
+    it('escapes quotes and backslashes inside the quoted phrase', async () => {
+      mockMusicBrainzAxios.get.mockResolvedValue({ data: { artists: [] } });
+
+      await service.searchArtist('Say "Hi" \\ Bye');
+
+      expect(mockMusicBrainzAxios.get).toHaveBeenCalledWith('/artist', {
+        params: expect.objectContaining({
+          query: 'artist:"Say \\"Hi\\" \\\\ Bye"',
+        }),
+      });
+    });
+
+    it('maps sort-name and type on a lookup by MBID', async () => {
+      mockMusicBrainzAxios.get.mockResolvedValue({
+        data: {
+          id: 'mbid-wp',
+          name: 'The Wedding Present',
+          'sort-name': 'Wedding Present, The',
+          type: 'Group',
+        },
+      });
+      await expect(service.getArtistById('mbid-wp')).resolves.toMatchObject({
+        sortName: 'Wedding Present, The',
+        type: 'Group',
+      });
+    });
+
+    it('gives a retry after a 503 its own rate-limit slot', async () => {
+      jest.useFakeTimers();
+      try {
+        const sentAt: number[] = [];
+        let first = true;
+        mockMusicBrainzAxios.get.mockImplementation(async () => {
+          sentAt.push(Date.now());
+          if (first) {
+            first = false;
+            throw { isAxiosError: true, response: { status: 503 } };
+          }
+          return { data: { artists: [] } };
+        });
+        (service as unknown as { lastRequestTime: number }).lastRequestTime = 0;
+
+        const calls = Promise.all([
+          service.searchArtist('One'),
+          service.searchArtist('Two'),
+          service.searchArtist('Three'),
+        ]);
+        await jest.advanceTimersByTimeAsync(20000);
+        await calls;
+
+        const sorted = [...sentAt].sort((a, b) => a - b);
+        expect(sorted).toHaveLength(4);
+        for (let i = 1; i < sorted.length; i++) {
+          expect(sorted[i] - sorted[i - 1]).toBeGreaterThanOrEqual(1100);
+        }
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('spaces concurrent callers a full slot apart', async () => {
+      jest.useFakeTimers();
+      try {
+        const sentAt: number[] = [];
+        mockMusicBrainzAxios.get.mockImplementation(async () => {
+          sentAt.push(Date.now());
+          return { data: { artists: [] } };
+        });
+        (service as unknown as { lastRequestTime: number }).lastRequestTime = 0;
+
+        const calls = Promise.all([
+          service.searchArtist('One'),
+          service.searchArtist('Two'),
+          service.searchArtist('Three'),
+        ]);
+        await jest.advanceTimersByTimeAsync(5000);
+        await calls;
+
+        expect(sentAt).toHaveLength(3);
+        expect(sentAt[1] - sentAt[0]).toBeGreaterThanOrEqual(1100);
+        expect(sentAt[2] - sentAt[1]).toBeGreaterThanOrEqual(1100);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
+
   describe('getArtistReleases', () => {
     it('should fetch release groups for an artist', async () => {
       // Arrange

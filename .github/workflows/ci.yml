@@ -129,6 +129,9 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Pocket List PDF integration test (real Chromium)
+        run: POCKET_LIST_PDF_REQUIRED=1 npx jest tests/integration/pocketListPdf.test.ts
+
       - name: Run E2E tests (Chromium)
         run: npx playwright test --project=chromium
 

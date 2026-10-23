@@ -7,7 +7,7 @@ import { AlbumDetailResponse } from '../../shared/types';
 import ArtistLink from '../components/ArtistLink';
 import AddToCrateMenu from '../components/crates/AddToCrateMenu';
 import { AlbumListeningArc } from '../components/stats/AlbumListeningArc';
-import TrackLink from '../components/TrackLink';
+import AlbumTracksSection from '../components/stats/AlbumTracksSection';
 import { Button, IconButton } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton } from '../components/ui/Skeleton';
@@ -151,6 +151,34 @@ const AlbumDetailPage: React.FC = () => {
     fetchAlbumDetail(albumInfo, controller.signal);
     return () => controller.abort();
   }, [albumInfo, fetchAlbumDetail]);
+
+  /** Reload after a change made on this page (track merge or unmerge) */
+  const reload = useCallback(() => {
+    if (!albumInfo) return;
+    void fetchAlbumDetail(albumInfo, new AbortController().signal);
+  }, [albumInfo, fetchAlbumDetail]);
+
+  /** Stop counting a track name as another track of this album */
+  const handleUnmergeTrack = useCallback(
+    async (
+      historyArtist: string,
+      historyAlbum: string,
+      historyTrack: string
+    ) => {
+      try {
+        await api.removeTrackMapping(historyArtist, historyAlbum, historyTrack);
+        reload();
+      } catch (err) {
+        addNotification({
+          type: 'alert',
+          title: 'Unmerge failed',
+          message:
+            err instanceof Error ? err.message : 'Failed to unmerge track',
+        });
+      }
+    },
+    [api, addNotification, reload]
+  );
 
   /** Unmerge a history album version from this album by removing its mapping. */
   const handleUnmerge = useCallback(
@@ -309,6 +337,8 @@ const AlbumDetailPage: React.FC = () => {
     Boolean(mappings.albumMapping) ||
     Boolean(mappings.artistMapping) ||
     Boolean(mappings.compoundArtist) ||
+    (Array.isArray(mappings.mergedTracks) &&
+      mappings.mergedTracks.length > 0) ||
     (Array.isArray(mappings.mergedVersions) &&
       mappings.mergedVersions.length > 0);
 
@@ -404,42 +434,15 @@ const AlbumDetailPage: React.FC = () => {
       {/* Two-column content: Tracks | Mappings */}
       <div className='album-detail-content-grid'>
         {/* Tracks list */}
-        <div className='detail-page-section'>
-          <h3>Tracks</h3>
-          {data.tracks.length === 0 ? (
-            <p className='detail-page-meta'>
-              No track-level scrobbles for this album yet.
-            </p>
-          ) : (
-            <ul className='album-detail-tracks'>
-              {data.tracks.map((t, index) => (
-                <li
-                  key={`${t.track}-${index}`}
-                  className='album-detail-track-row'
-                >
-                  <span className='album-detail-track-rank'>{index + 1}.</span>
-                  <span className='album-detail-track-name'>
-                    <TrackLink
-                      artist={displayArtist}
-                      track={t.track}
-                      album={data.album}
-                    />
-                  </span>
-                  <span className='album-detail-track-count'>
-                    {t.playCount.toLocaleString()}{' '}
-                    {t.playCount === 1 ? 'play' : 'plays'}
-                  </span>
-                  <span
-                    className='album-detail-track-last-played'
-                    title={formatLocalDateOnly(t.lastPlayed * 1000)}
-                  >
-                    {formatRelativeTime(t.lastPlayed)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <AlbumTracksSection
+          tracks={data.tracks}
+          displayArtist={displayArtist}
+          album={data.album}
+          mappingAlbum={
+            data.trackMappingAlbum ?? { artist: data.artist, album: data.album }
+          }
+          onMerged={reload}
+        />
 
         {/* Mappings & Info */}
         <div className='album-detail-mappings-column'>
@@ -534,6 +537,42 @@ const AlbumDetailPage: React.FC = () => {
               </ul>
             </div>
           )}
+
+          {Array.isArray(mappings.mergedTracks) &&
+            mappings.mergedTracks.length > 0 && (
+              <div className='detail-page-section album-detail-mapping-card'>
+                <h3>Merged Tracks</h3>
+                <p className='detail-page-meta'>
+                  Track names counted as another track of this album.
+                </p>
+                <ul className='album-detail-alias-list'>
+                  {mappings.mergedTracks.map(merged => (
+                    <li
+                      key={`${merged.historyAlbum}|${merged.historyTrack}`}
+                      className='album-detail-alias-item'
+                    >
+                      <span>
+                        {merged.historyTrack} &rarr; {merged.cacheTrack}
+                      </span>
+                      <IconButton
+                        icon={<Unlink size={16} aria-hidden='true' />}
+                        size='small'
+                        variant='ghost'
+                        onClick={() =>
+                          void handleUnmergeTrack(
+                            merged.historyArtist,
+                            merged.historyAlbum,
+                            merged.historyTrack
+                          )
+                        }
+                        aria-label={`Unmerge ${merged.historyTrack}`}
+                        title='Count this track name on its own again'
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
           {Array.isArray(mappings.mergedVersions) &&
             mappings.mergedVersions.length > 0 && (

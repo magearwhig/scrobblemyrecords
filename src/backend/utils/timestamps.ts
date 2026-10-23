@@ -63,3 +63,13 @@ export function areConsecutiveLocalDays(ts1Ms: number, ts2Ms: number): boolean {
     Math.abs(date2.getTime() - date1.getTime()) / (1000 * 60 * 60 * 24);
   return Math.round(diffDays) === 1;
 }
+
+/**
+ * ISO 8601 UTC string at second precision, e.g. "2020-12-05T03:42:05Z".
+ * Used by data exports, where milliseconds would only add noise.
+ */
+export function toIsoSeconds(timestampMs: number): string {
+  return new Date(Math.floor(timestampMs / 1000) * 1000)
+    .toISOString()
+    .replace(/\.\d{3}Z$/, 'Z');
+}

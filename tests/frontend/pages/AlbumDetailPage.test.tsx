@@ -77,6 +77,8 @@ const mockCreateAlbumMappingsBatch = jest.fn();
 const mockRemoveDiscoveryAlbumMapping = jest.fn();
 const mockAddNotification = jest.fn();
 const mockGetCratesForRelease = jest.fn();
+const mockMergeTracks = jest.fn();
+const mockRemoveTrackMapping = jest.fn();
 
 jest.mock('../../../src/renderer/context/AppContext', () => ({
   useApp: () => ({ state: { serverUrl: 'http://localhost:3001' } }),
@@ -93,6 +95,8 @@ jest.mock('../../../src/renderer/services/api', () => ({
     getCrates: jest.fn().mockResolvedValue([]),
     getCratesForRelease: mockGetCratesForRelease,
     setCrateOverride: jest.fn(),
+    mergeTracks: mockMergeTracks,
+    removeTrackMapping: mockRemoveTrackMapping,
   }),
 }));
 
@@ -557,6 +561,138 @@ describe('AlbumDetailPage', () => {
     expect(mockRemoveDiscoveryAlbumMapping).toHaveBeenCalledWith(
       'radiohead',
       'kid a (deluxe)'
+    );
+    await waitFor(() =>
+      expect(mockStatsApi.getAlbumDetail).toHaveBeenCalledTimes(2)
+    );
+  });
+
+  // -------------------------------------------------------------- track merges
+
+  it('merges ticked tracks under the chosen name', async () => {
+    const user = userEvent.setup();
+    mockMergeTracks.mockResolvedValue(2);
+    mockStatsApi.getAlbumDetail.mockResolvedValue({
+      success: true,
+      data: {
+        ...baseAlbumData,
+        artist: 'Prof',
+        album: 'Good Time Boy',
+        trackMappingAlbum: { artist: 'prof', album: 'good time boy' },
+        tracks: [
+          {
+            track: 'Dirty Work',
+            playCount: 7,
+            lastPlayed: 1706745600,
+            spellings: ['Dirty Work', 'Dirty work'],
+          },
+          { track: 'Kia Boy', playCount: 5, lastPlayed: 1706659200 },
+          {
+            track: 'Dirt Work',
+            playCount: 1,
+            lastPlayed: 1706572800,
+            spellings: ['Dirt Work'],
+          },
+        ],
+      },
+    });
+    render(<AlbumDetailPage />);
+
+    await user.click(
+      await screen.findByRole('button', { name: /Merge tracks/ })
+    );
+    expect(
+      screen.getByText(/Tick the tracks that are the same song/)
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Merge$/ })).toBeDisabled();
+
+    await user.click(screen.getByLabelText('Select Dirt Work'));
+    await user.click(screen.getByLabelText('Select Dirty Work'));
+    // Defaults to the most-played row's name
+    expect(screen.getByRole('combobox')).toHaveValue('Dirty Work');
+    await user.click(screen.getByRole('button', { name: /^Merge$/ }));
+
+    expect(mockMergeTracks).toHaveBeenCalledWith(
+      'prof',
+      'good time boy',
+      ['Dirt Work', 'Dirty Work', 'Dirty work'],
+      'Dirty Work'
+    );
+    await waitFor(() =>
+      expect(mockStatsApi.getAlbumDetail).toHaveBeenCalledTimes(2)
+    );
+    expect(mockAddNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'success', title: 'Tracks merged' })
+    );
+    expect(screen.queryByLabelText('Select Dirt Work')).not.toBeInTheDocument();
+  });
+
+  it('lets you pick another name and cancel', async () => {
+    const user = userEvent.setup();
+    render(<AlbumDetailPage />);
+
+    await user.click(
+      await screen.findByRole('button', { name: /Merge tracks/ })
+    );
+    await user.click(screen.getByLabelText('Select Kid A'));
+    await user.click(screen.getByLabelText('Select Idioteque'));
+    await user.selectOptions(screen.getByRole('combobox'), 'Idioteque');
+    expect(screen.getByRole('combobox')).toHaveValue('Idioteque');
+
+    await user.click(screen.getByRole('button', { name: /Cancel/ }));
+    expect(screen.queryByLabelText('Select Kid A')).not.toBeInTheDocument();
+    expect(mockMergeTracks).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed merge', async () => {
+    const user = userEvent.setup();
+    mockMergeTracks.mockRejectedValue(new Error('disk full'));
+    render(<AlbumDetailPage />);
+
+    await user.click(
+      await screen.findByRole('button', { name: /Merge tracks/ })
+    );
+    await user.click(screen.getByLabelText('Select Kid A'));
+    await user.click(screen.getByLabelText('Select Idioteque'));
+    await user.click(screen.getByRole('button', { name: /^Merge$/ }));
+
+    await waitFor(() =>
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'alert', message: 'disk full' })
+      )
+    );
+    expect(screen.getByLabelText('Select Kid A')).toBeInTheDocument();
+  });
+
+  it('renders a merged-tracks card and unmerges a track', async () => {
+    const user = userEvent.setup();
+    mockRemoveTrackMapping.mockResolvedValue(undefined);
+    mockStatsApi.getAlbumDetail.mockResolvedValue({
+      success: true,
+      data: {
+        ...baseAlbumData,
+        mappings: {
+          mergedTracks: [
+            {
+              historyArtist: 'radiohead',
+              historyAlbum: 'kid a',
+              historyTrack: 'Idiotheque',
+              cacheTrack: 'Idioteque',
+            },
+          ],
+        },
+      },
+    });
+    render(<AlbumDetailPage />);
+
+    expect(await screen.findByText('Merged Tracks')).toBeInTheDocument();
+    expect(screen.getByText(/Idiotheque → Idioteque/)).toBeInTheDocument();
+    await user.click(screen.getByLabelText('Unmerge Idiotheque'));
+
+    expect(mockRemoveTrackMapping).toHaveBeenCalledWith(
+      'radiohead',
+      'kid a',
+      'Idiotheque'
     );
     await waitFor(() =>
       expect(mockStatsApi.getAlbumDetail).toHaveBeenCalledTimes(2)

@@ -4,6 +4,10 @@ import {
   stripDiscogsSuffix,
 } from '../../shared/utils/albumMapping';
 import {
+  TrackSpellings,
+  trackMatchKey,
+} from '../../shared/utils/trackNormalization';
+import {
   albumFromAlbumKey,
   artistFromAlbumKey,
   UNKNOWN_ALBUM_LABEL,
@@ -13,6 +17,7 @@ import { createLogger } from '../utils/logger';
 import { ArtistNameResolver } from './artistNameResolver';
 import { loadAlbumMappings } from './mergedAlbumHistory';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
+import { createTrackMapper, TrackMappingService } from './trackMappingService';
 
 export type RankingType = 'tracks' | 'artists' | 'albums';
 
@@ -46,6 +51,10 @@ export class RankingsService {
   } | null = null;
   private artistNameResolver: Pick<ArtistNameResolver, 'resolveArtist'> | null =
     null;
+  private trackMappingService: Pick<
+    TrackMappingService,
+    'createLookup'
+  > | null = null;
   private logger = createLogger('RankingsService');
 
   constructor(historyStorage: ScrobbleHistoryStorage) {
@@ -64,6 +73,13 @@ export class RankingsService {
     getAllAlbumMappings(): Promise<AlbumMapping[]>;
   }): void {
     this.mappingService = service;
+  }
+
+  /** Optional: track rankings count tracks merged by track mappings as one. */
+  setTrackMappingService(
+    service: Pick<TrackMappingService, 'createLookup'>
+  ): void {
+    this.trackMappingService = service;
   }
 
   /**
@@ -100,10 +116,16 @@ export class RankingsService {
     }> = [];
 
     const resolver = this.artistNameResolver;
+    const albumMappings = await loadAlbumMappings(this.mappingService);
     const canonicalize = createAlbumCanonicalizer(
-      await loadAlbumMappings(this.mappingService),
+      albumMappings,
       resolver ? name => resolver.resolveArtist(name) : undefined
     );
+    // Track rankings count a track mapping's tracks as the track it names
+    const mapTrack =
+      type === 'tracks'
+        ? await createTrackMapper(this.trackMappingService, albumMappings)
+        : null;
 
     for (const [albumKey, albumEntry] of Object.entries(index.albums)) {
       const artist = artistFromAlbumKey(albumKey);
@@ -129,7 +151,10 @@ export class RankingsService {
             album,
             albumArtist,
             albumKey: canonical.key,
-            track: play.track,
+            track:
+              mapTrack && play.track
+                ? mapTrack(artist, historyAlbum, play.track).track
+                : play.track,
           });
         }
       }
@@ -236,7 +261,13 @@ export class RankingsService {
   ): RankingItem[] {
     const counts = new Map<
       string,
-      { count: number; name: string; artist?: string }
+      {
+        count: number;
+        name: string;
+        artist?: string;
+        /** Tracks: named by the most-played spelling */
+        spellings?: TrackSpellings;
+      }
     >();
 
     for (const scrobble of scrobbles) {
@@ -247,7 +278,8 @@ export class RankingsService {
       switch (type) {
         case 'tracks':
           if (!scrobble.track) continue;
-          key = `${scrobble.artist}|${scrobble.track}`;
+          // Spellings of one track ("feat." vs "(with …)") rank as one
+          key = `${scrobble.artist}|${trackMatchKey(scrobble.track)}`;
           name = scrobble.track;
           artist = scrobble.artist;
           break;
@@ -268,8 +300,11 @@ export class RankingsService {
       const existing = counts.get(key);
       if (existing) {
         existing.count++;
+        existing.spellings?.add(name);
       } else {
-        counts.set(key, { count: 1, name, artist });
+        const spellings = type === 'tracks' ? new TrackSpellings() : undefined;
+        spellings?.add(name);
+        counts.set(key, { count: 1, name, artist, spellings });
       }
     }
 
@@ -279,7 +314,7 @@ export class RankingsService {
       .slice(0, topN);
 
     return sorted.map(([, data], index) => ({
-      name: data.name,
+      name: data.spellings?.best ?? data.name,
       artist: data.artist,
       count: data.count,
       rank: index + 1,

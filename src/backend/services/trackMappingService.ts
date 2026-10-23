@@ -1,18 +1,97 @@
-import { TrackMapping, TrackMappingsStore } from '../../shared/types';
+import { createHash } from 'crypto';
+
+import {
+  AlbumMapping,
+  TrackMapping,
+  TrackMappingsStore,
+} from '../../shared/types';
+import { createAlbumCanonicalizer } from '../../shared/utils/albumMapping';
+import { trackMatchKey } from '../../shared/utils/trackNormalization';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
 const TRACK_MAPPINGS_FILE = 'mappings/track-mappings.json';
 
+/** Finds the mapping for one scrobbled track, or null */
+export type TrackMappingLookup = (
+  artist: string,
+  album: string,
+  track: string
+) => TrackMapping | null;
+
 /**
- * Service for managing manual track mappings.
- * Used when automatic track normalization fails to match tracks in Forgotten Favorites.
+ * Key for one album in track mappings: artist and album through
+ * `trackMatchKey`, so case, punctuation, "(Deluxe Edition)" and Discogs "(2)"
+ * suffixes don't matter, and a merge saved from an album page opened by a
+ * slightly different name is found under the history album's own name.
+ */
+export function trackMappingAlbumKey(artist: string, album: string): string {
+  return `${trackMatchKey(artist)}|${trackMatchKey(album)}`;
+}
+
+/** Where one scrobbled track is counted, and the mapping that put it there */
+export type TrackMapper = (
+  artist: string,
+  album: string | null,
+  track: string
+) => {
+  artist: string;
+  album: string | null;
+  track: string;
+  mapping: TrackMapping | null;
+};
+
+/**
+ * Track mappings for a loop over plays. Looks a scrobble up under its own
+ * album, then under the album an album mapping merges it into. A mapping
+ * within one album (an album page merge) only renames the track, so the play
+ * stays on its own album with that album's other plays; a mapping to another
+ * album (from Forgotten Favorites) moves it there. Unresolved plays (album
+ * null) and a missing service map nothing.
+ */
+export async function createTrackMapper(
+  service: Pick<TrackMappingService, 'createLookup'> | null | undefined,
+  albumMappings: AlbumMapping[]
+): Promise<TrackMapper> {
+  const lookup = await service?.createLookup?.();
+  if (!lookup) {
+    return (artist, album, track) => ({ artist, album, track, mapping: null });
+  }
+  const canonicalize = createAlbumCanonicalizer(albumMappings);
+  return (artist, album, track) => {
+    if (album === null) return { artist, album, track, mapping: null };
+    let mapping = lookup(artist, album, track);
+    if (!mapping) {
+      const canonical = canonicalize(artist, album);
+      if (canonical.mapping) {
+        mapping = lookup(canonical.artist, canonical.album, track);
+      }
+    }
+    if (!mapping) return { artist, album, track, mapping: null };
+    const sameAlbum =
+      trackMappingAlbumKey(mapping.historyArtist, mapping.historyAlbum) ===
+      trackMappingAlbumKey(mapping.cacheArtist, mapping.cacheAlbum);
+    return sameAlbum
+      ? { artist, album, track: mapping.cacheTrack, mapping }
+      : {
+          artist: mapping.cacheArtist,
+          album: mapping.cacheAlbum,
+          track: mapping.cacheTrack,
+          mapping,
+        };
+  };
+}
+
+/**
+ * Service for managing manual track mappings: a scrobbled track (history
+ * artist/album/track) is counted as another (the cache side). Used when
+ * automatic track matching (`trackMatchKey`) can't tell two names are one
+ * song. Created from Forgotten Favorites, or by merging tracks on the album
+ * page, and applied wherever tracks are counted.
  *
  * Example use case:
  * - Last.fm: "Request Denied" by "El-p" on "Cancer 4 Cure"
  * - Local cache: "Request Denied [Explicit]" by "El-P" on "Cancer 4 Cure [Explicit]"
- *
- * When the standard normalization doesn't match these, users can create a manual mapping.
  */
 export class TrackMappingService {
   private fileStorage: FileStorage;
@@ -26,12 +105,17 @@ export class TrackMappingService {
     this.fileStorage = fileStorage;
   }
 
+  private albumKey(artist: string, album: string): string {
+    return trackMappingAlbumKey(artist, album);
+  }
+
   /**
-   * Create a normalized key for track lookup.
-   * Key format: "artist|album|track" all lowercase and trimmed.
+   * Key for track lookup: the album key plus `trackMatchKey(track)`, so a
+   * mapping also covers the spellings automatic matching already treats as
+   * the same track.
    */
   private trackKey(artist: string, album: string, track: string): string {
-    return `${artist.toLowerCase().trim()}|${album.toLowerCase().trim()}|${track.toLowerCase().trim()}`;
+    return `${this.albumKey(artist, album)}|${trackMatchKey(track)}`;
   }
 
   /**
@@ -202,6 +286,92 @@ export class TrackMappingService {
       album: historyAlbum,
       track: historyTrack,
     };
+  }
+
+  /**
+   * A synchronous lookup over the loaded mappings, for loops over every play
+   */
+  async createLookup(): Promise<TrackMappingLookup> {
+    await this.loadMappings();
+    const mappings = this.trackMappings;
+    return (artist, album, track) =>
+      mappings.get(this.trackKey(artist, album, track)) ?? null;
+  }
+
+  /** Mappings of tracks scrobbled on one album */
+  async getMappingsForAlbum(
+    artist: string,
+    album: string
+  ): Promise<TrackMapping[]> {
+    await this.loadMappings();
+    const albumKey = this.albumKey(artist, album);
+    return Array.from(this.trackMappings.values()).filter(
+      m => this.albumKey(m.historyArtist, m.historyAlbum) === albumKey
+    );
+  }
+
+  /**
+   * Count several tracks of one album as one song, named `canonical`. Maps
+   * every other spelling to it, repoints mappings (from any album) that led
+   * to any of them on this album, and drops a mapping of `canonical` itself,
+   * so mappings stay one hop and never loop. Returns the number of tracks
+   * mapped.
+   */
+  async mergeTracks(
+    artist: string,
+    album: string,
+    tracks: string[],
+    canonical: string
+  ): Promise<number> {
+    await this.loadMappings();
+    const albumKey = this.albumKey(artist, album);
+    const canonicalKey = trackMatchKey(canonical);
+    const mergedKeys = new Set(tracks.map(trackMatchKey));
+    mergedKeys.add(canonicalKey);
+    const now = Date.now();
+
+    this.trackMappings.delete(this.trackKey(artist, album, canonical));
+    for (const mapping of this.trackMappings.values()) {
+      if (
+        this.albumKey(mapping.cacheArtist, mapping.cacheAlbum) === albumKey &&
+        mergedKeys.has(trackMatchKey(mapping.cacheTrack))
+      ) {
+        mapping.cacheTrack = canonical;
+      }
+    }
+
+    let mapped = 0;
+    for (const track of tracks) {
+      if (trackMatchKey(track) === canonicalKey) continue;
+      this.trackMappings.set(this.trackKey(artist, album, track), {
+        historyArtist: artist,
+        historyAlbum: album,
+        historyTrack: track,
+        cacheArtist: artist,
+        cacheAlbum: album,
+        cacheTrack: canonical,
+        createdAt: now,
+      });
+      mapped++;
+    }
+
+    await this.saveMappings();
+    this.logger.info(
+      `Merged ${mapped} track names into "${artist}|${album}|${canonical}"`
+    );
+    return mapped;
+  }
+
+  /** Identifies the current mappings, for stats caches; '' when there are none */
+  async getFingerprint(): Promise<string> {
+    await this.loadMappings();
+    if (this.trackMappings.size === 0) return '';
+    const lines = Array.from(this.trackMappings.entries())
+      .map(([key, m]) =>
+        [key, m.cacheArtist, m.cacheAlbum, m.cacheTrack].join('\t')
+      )
+      .sort();
+    return createHash('sha1').update(lines.join('\n')).digest('hex');
   }
 
   /**

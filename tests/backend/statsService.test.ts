@@ -8,12 +8,20 @@ import {
 } from '../../src/backend/services/statsService';
 import { TrackMappingService } from '../../src/backend/services/trackMappingService';
 import { FileStorage } from '../../src/backend/utils/fileStorage';
-import { CollectionItem, ScrobbleHistoryIndex } from '../../src/shared/types';
+import {
+  CollectionItem,
+  ScrobbleHistoryIndex,
+  TrackMapping,
+} from '../../src/shared/types';
 
 // Mock dependencies
 jest.mock('../../src/backend/services/scrobbleHistoryStorage');
 jest.mock('../../src/backend/utils/fileStorage');
-jest.mock('../../src/backend/services/trackMappingService');
+// Only the service class is mocked; createTrackMapper is the real helper
+jest.mock('../../src/backend/services/trackMappingService', () => ({
+  ...jest.requireActual('../../src/backend/services/trackMappingService'),
+  TrackMappingService: jest.fn(),
+}));
 jest.mock('../../src/backend/services/mappingService');
 jest.mock('../../src/backend/services/artistNameResolver');
 
@@ -1162,7 +1170,7 @@ describe('StatsService', () => {
       const warmBlock = {
         warmedAt: Math.floor(Date.now() / 1000),
         syncTimestamp,
-        version: 3,
+        version: 4,
         artistAliasFingerprint: '',
         historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
         streaks: { currentStreak: 5, longestStreak: 10 },
@@ -1215,6 +1223,8 @@ describe('StatsService', () => {
     it.each([
       ['was built by older code', { version: 1 }],
       ['was built before unresolved plays were counted', { version: 2 }],
+      ['was built before track spellings were merged', { version: 3 }],
+      ['predates the track mappings', { trackMappingFingerprint: 'old' }],
       ['predates the artist aliases', { artistAliasFingerprint: 'old' }],
       [
         'was built from different history contents',
@@ -1234,7 +1244,7 @@ describe('StatsService', () => {
         warm: {
           warmedAt: 0,
           syncTimestamp,
-          version: 3,
+          version: 4,
           artistAliasFingerprint: '',
           historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
           topAlbums: { all: [{ artist: 'cached', album: 'cached' }] },
@@ -1267,7 +1277,7 @@ describe('StatsService', () => {
         warm: {
           warmedAt: 0,
           syncTimestamp,
-          version: 3,
+          version: 4,
           artistAliasFingerprint: '',
           // Built when a rule pointed somewhere else (same counts)
           historyFingerprint: computeHistoryFingerprint(
@@ -1293,7 +1303,7 @@ describe('StatsService', () => {
       const warmBlock = {
         warmedAt: 0,
         syncTimestamp,
-        version: 3,
+        version: 4,
         artistAliasFingerprint: '',
         historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
         // Built when there were no album mappings
@@ -1529,7 +1539,7 @@ describe('StatsService', () => {
       warm: {
         warmedAt: Math.floor(Date.now() / 1000),
         syncTimestamp,
-        version: 3,
+        version: 4,
         artistAliasFingerprint: '',
         historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
         streaks: { currentStreak: 7, longestStreak: 21 },
@@ -4244,6 +4254,253 @@ describe('StatsService', () => {
     });
   });
 
+  describe('track spellings and track mappings', () => {
+    const now = Math.floor(Date.now() / 1000);
+    const plays = (track: string, count: number, offset = 0) =>
+      Array.from({ length: count }, (_, i) => ({
+        timestamp: now - offset - i,
+        track,
+      }));
+    const profEntry = {
+      lastPlayed: now,
+      playCount: 9,
+      plays: [
+        ...plays('Jewelry Duty (with T-Pain)', 4),
+        ...plays('Jewelry Duty feat. T-Pain', 1, 10),
+        ...plays('Dirty Work', 3, 20),
+        ...plays('Dirt Work', 1, 30),
+      ],
+    };
+
+    /** A real TrackMappingService over the given mappings */
+    const useTrackMappings = (mappings: TrackMapping[]) => {
+      const { TrackMappingService: RealTrackMappingService } =
+        jest.requireActual<
+          typeof import('../../src/backend/services/trackMappingService')
+        >('../../src/backend/services/trackMappingService');
+      const storage = {
+        readJSON: jest.fn().mockResolvedValue({ schemaVersion: 1, mappings }),
+        writeJSONWithBackup: jest.fn().mockResolvedValue(undefined),
+      } as unknown as FileStorage;
+      statsService.setTrackMappingService(new RealTrackMappingService(storage));
+    };
+    const dirtWork: TrackMapping = {
+      historyArtist: 'prof',
+      historyAlbum: 'good time boy',
+      historyTrack: 'Dirt Work',
+      cacheArtist: 'prof',
+      cacheAlbum: 'good time boy',
+      cacheTrack: 'Dirty Work',
+      createdAt: 1,
+    };
+
+    beforeEach(() => {
+      mockHistoryStorage.getIndex.mockResolvedValue({
+        albums: { 'prof|good time boy': profEntry },
+        totalScrobbles: 9,
+        lastSyncTimestamp: now,
+        oldestScrobbleDate: 0,
+      });
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+        entry: profEntry,
+        matchType: 'exact',
+        matchedKeys: ['prof|good time boy'],
+      });
+    });
+
+    it('album detail merges spellings, names rows by the most-played one and lists what was scrobbled', async () => {
+      const result = await statsService.getAlbumDetail('Prof', 'Good Time Boy');
+
+      expect(result.tracks).toEqual([
+        expect.objectContaining({
+          track: 'Jewelry Duty (with T-Pain)',
+          playCount: 5,
+          spellings: [
+            'Jewelry Duty (with T-Pain)',
+            'Jewelry Duty feat. T-Pain',
+          ],
+        }),
+        expect.objectContaining({ track: 'Dirty Work', playCount: 3 }),
+        expect.objectContaining({ track: 'Dirt Work', playCount: 1 }),
+      ]);
+      expect(result.trackMappingAlbum).toEqual({
+        artist: 'Prof',
+        album: 'Good Time Boy',
+      });
+    });
+
+    it('album detail applies track mappings and lists them', async () => {
+      useTrackMappings([dirtWork]);
+
+      const result = await statsService.getAlbumDetail('Prof', 'Good Time Boy');
+
+      expect(result.tracks.map(t => [t.track, t.playCount])).toEqual([
+        ['Jewelry Duty (with T-Pain)', 5],
+        ['Dirty Work', 4],
+      ]);
+      expect(result.tracks[1].spellings).toEqual(['Dirty Work', 'Dirt Work']);
+      expect(result.mappings.mergedTracks).toEqual([
+        {
+          historyArtist: 'prof',
+          historyAlbum: 'good time boy',
+          historyTrack: 'Dirt Work',
+          cacheTrack: 'Dirty Work',
+        },
+      ]);
+    });
+
+    it('top tracks merge spellings and apply track mappings', async () => {
+      useTrackMappings([dirtWork]);
+
+      const top = await statsService.getTopTracks('all', 10);
+
+      expect(top.map(t => [t.track, t.playCount])).toEqual([
+        ['Jewelry Duty (with T-Pain)', 5],
+        ['Dirty Work', 4],
+      ]);
+    });
+
+    it('artist detail top tracks merge spellings and apply track mappings', async () => {
+      useTrackMappings([dirtWork]);
+
+      const detail = await statsService.getArtistDetail('Prof', 'month', []);
+
+      expect(detail.topTracks.map(t => [t.track, t.playCount])).toEqual([
+        ['Jewelry Duty (with T-Pain)', 5],
+        ['Dirty Work', 4],
+      ]);
+    });
+
+    it('track detail counts every spelling of the track', async () => {
+      useTrackMappings([dirtWork]);
+
+      const featured = await statsService.getTrackDetail(
+        'Prof',
+        'Jewelry Duty feat. T-Pain'
+      );
+      const typo = await statsService.getTrackDetail(
+        'Prof',
+        'Dirty Work',
+        'Good Time Boy'
+      );
+
+      expect(featured.totalPlayCount).toBe(5);
+      expect(typo.totalPlayCount).toBe(4);
+    });
+
+    describe('with an album mapping (old album merged into new album)', () => {
+      const oldEntry = {
+        lastPlayed: now,
+        playCount: 2,
+        plays: [
+          { timestamp: now, track: 'Dirty Work' },
+          { timestamp: now - 1, track: 'Dirt Work' },
+        ],
+      };
+      const newEntry = {
+        lastPlayed: now - 5,
+        playCount: 1,
+        plays: [{ timestamp: now - 5, track: 'Kia Boy' }],
+      };
+
+      beforeEach(() => {
+        mockHistoryStorage.getIndex.mockResolvedValue({
+          albums: {
+            'prof|old album': oldEntry,
+            'prof|new album': newEntry,
+          },
+          totalScrobbles: 3,
+          lastSyncTimestamp: now,
+          oldestScrobbleDate: 0,
+        });
+        mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+          entry: newEntry,
+          matchType: 'exact',
+          matchedKeys: ['prof|new album'],
+        });
+        statsService.setMappingService({
+          getAllAlbumMappings: jest.fn().mockResolvedValue([
+            {
+              historyArtist: 'prof',
+              historyAlbum: 'old album',
+              collectionArtist: 'prof',
+              collectionAlbum: 'new album',
+              collectionId: 0,
+              createdAt: 1,
+            },
+          ]),
+          getAlbumMapping: jest.fn().mockResolvedValue(null),
+        } as unknown as MappingService);
+      });
+
+      it('top tracks keep a merge saved on the new album with the other plays of the old one', async () => {
+        useTrackMappings([
+          { ...dirtWork, historyAlbum: 'new album', cacheAlbum: 'new album' },
+        ]);
+
+        const top = await statsService.getTopTracks('all', 10);
+
+        expect(top.map(t => [t.track, t.album, t.playCount])).toEqual([
+          ['Dirty Work', 'Old Album', 2],
+          ['Kia Boy', 'New Album', 1],
+        ]);
+      });
+
+      it('album detail finds a merge saved under the old album', async () => {
+        useTrackMappings([
+          { ...dirtWork, historyAlbum: 'old album', cacheAlbum: 'old album' },
+        ]);
+
+        const result = await statsService.getAlbumDetail('Prof', 'New Album');
+
+        expect(result.tracks.map(t => [t.track, t.playCount])).toEqual([
+          ['Dirty Work', 2],
+          ['Kia Boy', 1],
+        ]);
+        expect(result.mappings.mergedTracks).toEqual([
+          expect.objectContaining({
+            historyAlbum: 'old album',
+            historyTrack: 'Dirt Work',
+          }),
+        ]);
+      });
+    });
+
+    it('forgotten favorites merge spellings', async () => {
+      const old = now - 200 * 24 * 60 * 60;
+      mockHistoryStorage.getIndex.mockResolvedValue({
+        albums: {
+          'prof|good time boy': {
+            lastPlayed: old,
+            playCount: 10,
+            plays: [
+              ...Array.from({ length: 6 }, () => ({
+                timestamp: old,
+                track: 'Brrrr (with E-40)',
+              })),
+              ...Array.from({ length: 4 }, () => ({
+                timestamp: old,
+                track: 'Brrrr feat. E-40',
+              })),
+            ],
+          },
+        },
+        totalScrobbles: 10,
+        lastSyncTimestamp: now,
+        oldestScrobbleDate: 0,
+      });
+
+      const result = await statsService.getForgottenFavorites(90, 10, 100);
+
+      expect(result.tracks).toEqual([
+        expect.objectContaining({
+          track: 'Brrrr (with E-40)',
+          allTimePlayCount: 10,
+        }),
+      ]);
+    });
+  });
+
   describe('getAlbumDetail merged versions', () => {
     it('should include plays from history albums mapped into it and list them', async () => {
       // Arrange
@@ -5296,7 +5553,7 @@ describe('StatsService', () => {
           expect.stringContaining('stats-cache'),
           expect.objectContaining({
             warm: expect.objectContaining({
-              version: 3,
+              version: 4,
               historyFingerprint: 'scrobbles:8;unresolved:5',
             }),
           })

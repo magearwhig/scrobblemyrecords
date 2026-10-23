@@ -4,7 +4,10 @@ import {
   createAlbumCanonicalizer,
   createAlbumGroupNameResolver,
   createCollectionNameResolver,
+  discogsArtistIdentityKey,
   isCollectionLinked,
+  stripDiscogsSuffix,
+  stripDiscogsSuffixes,
 } from '../../../src/shared/utils/albumMapping';
 
 const mapping = (overrides: Partial<AlbumMapping>): AlbumMapping => ({
@@ -135,6 +138,76 @@ describe('albumMapping utils', () => {
       expect(albumGroupKey('artist', '...')).not.toBe(
         albumGroupKey('artist', '!!!')
       );
+    });
+
+    it('keeps vowel signs in other Indic and Thai scripts distinct', () => {
+      expect(albumGroupKey('artist', 'ক')).not.toBe(
+        albumGroupKey('artist', 'কা')
+      );
+      expect(albumGroupKey('artist', 'กิ')).not.toBe(
+        albumGroupKey('artist', 'กี')
+      );
+    });
+
+    it('still groups Latin spellings with and without accents', () => {
+      expect(albumGroupKey('Björk', 'Homogenic')).toBe(
+        albumGroupKey('Bjork', 'Homogenic')
+      );
+      expect(albumGroupKey('Sigur Rós', '( )')).toBe(
+        albumGroupKey('Sigur Ros', '( )')
+      );
+    });
+  });
+
+  describe('stripDiscogsSuffixes', () => {
+    it('strips the suffix from every joined artist', () => {
+      expect(stripDiscogsSuffixes('A (2), B (3)')).toBe('A, B');
+      expect(stripDiscogsSuffixes('Turnstile (2), Someone')).toBe(
+        'Turnstile, Someone'
+      );
+    });
+
+    it('strips a single trailing suffix', () => {
+      expect(stripDiscogsSuffixes('Discovery (7)')).toBe('Discovery');
+    });
+
+    it('leaves names with their own parentheses unchanged', () => {
+      expect(stripDiscogsSuffixes('Sunn O)))')).toBe('Sunn O)))');
+      expect(stripDiscogsSuffixes('Sunn O))), Boris (3)')).toBe(
+        'Sunn O))), Boris'
+      );
+      expect(stripDiscogsSuffixes('Band (1999 Remix) Club')).toBe(
+        'Band (1999 Remix) Club'
+      );
+    });
+
+    it('leaves stripDiscogsSuffix trailing-only', () => {
+      expect(stripDiscogsSuffix('A (2), B (3)')).toBe('A (2), B');
+    });
+  });
+
+  describe('discogsArtistIdentityKey', () => {
+    it('keeps the suffix of each joined artist', () => {
+      expect(discogsArtistIdentityKey('Turnstile (2), Someone (3)')).toBe(
+        'turnstile#2,someone#3'
+      );
+      expect(discogsArtistIdentityKey('Turnstile (2), Someone')).toBe(
+        'turnstile#2,someone'
+      );
+    });
+
+    it('tells apart the same name with different suffixes', () => {
+      const keys = ['Artist', 'Artist (2)', 'Artist (3)'].map(
+        discogsArtistIdentityKey
+      );
+      expect(new Set(keys).size).toBe(3);
+    });
+
+    it('ignores case, accents and punctuation like albumGroupKey', () => {
+      expect(discogsArtistIdentityKey('Sigur Rós')).toBe(
+        discogsArtistIdentityKey('sigur ros')
+      );
+      expect(discogsArtistIdentityKey('Sunn O)))')).toBe('sunno');
     });
   });
 

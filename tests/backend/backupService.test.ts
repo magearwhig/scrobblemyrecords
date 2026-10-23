@@ -735,6 +735,56 @@ describe('BackupService', () => {
       ]);
     });
 
+    it('backs up and restores record-store filing overrides', async () => {
+      const FILE = 'mappings/artist-filing-overrides.json';
+      const override = (key: string, fileUnder: string, updatedAt: number) => ({
+        key,
+        artist: key,
+        fileUnder,
+        updatedAt,
+      });
+      await fileStorage.writeJSON(FILE, {
+        schemaVersion: 1,
+        overrides: [override('alice cooper', 'Cooper, Alice', 10)],
+      });
+
+      expect(
+        (await service.getBackupPreview()).artistFilingOverridesCount
+      ).toBe(1);
+      const backupJson = await service.exportBackup({
+        includeCredentials: false,
+      });
+      expect(JSON.parse(backupJson).data.artistFilingOverrides).toHaveLength(1);
+
+      // After the backup: the override edited later, another added
+      await fileStorage.writeJSON(FILE, {
+        schemaVersion: 1,
+        overrides: [
+          override('alice cooper', 'Alice Cooper', 50),
+          override('cat power', 'Cat Power', 50),
+        ],
+      });
+      const importPreview = await service.previewImport(backupJson);
+      expect(importPreview.summary.artistFilingOverrides).toEqual({
+        new: 0,
+        existing: 1,
+      });
+
+      await service.importBackup(backupJson, { mode: 'merge' });
+      type Store = { overrides: Array<{ key: string; fileUnder: string }> };
+      let store = await fileStorage.readJSON<Store>(FILE);
+      expect(store!.overrides.map(o => [o.key, o.fileUnder]).sort()).toEqual([
+        ['alice cooper', 'Alice Cooper'],
+        ['cat power', 'Cat Power'],
+      ]);
+
+      await service.importBackup(backupJson, { mode: 'replace' });
+      store = await fileStorage.readJSON<Store>(FILE);
+      expect(store!.overrides.map(o => [o.key, o.fileUnder])).toEqual([
+        ['alice cooper', 'Cooper, Alice'],
+      ]);
+    });
+
     it('a replace restore of a backup with no crates clears them', async () => {
       const backupJson = await service.exportBackup({
         includeCredentials: false,

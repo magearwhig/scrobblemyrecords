@@ -857,6 +857,19 @@ export interface AlbumDetailTrack {
   track: string;
   playCount: number;
   lastPlayed: number; // Unix timestamp (seconds)
+  /** Every name this track was scrobbled under, for merging rows by hand */
+  spellings?: string[];
+}
+
+/**
+ * A track mapping on the album detail page: plays scrobbled as
+ * `historyTrack` count as `cacheTrack`
+ */
+export interface AlbumDetailMergedTrack {
+  historyArtist: string;
+  historyAlbum: string;
+  historyTrack: string;
+  cacheTrack: string;
 }
 
 /**
@@ -899,6 +912,8 @@ export interface AlbumDetailMappings {
   albumMapping?: AlbumDetailAlbumMapping;
   artistMapping?: AlbumDetailArtistMapping;
   compoundArtist?: AlbumDetailCompoundArtist;
+  /** Track names counted as another track of this album (track mappings) */
+  mergedTracks?: AlbumDetailMergedTrack[];
   /** Other history album names merged into this album via album mappings */
   mergedVersions?: AlbumDetailAlbumMapping[];
 }
@@ -915,6 +930,8 @@ export interface AlbumDetailResponse {
   firstPlayed: number | null; // Unix timestamp (seconds)
   lastPlayed: number | null; // Unix timestamp (seconds)
   tracks: AlbumDetailTrack[];
+  /** Artist and album that track merges on this page are saved under */
+  trackMappingAlbum?: { artist: string; album: string };
   arc: AlbumArcBucket[]; // Monthly listening pattern (reused from existing definition)
 
   // Collection info
@@ -973,6 +990,8 @@ export interface StatsCache {
     artistAliasFingerprint?: string;
     /** Album mappings fingerprint at warm time; mapping changes invalidate */
     albumMappingFingerprint?: string;
+    /** Track mappings fingerprint at warm time; merged tracks invalidate */
+    trackMappingFingerprint?: string;
     /** History contents at warm time (play totals); backfills and moves invalidate */
     historyFingerprint?: string;
     streaks: StreakInfo;
@@ -1587,6 +1606,8 @@ export interface MigrationReport {
 export interface MusicBrainzArtistMatch {
   mbid: string; // MusicBrainz artist ID
   name: string; // Artist name
+  sortName?: string; // e.g. "Smith, Elliott"; record-store filing
+  type?: string | null; // "Person", "Group", …
   disambiguation?: string; // Disambiguation text (e.g., "UK rock band")
   country?: string; // Country of origin
   beginYear?: number; // Year artist started
@@ -2062,6 +2083,9 @@ export interface BackupData {
   crates?: Crate[];
   /** Suggestion records only; the daily batch is never backed up */
   crateSuggestions?: CrateSuggestionRecord[];
+
+  /** Record-store "file under" overrides (optional for older backups) */
+  artistFilingOverrides?: ArtistFilingOverride[];
 }
 
 /**
@@ -2113,6 +2137,7 @@ export interface BackupPreview {
   cratesCount?: number;
   crateSuggestionsCount?: number;
   wishlistPriceAlertsCount?: number;
+  artistFilingOverridesCount?: number;
 }
 
 /**
@@ -2154,6 +2179,7 @@ export interface BackupImportPreview {
     savedCollections: ImportCategorySummary;
     crates?: ImportCategorySummary;
     crateSuggestions?: ImportCategorySummary;
+    artistFilingOverrides?: ImportCategorySummary;
     settingsWillMerge: boolean;
   };
 }
@@ -3439,7 +3465,7 @@ export interface AlbumTracklistMatch {
 }
 
 // ============================================
-// Smart Crates (see .plan/smart-crates-plan.md)
+// Smart Crates (see .plan/done/smart-crates-plan.md)
 // ============================================
 
 /** What a rule does when the data it needs is missing */
@@ -3765,4 +3791,329 @@ export interface CrateSuggestionsResponse {
   suggestions: CrateSuggestion[];
   exhausted: boolean;
   reason?: 'collectionLoading' | 'noCandidates';
+}
+
+// ============================================
+// Export Types (Backlog #9)
+// See .plan/data-export-plan.md, "Shared export data layer"
+// ============================================
+
+export const EXPORT_SCHEMA_VERSION = 1;
+
+export type ExportRowSource =
+  | 'discogs-collection'
+  | 'discogs-want'
+  | 'local-want';
+
+/** Whether a wanted item is already in the collection */
+export type OwnedMatchStatus =
+  | 'owned-same-release' // a collection row has the same confirmed releaseId
+  | 'owned-other-version' // a collection row has the same masterId (> 0)
+  | 'owned-name-match' // no id match; the name keys match
+  | 'not-owned'
+  | 'unknown'; // collection cache missing, unreadable, or partial
+
+/**
+ * Where a masterId came from.
+ * - 'release-data': from Discogs data for this exact release (a confirmed master)
+ * - 'search-guess': first hit of a Discogs master search (local wants), never
+ *   confirmed by the user
+ */
+export type MasterIdSource = 'release-data' | 'search-guess';
+
+/** How sure a cross-row link is. Consumers decide what to show or merge. */
+export type MatchConfidence =
+  | 'certain' // same confirmed releaseId
+  | 'confident' // same confirmed (release-data) masterId on both sides
+  | 'likely'; // involves a search-guess masterId, or names only
+
+export type MatchBasis =
+  | 'release-id'
+  | 'master-id'
+  | 'search-master-id'
+  | 'name';
+
+export interface ExportRowLink {
+  rowId: string;
+  basis: MatchBasis;
+  confidence: MatchConfidence;
+}
+
+export interface ExportCollectionRow {
+  /** "discogs-collection:{releaseId}:{copyIndex}" */
+  rowId: string;
+  source: 'discogs-collection';
+  releaseId: number;
+  /** null when absent or 0 */
+  masterId: number | null;
+  /** 'release-data' whenever masterId is set */
+  masterIdSource: MasterIdSource | null;
+  /** 1-based among copies of this release, ordered by dateAdded then cache order */
+  copyIndex: number;
+  /**
+   * Copies of this release in the collection, repeated on every copy's row.
+   * Count copies by counting rows; never sum copyCount.
+   */
+  copyCount: number;
+  /** Exactly as cached from Discogs, e.g. "Turnstile (2), Someone (3)" */
+  artistRaw: string;
+  /** Discogs "(N)" suffixes stripped from every joined artist */
+  artistDisplay: string;
+  /** Keeps the "(N)" suffixes; see discogsArtistIdentityKey */
+  artistIdentityKey: string;
+  /** albumGroupKey(artistDisplay, title); suffix-insensitive */
+  albumNameKey: string;
+  title: string;
+  /** Discogs 0 → null */
+  year: number | null;
+  formats: string[];
+  labels: string[];
+  /** [] until data-export Phase 4 captures labels[].catno */
+  catalogNumbers: string[];
+  /** From the release details cache when present, else null */
+  genres: string[] | null;
+  styles: string[] | null;
+  /** Discogs 0 → null */
+  rating: number | null;
+  /** CollectionNote field_id 1 */
+  mediaCondition: string | null;
+  /** CollectionNote field_id 2 */
+  sleeveCondition: string | null;
+  /** CollectionNote field_id 3 (free text) */
+  notes: string | null;
+  /** Any other field ids */
+  customFields: Array<{ fieldId: number; value: string }>;
+  /**
+   * ISO 8601 UTC, second precision, e.g. "2020-12-05T03:42:05Z"; null when
+   * the raw value can't be parsed (dateAddedRaw keeps the original)
+   */
+  dateAdded: string | null;
+  /** seconds; null when the raw value can't be parsed */
+  dateAddedUnix: number | null;
+  /** Discogs original string with offset */
+  dateAddedRaw: string;
+  coverImageUrl: string | null;
+}
+
+export interface ExportWishlistRow {
+  /** "discogs-want:{wantId}" | "local-want:{localId}" */
+  rowId: string;
+  source: 'discogs-want' | 'local-want';
+  /** discogs-want: WishlistItem.releaseId. local-want: always null */
+  releaseId: number | null;
+  /** null when absent or 0 */
+  masterId: number | null;
+  /** discogs-want: 'release-data'; local-want: 'search-guess' */
+  masterIdSource: MasterIdSource | null;
+  artistRaw: string;
+  artistDisplay: string;
+  /** null for local wants (Last.fm names carry no Discogs identity) */
+  artistIdentityKey: string | null;
+  albumNameKey: string;
+  /** WishlistItem.title / LocalWantItem.album */
+  title: string;
+  year: number | null;
+  /** discogs-want: from the versions cache entry matching releaseId, else [] */
+  formats: string[];
+  /** Same source; [] for local wants */
+  labels: string[];
+  /** [] until data-export Phase 4 */
+  catalogNumbers: string[];
+  /** WishlistItem.notes; null for local wants */
+  notes: string | null;
+  /** WishlistItem.rating (0–5); null for local wants */
+  priority: number | null;
+  /**
+   * ISO 8601 UTC; null when the raw value can't be parsed (dateAddedRaw
+   * keeps the original)
+   */
+  dateAdded: string | null;
+  /** seconds; null when the raw value can't be parsed */
+  dateAddedUnix: number | null;
+  /** Discogs ISO string, or LocalWantItem.addedAt (ms) */
+  dateAddedRaw: string | number;
+  vinylStatus: 'has_vinyl' | 'cd_only' | 'unknown' | 'checking';
+  lowestVinylPrice: number | null;
+  priceCurrency: string | null;
+  /** LocalWantItem.playCount; null for Discogs wants */
+  playCount: number | null;
+  ownedMatch: OwnedMatchStatus;
+  /** null for not-owned / unknown */
+  ownedMatchConfidence: MatchConfidence | null;
+  /** Every collection rowId that produced the match */
+  ownedCollectionRowIds: string[];
+  /** Same rows, with basis and confidence per row */
+  ownedCollectionLinks: ExportRowLink[];
+  /**
+   * Same release/master/album in the OTHER wishlist source, every confidence
+   * included; consumers must not treat 'likely' as "same item"
+   */
+  relatedWishlistLinks: ExportRowLink[];
+  /**
+   * local-want only: the stored LocalWantItem.releaseId when it differs from
+   * masterId (provenance only; never used for matching)
+   */
+  searchMasterIdCandidate: number | null;
+  coverImageUrl: string | null;
+}
+
+export interface ExportCollectionCacheInfo {
+  status: 'complete' | 'partial' | 'missing';
+  /** page-1 pagination.pages */
+  pagesExpected: number | null;
+  /** Consecutive pages read from page 1 */
+  pagesRead: number;
+  /** page-1 pagination.items */
+  itemsExpected: number | null;
+  itemsRead: number;
+  /** ISO; the age of the stalest data */
+  oldestPageAt: string | null;
+  newestPageAt: string | null;
+}
+
+export interface ExportSnapshotMeta {
+  schemaVersion: typeof EXPORT_SCHEMA_VERSION;
+  /** ISO 8601 UTC */
+  generatedAt: string;
+  /** Oldest page timestamp of the pages read (= collectionCache.oldestPageAt) */
+  collectionCachedAt: string | null;
+  collectionCache: ExportCollectionCacheInfo;
+  /** WishlistStore.lastUpdated (ISO) */
+  wishlistUpdatedAt: string | null;
+  /** ScrobbleHistoryIndex.lastSyncTimestamp (ms → ISO) */
+  historySyncedAt: string | null;
+  /** Identifies whose data it is; no tokens */
+  discogsUsername: string | null;
+}
+
+// ============================================
+// Pocket List Types
+// See .plan/done/pocket-list-export-plan.md
+// ============================================
+
+export type PocketListKind = 'wishlist' | 'collection';
+
+export type PocketListWishlistSource = 'discogs-want' | 'local-want';
+
+export interface PocketListOptions {
+  lists: PocketListKind[];
+  wishlistSources: PocketListWishlistSource[];
+  details: { format: boolean; pressing: boolean; notes: boolean };
+  /** Default true */
+  flagOwnedVersions: boolean;
+}
+
+// ============================================
+// Record-Store Filing Types
+// See .plan/done/record-store-filing-plan.md
+// ============================================
+
+/** One MusicBrainz lookup result, keyed by filing name key */
+export type ArtistFilingCacheEntry =
+  | {
+      /** Name as looked up */
+      name: string;
+      status: 'found';
+      /** MusicBrainz sort-name, e.g. "Smith, Elliott" */
+      sortName: string;
+      /** MusicBrainz artist type, e.g. "Person", "Group"; null when unset */
+      type: string | null;
+      /** null when several agreeing candidates matched */
+      mbid: string | null;
+      via: 'mbid-map' | 'search';
+      /** ms */
+      fetchedAt: number;
+    }
+  | {
+      name: string;
+      /**
+       * not-found: no candidate with this exact name; ambiguous: exact
+       * candidates disagree; none: the user chose "none of these" in
+       * release tracking
+       */
+      status: 'not-found' | 'ambiguous' | 'none';
+      /** ms */
+      fetchedAt: number;
+      /** The tracker mbid this result was based on ('none' only) */
+      mbid?: null;
+    };
+
+export interface ArtistFilingCacheStore {
+  schemaVersion: 1;
+  entries: Record<string, ArtistFilingCacheEntry>;
+}
+
+export interface MasterYearCacheStore {
+  schemaVersion: 1;
+  /** Keyed by Discogs master id; year null when Discogs has none */
+  entries: Record<string, { year: number | null; fetchedAt: number }>;
+}
+
+/** A user's "file under" for one artist name */
+export interface ArtistFilingOverride {
+  /** filingNameKey(artist) */
+  key: string;
+  /** Spelling the user saw when saving */
+  artist: string;
+  /** Sort name, e.g. "Cooper, Alice" */
+  fileUnder: string;
+  /** ms */
+  updatedAt: number;
+}
+
+export interface ArtistFilingOverridesStore {
+  schemaVersion: 1;
+  overrides: ArtistFilingOverride[];
+}
+
+export type ArtistFilingSource = 'override' | 'musicbrainz' | 'default';
+
+/** One artist credit as the Pocket List files it (Settings list) */
+export interface ArtistFilingRow {
+  /** Credit as shown, e.g. "Elliott Smith" */
+  artist: string;
+  key: string;
+  /** Sort name in effect, e.g. "Smith, Elliott" */
+  fileUnder: string;
+  /** Section label it lands in, e.g. "S", "#", "Various Artists" */
+  section: string;
+  source: ArtistFilingSource;
+  /** Set when a collaboration files under its first artist */
+  filedAs: string | null;
+  /** Cached MusicBrainz status for the credit; 'missing' when not fetched */
+  lookup: ArtistFilingCacheEntry['status'] | 'missing';
+  /** MusicBrainz type when found */
+  type: string | null;
+  override: string | null;
+  /** Rows in the collection and wishlist with this credit */
+  count: number;
+}
+
+export interface RecordStoreFilingJobStatus {
+  running: boolean;
+  startedAt: number | null;
+  finishedAt: number | null;
+  artistsDone: number;
+  artistsTotal: number;
+  mastersDone: number;
+  mastersTotal: number;
+  /** Lookups that failed (network) and will be retried next run */
+  failures: number;
+  cancelled: boolean;
+  error: string | null;
+}
+
+export interface RecordStoreFilingStatus {
+  artists: {
+    /** Distinct credits in the collection and wishlist (Various excluded) */
+    total: number;
+    musicbrainz: number;
+    override: number;
+    /** Looked up, but filed by today's rule (not found, ambiguous, none) */
+    unmatched: number;
+    /** Not looked up yet, or due for a retry */
+    missing: number;
+  };
+  masters: { total: number; cached: number; missing: number };
+  job: RecordStoreFilingJobStatus;
 }

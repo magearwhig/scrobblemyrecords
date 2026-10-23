@@ -949,6 +949,27 @@ export class WishlistService {
   }
 
   /**
+   * Original release year of a Discogs master (record-store filing). null
+   * when Discogs has no year or no such master; throws on other failures so
+   * the caller can retry later instead of caching a wrong answer.
+   */
+  async getMasterYear(masterId: number): Promise<number | null> {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await this.axios.get(`/masters/${masterId}`, {
+        headers,
+      });
+      const year = response.data?.year;
+      return typeof year === 'number' && year > 0 ? year : null;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Title, artist, tracklist and cover of a Discogs master or release, e.g.
    * to match unresolved plays against an album the user points at. Track
    * titles are in tracklist order; headings (no position) are skipped.

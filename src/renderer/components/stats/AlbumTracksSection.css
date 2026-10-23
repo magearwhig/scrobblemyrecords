@@ -1,0 +1,54 @@
+.album-tracks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.album-tracks-header h3 {
+  margin: 0;
+}
+
+.album-tracks-merge-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-sunken);
+  color: var(--text-primary);
+}
+
+.album-tracks-merge-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.album-tracks-merge-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.album-tracks-merge-name .form-select {
+  max-width: 100%;
+}
+
+.album-tracks-merge-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.album-tracks-merge-checkbox {
+  justify-self: end;
+  min-width: var(--space-6);
+}

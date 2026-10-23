@@ -1188,6 +1188,39 @@ describe('WishlistService', () => {
     });
   });
 
+  describe('getMasterYear', () => {
+    it("should return the master's original year", async () => {
+      mockAxiosInstance.get.mockResolvedValueOnce({
+        data: { id: 400, year: 1987 },
+      });
+      await expect(service.getMasterYear(400)).resolves.toBe(1987);
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+        '/masters/400',
+        expect.anything()
+      );
+    });
+
+    it('should return null for a missing year or a 404', async () => {
+      mockAxiosInstance.get.mockResolvedValueOnce({
+        data: { id: 400, year: 0 },
+      });
+      await expect(service.getMasterYear(400)).resolves.toBeNull();
+
+      mockAxiosInstance.get.mockRejectedValueOnce(
+        Object.assign(new Error('Not found'), {
+          isAxiosError: true,
+          response: { status: 404 },
+        })
+      );
+      await expect(service.getMasterYear(400)).resolves.toBeNull();
+    });
+
+    it('should throw on other failures so the year is fetched again later', async () => {
+      mockAxiosInstance.get.mockRejectedValueOnce(new Error('network down'));
+      await expect(service.getMasterYear(400)).rejects.toThrow('network down');
+    });
+  });
+
   describe('searchForRelease', () => {
     it('should search Discogs and parse results', async () => {
       mockAxiosInstance.get.mockResolvedValueOnce({

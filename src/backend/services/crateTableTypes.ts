@@ -1,7 +1,7 @@
 /**
  * Internal data shapes shared by the Smart Crates engine
  * (crateAlbumTable, crateEvaluator, crateService, crateSuggestionService).
- * Not sent to the client. See .plan/smart-crates-plan.md sections 5 and 7.
+ * Not sent to the client. See .plan/done/smart-crates-plan.md sections 5 and 7.
  */
 
 import { CrateCoverage } from '../../shared/types';

@@ -468,6 +468,30 @@ export class MigrationService {
     });
 
     // ============================================
+    // Record-Store Filing (Pocket List)
+    // ============================================
+    this.register('artist-filing-overrides', {
+      path: 'mappings/artist-filing-overrides.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('artist-filing-cache', {
+      path: 'cache/artist-filing.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('master-year-cache', {
+      path: 'cache/master-years.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    // ============================================
     // Embedding & Recommendation Files
     // ============================================
     this.register('embedding-record-embeddings', {

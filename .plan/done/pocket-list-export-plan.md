@@ -2,9 +2,26 @@
 
 ## Status
 
-Backlog -- not started. Depends only on data-export-plan.md **Phase 1**
-(`exportDataService.ts` rows, snapshot meta, and the `routes/export.ts`
-skeleton with `GET /meta`). No code, data, or tests have changed for this plan.
+Implemented 2026-10-21 on branch `feat/pocket-list`: Phases 1, 2, 2b and 3,
+together with data-export-plan.md Phase 1 (the shared row layer it depends on).
+Phase 4 on real data: wishlist + collection gives 1,362 albums on 137 pages,
+2.2 MB, rendered in about 0.5 s warm (wishlist alone 0.46 MB, collection alone
+1.9 MB); every page 288 × 576 pt, Noto Sans embedded. The phone checks in
+"Future Validation Strategy" step 7 (viewers, airplane mode, legibility at
+360 px) are manual and still to be done by the user.
+
+Deviations from this text:
+- Each letter section starts on a new page, so index and outline links land
+  on a page that starts with that section.
+- The cover title is a styled paragraph, so the outline has exactly one
+  bookmark per section.
+- "↑" and "★" aren't in Noto Sans and use a system font; the page-number
+  footer uses Helvetica, since Chromium's footer can't see the page's fonts.
+- `playwright-core` (pinned to the version `@playwright/test` resolves) is the
+  runtime dependency (Open Decision 6); a missing browser gives the 503 hint.
+- A wishlist-only export still reads the collection, to name the owned copy.
+- Selecting Notes alone keeps version lines, so notes stay visible.
+- Tests live under `tests/backend/services/` and `tests/backend/routes/`.
 
 Revised 2026-10-11 after a peer review: local-want id handling, match
 confidence, suffix-preserving identity, conservative album grouping, explicit
@@ -21,7 +38,7 @@ opening Discogs over and over.
 
 This plan covers **readable collation, grouping, and the PDF layout**. It
 **does not** define the data rows. Those belong to
-[data-export-plan.md](data-export-plan.md):
+[data-export-plan.md](../data-export-plan.md):
 
 | | Pocket List (this plan) | Data Export (data-export-plan.md) |
 |---|---|---|

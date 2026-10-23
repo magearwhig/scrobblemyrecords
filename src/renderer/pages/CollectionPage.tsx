@@ -1,4 +1,4 @@
-import { AlertTriangle, Bookmark, Boxes, X } from 'lucide-react';
+import { AlertTriangle, Bookmark, Boxes, FileDown, X } from 'lucide-react';
 import React, {
   useState,
   useEffect,
@@ -23,6 +23,7 @@ import {
 import AlbumCard from '../components/AlbumCard';
 import CacheStatusIndicator from '../components/CacheStatusIndicator';
 import CollectionFilterControls from '../components/CollectionFilterControls';
+import PocketListExportDialog from '../components/PocketListExportDialog';
 import SearchBar from '../components/SearchBar';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
@@ -156,6 +157,7 @@ const CollectionPage: React.FC = () => {
     []
   );
   const [savePresetModalOpen, setSavePresetModalOpen] = useState(false);
+  const [pocketListOpen, setPocketListOpen] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
   const [savingPreset, setSavingPreset] = useState(false);
 
@@ -1279,6 +1281,16 @@ const CollectionPage: React.FC = () => {
               {entireCollection.length > 0 && (
                 <span>{entireCollection.length} total items</span>
               )}
+              <Button
+                variant='secondary'
+                size='small'
+                className='pocket-list-button'
+                onClick={() => setPocketListOpen(true)}
+                iconLeft={<FileDown size={16} aria-hidden='true' />}
+                title='Download an offline PDF checklist of your collection'
+              >
+                Pocket List
+              </Button>
             </div>
           </div>
 
@@ -2042,6 +2054,12 @@ const CollectionPage: React.FC = () => {
           </Button>
         </div>
       </Modal>
+
+      <PocketListExportDialog
+        isOpen={pocketListOpen}
+        onClose={() => setPocketListOpen(false)}
+        initialList='collection'
+      />
     </div>
   );
 };

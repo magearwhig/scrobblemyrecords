@@ -1,4 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import React from 'react';
@@ -42,6 +48,8 @@ const mockApiServiceInstance = {
   addToDiscardPile: jest.fn(),
   getUserPreferences: jest.fn(),
   updateUserPreferences: jest.fn(),
+  getExportMeta: jest.fn(),
+  exportPocketList: jest.fn(),
 };
 
 // Mock the getApiService function to return our mock instance
@@ -321,6 +329,24 @@ describe('CollectionPage', () => {
       collectionPresets: [],
     });
     mockApiServiceInstance.updateUserPreferences.mockResolvedValue(undefined);
+    mockApiServiceInstance.getExportMeta.mockReturnValue(new Promise(() => {}));
+  });
+
+  describe('Pocket List', () => {
+    it('opens the Pocket List dialog preselected to the collection', async () => {
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Pocket List/ }));
+
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Pocket List PDF',
+      });
+      expect(within(dialog).getByLabelText('Collection')).toBeChecked();
+      expect(mockApiServiceInstance.getExportMeta).toHaveBeenCalled();
+    });
   });
 
   describe('Authentication', () => {

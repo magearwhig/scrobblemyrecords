@@ -114,6 +114,7 @@ describe('Suggestions Routes', () => {
     mockTrackMappingService = new MockedTrackMappingService(
       mockFileStorage
     ) as jest.Mocked<TrackMappingService>;
+    mockTrackMappingService.getMappingsForAlbum.mockResolvedValue([]);
     mockHiddenItemService = new MockedHiddenItemService(
       mockFileStorage
     ) as jest.Mocked<HiddenItemService>;
@@ -1298,6 +1299,8 @@ describe('Suggestions Routes', () => {
       await new Promise(resolve => setTimeout(resolve, 0));
       expect(mockStatsService.invalidateStatsCache).toHaveBeenCalled();
       expect(mockStatsService.warmCache).toHaveBeenCalled();
+      // Forgotten Favorites apply track mappings through album mappings
+      expect(mockStatsService.clearForgottenFavoritesCache).toHaveBeenCalled();
     });
 
     it('should reject an empty batch', async () => {
@@ -1321,6 +1324,213 @@ describe('Suggestions Routes', () => {
         expect(response.status).toBe(400);
       }
       expect(mockMappingService.addAlbumMappings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('album history track stats', () => {
+    it('counts every play per track and leads mapped tracklist titles to their track', async () => {
+      const plays = [
+        ...Array.from({ length: 40 }, (_, i) => ({
+          timestamp: 1640000000 - i,
+          track: 'Jewelry Duty (with T-Pain)',
+        })),
+        ...Array.from({ length: 20 }, (_, i) => ({
+          timestamp: 1630000000 - i,
+          track: 'Jewelry Duty feat. T-Pain',
+        })),
+        { timestamp: 1620000000, track: 'Dirty Work' },
+      ];
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+        entry: { lastPlayed: 1640000000, playCount: plays.length, plays },
+        matchType: 'exact',
+        matchedKeys: ['prof|good time boy'],
+      });
+      mockTrackMappingService.getMappingsForAlbum.mockImplementation(
+        async (_artist, album) =>
+          album === 'good time boy'
+            ? [
+                {
+                  historyArtist: 'prof',
+                  historyAlbum: 'good time boy',
+                  historyTrack: 'Dirt Work',
+                  cacheArtist: 'prof',
+                  cacheAlbum: 'good time boy',
+                  cacheTrack: 'Dirty Work',
+                  createdAt: 1,
+                },
+              ]
+            : []
+      );
+
+      const response = await request(app).get(
+        '/api/v1/suggestions/album-history/Prof/Good%20Time%20Boy'
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.plays).toHaveLength(50);
+      expect(response.body.data.trackStats).toEqual({
+        jewelryduty: { count: 60, lastPlayed: 1640000000 },
+        dirtywork: { count: 1, lastPlayed: 1620000000 },
+      });
+      expect(response.body.data.trackAliases).toEqual({
+        dirtwork: 'dirtywork',
+      });
+    });
+  });
+
+  describe('album history track mappings', () => {
+    const dirtWork = {
+      historyArtist: 'prof',
+      historyAlbum: 'new album',
+      historyTrack: 'Dirt Work',
+      cacheArtist: 'prof',
+      cacheAlbum: 'new album',
+      cacheTrack: 'Dirty Work',
+      createdAt: 1,
+    };
+
+    it('applies merges saved on the album a history album is merged into', async () => {
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+        entry: {
+          lastPlayed: 1640000000,
+          playCount: 2,
+          plays: [
+            { timestamp: 1640000000, track: 'Dirty Work' },
+            { timestamp: 1639000000, track: 'Dirt Work' },
+          ],
+        },
+        matchType: 'exact',
+        matchedKeys: ['prof|old album'],
+      });
+      mockMappingService.getAllAlbumMappings = jest.fn().mockResolvedValue([
+        {
+          historyArtist: 'prof',
+          historyAlbum: 'old album',
+          collectionArtist: 'prof',
+          collectionAlbum: 'new album',
+          collectionId: 0,
+          createdAt: 1,
+        },
+      ]);
+      mockTrackMappingService.getMappingsForAlbum.mockImplementation(
+        async (_artist, album) => (album === 'new album' ? [dirtWork] : [])
+      );
+
+      const response = await request(app).get(
+        '/api/v1/suggestions/album-history/Prof/Old%20Album'
+      );
+
+      expect(response.body.data.trackStats).toEqual({
+        dirtywork: { count: 2, lastPlayed: 1640000000 },
+      });
+      expect(response.body.data.trackAliases).toEqual({
+        dirtwork: 'dirtywork',
+      });
+    });
+
+    it('counts a track called "Constructor"', async () => {
+      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
+        entry: {
+          lastPlayed: 1640000000,
+          playCount: 1,
+          plays: [{ timestamp: 1640000000, track: 'Constructor' }],
+        },
+        matchType: 'exact',
+        matchedKeys: ['a|b'],
+      });
+
+      const response = await request(app).get(
+        '/api/v1/suggestions/album-history/A/B'
+      );
+
+      expect(response.body.data.trackStats).toEqual({
+        constructor: { count: 1, lastPlayed: 1640000000 },
+      });
+    });
+  });
+
+  describe('POST /api/v1/suggestions/mappings/tracks/merge', () => {
+    beforeEach(() => {
+      mockTrackMappingService.mergeTracks.mockResolvedValue(1);
+      mockStatsService.invalidateStatsCache = jest
+        .fn()
+        .mockResolvedValue(undefined);
+      mockStatsService.warmCache = jest.fn().mockResolvedValue(undefined);
+    });
+
+    it('merges the tracks and refreshes cached stats', async () => {
+      const response = await request(app)
+        .post('/api/v1/suggestions/mappings/tracks/merge')
+        .send({
+          artist: 'prof',
+          album: 'good time boy',
+          tracks: ['Dirty Work', 'Dirt Work'],
+          canonical: 'Dirty Work',
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ success: true, data: { mapped: 1 } });
+      expect(mockTrackMappingService.mergeTracks).toHaveBeenCalledWith(
+        'prof',
+        'good time boy',
+        ['Dirty Work', 'Dirt Work'],
+        'Dirty Work'
+      );
+      expect(mockStatsService.clearForgottenFavoritesCache).toHaveBeenCalled();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(mockStatsService.warmCache).toHaveBeenCalled();
+    });
+
+    it.each([
+      ['fewer than two tracks', { tracks: ['Dirty Work'] }],
+      ['a blank track', { tracks: ['Dirty Work', ' '] }],
+      ['no canonical name', { canonical: '' }],
+      ['no album', { album: undefined }],
+    ])('rejects %s', async (_reason, overrides) => {
+      const response = await request(app)
+        .post('/api/v1/suggestions/mappings/tracks/merge')
+        .send({
+          artist: 'prof',
+          album: 'good time boy',
+          tracks: ['Dirty Work', 'Dirt Work'],
+          canonical: 'Dirty Work',
+          ...overrides,
+        });
+
+      expect(response.status).toBe(400);
+      expect(mockTrackMappingService.mergeTracks).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('track mapping changes refresh cached stats', () => {
+    beforeEach(() => {
+      mockStatsService.invalidateStatsCache = jest
+        .fn()
+        .mockResolvedValue(undefined);
+      mockStatsService.warmCache = jest.fn().mockResolvedValue(undefined);
+    });
+
+    it('after creating a mapping', async () => {
+      mockTrackMappingService.addTrackMapping.mockResolvedValue(undefined);
+      await request(app).post('/api/v1/suggestions/mappings/tracks').send({
+        historyArtist: 'a',
+        historyAlbum: 'b',
+        historyTrack: 'c',
+        cacheArtist: 'a',
+        cacheAlbum: 'b',
+        cacheTrack: 'd',
+      });
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(mockStatsService.warmCache).toHaveBeenCalled();
+    });
+
+    it('after removing a mapping', async () => {
+      mockTrackMappingService.removeTrackMapping.mockResolvedValue(true);
+      await request(app)
+        .delete('/api/v1/suggestions/mappings/tracks')
+        .send({ historyArtist: 'a', historyAlbum: 'b', historyTrack: 'c' });
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(mockStatsService.warmCache).toHaveBeenCalled();
     });
   });
 });

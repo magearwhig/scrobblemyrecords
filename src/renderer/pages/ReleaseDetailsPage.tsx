@@ -15,7 +15,7 @@ import {
   AddDiscardPileItemRequest,
   MarketplaceStats,
 } from '../../shared/types';
-import { normalizeForMatching } from '../../shared/utils/trackNormalization';
+import { trackMatchKey } from '../../shared/utils/trackNormalization';
 import AlbumScrobbleHistory from '../components/AlbumScrobbleHistory';
 import ArtistLink from '../components/ArtistLink';
 import AddToCrateMenu from '../components/crates/AddToCrateMenu';
@@ -46,6 +46,10 @@ interface AlbumHistoryData {
   lastPlayed: number | null;
   playCount: number;
   plays: Array<{ timestamp: number; track?: string }>;
+  /** Plays per track over all plays, keyed by trackMatchKey */
+  trackStats?: Record<string, { count: number; lastPlayed: number }>;
+  /** trackMatchKey of a mapped track name -> key of the track it counts as */
+  trackAliases?: Record<string, string>;
 }
 
 /**
@@ -168,20 +172,21 @@ const ReleaseDetailsPage: React.FC = () => {
     }
   });
 
-  // Calculate per-track scrobble stats from album history
+  // Per-track scrobble stats from album history, keyed by trackMatchKey:
+  // the server's counts over every play, else counted from the plays list
   const trackScrobbleStats = useMemo((): Map<string, TrackScrobbleStats> => {
     const stats = new Map<string, TrackScrobbleStats>();
-
-    if (!albumHistory?.plays) {
+    if (albumHistory?.trackStats) {
+      for (const [key, stat] of Object.entries(albumHistory.trackStats)) {
+        stats.set(key, { count: stat.count, lastPlayed: stat.lastPlayed });
+      }
       return stats;
     }
 
-    for (const play of albumHistory.plays) {
+    for (const play of albumHistory?.plays ?? []) {
       if (!play.track) continue;
-
-      const normalizedTrack = normalizeForMatching(play.track);
-      const existing = stats.get(normalizedTrack);
-
+      const key = trackMatchKey(play.track);
+      const existing = stats.get(key);
       if (existing) {
         existing.count++;
         // Keep the most recent play timestamp
@@ -189,20 +194,23 @@ const ReleaseDetailsPage: React.FC = () => {
           existing.lastPlayed = play.timestamp;
         }
       } else {
-        stats.set(normalizedTrack, {
-          count: 1,
-          lastPlayed: play.timestamp,
-        });
+        stats.set(key, { count: 1, lastPlayed: play.timestamp });
       }
     }
-
     return stats;
-  }, [albumHistory?.plays]);
+  }, [albumHistory?.trackStats, albumHistory?.plays]);
 
-  // Helper to get scrobble stats for a track
+  // Helper to get scrobble stats for a tracklist title. A title that a
+  // track mapping counts as another track (e.g. a typo) uses that track.
   const getTrackStats = (trackTitle: string): TrackScrobbleStats | null => {
-    const normalizedTitle = normalizeForMatching(trackTitle);
-    return trackScrobbleStats.get(normalizedTitle) || null;
+    const key = trackMatchKey(trackTitle);
+    // Own keys only: a track called "Constructor" must not find Object's
+    const aliases = albumHistory?.trackAliases;
+    const aliased =
+      aliases && Object.prototype.hasOwnProperty.call(aliases, key)
+        ? aliases[key]
+        : key;
+    return trackScrobbleStats.get(aliased) || null;
   };
 
   const loadReleaseDetails = async () => {

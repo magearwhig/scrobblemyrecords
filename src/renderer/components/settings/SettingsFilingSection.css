@@ -1,0 +1,111 @@
+.filing-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+.filing-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.filing-search {
+  flex: 0 1 16rem;
+  min-width: 10rem;
+}
+
+.filing-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.filing-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.filing-row:last-child {
+  border-bottom: none;
+}
+
+.filing-section-letter {
+  flex: 0 0 2.25rem;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.filing-row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.filing-row-artist {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.filing-row-meta {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.filing-row-meta strong {
+  color: var(--text-primary);
+}
+
+.filing-row-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-1);
+}
+
+.filing-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.filing-edit-label {
+  display: flex;
+  flex: 1 1 14rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.filing-edit-actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.filing-edit-error {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--status-error);
+}
+
+.filing-more {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}

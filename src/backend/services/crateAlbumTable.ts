@@ -2,7 +2,7 @@
  * Album table for Smart Crates: the owned collection deduped by release ID,
  * grouped into albums the way Stats groups them, with listening data
  * attributed per album. Built once and memoised until its inputs change.
- * See .plan/smart-crates-plan.md sections 5 and 7.
+ * See .plan/done/smart-crates-plan.md sections 5 and 7.
  */
 
 import {

@@ -43,6 +43,11 @@ import {
   EntireCollectionResponse,
   ExcludedArtistResponse,
   ExcludedHistoryArtist,
+  ExportSnapshotMeta,
+  ArtistFilingOverride,
+  ArtistFilingRow,
+  RecordStoreFilingJobStatus,
+  RecordStoreFilingStatus,
   ExclusionSuggestion,
   ForgottenTrack,
   HiddenAlbum,
@@ -64,6 +69,7 @@ import {
   MonitoredSeller,
   MonitoredWebsite,
   MusicBrainzArtistMatch,
+  PocketListOptions,
   NewReleaseSyncStatus,
   RecommendationResult,
   RecommendationSettings,
@@ -102,6 +108,10 @@ import {
   WrappedData,
   WishlistPriceRefreshStatus,
 } from '../../shared/types';
+import {
+  filenameFromContentDisposition,
+  readBlobText,
+} from '../utils/downloadBlob';
 import { createLogger } from '../utils/logger';
 
 import { getApiToken } from './apiToken';
@@ -1083,6 +1093,10 @@ class ApiService {
     lastPlayed: number | null;
     playCount: number;
     plays: Array<{ timestamp: number; track?: string }>;
+    /** Plays per track over all plays, keyed by trackMatchKey */
+    trackStats?: Record<string, { count: number; lastPlayed: number }>;
+    /** trackMatchKey of a mapped track name -> key of the track it counts as */
+    trackAliases?: Record<string, string>;
   }> {
     const response = await this.api.get(
       `/suggestions/album-history/${encodeURIComponent(artist)}/${encodeURIComponent(album)}`
@@ -1258,7 +1272,7 @@ class ApiService {
   }
 
   // ============================================
-  // Track Mapping methods (for Forgotten Favorites)
+  // Track Mapping methods (Forgotten Favorites, album page merges)
   // ============================================
 
   async getTrackMappings(): Promise<TrackMapping[]> {
@@ -1285,6 +1299,22 @@ class ApiService {
     await this.api.delete('/suggestions/mappings/tracks', {
       data: { historyArtist, historyAlbum, historyTrack },
     });
+  }
+
+  /** Count several tracks of one album as one song, named `canonical` */
+  async mergeTracks(
+    artist: string,
+    album: string,
+    tracks: string[],
+    canonical: string
+  ): Promise<number> {
+    const response = await this.api.post('/suggestions/mappings/tracks/merge', {
+      artist,
+      album,
+      tracks,
+      canonical,
+    });
+    return response.data.data.mapped;
   }
 
   async getTrackMappingCount(): Promise<number> {
@@ -2297,6 +2327,97 @@ class ApiService {
     return response.data;
   }
 
+  // ============================================
+  // Export (see .plan/done/pocket-list-export-plan.md)
+  // ============================================
+
+  /**
+   * Snapshot freshness of the cached data the exports read from
+   * (wishlist sync time, collection cache completeness).
+   */
+  async getExportMeta(): Promise<ExportSnapshotMeta> {
+    const response = await this.api.get('/export/meta');
+    return response.data.data;
+  }
+
+  /**
+   * Generate the Pocket List PDF. Goes through the shared axios instance (as a
+   * blob, like `exportBackup`) so the API-token header is attached; a plain
+   * `<a href>` would not send it. Rendering can take a while, hence the longer
+   * per-request timeout. Error bodies arrive as a JSON blob, so the server's
+   * message is read out of it and rethrown as the Error message.
+   */
+  async exportPocketList(
+    options: PocketListOptions,
+    signal?: AbortSignal
+  ): Promise<{ blob: Blob; filename: string }> {
+    const includesWishlist = options.lists.includes('wishlist');
+    const params: Record<string, string> = {
+      lists: options.lists.join(','),
+      details: (['format', 'pressing', 'notes'] as const)
+        .filter(key => options.details[key])
+        .join(','),
+      flagOwned: String(options.flagOwnedVersions),
+    };
+    if (includesWishlist) {
+      params.sources = options.wishlistSources.join(',');
+    }
+
+    try {
+      const response = await this.api.get('/export/pocket-list', {
+        params,
+        responseType: 'blob',
+        timeout: 90000,
+        signal,
+      });
+      const header = response.headers?.['content-disposition'];
+      const filename =
+        filenameFromContentDisposition(
+          typeof header === 'string' ? header : null
+        ) ?? defaultPocketListFilename(options.lists);
+      return { blob: response.data, filename };
+    } catch (error) {
+      throw new Error(await pocketListErrorMessage(error));
+    }
+  }
+
+  /**
+   * Record-store filing (Pocket List order): cache coverage and the
+   * background refresh's progress
+   */
+  async getFilingStatus(): Promise<RecordStoreFilingStatus> {
+    const response = await this.api.get('/filing/status');
+    return response.data.data;
+  }
+
+  /** Start fetching missing MusicBrainz sort names and Discogs master years */
+  async startFilingRefresh(full = false): Promise<RecordStoreFilingJobStatus> {
+    const response = await this.api.post('/filing/refresh', { full });
+    return response.data.data;
+  }
+
+  async cancelFilingRefresh(): Promise<void> {
+    await this.api.post('/filing/cancel');
+  }
+
+  /** Every artist in the collection and wishlist, in filing order */
+  async getFilingArtists(): Promise<ArtistFilingRow[]> {
+    const response = await this.api.get('/filing/artists');
+    return response.data.data;
+  }
+
+  /** Set "file under" for an artist; an empty value removes the override */
+  async setFilingOverride(
+    artist: string,
+    fileUnder: string
+  ): Promise<ArtistFilingOverride | null> {
+    const response = await this.api.put('/filing/overrides', {
+      artist,
+      fileUnder,
+    });
+    return response.data.data;
+  }
+
   /**
    * Preview what would happen if a backup was imported.
    */
@@ -2853,6 +2974,51 @@ class ApiService {
     this.baseUrl = baseUrl;
     this.api.defaults.baseURL = `${baseUrl}/api/v1`;
   }
+}
+
+/** Fallback when `Content-Disposition` isn't readable (e.g. not CORS-exposed) */
+function defaultPocketListFilename(lists: PocketListOptions['lists']): string {
+  const kinds = (['wishlist', 'collection'] as const).filter(kind =>
+    lists.includes(kind)
+  );
+  const date = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const ymd = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return `listenography-pocket-list-${kinds.join('-')}-${ymd}.pdf`;
+}
+
+/**
+ * The server's error message for a failed blob request. The body of an error
+ * response is a Blob holding `{ success: false, error }`.
+ */
+async function pocketListErrorMessage(error: unknown): Promise<string> {
+  const err = error as {
+    code?: string;
+    message?: string;
+    response?: { status?: number; data?: unknown };
+  };
+  const data = err?.response?.data;
+  let body: unknown = data;
+  try {
+    if (typeof Blob !== 'undefined' && data instanceof Blob) {
+      body = JSON.parse(await readBlobText(data));
+    } else if (typeof data === 'string') {
+      body = JSON.parse(data);
+    }
+  } catch {
+    body = undefined;
+  }
+  const serverError = (body as { error?: unknown } | undefined)?.error;
+  if (typeof serverError === 'string' && serverError) return serverError;
+  if (err?.code === 'ECONNABORTED') {
+    return 'The PDF took too long to generate. Please try again.';
+  }
+  if (err?.response?.status) {
+    return `Pocket List export failed (HTTP ${err.response.status})`;
+  }
+  return error instanceof Error && error.message
+    ? error.message
+    : 'Pocket List export failed';
 }
 
 // Create a singleton instance

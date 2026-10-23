@@ -1,7 +1,7 @@
 /**
  * Smart Crates rule evaluation. Pure: everything comes from the album table
  * and the evaluation context, so every edge case is testable with fixtures.
- * See .plan/smart-crates-plan.md sections 4, 6 and 9.
+ * See .plan/done/smart-crates-plan.md sections 4, 6 and 9.
  */
 
 import {

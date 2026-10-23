@@ -288,6 +288,12 @@ const SettingsBackupSection: React.FC<SettingsBackupSectionProps> = ({
               {(preview.cratesCount ?? 0) > 0 && (
                 <li>{preview.cratesCount} crates</li>
               )}
+              {(preview.artistFilingOverridesCount ?? 0) > 0 && (
+                <li>
+                  {preview.artistFilingOverridesCount} record-store filing
+                  overrides
+                </li>
+              )}
               {(preview.wishlistPriceAlertsCount ?? 0) > 0 && (
                 <li>
                   {preview.wishlistPriceAlertsCount} wishlist price alerts

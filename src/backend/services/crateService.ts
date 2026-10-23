@@ -3,7 +3,7 @@
  *
  * Crates are stored in collections/crates.json and evaluated on read against
  * the album table (see crateAlbumTable.ts). Nothing about membership is
- * persisted. See .plan/smart-crates-plan.md.
+ * persisted. See .plan/done/smart-crates-plan.md.
  */
 
 import crypto from 'crypto';

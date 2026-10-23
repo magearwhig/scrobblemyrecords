@@ -772,6 +772,18 @@ Library > Crates: saved groups of albums you own that keep themselves up to date
 - **Elsewhere**: pin crates to What to Play, "Add to crate" on Release Details and Album Detail, "Save as crate" from Collection filters
 - Listening rules use Last.fm scrobbles from any source, so crates talk about scrobbles recorded, never about records played. Crates and suggestion history are included in backups
 
+### 📱 Pocket List (offline PDF)
+A phone-sized PDF of your wishlist, your collection, or both, to read offline in a record shop. Click **Pocket List** on the Wishlist or Collection page, download, and move the file to your phone (AirDrop, email, a cloud drive).
+
+- **Filed like a record store**: people by surname (Elliott Smith under S), bands by name, a leading "The", "A" or "An" ignored, numbers spelled out (10,000 Maniacs under T), albums oldest to newest, Various Artists and Soundtracks sections at the end. Letter sections have a tappable index on page 1 and PDF bookmarks; artist headings repeat when a block runs onto the next page
+- **Filing data**: sort names come from MusicBrainz and original years from Discogs, fetched once with **Fetch filing data** (in the Pocket List dialog or Settings → Mappings → Record-Store Filing) and cached; artists not yet looked up file by their own name. Change where any artist goes with "File under" in that Settings card (overrides are included in backups)
+- **Owned and wanted together**: pressings and copies of one album are grouped, so you can see "have the 1994 pressing, want the reissue" at a glance
+- **Honest owned flags on wanted albums**: "OWNED: this pressing", "OWNED: another version", or "Possibly owned" when only the title matches
+- **Uncluttered**: years sit in a right-hand column and badges only mark what differs: a collection-only list shows just copy counts (×2), a wishlist-only list leaves out WANTED
+- **Options**: Discogs and/or monitored wants, format, pressing (year, label), wishlist notes
+- The export itself is built from cached data only: no Discogs, MusicBrainz or Last.fm calls, nothing saved on the server. The cover shows when the wishlist and collection were last synced, so sync first for an up-to-date list
+- Rendered with Chromium via `playwright-core`. If the browser is missing (e.g. a fresh headless install), run `npx playwright install chromium`
+
 ### 📦 Discard Pile
 Track records you want to sell, gift, trade in, or remove from your collection:
 
@@ -807,6 +819,12 @@ View detailed listening history for any album:
 - Mappings stay one hop deep: chains are flattened, and merging back reverses an earlier merge
 - **Suggested Album Merges** (Settings → Mappings) lists albums that look like versions of each other (spelling, punctuation, "Deluxe"/"Remastered" tags, artist aliases) with their play counts; merge or dismiss each one
 
+**Track Spellings and Merging:**
+- Within one album, track names that differ only by featured-artist credits ("feat. T-Pain" / "(with T-Pain)"), punctuation and spacing ("vs" / "vs.", "Woman(Intro)" / "Woman (Intro)"), "&" / "and", accents or "[Explicit]"-style tags count as one track, named by the most-played spelling
+- For anything else (e.g. a typo on a record's tracklist), **Merge tracks** on the album page: tick the rows that are the same song and pick the name to keep; a **Merged Tracks** card unmerges
+- Merges and Forgotten Favorites mappings apply on the album, artist and track pages, Release Details play counts, Top Tracks, Rankings, Wrapped and Forgotten Favorites; Settings → Mappings → Track Mappings lists them all
+- Release Details per-track play counts cover every play of the album
+
 ### 💾 Backup & Restore
 Protect your user-generated data with manual and automatic backups:
 
@@ -814,7 +832,7 @@ Protect your user-generated data with manual and automatic backups:
 - All settings (user, suggestions, AI, wishlist, sellers, releases, sync)
 - Album mappings (Last.fm → Discogs collection, and merged album versions)
 - Dismissed album merge suggestions
-- Track mappings (Last.fm → normalized cache)
+- Track mappings (track names counted as another track, including album page merges)
 - Compound-artist mappings
 - Unresolved history: album assignments for albumless plays, hidden tracks, and excluded artists
 - Artist name mappings (scrobbling and discovery)
@@ -1044,6 +1062,8 @@ See also: [TEST_STYLE_GUIDE.md](TEST_STYLE_GUIDE.md) | [TESTING_GUIDE.md](TESTIN
 ## 📄 License
 
 MIT License - See [LICENSE](LICENSE) file for details.
+
+Third-party notices: the Pocket List PDF embeds Noto Sans (via `@fontsource/noto-sans`), © The Noto Project Authors, licensed under the SIL Open Font License 1.1 (see `node_modules/@fontsource/noto-sans/LICENSE`).
 
 ---
 
