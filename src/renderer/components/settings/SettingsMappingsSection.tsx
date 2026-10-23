@@ -1152,8 +1152,8 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
           <div>
             <h3>Track Mappings</h3>
             <p className='settings-section-description'>
-              Link Forgotten Favorites tracks to local scrobble cache when
-              auto-matching fails
+              Track names counted as another track when automatic matching
+              can&apos;t tell they&apos;re the same song
             </p>
           </div>
           <span className='settings-section-badge'>{trackMappings.length}</span>
@@ -1161,10 +1161,11 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
 
         <div className='settings-section-content'>
           <div className='settings-info-box'>
-            Track mappings are created from the Forgotten Favorites page when
-            automatic normalization fails to match a track. These mappings help
-            the app recognize tracks with different naming (e.g.,
-            &quot;[Explicit]&quot; suffixes).
+            Spellings that differ only by featured artists, punctuation or
+            &quot;[Explicit]&quot; suffixes already count as one track. For the
+            rest (e.g. a typo on a tracklist), use Merge tracks on an
+            album&apos;s page, or map a track from Forgotten Favorites. Mappings
+            apply wherever tracks are counted.
           </div>
 
           {trackMappingsLoading ? (
@@ -1174,8 +1175,8 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
             </div>
           ) : trackMappings.length === 0 ? (
             <div className='settings-empty-text'>
-              No track mappings yet. Create them from the Forgotten Favorites
-              page when a track fails to match automatically.
+              No track mappings yet. Create them with Merge tracks on an
+              album&apos;s page, or from Forgotten Favorites.
             </div>
           ) : (
             <div className='settings-subsection'>
@@ -1189,14 +1190,14 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
                     <div className='settings-discovery-info'>
                       <div className='settings-discovery-source'>
                         <span className='settings-discovery-label source'>
-                          Forgotten Favorites:
+                          Scrobbled as:
                         </span>
                         {mapping.historyArtist} — {mapping.historyAlbum} —{' '}
                         {mapping.historyTrack}
                       </div>
                       <div className='settings-discovery-target'>
                         <span className='settings-discovery-label target'>
-                          Local Cache:
+                          Counted as:
                         </span>
                         {mapping.cacheArtist} — {mapping.cacheAlbum} —{' '}
                         {mapping.cacheTrack}

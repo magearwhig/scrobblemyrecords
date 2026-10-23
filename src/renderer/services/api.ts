@@ -1093,6 +1093,10 @@ class ApiService {
     lastPlayed: number | null;
     playCount: number;
     plays: Array<{ timestamp: number; track?: string }>;
+    /** Plays per track over all plays, keyed by trackMatchKey */
+    trackStats?: Record<string, { count: number; lastPlayed: number }>;
+    /** trackMatchKey of a mapped track name -> key of the track it counts as */
+    trackAliases?: Record<string, string>;
   }> {
     const response = await this.api.get(
       `/suggestions/album-history/${encodeURIComponent(artist)}/${encodeURIComponent(album)}`
@@ -1268,7 +1272,7 @@ class ApiService {
   }
 
   // ============================================
-  // Track Mapping methods (for Forgotten Favorites)
+  // Track Mapping methods (Forgotten Favorites, album page merges)
   // ============================================
 
   async getTrackMappings(): Promise<TrackMapping[]> {
@@ -1295,6 +1299,22 @@ class ApiService {
     await this.api.delete('/suggestions/mappings/tracks', {
       data: { historyArtist, historyAlbum, historyTrack },
     });
+  }
+
+  /** Count several tracks of one album as one song, named `canonical` */
+  async mergeTracks(
+    artist: string,
+    album: string,
+    tracks: string[],
+    canonical: string
+  ): Promise<number> {
+    const response = await this.api.post('/suggestions/mappings/tracks/merge', {
+      artist,
+      album,
+      tracks,
+      canonical,
+    });
+    return response.data.data.mapped;
   }
 
   async getTrackMappingCount(): Promise<number> {

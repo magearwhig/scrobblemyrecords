@@ -7,7 +7,11 @@ import {
   SuggestionSettings,
   SyncSettings,
 } from '../../shared/types';
-import { createCollectionNameResolver } from '../../shared/utils/albumMapping';
+import {
+  createAlbumCanonicalizer,
+  createCollectionNameResolver,
+} from '../../shared/utils/albumMapping';
+import { trackMatchKey } from '../../shared/utils/trackNormalization';
 import { AIPromptBuilder, AIPromptContext } from '../services/aiPromptBuilder';
 import { findAlbumMergeSuggestions } from '../services/albumMergeSuggestions';
 import { AnalyticsService } from '../services/analyticsService';
@@ -60,10 +64,13 @@ export default function createSuggestionsRouter(
   const router = express.Router();
 
   /**
-   * Album mappings change how albums are merged in cached stats (e.g. top
-   * albums), so rebuild the warm cache in the background.
+   * Album and track mappings change how albums and tracks are merged in
+   * cached stats (e.g. top albums, top tracks), so rebuild the warm cache in
+   * the background.
    */
-  const refreshStatsAfterAlbumMappingChange = (): void => {
+  const refreshStatsAfterMappingChange = (): void => {
+    // Forgotten Favorites apply track mappings through album mappings
+    statsService.clearForgottenFavoritesCache();
     void (async () => {
       try {
         await statsService.invalidateStatsCache();
@@ -921,54 +928,73 @@ export default function createSuggestionsRouter(
           matchedKeys: [...new Set(allMatchedKeys)],
         };
 
-        // Apply track mappings to normalize track names
-        // This ensures that tracks mapped in Forgotten Favorites show correctly
-        // We need to check mappings for ALL matched album variants from Last.fm history
-        const mappedPlays = await Promise.all(
-          combinedResult.entry.plays.map(async play => {
-            if (!play.track) return play;
-
-            // Try to find a mapping for this track
-            // Strategy 1: Check against the Discogs album name (what was requested)
-            let mappedTrack = await trackMappingService.getTrackMapping(
-              decodedArtist,
-              decodedAlbum,
-              play.track
-            );
-
-            // Strategy 2: If not found, check against all matched Last.fm history keys
-            if (!mappedTrack && combinedResult.matchedKeys) {
-              for (const key of combinedResult.matchedKeys) {
-                // Parse the key to get the actual Last.fm artist/album names
-                const parts = key.split('|');
-                if (parts.length >= 2) {
-                  const historyArtist = parts[0];
-                  const historyAlbum = parts.slice(1).join('|'); // Handle album names with | in them
-
-                  mappedTrack = await trackMappingService.getTrackMapping(
-                    historyArtist,
-                    historyAlbum,
-                    play.track
-                  );
-
-                  if (mappedTrack) {
-                    break; // Found a mapping, stop searching
-                  }
-                }
-              }
-            }
-
-            if (mappedTrack) {
-              // Use the cache track name (the target of the mapping)
-              return {
-                ...play,
-                track: mappedTrack.cacheTrack,
-              };
-            }
-
-            return play;
-          })
+        // Albums whose track mappings apply: the Discogs album asked for,
+        // every matched Last.fm history album, and the albums those are
+        // merged into by album mappings (where album page merges are saved)
+        const canonicalize = createAlbumCanonicalizer(
+          await loadAlbumMappings(mappingService)
         );
+        const albumNames: Array<{ artist: string; album: string }> = [];
+        for (const name of [
+          { artist: decodedArtist, album: decodedAlbum },
+          ...combinedResult.matchedKeys.map(key => {
+            // Album names may contain "|"
+            const [historyArtist, ...rest] = key.split('|');
+            return { artist: historyArtist, album: rest.join('|') };
+          }),
+        ]) {
+          albumNames.push(name);
+          const canonical = canonicalize(name.artist, name.album);
+          if (canonical.mapping) {
+            albumNames.push({
+              artist: canonical.artist,
+              album: canonical.album,
+            });
+          }
+        }
+        const albumTrackMappings = (
+          await Promise.all(
+            albumNames.map(name =>
+              trackMappingService.getMappingsForAlbum(name.artist, name.album)
+            )
+          )
+        ).flat();
+        // First mapping found per scrobbled track key, in albumNames order
+        const mappedTrackByKey = new Map<string, string>();
+        for (const mapping of albumTrackMappings) {
+          const key = trackMatchKey(mapping.historyTrack);
+          if (!mappedTrackByKey.has(key)) {
+            mappedTrackByKey.set(key, mapping.cacheTrack);
+          }
+        }
+
+        // Apply track mappings so tracks show and count under the track
+        // they are mapped to
+        const mappedPlays = combinedResult.entry.plays.map(play => {
+          if (!play.track) return play;
+          const mappedTrack = mappedTrackByKey.get(trackMatchKey(play.track));
+          return mappedTrack ? { ...play, track: mappedTrack } : play;
+        });
+
+        // Per-track counts over every play (the plays list is cut to 50),
+        // keyed by trackMatchKey. trackAliases leads a tracklist title that
+        // a track mapping counts as another track (e.g. a typo) to its key.
+        const trackStats = new Map<
+          string,
+          { count: number; lastPlayed: number }
+        >();
+        for (const play of mappedPlays) {
+          if (!play.track) continue;
+          const key = trackMatchKey(play.track);
+          const stat = trackStats.get(key) ?? { count: 0, lastPlayed: 0 };
+          stat.count++;
+          stat.lastPlayed = Math.max(stat.lastPlayed, play.timestamp);
+          trackStats.set(key, stat);
+        }
+        const trackAliases = new Map<string, string>();
+        for (const [key, mappedTrack] of mappedTrackByKey) {
+          trackAliases.set(key, trackMatchKey(mappedTrack));
+        }
 
         res.json({
           success: true,
@@ -978,6 +1004,8 @@ export default function createSuggestionsRouter(
             album: decodedAlbum,
             lastPlayed: combinedResult.entry.lastPlayed,
             playCount: combinedResult.entry.playCount,
+            trackStats: Object.fromEntries(trackStats),
+            trackAliases: Object.fromEntries(trackAliases),
             plays: [...mappedPlays]
               .sort((a, b) => b.timestamp - a.timestamp)
               .slice(0, 50), // Most recent 50 plays
@@ -1646,7 +1674,7 @@ export default function createSuggestionsRouter(
         }
       }
 
-      refreshStatsAfterAlbumMappingChange();
+      refreshStatsAfterMappingChange();
 
       res.json({
         success: true,
@@ -1726,7 +1754,7 @@ export default function createSuggestionsRouter(
         }
       }
 
-      if (added > 0) refreshStatsAfterAlbumMappingChange();
+      if (added > 0) refreshStatsAfterMappingChange();
 
       res.json({ success: true, data: { added } });
     } catch (error) {
@@ -1779,7 +1807,7 @@ export default function createSuggestionsRouter(
         }
       }
 
-      if (removed) refreshStatsAfterAlbumMappingChange();
+      if (removed) refreshStatsAfterMappingChange();
 
       res.json({
         success: true,
@@ -2048,6 +2076,7 @@ export default function createSuggestionsRouter(
 
       // Invalidate forgotten favorites cache since mappings affect the results
       statsService.clearForgottenFavoritesCache();
+      refreshStatsAfterMappingChange();
 
       res.json({
         success: true,
@@ -2087,6 +2116,7 @@ export default function createSuggestionsRouter(
       // Invalidate forgotten favorites cache since mappings affect the results
       if (removed) {
         statsService.clearForgottenFavoritesCache();
+        refreshStatsAfterMappingChange();
       }
 
       res.json({
@@ -2095,6 +2125,51 @@ export default function createSuggestionsRouter(
       });
     } catch (error) {
       logger.error('Error removing track mapping', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
+   * POST /api/v1/suggestions/mappings/tracks/merge
+   * Count several tracks of one album as one song (album detail page).
+   * Body: { artist, album, tracks: string[], canonical }
+   */
+  router.post('/mappings/tracks/merge', async (req: Request, res: Response) => {
+    try {
+      const { artist, album, tracks, canonical } = req.body ?? {};
+      if (
+        typeof artist !== 'string' ||
+        !artist.trim() ||
+        typeof album !== 'string' ||
+        !album.trim() ||
+        typeof canonical !== 'string' ||
+        !canonical.trim() ||
+        !Array.isArray(tracks) ||
+        tracks.length < 2 ||
+        !tracks.every(t => typeof t === 'string' && t.trim())
+      ) {
+        return res.status(400).json({
+          success: false,
+          error:
+            'artist, album and canonical must be strings and tracks a list of at least two names',
+        });
+      }
+
+      const mapped = await trackMappingService.mergeTracks(
+        artist,
+        album,
+        tracks,
+        canonical
+      );
+      statsService.clearForgottenFavoritesCache();
+      refreshStatsAfterMappingChange();
+
+      res.json({ success: true, data: { mapped } });
+    } catch (error) {
+      logger.error('Error merging tracks', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

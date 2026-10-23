@@ -1,6 +1,8 @@
 import {
   normalizeForMatching,
   createNormalizedTrackKey,
+  TrackSpellings,
+  trackMatchKey,
 } from '../../../src/shared/utils/trackNormalization';
 
 describe('normalizeForMatching', () => {
@@ -229,7 +231,7 @@ describe('createNormalizedTrackKey', () => {
       'Cancer 4 Cure [Explicit]',
       'Request Denied [Explicit]'
     );
-    expect(key).toBe('el-p|cancer 4 cure|request denied');
+    expect(key).toBe('el-p|cancer 4 cure|requestdenied');
   });
 
   it('produces same key for Last.fm and Discogs versions', () => {
@@ -263,5 +265,65 @@ describe('createNormalizedTrackKey', () => {
       'Great Song'
     );
     expect(original).toBe(remastered);
+  });
+});
+
+describe('trackMatchKey', () => {
+  it.each([
+    ['Jewelry Duty (with T-Pain)', 'Jewelry Duty feat. T-Pain'],
+    [
+      'Kin (I’m Outside) [with Pete & Bas and JonRay]',
+      'Kin (I’m Outside) feat. Pete & Bas and Jonray',
+    ],
+    ['Song (ft. Guest)', 'Song'],
+    ['Song featuring Guest', 'Song'],
+    ['Saved By A Woman (Intro)', 'Saved By A Woman(Intro)'],
+    ['Good Arms vs Bad Arms', 'Good Arms vs. Bad Arms'],
+    ['Otis/Carl', 'Otis / Carl'],
+    ['Seein’ Stars', 'Seein Stars'],
+    ['L.A.X.', 'LAX'],
+    ['Hi-Speed Soul', 'Hi Speed Soul'],
+    ['Rock & Roll', 'Rock and Roll'],
+    ['Beyoncé', 'Beyonce'],
+    ['Request Denied [Explicit]', 'Request Denied'],
+  ])('treats "%s" and "%s" as one track', (a, b) => {
+    expect(trackMatchKey(a)).toBe(trackMatchKey(b));
+  });
+
+  it.each([
+    ['The Vowels, Pt. 1', 'The Vowels, Pt. 2'],
+    ['Dirty Work', 'Dirt Work'],
+    ['Stay With Me', 'Stay'],
+    ['Grown Up - Live', 'Grown Up'],
+    ['カ', 'ガ'],
+    ['कल', 'काल'],
+  ])('keeps "%s" and "%s" apart', (a, b) => {
+    expect(trackMatchKey(a)).not.toBe(trackMatchKey(b));
+  });
+
+  it('keys a punctuation-only title on its normalized form', () => {
+    expect(trackMatchKey('/=/=/')).toBe('/=/=/');
+    expect(trackMatchKey('/=/=/')).not.toBe(trackMatchKey('/=/'));
+  });
+});
+
+describe('TrackSpellings', () => {
+  it('names a track by its most-played spelling', () => {
+    const spellings = new TrackSpellings();
+    spellings.add('Jewelry Duty feat. T-Pain');
+    spellings.add('Jewelry Duty (with T-Pain)');
+    spellings.add('Jewelry Duty (with T-Pain)');
+    expect(spellings.best).toBe('Jewelry Duty (with T-Pain)');
+    expect(spellings.all).toEqual([
+      'Jewelry Duty feat. T-Pain',
+      'Jewelry Duty (with T-Pain)',
+    ]);
+  });
+
+  it('keeps the first spelling seen on a tie', () => {
+    const spellings = new TrackSpellings();
+    spellings.add('Dirt Work');
+    spellings.add('Dirty Work');
+    expect(spellings.best).toBe('Dirt Work');
   });
 });

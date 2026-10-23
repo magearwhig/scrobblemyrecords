@@ -401,6 +401,7 @@ statsService.setMappingService(mappingService);
 syncService.setStatsWarmer(statsService);
 const rankingsService = new RankingsService(historyStorage);
 rankingsService.setMappingService(mappingService);
+rankingsService.setTrackMappingService(trackMappingService);
 const imageService = new ImageService(fileStorage, lastfmService);
 imageService.setMappingService(mappingService);
 const wishlistService = new WishlistService(fileStorage, authService);

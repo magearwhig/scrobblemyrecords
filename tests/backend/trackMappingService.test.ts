@@ -1,4 +1,7 @@
-import { TrackMappingService } from '../../src/backend/services/trackMappingService';
+import {
+  createTrackMapper,
+  TrackMappingService,
+} from '../../src/backend/services/trackMappingService';
 import { FileStorage } from '../../src/backend/utils/fileStorage';
 import { TrackMapping, TrackMappingsStore } from '../../src/shared/types';
 
@@ -383,6 +386,227 @@ describe('TrackMappingService', () => {
       mockFileStorage.readJSON.mockResolvedValueOnce(null);
       const count = await service.getTrackMappingCount();
       expect(count).toBe(0);
+    });
+  });
+
+  describe('looser keys', () => {
+    it('finds a mapping under spellings automatic matching treats as one', async () => {
+      await service.addTrackMapping(
+        createMockMapping({
+          historyArtist: 'Prof',
+          historyAlbum: 'Good Time Boy',
+          historyTrack: 'Jewelry Duty feat. T-Pain',
+        })
+      );
+      expect(
+        await service.getTrackMapping(
+          'prof',
+          'Good Time Boy (Deluxe Edition)',
+          'Jewelry Duty (with T-Pain)'
+        )
+      ).not.toBeNull();
+    });
+  });
+
+  describe('createLookup', () => {
+    it('looks mappings up synchronously', async () => {
+      await service.addTrackMapping(createMockMapping());
+      const lookup = await service.createLookup();
+      expect(
+        lookup('el-p', 'cancer 4 cure', 'request denied')?.cacheTrack
+      ).toBe('Request Denied [Explicit]');
+      expect(lookup('el-p', 'cancer 4 cure', 'other')).toBeNull();
+    });
+  });
+
+  describe('getMappingsForAlbum', () => {
+    it('returns the mappings of tracks scrobbled on that album', async () => {
+      await service.addTrackMapping(createMockMapping());
+      await service.addTrackMapping(
+        createMockMapping({ historyAlbum: 'Other Album' })
+      );
+      const mappings = await service.getMappingsForAlbum(
+        'El-P',
+        'Cancer 4 Cure [Explicit]'
+      );
+      expect(mappings).toHaveLength(1);
+      expect(mappings[0].historyAlbum).toBe('Cancer 4 Cure');
+    });
+  });
+
+  describe('mergeTracks', () => {
+    it('maps every other spelling to the chosen name and saves once', async () => {
+      const mapped = await service.mergeTracks(
+        'prof',
+        'good time boy',
+        ['Dirty Work', 'Dirt Work', 'Dirty Work!'],
+        'Dirty Work'
+      );
+
+      expect(mapped).toBe(1);
+      expect(mockFileStorage.writeJSONWithBackup).toHaveBeenCalledTimes(1);
+      const lookup = await service.createLookup();
+      expect(lookup('prof', 'good time boy', 'Dirt Work')).toMatchObject({
+        historyTrack: 'Dirt Work',
+        cacheArtist: 'prof',
+        cacheAlbum: 'good time boy',
+        cacheTrack: 'Dirty Work',
+      });
+      expect(lookup('prof', 'good time boy', 'Dirty Work')).toBeNull();
+    });
+
+    it('repoints mappings into a merged name and never loops', async () => {
+      await service.mergeTracks(
+        'prof',
+        'good time boy',
+        ['Dirty Work', 'Dirt Work'],
+        'Dirty Work'
+      );
+      // Merging the other way round: "Dirty Work" now maps to "Dirt Work",
+      // and "Dirt Work" no longer maps anywhere
+      await service.mergeTracks(
+        'prof',
+        'good time boy',
+        ['Dirty Work', 'Dirt Work'],
+        'Dirt Work'
+      );
+
+      const lookup = await service.createLookup();
+      expect(lookup('prof', 'good time boy', 'Dirty Work')?.cacheTrack).toBe(
+        'Dirt Work'
+      );
+      expect(lookup('prof', 'good time boy', 'Dirt Work')).toBeNull();
+    });
+
+    it('repoints an earlier mapping into a track that is merged away', async () => {
+      await service.mergeTracks(
+        'prof',
+        'good time boy',
+        ['Dirt Work', 'Dirty Work'],
+        'Dirty Work'
+      );
+      await service.mergeTracks(
+        'prof',
+        'good time boy',
+        ['Dirty Work', 'Dirty Work (Remix)'],
+        'Dirty Work (Remix)'
+      );
+
+      const lookup = await service.createLookup();
+      expect(lookup('prof', 'good time boy', 'Dirt Work')?.cacheTrack).toBe(
+        'Dirty Work (Remix)'
+      );
+      expect(lookup('prof', 'good time boy', 'Dirty Work')?.cacheTrack).toBe(
+        'Dirty Work (Remix)'
+      );
+    });
+  });
+
+  describe('mergeTracks across albums', () => {
+    it('repoints a mapping from another album into a merged track', async () => {
+      await service.addTrackMapping({
+        historyArtist: 'prof',
+        historyAlbum: 'old album',
+        historyTrack: 'A',
+        cacheArtist: 'prof',
+        cacheAlbum: 'new album',
+        cacheTrack: 'B',
+      });
+      await service.mergeTracks('prof', 'new album', ['B', 'C'], 'C');
+
+      const lookup = await service.createLookup();
+      expect(lookup('prof', 'old album', 'A')?.cacheTrack).toBe('C');
+    });
+
+    it('finds a merge saved under a slightly different album name', async () => {
+      await service.mergeTracks(
+        'Prof',
+        'Good Time Boy!',
+        ['Dirty Work', 'Dirt Work'],
+        'Dirty Work'
+      );
+      const lookup = await service.createLookup();
+      expect(lookup('prof', 'good time boy', 'Dirt Work')?.cacheTrack).toBe(
+        'Dirty Work'
+      );
+    });
+  });
+
+  describe('createTrackMapper', () => {
+    const merge = (overrides: Partial<TrackMapping> = {}): TrackMapping => ({
+      historyArtist: 'prof',
+      historyAlbum: 'new album',
+      historyTrack: 'Dirt Work',
+      cacheArtist: 'prof',
+      cacheAlbum: 'new album',
+      cacheTrack: 'Dirty Work',
+      createdAt: 1,
+      ...overrides,
+    });
+    const albumMapping = {
+      historyArtist: 'prof',
+      historyAlbum: 'old album',
+      collectionArtist: 'prof',
+      collectionAlbum: 'new album',
+      collectionId: 0,
+      createdAt: 1,
+    };
+
+    it('keeps a play on its own album when a same-album merge renames it', async () => {
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        mappings: [merge()],
+      });
+      const mapTrack = await createTrackMapper(service, [albumMapping]);
+
+      // Found under the album it is merged into, but stays on "old album"
+      // with that album's other "Dirty Work" plays
+      expect(mapTrack('prof', 'old album', 'Dirt Work')).toMatchObject({
+        artist: 'prof',
+        album: 'old album',
+        track: 'Dirty Work',
+      });
+    });
+
+    it('moves a play to the album of a cross-album mapping', async () => {
+      mockFileStorage.readJSON.mockResolvedValue({
+        schemaVersion: 1,
+        mappings: [merge({ historyAlbum: 'deluxe', cacheAlbum: 'standard' })],
+      });
+      const mapTrack = await createTrackMapper(service, []);
+
+      expect(mapTrack('prof', 'deluxe', 'Dirt Work')).toMatchObject({
+        album: 'standard',
+        track: 'Dirty Work',
+      });
+      expect(mapTrack('prof', null, 'Dirt Work')).toMatchObject({
+        album: null,
+        track: 'Dirt Work',
+        mapping: null,
+      });
+    });
+
+    it('maps nothing without a service', async () => {
+      const mapTrack = await createTrackMapper(null, []);
+      expect(mapTrack('a', 'b', 'c')).toEqual({
+        artist: 'a',
+        album: 'b',
+        track: 'c',
+        mapping: null,
+      });
+    });
+  });
+
+  describe('getFingerprint', () => {
+    it('is empty without mappings and changes with them', async () => {
+      expect(await service.getFingerprint()).toBe('');
+      await service.addTrackMapping(createMockMapping());
+      const first = await service.getFingerprint();
+      await service.addTrackMapping(
+        createMockMapping({ cacheTrack: 'Something Else' })
+      );
+      expect(first).not.toBe('');
+      expect(await service.getFingerprint()).not.toBe(first);
     });
   });
 });

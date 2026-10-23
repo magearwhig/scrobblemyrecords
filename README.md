@@ -818,6 +818,12 @@ View detailed listening history for any album:
 - Mappings stay one hop deep: chains are flattened, and merging back reverses an earlier merge
 - **Suggested Album Merges** (Settings → Mappings) lists albums that look like versions of each other (spelling, punctuation, "Deluxe"/"Remastered" tags, artist aliases) with their play counts; merge or dismiss each one
 
+**Track Spellings and Merging:**
+- Within one album, track names that differ only by featured-artist credits ("feat. T-Pain" / "(with T-Pain)"), punctuation and spacing ("vs" / "vs.", "Woman(Intro)" / "Woman (Intro)"), "&" / "and", accents or "[Explicit]"-style tags count as one track, named by the most-played spelling
+- For anything else (e.g. a typo on a record's tracklist), **Merge tracks** on the album page: tick the rows that are the same song and pick the name to keep; a **Merged Tracks** card unmerges
+- Merges and Forgotten Favorites mappings apply on the album, artist and track pages, Release Details play counts, Top Tracks, Rankings, Wrapped and Forgotten Favorites; Settings → Mappings → Track Mappings lists them all
+- Release Details per-track play counts cover every play of the album
+
 ### 💾 Backup & Restore
 Protect your user-generated data with manual and automatic backups:
 
@@ -825,7 +831,7 @@ Protect your user-generated data with manual and automatic backups:
 - All settings (user, suggestions, AI, wishlist, sellers, releases, sync)
 - Album mappings (Last.fm → Discogs collection, and merged album versions)
 - Dismissed album merge suggestions
-- Track mappings (Last.fm → normalized cache)
+- Track mappings (track names counted as another track, including album page merges)
 - Compound-artist mappings
 - Unresolved history: album assignments for albumless plays, hidden tracks, and excluded artists
 - Artist name mappings (scrobbling and discovery)

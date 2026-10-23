@@ -439,6 +439,14 @@ const specs: EndpointSpec[] = [
     expected: undefined,
   },
   {
+    name: 'mergeTracks',
+    verb: 'post',
+    url: '/suggestions/mappings/tracks/merge',
+    reply: { success: true, data: { mapped: 2 } },
+    call: api => api.mergeTracks('a', 'b', ['c', 'd'], 'c'),
+    expected: 2,
+  },
+  {
     name: 'getTrackMappingCount',
     verb: 'get',
     url: '/suggestions/mappings/tracks/count',

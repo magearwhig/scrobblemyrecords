@@ -20,6 +20,7 @@ const mockApiService = {
   getCrates: jest.fn().mockResolvedValue([]),
   getCratesForRelease: jest.fn().mockResolvedValue([]),
   setCrateOverride: jest.fn(),
+  getAlbumHistory: jest.fn(),
 };
 
 jest.mock('../../../src/renderer/services/api', () => ({
@@ -1304,5 +1305,98 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
     expect(
       screen.getByText(/Tracks will be scrobbled starting from:/)
     ).toBeInTheDocument();
+  });
+});
+
+describe('ReleaseDetailsPage per-track play counts', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    Object.defineProperty(window, 'localStorage', {
+      value: localStorageMock,
+      writable: true,
+      configurable: true,
+    });
+    const release = {
+      ...mockRelease,
+      title: 'Good Time Boy',
+      artist: 'Prof',
+      tracklist: [
+        { position: 'A1', title: 'Jewelry Duty feat. T-Pain', duration: '' },
+        { position: 'A2', title: 'Dirt Work', duration: '' },
+        { position: 'A3', title: 'Fighter', duration: '' },
+      ],
+    };
+    mockLocalStorage.clear();
+    mockLocalStorage.setItem('selectedRelease', JSON.stringify(release));
+    mockApiService.getReleaseDetails.mockResolvedValue(release);
+  });
+
+  afterEach(() => {
+    mockApiService.getAlbumHistory.mockReset();
+  });
+
+  it('uses the server counts and follows track mappings for tracklist titles', async () => {
+    mockApiService.getAlbumHistory.mockResolvedValue({
+      found: true,
+      artist: 'Prof',
+      album: 'Good Time Boy',
+      lastPlayed: 1640000000,
+      playCount: 65,
+      plays: [{ timestamp: 1640000000, track: 'Jewelry Duty (with T-Pain)' }],
+      trackStats: {
+        jewelryduty: { count: 57, lastPlayed: 1640000000 },
+        dirtywork: { count: 8, lastPlayed: 1630000000 },
+      },
+      trackAliases: { dirtwork: 'dirtywork' },
+    });
+
+    renderWithProviders(<ReleaseDetailsPage />);
+
+    expect(await screen.findByText('57 plays')).toBeInTheDocument();
+    expect(screen.getByText('8 plays')).toBeInTheDocument();
+    expect(screen.getAllByText(/\d+ plays?$/)).toHaveLength(2);
+  });
+
+  it('ignores inherited keys when following track aliases', async () => {
+    const release = {
+      ...mockRelease,
+      tracklist: [{ position: 'A1', title: 'Constructor', duration: '' }],
+    };
+    mockLocalStorage.setItem('selectedRelease', JSON.stringify(release));
+    mockApiService.getReleaseDetails.mockResolvedValue(release);
+    mockApiService.getAlbumHistory.mockResolvedValue({
+      found: true,
+      artist: 'Test Artist',
+      album: 'Test Album',
+      lastPlayed: 1640000000,
+      playCount: 3,
+      plays: [],
+      trackStats: { constructor: { count: 3, lastPlayed: 1640000000 } },
+      trackAliases: {},
+    });
+
+    renderWithProviders(<ReleaseDetailsPage />);
+
+    expect(await screen.findByText('3 plays')).toBeInTheDocument();
+  });
+
+  it('counts from the plays list when the server sends no counts', async () => {
+    mockApiService.getAlbumHistory.mockResolvedValue({
+      found: true,
+      artist: 'Prof',
+      album: 'Good Time Boy',
+      lastPlayed: 1640000000,
+      playCount: 3,
+      plays: [
+        { timestamp: 1640000000, track: 'Jewelry Duty (with T-Pain)' },
+        { timestamp: 1639000000, track: 'Jewelry Duty feat. T-Pain' },
+        { timestamp: 1638000000, track: 'Fighter' },
+      ],
+    });
+
+    renderWithProviders(<ReleaseDetailsPage />);
+
+    expect(await screen.findByText('2 plays')).toBeInTheDocument();
+    expect(screen.getByText('1 play')).toBeInTheDocument();
   });
 });

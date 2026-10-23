@@ -389,6 +389,66 @@ describe('RankingsService', () => {
       }
     });
 
+    it('should rank spellings of one track as one', async () => {
+      mockHistoryStorage.getIndex = jest.fn().mockResolvedValue({
+        albums: {
+          'prof|good time boy': {
+            playCount: 3,
+            plays: [
+              { timestamp: 1705320000, track: 'Brrrr (with E-40)' },
+              { timestamp: 1705320001, track: 'Brrrr (with E-40)' },
+              { timestamp: 1705320002, track: 'Brrrr feat. E-40' },
+            ],
+          },
+        },
+      });
+
+      const result = await service.getRankingsOverTime('tracks', 10);
+
+      const rankings = result.snapshots[result.snapshots.length - 1].rankings;
+      expect(rankings).toHaveLength(1);
+      expect(rankings[0].count).toBe(3);
+    });
+
+    it('should apply track mappings and name tracks by the most-played spelling', async () => {
+      mockHistoryStorage.getIndex = jest.fn().mockResolvedValue({
+        albums: {
+          'prof|good time boy': {
+            playCount: 4,
+            plays: [
+              { timestamp: 1705320000, track: 'Dirt Work' },
+              { timestamp: 1705320001, track: 'Dirty Work' },
+              { timestamp: 1705320002, track: 'Brrrr feat. E-40' },
+              { timestamp: 1705320003, track: 'Brrrr (with E-40)' },
+              { timestamp: 1705320004, track: 'Brrrr (with E-40)' },
+            ],
+          },
+        },
+      });
+      service.setTrackMappingService({
+        createLookup: async () => (_artist, album, track) =>
+          album === 'good time boy' && track === 'Dirt Work'
+            ? {
+                historyArtist: 'prof',
+                historyAlbum: 'good time boy',
+                historyTrack: 'Dirt Work',
+                cacheArtist: 'prof',
+                cacheAlbum: 'good time boy',
+                cacheTrack: 'Dirty Work',
+                createdAt: 1,
+              }
+            : null,
+      });
+
+      const result = await service.getRankingsOverTime('tracks', 10);
+
+      const rankings = result.snapshots[result.snapshots.length - 1].rankings;
+      expect(rankings.map(r => [r.name, r.count])).toEqual([
+        ['Brrrr (with E-40)', 3],
+        ['Dirty Work', 2],
+      ]);
+    });
+
     it('should sort rankings by count descending', async () => {
       const mockIndex = {
         albums: {

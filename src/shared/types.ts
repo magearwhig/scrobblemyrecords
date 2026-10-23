@@ -857,6 +857,19 @@ export interface AlbumDetailTrack {
   track: string;
   playCount: number;
   lastPlayed: number; // Unix timestamp (seconds)
+  /** Every name this track was scrobbled under, for merging rows by hand */
+  spellings?: string[];
+}
+
+/**
+ * A track mapping on the album detail page: plays scrobbled as
+ * `historyTrack` count as `cacheTrack`
+ */
+export interface AlbumDetailMergedTrack {
+  historyArtist: string;
+  historyAlbum: string;
+  historyTrack: string;
+  cacheTrack: string;
 }
 
 /**
@@ -899,6 +912,8 @@ export interface AlbumDetailMappings {
   albumMapping?: AlbumDetailAlbumMapping;
   artistMapping?: AlbumDetailArtistMapping;
   compoundArtist?: AlbumDetailCompoundArtist;
+  /** Track names counted as another track of this album (track mappings) */
+  mergedTracks?: AlbumDetailMergedTrack[];
   /** Other history album names merged into this album via album mappings */
   mergedVersions?: AlbumDetailAlbumMapping[];
 }
@@ -915,6 +930,8 @@ export interface AlbumDetailResponse {
   firstPlayed: number | null; // Unix timestamp (seconds)
   lastPlayed: number | null; // Unix timestamp (seconds)
   tracks: AlbumDetailTrack[];
+  /** Artist and album that track merges on this page are saved under */
+  trackMappingAlbum?: { artist: string; album: string };
   arc: AlbumArcBucket[]; // Monthly listening pattern (reused from existing definition)
 
   // Collection info
@@ -973,6 +990,8 @@ export interface StatsCache {
     artistAliasFingerprint?: string;
     /** Album mappings fingerprint at warm time; mapping changes invalidate */
     albumMappingFingerprint?: string;
+    /** Track mappings fingerprint at warm time; merged tracks invalidate */
+    trackMappingFingerprint?: string;
     /** History contents at warm time (play totals); backfills and moves invalidate */
     historyFingerprint?: string;
     streaks: StreakInfo;
