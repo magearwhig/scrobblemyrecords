@@ -143,10 +143,11 @@ function renderCover(model: PocketListModel): string {
     `<p class="cover-line">Generated ${text(humanDateTime(meta.generatedAt))}</p>`
   );
 
-  const countParts = [
-    plural(counts.albums, 'album', 'albums'),
-    plural(counts.entries, 'entry', 'entries'),
-  ];
+  const countParts = [plural(counts.albums, 'album', 'albums')];
+  // Entries only differ from albums when version lines are printed
+  if (counts.entries !== counts.albums) {
+    countParts.push(plural(counts.entries, 'entry', 'entries'));
+  }
   if (meta.lists.includes('collection')) {
     countParts.push(`${counts.owned} owned`);
   }
@@ -190,7 +191,7 @@ function renderCover(model: PocketListModel): string {
     lines.push(`<p class="cover-warning">${text(warning)}</p>`);
   }
 
-  return `<header class="cover">\n${lines.join('\n')}\n${renderLegend()}\n${renderIndex(model.sections)}\n</header>`;
+  return `<header class="cover">\n${lines.join('\n')}\n${renderLegend(meta.lists)}\n${renderIndex(model.sections)}\n</header>`;
 }
 
 const LEGEND: Array<[PocketBadge, string]> = [
@@ -214,10 +215,21 @@ const LEGEND: Array<[PocketBadge, string]> = [
   ],
 ];
 
-function renderLegend(): string {
-  const items = LEGEND.map(
-    ([b, meaning]) => `<li>${badge(b)} ${text(meaning)}</li>`
-  ).join('\n');
+/** A collection-only list prints no OWNED badges, just copy counts and formats */
+const COLLECTION_LEGEND: Array<[PocketBadge, string]> = [
+  [{ text: '×2', tone: 'count' }, 'copies you own'],
+  [{ text: 'CD', tone: 'neutral' }, 'formats other than vinyl are named'],
+];
+
+function renderLegend(lists: PocketListKind[]): string {
+  const legend = !lists.includes('wishlist')
+    ? COLLECTION_LEGEND
+    : lists.includes('collection')
+      ? LEGEND
+      : LEGEND.filter(([b]) => b.tone !== 'wanted' && b.text !== 'OWNED');
+  const items = legend
+    .map(([b, meaning]) => `<li>${badge(b)} ${text(meaning)}</li>`)
+    .join('\n');
   return `<ul class="legend">\n${items}\n</ul>
 <p class="legend-note">${text(
     'Filed like a record store: people by surname, bands by name, a leading “The”, “A” or “An” ignored, numbers spelled out (10,000 Maniacs under T). Albums run oldest to newest. Compilations and soundtracks are at the end, by title. # holds symbols, Other holds non-Latin scripts.'
@@ -249,11 +261,19 @@ function renderIndex(sections: PocketListSection[]): string {
 // Sections and artist blocks
 // ---------------------------------------------------------------------------
 
+/** Boxed badges sit in the right-hand column; plain-text ones stay with the details */
+function isBoxed(b: PocketBadge): boolean {
+  return b.tone !== 'neutral' && b.tone !== 'count';
+}
+
+/** Pressing details on the left, boxed badges in a right-hand column */
 function renderVersion(version: PocketListVersionLine): string {
+  const boxed = version.badges.filter(isBoxed);
+  const plain = version.badges.filter(b => !isBoxed(b));
   const parts: string[] = [];
   if (version.text)
     parts.push(`<span class="ver-text">${text(version.text)}</span>`);
-  if (version.badges.length > 0) parts.push(badges(version.badges));
+  if (plain.length > 0) parts.push(badges(plain));
   if (version.credited) {
     parts.push(`<span class="ver-extra">${text(version.credited)}</span>`);
   }
@@ -263,16 +283,18 @@ function renderVersion(version: PocketListVersionLine): string {
   if (version.notes) {
     parts.push(`<span class="ver-notes">${text(version.notes)}</span>`);
   }
-  return `<div class="ver ver-${version.status}">${parts.join(' ')}</div>`;
+  const marks =
+    boxed.length > 0 ? ` <span class="ver-marks">${badges(boxed)}</span>` : '';
+  return `<div class="ver ver-${version.status}"><span class="ver-main">${parts.join(' ')}</span>${marks}</div>`;
 }
 
+/** Title and markers on the left, the year in a right-hand column */
 function renderAlbumLine(album: PocketListAlbumGroup): string {
-  const parts = [`<span class="album-title">${text(album.title)}</span>`];
-  if (album.year !== null) {
-    parts.push(`<span class="album-year">· ${album.year}</span>`);
-  }
-  if (album.badges.length > 0) parts.push(badges(album.badges));
-  return `<div class="album-line">${parts.join(' ')}</div>`;
+  const main = [`<span class="album-title">${text(album.title)}</span>`];
+  if (album.badges.length > 0) main.push(badges(album.badges));
+  const year =
+    album.year !== null ? ` <span class="album-year">${album.year}</span>` : '';
+  return `<div class="album-line"><span class="album-main">${main.join(' ')}</span>${year}</div>`;
 }
 
 /** One body row of an artist table */
@@ -418,19 +440,32 @@ tr { break-inside: avoid; }
 tr.album { break-inside: avoid-page; }
 tr.album-long { break-inside: auto; }
 .album-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8pt;
   font-size: var(--size-album);
   padding-left: 6pt;
   margin-top: 2pt;
   break-after: avoid-page;
   break-inside: avoid;
 }
-.album-year { color: var(--dim); }
-.ver {
+.album-main { flex: 1; min-width: 0; }
+.album-year {
+  flex: none;
   font-size: var(--size-line);
-  padding-left: 16pt;
-  text-indent: -4pt;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.ver {
+  display: flex;
+  align-items: baseline;
+  gap: 6pt;
+  font-size: var(--size-line);
+  padding-left: 12pt;
   break-inside: avoid;
 }
+.ver-main { flex: 1; min-width: 0; padding-left: 4pt; text-indent: -4pt; }
+.ver-marks { flex: 0 1 auto; max-width: 60%; text-align: right; }
 .ver-text { color: var(--ink); }
 .ver-extra { color: var(--dim); }
 .ver-notes { color: var(--dim); font-style: italic; }
@@ -443,12 +478,21 @@ tr.album-long { break-inside: auto; }
   border: 1pt solid var(--ink);
   border-radius: 2pt;
   padding: 0 2pt;
+  white-space: nowrap;
   color: var(--ink);
   background: var(--paper);
 }
 .badge-wanted { border-color: var(--accent); border-width: 1.5pt; }
 .badge-possible { border-style: dashed; font-weight: 400; }
-.badge-neutral { border-color: var(--rule); font-weight: 400; }
+.badge-neutral, .badge-count {
+  border: none;
+  padding: 0;
+  font-size: var(--size-small);
+  font-weight: 400;
+  color: var(--dim);
+  white-space: normal;
+}
+.badge-count { font-weight: 700; color: var(--ink); }
 `;
 
 /**

@@ -556,12 +556,7 @@ function buildGroup(
       rowId: first.rowId,
       status: 'owned',
       text,
-      badges: [
-        {
-          text: copies.length > 1 ? `OWNED ×${copies.length}` : 'OWNED',
-          tone: 'owned',
-        },
-      ],
+      badges: ownedBadges(copies.length, ctx.options),
       credited: credited(first),
       note: ambiguousNote,
       notes: null,
@@ -574,7 +569,7 @@ function buildGroup(
   for (const row of wanted) {
     const info = ctx.wants.get(row.rowId) as WantInfo;
     const isLocal = row.source === 'local-want';
-    const badges: PocketBadge[] = [{ text: 'WANTED', tone: 'wanted' }];
+    const badges = wantedBadges(1, ctx.options);
     if (isLocal) {
       badges.push({ text: 'any version', tone: 'neutral' });
       badges.push({ text: 'monitored', tone: 'neutral' });
@@ -618,22 +613,30 @@ function buildGroup(
     line.note = line.note ? `${overlap}; ${line.note}` : overlap;
   }
 
+  // A single-list line may print nothing (e.g. a notes-only export and a
+  // pressing without notes); keep its OWNED or WANTED badge so it still shows
+  for (const line of lines) {
+    if (
+      !line.text &&
+      line.badges.length === 0 &&
+      !line.credited &&
+      !line.note &&
+      !line.notes
+    ) {
+      line.badges.push(
+        line.status === 'owned'
+          ? { text: 'OWNED', tone: 'owned' }
+          : { text: 'WANTED', tone: 'wanted' }
+      );
+    }
+  }
+
   const ownedCount = owned.length;
   const wantedCount = wanted.length;
   const badges: PocketBadge[] = [];
   if (!ctx.showVersions) {
-    if (ownedCount > 0) {
-      badges.push({
-        text: ownedCount > 1 ? `OWNED ×${ownedCount}` : 'OWNED',
-        tone: 'owned',
-      });
-    }
-    if (wantedCount > 0) {
-      badges.push({
-        text: wantedCount > 1 ? `WANTED (${wantedCount} pressings)` : 'WANTED',
-        tone: 'wanted',
-      });
-    }
+    badges.push(...ownedBadges(ownedCount, ctx.options));
+    badges.push(...wantedBadges(wantedCount, ctx.options));
     if (wantedCount > 0 && wanted.every(r => r.source === 'local-want')) {
       badges.push({ text: 'any version', tone: 'neutral' });
     }
@@ -679,6 +682,38 @@ function buildGroup(
     },
     flags,
   };
+}
+
+/**
+ * The owned marker for `count` copies. A collection-only list leaves out
+ * "OWNED", since every entry is owned, and keeps just a copy count ("×2").
+ */
+function ownedBadges(count: number, options: PocketListOptions): PocketBadge[] {
+  if (count === 0) return [];
+  if (!options.lists.includes('wishlist')) {
+    return count > 1 ? [{ text: `×${count}`, tone: 'count' }] : [];
+  }
+  return [{ text: count > 1 ? `OWNED ×${count}` : 'OWNED', tone: 'owned' }];
+}
+
+/**
+ * The wanted marker for `count` wanted pressings. A wishlist-only list leaves
+ * out "WANTED", since every entry is wanted, and keeps the pressing count.
+ */
+function wantedBadges(
+  count: number,
+  options: PocketListOptions
+): PocketBadge[] {
+  if (count === 0) return [];
+  if (!options.lists.includes('collection')) {
+    return count > 1 ? [{ text: `${count} pressings`, tone: 'count' }] : [];
+  }
+  return [
+    {
+      text: count > 1 ? `WANTED (${count} pressings)` : 'WANTED',
+      tone: 'wanted',
+    },
+  ];
 }
 
 function plural(n: number, one: string, many: string): string {

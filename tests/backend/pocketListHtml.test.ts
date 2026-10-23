@@ -80,7 +80,7 @@ describe('pocketListHtml', () => {
       .find(g => g.title === LONG_GROUP_TITLE);
     expect(longGroup!.versions.length).toBeGreaterThan(MAX_UNSPLIT_VERSIONS);
     expect(html).toContain(
-      `<tr class="album album-long"><td><table class="album-table" role="presentation"><thead><tr><td><div class="album-line"><span class="album-title">${LONG_GROUP_TITLE}</span>`
+      `<tr class="album album-long"><td><table class="album-table" role="presentation"><thead><tr><td><div class="album-line"><span class="album-main"><span class="album-title">${LONG_GROUP_TITLE}</span>`
     );
     // Short groups are a single unsplittable row
     expect(html).toContain('<tr class="album"><td><div class="album-line">');
@@ -133,6 +133,48 @@ describe('pocketListHtml', () => {
       '<p class="cover-warning">Collection cache incomplete (3 of 24 pages)</p>'
     );
     expect(withWarning).toContain(model.meta.wantsSummary!);
+  });
+
+  it('puts the year and boxed badges in right-hand columns', () => {
+    const lines = [...html.matchAll(/<div class="album-line">(.*?)<\/div>/g)];
+    expect(lines.length).toBeGreaterThan(0);
+    for (const [, line] of lines) {
+      expect(line).toMatch(/^<span class="album-main">/);
+      expect(line).not.toContain('· <');
+    }
+    expect(html).toMatch(
+      /<span class="album-main">[^]*?<\/span> <span class="album-year">\d{4}<\/span><\/div>/
+    );
+    const versions = [...html.matchAll(/<div class="ver [^"]+">(.*?)<\/div>/g)];
+    expect(versions.length).toBeGreaterThan(0);
+    for (const [, line] of versions) {
+      const marks = /<span class="ver-marks">(.*)<\/span>$/.exec(line)?.[1];
+      if (marks) expect(marks).not.toMatch(/badge-(neutral|count)/);
+    }
+  });
+
+  it('shows only the legend lines that apply to the chosen lists', () => {
+    const withLists = (lists: Array<'wishlist' | 'collection'>) =>
+      renderPocketListHtml(
+        { ...model, meta: { ...model.meta, lists } },
+        NO_FONTS
+      );
+    const legendOf = (doc: string) =>
+      /<ul class="legend">([^]*?)<\/ul>/.exec(doc)![1];
+
+    const both = legendOf(withLists(['wishlist', 'collection']));
+    expect(both).toContain('>OWNED</span>');
+    expect(both).toContain('>WANTED</span>');
+
+    const collection = legendOf(withLists(['collection']));
+    expect(collection).toContain('copies you own');
+    expect(collection).not.toContain('OWNED');
+    expect(collection).not.toContain('WANTED');
+
+    const wishlist = legendOf(withLists(['wishlist']));
+    expect(wishlist).toContain('OWNED: another version');
+    expect(wishlist).not.toContain('>OWNED</span>');
+    expect(wishlist).not.toContain('WANTED');
   });
 
   it('normalizes text to NFC', () => {

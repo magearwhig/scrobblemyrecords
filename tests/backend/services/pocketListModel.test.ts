@@ -509,6 +509,73 @@ describe('buildPocketListModel', () => {
       expect(badgeTexts(albums(allOff)[1].badges)).toEqual(['OWNED']);
     });
 
+    it('leaves out OWNED on a collection-only list and keeps copy counts', () => {
+      const two = [
+        coll('Band', 'Album', { releaseId: 5, copyIndex: 1, copyCount: 2 }),
+        coll('Band', 'Album', { releaseId: 5, copyIndex: 2, copyCount: 2 }),
+      ];
+      const one = coll('Band', 'Other', { releaseId: 6, masterId: 2 });
+      const off = { format: false, pressing: false, notes: false };
+      const albumLevel = build([...two, one], [], {
+        lists: ['collection'],
+        details: off,
+      });
+      expect(albums(albumLevel).map(g => badgeTexts(g.badges))).toEqual([
+        ['×2'],
+        [],
+      ]);
+      expect(albums(albumLevel)[0].badges[0].tone).toBe('count');
+
+      const versionLevel = build([...two, one], [], { lists: ['collection'] });
+      expect(
+        albums(versionLevel).map(g => badgeTexts(g.versions[0].badges))
+      ).toEqual([['×2'], []]);
+    });
+
+    it('leaves out WANTED on a wishlist-only list and keeps pressing counts', () => {
+      const off = { format: false, pressing: false, notes: false };
+      const model = build(
+        [],
+        [
+          want('Band', 'Album', { masterId: 1 }),
+          want('Band', 'Album', { masterId: 1 }),
+          want('Band', 'Other', { masterId: 2 }),
+        ],
+        { lists: ['wishlist'], details: off }
+      );
+      expect(albums(model).map(g => badgeTexts(g.badges))).toEqual([
+        ['2 pressings'],
+        [],
+      ]);
+      const versions = build([], [want('Band', 'Album', { masterId: 1 })], {
+        lists: ['wishlist'],
+      });
+      expect(badgeTexts(albums(versions)[0].versions[0].badges)).toEqual([]);
+    });
+
+    it('keeps a marker on single-list lines that would otherwise print nothing', () => {
+      const notesOnly = { format: false, pressing: false, notes: true };
+      const wishlist = build(
+        [],
+        [
+          want('Band', 'Album', { masterId: 1 }),
+          want('Band', 'Album', { masterId: 1 }),
+        ],
+        { lists: ['wishlist'], details: notesOnly }
+      );
+      expect(
+        albums(wishlist)[0].versions.map(v => badgeTexts(v.badges))
+      ).toEqual([['WANTED'], ['WANTED']]);
+
+      const collection = build([coll('Band', 'Album', { masterId: 1 })], [], {
+        lists: ['collection'],
+        details: notesOnly,
+      });
+      expect(badgeTexts(albums(collection)[0].versions[0].badges)).toEqual([
+        'OWNED',
+      ]);
+    });
+
     it('keeps version lines for a notes-only export so notes stay visible', () => {
       const noted = want('Band', 'Album', {
         masterId: 1,
@@ -529,7 +596,7 @@ describe('buildPocketListModel', () => {
         ['', 'Gatefold only'],
         ['CD', null],
       ]);
-      expect(badgeTexts(group.versions[0].badges)).toEqual(['WANTED']);
+      expect(badgeTexts(group.versions[0].badges)).toEqual([]);
       // Counts stay on the version lines, not the album line
       expect(badgeTexts(group.badges)).toEqual([]);
       expect(model.meta.counts.entries).toBe(2);
@@ -723,10 +790,7 @@ describe('buildPocketListModel', () => {
       const [group] = albums(model);
       expect(group.versions).toHaveLength(1);
       expect(group.versions[0].rowId).toBe(discogs.rowId);
-      expect(badgeTexts(group.versions[0].badges)).toEqual([
-        'WANTED',
-        'also monitored',
-      ]);
+      expect(badgeTexts(group.versions[0].badges)).toEqual(['also monitored']);
       expect(model.meta.counts.overlapsCollapsed).toBe(1);
       expect(model.meta.wantsSummary).toBe(
         '1 want (1 Discogs + 1 monitored; 1 in both lists)'
@@ -748,7 +812,6 @@ describe('buildPocketListModel', () => {
         mon.rowId,
       ]);
       expect(badgeTexts(group.versions[1].badges)).toEqual([
-        'WANTED',
         'any version',
         'monitored',
       ]);

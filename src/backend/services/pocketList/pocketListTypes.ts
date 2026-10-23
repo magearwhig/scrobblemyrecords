@@ -77,8 +77,8 @@ export const POCKET_SECTION_BUCKETS: PocketSectionBucket[] = [
 export interface PocketBadge {
   /** e.g. "OWNED", "WANTED", "OWNED: another version", "Possibly owned", "any version" */
   text: string;
-  /** Styling hint only */
-  tone: 'owned' | 'wanted' | 'possible' | 'neutral';
+  /** Styling hint only; neutral and count print as plain text, not a box */
+  tone: 'owned' | 'wanted' | 'possible' | 'neutral' | 'count';
 }
 
 export interface PocketListVersionLine {
