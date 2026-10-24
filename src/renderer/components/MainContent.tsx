@@ -11,6 +11,7 @@ const CollectionAnalyticsPage = React.lazy(
 );
 const CollectionPage = React.lazy(() => import('../pages/CollectionPage'));
 const CratesPage = React.lazy(() => import('../pages/CratesPage'));
+const CheckRecordPage = React.lazy(() => import('../pages/CheckRecordPage'));
 const DiscardPilePage = React.lazy(() => import('../pages/DiscardPilePage'));
 const DiscoveryPage = React.lazy(() => import('../pages/DiscoveryPage'));
 const HistoryPage = React.lazy(() => import('../pages/HistoryPage'));
@@ -87,6 +88,8 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
         return <StatsPage />;
       case ROUTES.CRATES:
         return <CratesPage />;
+      case ROUTES.CHECK_RECORD:
+        return <CheckRecordPage />;
       case ROUTES.DISCARD_PILE:
         return <DiscardPilePage />;
       case ROUTES.COLLECTION_ANALYTICS:

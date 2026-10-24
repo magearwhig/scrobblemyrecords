@@ -27,6 +27,7 @@ import createFilingRouter from './backend/routes/filing';
 import createImagesRouter from './backend/routes/images';
 import jobsRouter from './backend/routes/jobs';
 import createLabelsRouter from './backend/routes/labels';
+import createLookupRouter from './backend/routes/lookup';
 import { createMemoryScrobbleRouter } from './backend/routes/memoryScrobble';
 import { registerPocketListRoute } from './backend/routes/pocketListRoute';
 import { createRecommendationsRouter } from './backend/routes/recommendations';
@@ -80,6 +81,7 @@ import { ProfileBuilderService } from './backend/services/profileBuilderService'
 import { RankingsService } from './backend/services/rankingsService';
 import { RecommendationLogService } from './backend/services/recommendationLogService';
 import { RecommendationService } from './backend/services/recommendationService';
+import { RecordLookupService } from './backend/services/recordLookupService';
 import { ReleaseTrackingService } from './backend/services/releaseTrackingService';
 import { SavedCollectionService } from './backend/services/savedCollectionService';
 import { ScoringEngineService } from './backend/services/scoringEngineService';
@@ -464,6 +466,11 @@ const exportDataService = new ExportDataService(
   wishlistService,
   historyStorage
 );
+// Check a Record: one lookup across collection, wants and discard pile
+const recordLookupService = new RecordLookupService({
+  exportData: exportDataService,
+  discardPile: discardPileService,
+});
 // Record-store filing for the Pocket List: MusicBrainz sort names, Discogs
 // master years and the user's overrides; fetched only by its refresh job
 const recordStoreFilingService = new RecordStoreFilingService(
@@ -575,6 +582,7 @@ app.use(
   )
 );
 app.use('/api/v1/filing', createFilingRouter(recordStoreFilingService));
+app.use('/api/v1/lookup', createLookupRouter(recordLookupService));
 app.use(
   '/api/v1/collection-analytics',
   createCollectionAnalyticsRouter(
@@ -763,6 +771,7 @@ async function startServer() {
     rankingsService.setArtistNameResolver(artistNameResolver);
     analyticsService.setArtistNameResolver(artistNameResolver);
     crateTableBuilder.setArtistNameResolver(artistNameResolver);
+    recordLookupService.setArtistNameResolver(artistNameResolver);
 
     // A backup restore rewrites mapping files; reload everything that keeps
     // them in memory so the restore takes effect without a restart

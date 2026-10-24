@@ -1,0 +1,184 @@
+/* Check a Record: one search across collection, wants and discard pile */
+
+.check-record-page {
+  max-width: 760px;
+  margin: 0 auto;
+  color: var(--text-primary);
+}
+
+.check-record-header h1 {
+  margin: 0;
+  font-size: var(--text-2xl);
+  color: var(--text-primary);
+}
+
+.check-record-header p {
+  margin: var(--space-1) 0 var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.check-record-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+}
+
+.check-record-search:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-primary-muted);
+}
+
+.check-record-search input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-3) 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  /* 16px or more keeps phones from zooming in on focus */
+  font-size: var(--text-md);
+}
+
+.check-record-warning,
+.check-record-note,
+.check-record-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+
+.check-record-warning {
+  border-color: var(--status-warning);
+}
+
+.check-record-error {
+  border-color: var(--status-error);
+  color: var(--status-error);
+}
+
+.check-record-meta {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.check-record-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.check-record-card {
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+}
+
+.check-record-card-header {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.check-record-cover {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  background: var(--bg-secondary);
+}
+
+.check-record-cover--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+}
+
+.check-record-card-title {
+  min-width: 0;
+}
+
+.check-record-card-title h2 {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.check-record-card-title p {
+  margin: var(--space-1) 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.check-record-card-title .check-record-linked {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.check-record-card section {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.check-record-card h3 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+
+.check-record-card ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.check-record-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-1) 0;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.check-record-line-main {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.check-record-line-note {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
