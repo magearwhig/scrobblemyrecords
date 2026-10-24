@@ -549,6 +549,75 @@ describe('Scrobble Routes', () => {
       expect(response.body.error).toBe('Release with tracklist is required');
     });
 
+    it('reads hour-long durations', async () => {
+      const response = await request(app)
+        .post('/api/v1/scrobble/prepare-from-release')
+        .send({
+          release: {
+            ...mockRelease,
+            tracklist: [
+              { position: 'A1', title: 'Long', duration: '1:10:00' },
+              { position: 'A2', title: 'Next', duration: '3:00' },
+            ],
+          },
+          startTime: 1000,
+        })
+        .expect(200);
+      expect(response.body.data.tracks[0].duration).toBe(4200);
+      expect(response.body.data.tracks[1].timestamp).toBe(5201);
+    });
+
+    it('skips headings and scrobbles split tracks as their parts', async () => {
+      const release = {
+        ...mockRelease,
+        tracklist: [
+          { position: '', title: 'Side A', duration: '29:19' },
+          {
+            position: 'A1',
+            title: 'Intro / Sweet Jane',
+            duration: '8:00',
+            subTracks: [
+              { position: 'A1a', title: 'Intro' },
+              { position: 'A1b', title: 'Sweet Jane' },
+            ],
+          },
+          { position: 'A2', title: 'Heroin', duration: '13:11' },
+        ],
+      };
+
+      const whole = await request(app)
+        .post('/api/v1/scrobble/prepare-from-release')
+        .send({ release, startTime: 1000 })
+        .expect(200);
+      expect(
+        whole.body.data.tracks.map((t: { track: string }) => t.track)
+      ).toEqual(['Intro / Sweet Jane', 'Heroin']);
+      expect(whole.body.data.tracks[0].duration).toBe(480);
+
+      const split = await request(app)
+        .post('/api/v1/scrobble/prepare-from-release')
+        .send({
+          release,
+          selectedTracks: [0, 1, 2],
+          splitTracks: [1],
+          startTime: 1000,
+        })
+        .expect(200);
+      expect(
+        split.body.data.tracks.map(
+          (t: { track: string; duration: number; timestamp: number }) => [
+            t.track,
+            t.duration,
+            t.timestamp,
+          ]
+        )
+      ).toEqual([
+        ['Intro', 240, 1000],
+        ['Sweet Jane', 240, 1241],
+        ['Heroin', 791, 1482],
+      ]);
+    });
+
     it('should work without selected tracks (uses all tracks)', async () => {
       const response = await request(app)
         .post('/api/v1/scrobble/prepare-from-release')

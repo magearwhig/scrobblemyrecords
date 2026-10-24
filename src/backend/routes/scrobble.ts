@@ -7,6 +7,7 @@ import {
   Track,
 } from '../../shared/types';
 import { isCollectionLinked } from '../../shared/utils/albumMapping';
+import { trackSeconds, tracksToScrobble } from '../../shared/utils/tracklist';
 import { artistMappingService } from '../services/artistMappingService';
 import { AuthService } from '../services/authService';
 import { DurationLookupService } from '../services/durationLookupService';
@@ -426,7 +427,7 @@ export default function createScrobbleRouter(
   // Prepare tracks for scrobbling from release
   router.post('/prepare-from-release', async (req: Request, res: Response) => {
     try {
-      const { release, selectedTracks, startTime } = req.body;
+      const { release, selectedTracks, splitTracks, startTime } = req.body;
 
       if (!release || !release.tracklist) {
         return res.status(400).json({
@@ -435,13 +436,17 @@ export default function createScrobbleRouter(
         });
       }
 
-      // Filter tracks if specific tracks are selected
-      const tracksToScrobble =
-        selectedTracks && selectedTracks.length > 0
-          ? release.tracklist.filter((track: Track, index: number) =>
-              selectedTracks.includes(index)
-            )
-          : release.tracklist;
+      // Selected tracks (all when none are given), headings skipped; tracks
+      // in splitTracks are scrobbled as their parts
+      const tracklist: Track[] = release.tracklist;
+      const selected: number[] =
+        Array.isArray(selectedTracks) && selectedTracks.length > 0
+          ? selectedTracks
+          : tracklist.map((_track, index) => index);
+      const split = new Set<number>(
+        Array.isArray(splitTracks) ? splitTracks : []
+      );
+      const scrobbleRows = tracksToScrobble(tracklist, selected, split);
 
       // Parse start time (expecting Unix timestamp in seconds)
       const startTimestamp = startTime
@@ -450,11 +455,10 @@ export default function createScrobbleRouter(
 
       // Calculate timestamps based on track durations
       let currentTime = startTimestamp;
-      const scrobbleTracks: ScrobbleTrack[] = tracksToScrobble.map(
+      const scrobbleTracks: ScrobbleTrack[] = scrobbleRows.map(
         (track: Track) => {
-          const trackDuration = track.duration
-            ? parseTrackDuration(track.duration)
-            : 180; // Default 3 minutes
+          // M:SS or H:MM:SS; 3 minutes when unknown
+          const trackDuration = trackSeconds(track);
 
           const originalArtist = track.artist || release.artist;
           const mappedArtist =
@@ -497,25 +501,6 @@ export default function createScrobbleRouter(
       });
     }
   });
-
-  // Helper function to parse track duration from Discogs format (e.g., "3:45")
-  function parseTrackDuration(duration: string): number {
-    if (typeof duration === 'number') {
-      return duration;
-    }
-
-    if (typeof duration === 'string') {
-      const parts = duration.split(':');
-      if (parts.length === 2) {
-        const minutes = parseInt(parts[0]);
-        const seconds = parseInt(parts[1]);
-        return minutes * 60 + seconds;
-      }
-    }
-
-    // Default to 3 minutes if parsing fails
-    return 180;
-  }
 
   // Get scrobble progress for a session
   router.get('/progress/:sessionId', async (req: Request, res: Response) => {

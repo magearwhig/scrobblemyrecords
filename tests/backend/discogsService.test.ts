@@ -2,6 +2,7 @@ import { AuthService } from '../../src/backend/services/authService';
 import { DiscogsService } from '../../src/backend/services/discogsService';
 import { getDiscogsAxios } from '../../src/backend/utils/discogsAxios';
 import { FileStorage } from '../../src/backend/utils/fileStorage';
+import { TRACKLIST_VERSION } from '../../src/shared/utils/tracklist';
 
 // Mock dependencies
 jest.mock('../../src/backend/utils/discogsAxios');
@@ -242,6 +243,120 @@ describe('DiscogsService', () => {
       });
       expect(mockAxiosInstance.get).toHaveBeenCalled();
       expect(mockFileStorage.writeJSON).toHaveBeenCalled();
+    });
+
+    it('keeps the parts of a track Discogs lists as an index track', async () => {
+      jest.spyOn(discogsService as any, 'getAuthHeaders').mockResolvedValue({});
+      mockFileStorage.readJSON.mockResolvedValue(null);
+      mockAxiosInstance.get.mockResolvedValue({
+        data: {
+          id: 1187012,
+          title: 'Rock N Roll Animal',
+          artists: [{ name: 'Lou Reed' }],
+          tracklist: [
+            {
+              position: '',
+              type_: 'index',
+              title: 'Intro / Sweet Jane',
+              duration: '7:55',
+              sub_tracks: [
+                {
+                  position: 'A1a',
+                  type_: 'track',
+                  title: 'Intro ',
+                  duration: '',
+                },
+                {
+                  position: 'A1b',
+                  type_: 'track',
+                  title: 'Sweet Jane',
+                  duration: '',
+                },
+              ],
+            },
+            {
+              position: 'A2',
+              type_: 'track',
+              title: 'Heroin',
+              duration: '13:11',
+            },
+          ],
+        },
+      });
+
+      const result = await discogsService.getReleaseDetails(1187012);
+
+      expect(result?.tracklistVersion).toBe(TRACKLIST_VERSION);
+      expect(result?.tracklist?.[0]).toMatchObject({
+        position: 'A1',
+        title: 'Intro / Sweet Jane',
+        subTracks: [{ title: 'Intro' }, { title: 'Sweet Jane' }],
+      });
+    });
+
+    it('re-fetches a cached release that lost index track parts', async () => {
+      jest.spyOn(discogsService as any, 'getAuthHeaders').mockResolvedValue({});
+      mockFileStorage.readJSON.mockResolvedValue({
+        id: 5,
+        title: 'Old',
+        artist: 'Band',
+        genres: ['Rock'],
+        tracklist: [{ position: '', title: 'The Czar', duration: '10:54' }],
+      });
+      mockAxiosInstance.get.mockResolvedValue({
+        data: {
+          id: 5,
+          title: 'Old',
+          artists: [{ name: 'Band' }],
+          tracklist: [
+            {
+              position: '',
+              type_: 'index',
+              title: 'The Czar',
+              duration: '10:54',
+              sub_tracks: [
+                {
+                  position: 'A4a',
+                  type_: 'track',
+                  title: 'Usurper',
+                  duration: '',
+                },
+                {
+                  position: 'A4b',
+                  type_: 'track',
+                  title: 'Escape',
+                  duration: '',
+                },
+              ],
+            },
+          ],
+        },
+      });
+
+      const result = await discogsService.getReleaseDetails(5);
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+        '/releases/5',
+        expect.anything()
+      );
+      expect(result?.tracklist?.[0].position).toBe('A4');
+    });
+
+    it('falls back to the cached copy when that re-fetch fails', async () => {
+      const cached = {
+        id: 5,
+        title: 'Old',
+        artist: 'Band',
+        genres: ['Rock'],
+        tracklist: [{ position: '', title: 'The Czar', duration: '10:54' }],
+      };
+      jest.spyOn(discogsService as any, 'getAuthHeaders').mockResolvedValue({});
+      mockFileStorage.readJSON.mockResolvedValue(cached);
+      mockAxiosInstance.get.mockRejectedValue(new Error('offline'));
+
+      await expect(discogsService.getReleaseDetails(5)).resolves.toEqual(
+        cached
+      );
     });
   });
 

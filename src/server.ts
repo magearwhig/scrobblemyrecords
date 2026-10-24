@@ -106,8 +106,9 @@ import { getAllCachedCollectionItems } from './backend/utils/collectionCache';
 import { resolveDataDir } from './backend/utils/dataDir';
 import { FileStorage } from './backend/utils/fileStorage';
 import { createLogger } from './backend/utils/logger';
-import { CollectionItem } from './shared/types';
+import { CollectionItem, Track } from './shared/types';
 import { stripDiscogsSuffix } from './shared/utils/albumMapping';
+import { tracklistMatchTitles } from './shared/utils/tracklist';
 
 const log = createLogger('Server');
 
@@ -823,12 +824,13 @@ async function startServer() {
         }
         seen.add(id);
         if (!releaseTracklists.has(id)) {
-          const details = await fileStorage.readJSON<{
-            tracklist?: Array<{ title?: string; position?: string }>;
-          }>(`collections/release-${id}.json`);
-          const tracks = (details?.tracklist ?? [])
-            .filter(t => t.title && t.position !== '')
-            .map(t => t.title as string);
+          const details = await fileStorage.readJSON<{ tracklist?: Track[] }>(
+            `collections/release-${id}.json`
+          );
+          // Tracks and the parts of tracks that have them
+          const tracks = tracklistMatchTitles(details?.tracklist).map(
+            t => t.title
+          );
           releaseTracklists.set(id, tracks.length > 0 ? tracks : null);
         }
         const tracks = releaseTracklists.get(id);

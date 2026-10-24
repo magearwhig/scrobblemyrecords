@@ -21,6 +21,7 @@
   --text-tertiary: #808080;
   --text-disabled: #999999;
   --text-inverse: #ffffff;
+  --text-on-overlay: #ffffff; /* text on a dark scrim over artwork, both themes */
   --text-accent: #b8892e;
 
   /* --- Status --- */
@@ -3384,7 +3385,7 @@ select.form-input:disabled {
   right: 0.5rem;
   padding: 0.2rem 0.5rem;
   background: rgba(0, 0, 0, 0.75);
-  color: var(--text-inverse);
+  color: var(--text-on-overlay);
   border-radius: var(--radius-full);
   font-size: var(--text-xs);
   font-weight: 600;

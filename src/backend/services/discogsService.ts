@@ -11,13 +11,17 @@ import {
   DiscogsRawFormat,
   DiscogsRawLabel,
   DiscogsRawReleaseResponse,
-  DiscogsRawTrack,
   DiscogsRelease,
   DiscogsUserIdentity,
   ApiResponse,
   TimestampedCache,
 } from '../../shared/types';
 import { safeJsonParse } from '../../shared/utils/safeJsonParse';
+import {
+  fromDiscogsTracklist,
+  needsTracklistRefetch,
+  TRACKLIST_VERSION,
+} from '../../shared/utils/tracklist';
 import { getDiscogsAxios } from '../utils/discogsAxios';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
@@ -423,14 +427,22 @@ export class DiscogsService {
   }
 
   async getReleaseDetails(releaseId: number): Promise<DiscogsRelease | null> {
+    // A cached copy being re-fetched; returned if the fetch fails
+    let staleCopy: DiscogsRelease | null = null;
     try {
       const cacheKey = `collections/release-${releaseId}.json`;
 
       // Try cache first
       const cached = await this.fileStorage.readJSON<DiscogsRelease>(cacheKey);
-      if (cached && cached.genres !== undefined) {
+      if (
+        cached &&
+        cached.genres !== undefined &&
+        !needsTracklistRefetch(cached)
+      ) {
         return cached;
       }
+      // Re-fetching only for lost track parts: keep the copy as a fallback
+      if (cached && cached.genres !== undefined) staleCopy = cached;
 
       // Add delay to respect rate limits (1 request per second)
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -456,15 +468,8 @@ export class DiscogsService {
         catalog_number: rawRelease.catalog_number,
         cover_image: rawRelease.images?.[0]?.uri,
         resource_url: rawRelease.resource_url,
-        tracklist:
-          rawRelease.tracklist?.map((track: DiscogsRawTrack) => ({
-            position: track.position,
-            title: track.title,
-            duration: track.duration,
-            artist: track.artists
-              ?.map((a: DiscogsRawArtist) => a.name)
-              .join(', '),
-          })) || [],
+        tracklist: fromDiscogsTracklist(rawRelease.tracklist),
+        tracklistVersion: TRACKLIST_VERSION,
       };
 
       // Cache the release
@@ -473,7 +478,7 @@ export class DiscogsService {
       return release;
     } catch (error) {
       this.logger.error('Error fetching release details', error);
-      return null;
+      return staleCopy;
     }
   }
 

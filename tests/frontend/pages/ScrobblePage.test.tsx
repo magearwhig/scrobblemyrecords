@@ -578,6 +578,45 @@ describe('ScrobblePage', () => {
       expect(scrobbleButton).toBeDisabled();
     });
 
+    it('skips headings and sends durations in seconds', async () => {
+      const user = userEvent.setup();
+      mockApi.getReleaseDetails.mockResolvedValue({
+        id: 1,
+        artist: 'Lou Reed',
+        title: 'Rock N Roll Animal',
+        tracklist: [
+          { position: '', title: 'Side A', duration: '29:19' },
+          {
+            position: 'A1',
+            title: 'Intro / Sweet Jane',
+            duration: '7:55',
+            subTracks: [
+              { position: 'A1a', title: 'Intro' },
+              { position: 'A1b', title: 'Sweet Jane' },
+            ],
+          },
+          { position: 'A2', title: 'Heroin', duration: '13:11' },
+        ],
+      });
+      mockApi.scrobbleBatch.mockResolvedValue({ success: 2, failed: 0 });
+
+      renderScrobblePageWithProviders(authStatus);
+
+      await user.click(
+        await screen.findByRole('button', { name: /Scrobble 2 Tracks/ })
+      );
+
+      await waitFor(() => expect(mockApi.scrobbleBatch).toHaveBeenCalled());
+      const sent = mockApi.scrobbleBatch.mock.calls[0][0] as Array<{
+        track: string;
+        duration?: number;
+      }>;
+      expect(sent.map(t => [t.track, t.duration])).toEqual([
+        ['Intro / Sweet Jane', 475],
+        ['Heroin', 791],
+      ]);
+    });
+
     it('allows scrobbling selected tracks', async () => {
       const user = userEvent.setup();
 

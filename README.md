@@ -202,6 +202,7 @@ without a `duration` field.
 - **Home Dashboard**: Engaging dashboard with quick stats, quick actions, recent albums, and monthly highlights
 - **Collection Browser**: Search and filter your Discogs collection; your search, filters and scroll position come back when you return from an album
 - **Release Details**: Side/disc track selection and per-album scrobble history
+- **Tracks with parts**: a track Discogs lists in parts ("Intro / Sweet Jane", "The Czar") is one track, with its parts shown underneath; **Split** scrobbles it as its parts instead, remembered per release
 - **Track Selection**: Choose individual tracks or entire albums
 - **Batch Scrobbling**: Scrobble multiple items with progress tracking
 - **Smart Timing**: Auto timing (simulates just finishing listening) or custom timestamps

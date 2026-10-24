@@ -430,7 +430,9 @@ class ApiService {
   async prepareTracksFromRelease(
     release: DiscogsRelease,
     selectedTracks?: number[],
-    startTime?: number
+    startTime?: number,
+    /** Tracks to scrobble as their parts (see Track.subTracks) */
+    splitTracks?: number[]
   ): Promise<{
     tracks: ScrobbleTrack[];
     release: DiscogsRelease;
@@ -440,6 +442,7 @@ class ApiService {
     const response = await this.api.post('/scrobble/prepare-from-release', {
       release,
       selectedTracks,
+      splitTracks,
       startTime,
     });
     return response.data.data;
