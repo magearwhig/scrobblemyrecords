@@ -12,6 +12,10 @@ interface OnThisDayProps {
   loading?: boolean;
 }
 
+/** "Today" for this year's entry, not "0 years ago" */
+const yearsAgoLabel = (yearsAgo: number): string =>
+  yearsAgo === 0 ? 'Today' : `${yearsAgo} year${yearsAgo !== 1 ? 's' : ''} ago`;
+
 /**
  * Card-based timeline showing what was listened to on this day in previous years
  */
@@ -76,13 +80,12 @@ export const OnThisDay: React.FC<OnThisDayProps> = ({ data, loading }) => {
             key={yearEntry.year}
             className='on-this-day-year-card'
             role='group'
-            aria-label={`${yearEntry.yearsAgo} year${yearEntry.yearsAgo !== 1 ? 's' : ''} ago — ${yearEntry.totalScrobbles} scrobbles`}
+            aria-label={`${yearsAgoLabel(yearEntry.yearsAgo)} — ${yearEntry.totalScrobbles} scrobbles`}
           >
             <div className='on-this-day-year-header'>
               <span className='on-this-day-year-label'>{yearEntry.year}</span>
               <span className='on-this-day-year-ago'>
-                {yearEntry.yearsAgo} year{yearEntry.yearsAgo !== 1 ? 's' : ''}{' '}
-                ago
+                {yearsAgoLabel(yearEntry.yearsAgo)}
               </span>
               <span className='on-this-day-year-scrobbles'>
                 {yearEntry.totalScrobbles} scrobble

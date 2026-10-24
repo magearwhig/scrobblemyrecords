@@ -7,7 +7,13 @@ import {
   Split,
   XCircle,
 } from 'lucide-react';
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from 'react';
 import './ReleaseDetailsPage.page.css';
 
 import {
@@ -33,11 +39,12 @@ import { ReleaseDetailsSkeleton } from '../components/ui/Skeleton';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useHistorySynced } from '../hooks/useHistorySynced';
-import { navigate } from '../routes';
+import { navigate, ROUTES } from '../routes';
 import { getApiService } from '../services/api';
 import { formatLocalTimeClean, formatRelativeTime } from '../utils/dateUtils';
 import { createLogger } from '../utils/logger';
 import { playAlbumOnSpotify, playTrackOnSpotify } from '../utils/spotifyUtils';
+import { getHashParam } from '../utils/tabUtils';
 
 const logger = createLogger('ReleaseDetailsPage');
 
@@ -166,6 +173,9 @@ const ReleaseDetailsPage: React.FC = () => {
   // Pattern to detect Discogs disambiguation suffix like (2), (11), etc.
   const DISAMBIGUATION_PATTERN = /\s*\(\d+\)\s*$/;
 
+  // Id of the release on screen, to tell a new ?id= from the current one
+  const loadedIdRef = useRef<number | null>(null);
+
   // Load release details on mount - the key prop from MainContent ensures
   // this component remounts when navigating to a different release
   useEffect(() => {
@@ -175,6 +185,22 @@ const ReleaseDetailsPage: React.FC = () => {
       loadReleaseDetails();
     }, 0);
     return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The route name stays the same when only the id changes
+  // (#release-details?id=1 → ?id=2), so nothing remounts: reload here
+  useEffect(() => {
+    const onHashChange = () => {
+      if (!window.location.hash.startsWith(`#${ROUTES.RELEASE_DETAILS}`))
+        return;
+      const urlId = parseInt(getHashParam('id') ?? '', 10);
+      if (Number.isFinite(urlId) && urlId !== loadedIdRef.current) {
+        loadReleaseDetails();
+      }
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -305,12 +331,19 @@ const ReleaseDetailsPage: React.FC = () => {
         `releaseData from localStorage: ${releaseData ? 'exists' : 'null'}`
       );
 
-      if (!releaseData) {
+      // An id in the URL (#release-details?id=123) wins over the stored
+      // selection, which may belong to the previously viewed release
+      const urlId = parseInt(getHashParam('id') ?? '', 10);
+      const storedInfo = releaseData ? JSON.parse(releaseData) : null;
+      const releaseInfo =
+        Number.isFinite(urlId) && storedInfo?.id !== urlId
+          ? { id: urlId }
+          : storedInfo;
+
+      if (!releaseInfo) {
         setError('No release data found. Please go back and select an album.');
         return;
       }
-
-      const releaseInfo = JSON.parse(releaseData);
       logger.info('Parsed releaseInfo', {
         id: releaseInfo.id,
         title: releaseInfo.title,
@@ -336,6 +369,12 @@ const ReleaseDetailsPage: React.FC = () => {
         title: fullRelease.title,
       });
       setRelease(fullRelease);
+      loadedIdRef.current = fullRelease.id;
+      // Keep the stored selection in step with what is shown, so pages that
+      // come back here (artist and track links) reopen this release
+      if (storedInfo?.id !== fullRelease.id) {
+        localStorage.setItem('selectedRelease', JSON.stringify(fullRelease));
+      }
 
       // Fetch marketplace stats in background
       setLoadingMarketplaceStats(true);
@@ -357,10 +396,8 @@ const ReleaseDetailsPage: React.FC = () => {
       // Check if this release is in the discard pile
       try {
         const discardPileIds = await api.getDiscardPileCollectionIds();
-        if (storedCollectionItemId) {
-          setIsInDiscardPile(
-            discardPileIds.includes(parseInt(storedCollectionItemId, 10))
-          );
+        if (parsedCollectionItemId === releaseInfo.id) {
+          setIsInDiscardPile(discardPileIds.includes(parsedCollectionItemId));
         }
       } catch (err) {
         logger.warn('Failed to check discard pile status', err);
@@ -1635,7 +1672,7 @@ const ReleaseDetailsPage: React.FC = () => {
                 <strong>{release.artist}</strong>
                 <span> - </span>
                 <span>{release.title}</span>
-                {release.year && (
+                {!!release.year && (
                   <span className='text-muted'> ({release.year})</span>
                 )}
               </div>

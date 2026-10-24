@@ -5,6 +5,7 @@ import {
   AlbumPlayCountResponse,
   AlbumPlayCountResult,
   CollectionItem,
+  DASHBOARD_COUNT_CAP,
   DashboardData,
   DashboardQuickActions,
   DashboardQuickStats,
@@ -158,10 +159,10 @@ export default function createStatsRouter(
           let missingAlbumsCount = 0;
           if (analyticsService && username) {
             const collection = await loadCollection(username);
-            // Get a count of missing albums (capped at 100 for performance)
+            // Get a count of missing albums (capped for performance)
             const missingAlbums = await analyticsService.getMissingAlbums(
               collection,
-              100
+              DASHBOARD_COUNT_CAP
             );
             missingAlbumsCount = missingAlbums.length;
           }
@@ -182,7 +183,7 @@ export default function createStatsRouter(
             const collection = await loadCollection(username);
             const dustyCorners = await statsService.getDustyCorners(
               collection,
-              100
+              DASHBOARD_COUNT_CAP
             );
             dustyCornersCount = dustyCorners.length;
           }

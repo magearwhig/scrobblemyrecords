@@ -296,8 +296,10 @@ describe('HomePage Dashboard', () => {
       });
 
       // Should show the action items
-      expect(screen.getByText('2 new')).toBeInTheDocument(); // seller matches
-      expect(screen.getByText('seller matches')).toBeInTheDocument();
+      expect(screen.getByText('active seller matches')).toBeInTheDocument();
+      expect(
+        screen.getByText('active seller matches').previousSibling
+      ).toHaveTextContent('2');
     });
   });
 

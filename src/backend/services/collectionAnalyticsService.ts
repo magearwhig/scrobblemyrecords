@@ -49,6 +49,16 @@ const FORMAT_CATEGORIES: Record<string, string> = {
 const LABEL_SUFFIX_PATTERN =
   /\s*(Ltd\.?|Inc\.?|Records|Recordings|Music|Rec\.?|Co\.?|Entertainment|Group)\s*$/i;
 
+/** Grouping key for a label, so "Sub Pop" and "Sub Pop Records" count once */
+function labelKey(rawLabel: string): string {
+  const trimmed = rawLabel.trim();
+  const normalized = trimmed
+    .replace(LABEL_SUFFIX_PATTERN, '')
+    .trim()
+    .toLowerCase();
+  return normalized || trimmed.toLowerCase();
+}
+
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class CollectionAnalyticsService {
@@ -172,11 +182,7 @@ export class CollectionAnalyticsService {
         const trimmed = rawLabel.trim();
         if (!trimmed) continue;
 
-        const normalized = trimmed
-          .replace(LABEL_SUFFIX_PATTERN, '')
-          .trim()
-          .toLowerCase();
-        const key = normalized || trimmed.toLowerCase();
+        const key = labelKey(trimmed);
 
         const entry = normalizedMap.get(key) || {
           variants: new Map<string, number>(),
@@ -338,7 +344,7 @@ export class CollectionAnalyticsService {
       artistSet.add(release.artist);
       if (release.label) {
         for (const l of release.label) {
-          labelSet.add(l);
+          if (l.trim()) labelSet.add(labelKey(l));
         }
       }
 

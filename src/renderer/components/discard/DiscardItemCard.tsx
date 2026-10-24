@@ -60,11 +60,14 @@ const DiscardItemCard: React.FC<DiscardItemCardProps> = ({
   formatCurrency,
   formatDate,
 }) => {
+  // Sold, traded in, gifted or removed: the reason is history, not current status
+  const isHistory = HISTORY_STATUSES.includes(item.status);
+
   return (
     <div
       className={`discard-item-card ${item.orphaned ? 'orphaned' : ''}${selected ? ' selected' : ''}`}
     >
-      {selectionMode && !HISTORY_STATUSES.includes(item.status) && (
+      {selectionMode && !isHistory && (
         <input
           type='checkbox'
           className='item-select-checkbox'
@@ -99,12 +102,14 @@ const DiscardItemCard: React.FC<DiscardItemCardProps> = ({
         {item.format && (
           <div className='item-format'>{item.format.join(', ')}</div>
         )}
-        {item.year && <div className='item-year'>{item.year}</div>}
+        {!!item.year && <div className='item-year'>{item.year}</div>}
       </div>
 
       <div className='item-badges'>
         <span className={`reason-badge reason-${item.reason}`}>
-          {REASON_LABELS[item.reason]}
+          {isHistory
+            ? `Original reason: ${REASON_LABELS[item.reason]}`
+            : REASON_LABELS[item.reason]}
         </span>
         <span className={`status-badge status-${item.status}`}>
           {STATUS_LABELS[item.status]}
@@ -123,6 +128,11 @@ const DiscardItemCard: React.FC<DiscardItemCardProps> = ({
           </div>
         )}
         <div className='item-date'>Added: {formatDate(item.addedAt)}</div>
+        {isHistory && (
+          <div className='item-date'>
+            {STATUS_LABELS[item.status]} on {formatDate(item.statusChangedAt)}
+          </div>
+        )}
       </div>
 
       {item.marketplaceUrl && (

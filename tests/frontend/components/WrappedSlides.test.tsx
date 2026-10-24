@@ -119,20 +119,31 @@ describe('WrappedSlide', () => {
   });
 });
 
+const RANGE = {
+  startDate: new Date(2026, 0, 1, 12).getTime(),
+  endDate: new Date(2026, 11, 31, 12).getTime(),
+};
+
 describe('TotalScrobblesSlide', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it('displays total scrobbles formatted', () => {
-    render(<TotalScrobblesSlide stats={createBaseStats()} />);
+    render(<TotalScrobblesSlide stats={createBaseStats()} {...RANGE} />);
 
     expect(screen.getByText('5,000')).toBeInTheDocument();
     expect(screen.getByText('tracks')).toBeInTheDocument();
   });
 
+  it('shows the date range', () => {
+    render(<TotalScrobblesSlide stats={createBaseStats()} {...RANGE} />);
+
+    expect(screen.getByText('Jan 1, 2026 – Dec 31, 2026')).toBeInTheDocument();
+  });
+
   it('displays estimated listening hours', () => {
-    render(<TotalScrobblesSlide stats={createBaseStats()} />);
+    render(<TotalScrobblesSlide stats={createBaseStats()} {...RANGE} />);
 
     expect(screen.getByText(/416 hours/)).toBeInTheDocument();
   });
@@ -144,6 +155,7 @@ describe('TotalScrobblesSlide', () => {
           totalScrobbles: 1234567,
           estimatedListeningHours: 10000,
         })}
+        {...RANGE}
       />
     );
 
@@ -899,7 +911,9 @@ describe('VinylVsDigitalSlide', () => {
   it('displays vinyl vs digital breakdown', () => {
     render(<VinylVsDigitalSlide crossSource={baseCrossSource} />);
 
-    expect(screen.getByText('Vinyl vs Digital')).toBeInTheDocument();
+    expect(
+      screen.getByText('Listenography vs Everywhere Else')
+    ).toBeInTheDocument();
     expect(screen.getByText(/2,000/)).toBeInTheDocument();
     expect(screen.getByText(/40%/)).toBeInTheDocument();
     expect(screen.getByText(/3,000/)).toBeInTheDocument();
@@ -918,7 +932,9 @@ describe('VinylVsDigitalSlide', () => {
       />
     );
 
-    expect(screen.getByText('Vinyl vs Digital')).toBeInTheDocument();
+    expect(
+      screen.getByText('Listenography vs Everywhere Else')
+    ).toBeInTheDocument();
     expect(screen.getByText(/No source data available/)).toBeInTheDocument();
   });
 

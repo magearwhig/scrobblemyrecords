@@ -499,7 +499,7 @@ const DiscoveryPage: React.FC = () => {
                     <div className='mapping-result-artist'>
                       {item.release.artist}
                     </div>
-                    {item.release.year && (
+                    {!!item.release.year && (
                       <div className='mapping-result-year'>
                         {item.release.year}
                       </div>

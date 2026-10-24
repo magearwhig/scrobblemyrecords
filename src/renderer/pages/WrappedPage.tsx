@@ -120,7 +120,8 @@ const WrappedPage: React.FC = () => {
       return;
     }
 
-    const start = new Date(customStart).getTime();
+    // Local midnight, like the presets ("YYYY-MM-DD" alone parses as UTC)
+    const start = new Date(`${customStart}T00:00:00`).getTime();
     const end = new Date(`${customEnd}T23:59:59.999`).getTime();
 
     if (start >= end) {

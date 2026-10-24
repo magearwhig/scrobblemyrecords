@@ -165,7 +165,12 @@ export const RankedRow: React.FC<RankedRowProps> = ({
 export const RankedListHeader: React.FC = () => (
   <div className='ranked-list-header' aria-hidden='true'>
     <span className='ranked-list-header-name'>Name</span>
-    <span className='ranked-list-header-bar'>Share of plays</span>
+    <span
+      className='ranked-list-header-bar'
+      title='Bar length is plays relative to the most-played item in this list'
+    >
+      Compared with #1
+    </span>
     <span className='ranked-row-date ranked-row-date--first'>First played</span>
     <span className='ranked-row-date ranked-row-date--last'>Last played</span>
     <span className='ranked-list-header-count'>Plays</span>

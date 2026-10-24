@@ -17,3 +17,14 @@ export const getTabFromUrl = (
   const tab = params.get('tab');
   return tab && validTabs.includes(tab) ? tab : defaultTab;
 };
+
+/**
+ * Reads one query parameter from the current URL hash
+ * ("#release-details?id=123" → getHashParam('id') === '123').
+ */
+export const getHashParam = (name: string): string | null => {
+  const hash = window.location.hash;
+  const queryStart = hash.indexOf('?');
+  if (queryStart === -1) return null;
+  return new URLSearchParams(hash.substring(queryStart)).get(name);
+};

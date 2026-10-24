@@ -60,7 +60,7 @@ const RecommendationCard: React.FC<RecommendationCardProps> = React.memo(
             {release.title}
           </button>
           <div className='recommendation-card__artist'>{release.artist}</div>
-          {release.year && (
+          {!!release.year && (
             <div className='recommendation-card__year'>{release.year}</div>
           )}
 

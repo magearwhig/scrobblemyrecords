@@ -2,7 +2,7 @@ import { Disc3 } from 'lucide-react';
 import React from 'react';
 
 import { DashboardRecentAlbum } from '../../../shared/types';
-import { navigate } from '../../routes';
+import { navigate, ROUTES } from '../../routes';
 import { formatLocalTimeClean } from '../../utils/dateUtils';
 import AlbumLink from '../AlbumLink';
 
@@ -14,7 +14,7 @@ interface RecentAlbumsProps {
 /**
  * Compact list of recently played albums.
  * Shows album cover, artist, title, and when it was last played.
- * Clicking navigates to collection if owned, or shows details if not.
+ * Clicking opens the owned release, or shows details if not.
  */
 export const RecentAlbums: React.FC<RecentAlbumsProps> = ({
   albums,
@@ -26,7 +26,13 @@ export const RecentAlbums: React.FC<RecentAlbumsProps> = ({
 
   const handleAlbumClick = (album: DashboardRecentAlbum) => {
     if (album.inCollection && album.releaseId) {
-      navigate(`collection?release=${album.releaseId}`);
+      // CollectionItem.id is the release id; the release page needs it for
+      // the crate and discard controls of an owned record
+      localStorage.setItem('selectedCollectionItemId', String(album.releaseId));
+      navigate(ROUTES.RELEASE_DETAILS, {
+        id: album.releaseId.toString(),
+        from: ROUTES.HOME,
+      });
     }
     // For non-collection albums, we could show a modal or do nothing
   };
@@ -34,8 +40,11 @@ export const RecentAlbums: React.FC<RecentAlbumsProps> = ({
   const formatTimestamp = (timestamp: number): string => {
     const date = new Date(timestamp * 1000);
     const now = new Date();
-    const diffDays = Math.floor(
-      (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
+    // Calendar days between the local dates, not elapsed 24-hour blocks
+    const startOfDay = (d: Date) =>
+      new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const diffDays = Math.round(
+      (startOfDay(now) - startOfDay(date)) / (1000 * 60 * 60 * 24)
     );
 
     if (diffDays === 0) {
@@ -72,7 +81,7 @@ export const RecentAlbums: React.FC<RecentAlbumsProps> = ({
             tabIndex={album.inCollection ? 0 : undefined}
             aria-label={
               album.inCollection
-                ? `View ${album.album} by ${album.artist} in collection`
+                ? `Open ${album.album} by ${album.artist}`
                 : undefined
             }
             onKeyDown={

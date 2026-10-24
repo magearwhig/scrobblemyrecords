@@ -1071,7 +1071,7 @@ const WebsitesPage: React.FC<WebsitesPageProps> = ({ embedded = false }) => {
                         !item.matches?.onWishlist &&
                         !item.matches?.onLocalWant && (
                           <Badge variant='info' size='small'>
-                            In collection
+                            Artist in collection
                           </Badge>
                         )}
                       {item.matches?.artistInLastfmTop &&

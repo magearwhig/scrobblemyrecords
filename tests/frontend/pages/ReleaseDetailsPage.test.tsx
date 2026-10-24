@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 
@@ -381,6 +381,71 @@ describe('ReleaseDetailsPage Side Selection', () => {
       await screen.findByRole('link', { name: 'Short jazz' })
     ).toHaveAttribute('href', '#crates?id=c1');
     expect(mockApiService.getCratesForRelease).toHaveBeenCalledWith(123);
+  });
+
+  it('loads the release in the URL, not the previously stored one', async () => {
+    mockLocalStorage.setItem('selectedRelease', JSON.stringify(mockRelease));
+    mockLocalStorage.setItem('selectedCollectionItemId', '123');
+    window.location.hash = '#release-details?id=777';
+    mockApiService.getReleaseDetails.mockResolvedValue({
+      ...mockRelease,
+      id: 777,
+      title: 'Linked Album',
+    });
+    try {
+      renderWithProviders(<ReleaseDetailsPage />);
+
+      expect(await screen.findByText('Linked Album')).toBeInTheDocument();
+      expect(mockApiService.getReleaseDetails).toHaveBeenCalledWith(777);
+      expect(mockApiService.getReleaseDetails).not.toHaveBeenCalledWith(123);
+      // The stored collection item belongs to the other release
+      expect(screen.queryByText(/Add to Discard Pile/)).not.toBeInTheDocument();
+    } finally {
+      window.location.hash = '';
+    }
+  });
+
+  it('reloads when only the id in the URL changes', async () => {
+    window.location.hash = '#release-details?id=777';
+    mockApiService.getReleaseDetails.mockImplementation(async (id: number) => ({
+      ...mockRelease,
+      id,
+      title: id === 777 ? 'Linked Album' : 'Second Album',
+    }));
+    try {
+      renderWithProviders(<ReleaseDetailsPage />);
+      expect(await screen.findByText('Linked Album')).toBeInTheDocument();
+      // Stored so artist and track pages come back to this release
+      expect(
+        JSON.parse(mockLocalStorage.getItem('selectedRelease') as string).id
+      ).toBe(777);
+
+      act(() => {
+        window.location.hash = '#release-details?id=888';
+        window.dispatchEvent(new window.HashChangeEvent('hashchange'));
+      });
+
+      expect(await screen.findByText('Second Album')).toBeInTheDocument();
+      expect(mockApiService.getReleaseDetails).toHaveBeenCalledWith(888);
+    } finally {
+      window.location.hash = '';
+    }
+  });
+
+  it('loads the release in the URL when nothing is stored', async () => {
+    window.location.hash = '#release-details?id=777';
+    mockApiService.getReleaseDetails.mockResolvedValue({
+      ...mockRelease,
+      id: 777,
+      title: 'Linked Album',
+    });
+    try {
+      renderWithProviders(<ReleaseDetailsPage />);
+
+      expect(await screen.findByText('Linked Album')).toBeInTheDocument();
+    } finally {
+      window.location.hash = '';
+    }
   });
 
   it('should ignore a stale collection item id left by a previous release', async () => {

@@ -75,9 +75,13 @@ const EmbeddingManager: React.FC<EmbeddingManagerProps> = ({
         )}
         {!isFullyIndexed && !status.isRebuilding && (
           <Badge variant='warning' pill>
-            {status.staleRecords > 0
-              ? `${status.staleRecords} records need indexing`
-              : `${status.totalRecords - status.embeddedRecords} records not indexed`}
+            {[
+              status.staleRecords > 0 && `${status.staleRecords} stale`,
+              status.totalRecords > status.embeddedRecords &&
+                `${status.totalRecords - status.embeddedRecords} not indexed`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </Badge>
         )}
         {status.isRebuilding && (

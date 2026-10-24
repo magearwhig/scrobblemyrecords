@@ -3,11 +3,8 @@ import React, { useState } from 'react';
 
 import { AISuggestion } from '../../shared/types';
 import { navigate } from '../routes';
-import { createLogger } from '../utils/logger';
 
 import { Button } from './ui/Button';
-
-const logger = createLogger('AISuggestionCard');
 
 interface AISuggestionCardProps {
   suggestion: AISuggestion;
@@ -25,33 +22,13 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
   const { album, reasoning, confidence, mood } = suggestion;
   const release = album?.release;
 
-  const handleViewInCollection = () => {
-    if (release) {
-      localStorage.setItem('selectedRelease', JSON.stringify(release));
-      if (album) {
-        localStorage.setItem('selectedCollectionItemId', album.id.toString());
-      }
-      navigate('release-details');
-    }
-  };
-
   const handleViewDetails = () => {
     if (release) {
-      // Store the release data for the details page (use same key as AlbumCard in collection)
-      logger.info('handleViewDetails called');
-      logger.info('release info', {
-        id: release.id,
-        title: release.title,
-        artist: release.artist,
-      });
+      // Same keys as AlbumCard in the collection
       localStorage.setItem('selectedRelease', JSON.stringify(release));
       if (album) {
         localStorage.setItem('selectedCollectionItemId', album.id.toString());
       }
-      const stored = localStorage.getItem('selectedRelease');
-      logger.info('localStorage set, verifying', {
-        title: stored ? JSON.parse(stored).title : 'null',
-      });
       navigate('release-details');
     }
   };
@@ -158,11 +135,8 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
         )}
 
         <div className='ai-suggestion-actions'>
-          <Button size='small' onClick={handleViewInCollection}>
-            View in Collection
-          </Button>
-          <Button variant='secondary' size='small' onClick={handleViewDetails}>
-            Details
+          <Button size='small' onClick={handleViewDetails}>
+            Open release
           </Button>
           {onRefresh && (
             <Button

@@ -6,11 +6,27 @@ import WrappedSlide from './WrappedSlide';
 
 interface TotalScrobblesSlideProps {
   stats: WrappedListeningStats;
+  startDate: number; // milliseconds
+  endDate: number; // milliseconds
 }
 
-const TotalScrobblesSlide: React.FC<TotalScrobblesSlideProps> = ({ stats }) => {
+const formatDay = (ms: number) =>
+  new Date(ms).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+const TotalScrobblesSlide: React.FC<TotalScrobblesSlideProps> = ({
+  stats,
+  startDate,
+  endDate,
+}) => {
   return (
     <WrappedSlide>
+      <p className='wrapped-subtitle'>
+        {formatDay(startDate)} – {formatDay(endDate)}
+      </p>
       <p className='wrapped-slide-label'>You listened to</p>
       <div className='wrapped-big-number'>
         {stats.totalScrobbles.toLocaleString()}

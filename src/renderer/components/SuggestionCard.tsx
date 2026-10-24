@@ -3,11 +3,8 @@ import React, { useState } from 'react';
 
 import { SuggestionResult, SuggestionFactors } from '../../shared/types';
 import { navigate } from '../routes';
-import { createLogger } from '../utils/logger';
 
 import { Button } from './ui/Button';
-
-const logger = createLogger('SuggestionCard');
 
 interface SuggestionCardProps {
   suggestion: SuggestionResult;
@@ -72,27 +69,10 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
     return labels[name] || name;
   };
 
-  const handleViewInCollection = () => {
-    localStorage.setItem('selectedRelease', JSON.stringify(release));
-    localStorage.setItem('selectedCollectionItemId', album.id.toString());
-    navigate('release-details');
-  };
-
   const handleViewDetails = () => {
-    // Store the release data for the details page (use same key as AlbumCard in collection)
-    logger.info('handleViewDetails called');
-    logger.info('release object', release);
-    logger.info('release info', {
-      id: release?.id,
-      title: release?.title,
-      artist: release?.artist,
-    });
+    // Same keys as AlbumCard in the collection
     localStorage.setItem('selectedRelease', JSON.stringify(release));
     localStorage.setItem('selectedCollectionItemId', album.id.toString());
-    const stored = localStorage.getItem('selectedRelease');
-    logger.info('localStorage set, verifying', {
-      title: stored ? JSON.parse(stored).title : 'null',
-    });
     navigate('release-details');
   };
 
@@ -156,11 +136,8 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
         )}
 
         <div className='suggestion-card-actions'>
-          <Button size='small' onClick={handleViewInCollection}>
-            View in Collection
-          </Button>
-          <Button variant='secondary' size='small' onClick={handleViewDetails}>
-            Details
+          <Button size='small' onClick={handleViewDetails}>
+            Open release
           </Button>
           {onDismiss && (
             <Button

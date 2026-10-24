@@ -32,7 +32,12 @@ const WrappedSlideshow: React.FC<WrappedSlideshowProps> = ({
   const slides = useMemo(() => {
     // Last.fm-only slides (always included)
     const slideList: React.ReactNode[] = [
-      <TotalScrobblesSlide key='total' stats={data.listening} />,
+      <TotalScrobblesSlide
+        key='total'
+        stats={data.listening}
+        startDate={data.startDate}
+        endDate={data.endDate}
+      />,
       <TopArtistsSlide key='artists' artists={data.listening.topArtists} />,
       <TopAlbumsSlide key='albums' albums={data.listening.topAlbums} />,
       <TopTracksSlide key='tracks' tracks={data.listening.topTracks} />,

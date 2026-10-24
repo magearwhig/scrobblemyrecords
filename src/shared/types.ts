@@ -2241,6 +2241,9 @@ export interface DashboardQuickStats {
 /**
  * Quick action counts for actionable items
  */
+/** Missing-album and dusty-corner counts on the dashboard stop at this many */
+export const DASHBOARD_COUNT_CAP = 100;
+
 export interface DashboardQuickActions {
   newSellerMatches: number;
   missingAlbumsCount: number;
