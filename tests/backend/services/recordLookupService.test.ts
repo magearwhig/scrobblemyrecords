@@ -212,6 +212,9 @@ describe('RecordLookupService.check', () => {
       ],
     });
     expect((await service.check('acdc')).groups).toHaveLength(1);
+    expect((await service.check('acdc back')).groups).toHaveLength(1);
+    expect((await service.check('back acdc')).groups).toHaveLength(1);
+    expect((await service.check('acdc highway')).groups).toHaveLength(0);
   });
 
   it('groups pressings of one confirmed master into one card', async () => {

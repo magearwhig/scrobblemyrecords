@@ -396,6 +396,10 @@ function textScore(
   for (const q of queryWords) {
     if (row.words.includes(q)) score += 2;
     else if (row.words.some(w => w.startsWith(q))) score += 1;
+    // A word typed without its punctuation ("acdc" for AC/DC), from the
+    // start of a name only
+    else if (q.length >= 3 && row.compacts.some(c => c.startsWith(q)))
+      score += 1;
     else {
       score = 0;
       break;

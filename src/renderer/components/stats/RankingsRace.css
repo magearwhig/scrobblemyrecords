@@ -28,7 +28,7 @@
 
 .rankings-race-play-button {
   background: var(--accent-primary);
-  color: var(--text-inverse);
+  color: var(--text-on-fill);
   border: none;
   border-radius: 50%;
   width: 3rem;

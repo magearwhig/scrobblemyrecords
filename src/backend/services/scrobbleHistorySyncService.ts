@@ -104,6 +104,8 @@ export class ScrobbleHistorySyncService extends EventEmitter {
 
   private isSyncing = false;
   private isPaused = false;
+  /** A full sync was paused, so resume should rebuild rather than top up */
+  private pausedFullSync = false;
   private syncAbortController: AbortController | null = null;
 
   constructor(
@@ -177,6 +179,12 @@ export class ScrobbleHistorySyncService extends EventEmitter {
     if (this.historyStorage) {
       this.historyStorage.invalidateCache();
     }
+  }
+
+  /** Save a full sync in progress, marked so it isn't taken as complete */
+  private async savePartialIndex(index: ScrobbleHistoryIndex): Promise<void> {
+    index.fullSyncIncomplete = true;
+    await this.saveIndex(index);
   }
 
   private async loadSyncSettings(): Promise<void> {
@@ -439,6 +447,7 @@ export class ScrobbleHistorySyncService extends EventEmitter {
     this.logger.info('Starting full scrobble history sync');
     this.isSyncing = true;
     this.isPaused = false;
+    this.pausedFullSync = false;
     this.syncAbortController = new AbortController();
 
     // Invalidate stale overview cache at sync start so reads fall back to live computation
@@ -465,6 +474,12 @@ export class ScrobbleHistorySyncService extends EventEmitter {
     };
 
     try {
+      // A complete index stays live until the rebuild has every page; only a
+      // first sync (or an earlier unfinished one) is saved as it goes, so
+      // suggestions can start on recent plays
+      const existing = await this.getHistoryIndex();
+      const replacing = !!existing && !existing.fullSyncIncomplete;
+
       // First fetch to get total pages
       const firstPage = await this.fetchScrobblePage(1);
       const totalPages = firstPage.totalPages;
@@ -504,12 +519,13 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       // Save after first page so suggestions can work with recent data
       // Use the newest scrobble timestamp (in ms) for accurate sync tracking
       index.lastSyncTimestamp = newestScrobbleTimestamp * 1000;
-      await this.saveIndex(index);
+      if (!replacing) await this.savePartialIndex(index);
 
       // Fetch remaining pages
       for (let page = 2; page <= totalPages; page++) {
         // Check for pause or abort
         if (this.isPaused) {
+          this.pausedFullSync = true;
           this.syncStatus.status = 'paused';
           this.emit('statusChange', this.syncStatus);
           return;
@@ -525,43 +541,46 @@ export class ScrobbleHistorySyncService extends EventEmitter {
           setTimeout(resolve, this.getRequestDelay())
         );
 
-        try {
-          const pageData = await this.fetchScrobblePage(page);
-          const pageResult = this.processScrobbles(
-            pageData.tracks,
-            index,
-            identities
-          );
-          processedCount += pageResult.processed;
-          unresolvedCount += pageResult.unresolved;
-          if (pageResult.newestTimestamp > newestScrobbleTimestamp) {
-            newestScrobbleTimestamp = pageResult.newestTimestamp;
-          }
-          index.totalScrobbles = processedCount;
+        // A page that keeps failing stops the sync: skipping it would leave a
+        // hole that incremental syncs never go back for
+        const pageData = await this.fetchPageWithRetry(
+          page,
+          {},
+          3,
+          'Full sync'
+        );
+        const pageResult = this.processScrobbles(
+          pageData.tracks,
+          index,
+          identities
+        );
+        processedCount += pageResult.processed;
+        unresolvedCount += pageResult.unresolved;
+        if (pageResult.newestTimestamp > newestScrobbleTimestamp) {
+          newestScrobbleTimestamp = pageResult.newestTimestamp;
+        }
+        index.totalScrobbles = processedCount;
 
-          this.syncStatus.currentPage = page;
-          this.syncStatus.scrobblesFetched = processedCount;
-          this.syncStatus.progress = Math.round((page / totalPages) * 100);
-          this.syncStatus.estimatedTimeRemaining = Math.round(
-            ((totalPages - page) * this.getRequestDelay()) / 1000
-          );
-          this.emit('statusChange', this.syncStatus);
+        this.syncStatus.currentPage = page;
+        this.syncStatus.scrobblesFetched = processedCount;
+        this.syncStatus.progress = Math.round((page / totalPages) * 100);
+        this.syncStatus.estimatedTimeRemaining = Math.round(
+          ((totalPages - page) * this.getRequestDelay()) / 1000
+        );
+        this.emit('statusChange', this.syncStatus);
 
-          // Save progress periodically (every 10 pages)
-          if (page % 10 === 0) {
-            index.lastSyncTimestamp = newestScrobbleTimestamp * 1000;
-            await this.saveIndex(index);
-            this.logger.debug(`Saved progress at page ${page}/${totalPages}`);
-          }
-        } catch (error) {
-          this.logger.error(`Error fetching page ${page}`, error);
-          // Continue with next page on error
+        // Save progress periodically (every 10 pages)
+        if (!replacing && page % 10 === 0) {
+          index.lastSyncTimestamp = newestScrobbleTimestamp * 1000;
+          await this.savePartialIndex(index);
+          this.logger.debug(`Saved progress at page ${page}/${totalPages}`);
         }
       }
 
       // Final save - use the newest scrobble timestamp (in ms) for accurate sync tracking
       index.lastSyncTimestamp = newestScrobbleTimestamp * 1000;
       index.lastSyncCompletedAt = Date.now();
+      delete index.fullSyncIncomplete;
       await this.saveIndex(index);
 
       this.syncStatus.status = 'completed';
@@ -600,6 +619,11 @@ export class ScrobbleHistorySyncService extends EventEmitter {
     const existingIndex = await this.getHistoryIndex();
     if (!existingIndex) {
       this.logger.info('No existing index, starting full sync');
+      return this.startFullSync();
+    }
+    if (existingIndex.fullSyncIncomplete) {
+      // Topping up would only add new plays; the older pages are still missing
+      this.logger.info('Last full sync did not finish, starting it again');
       return this.startFullSync();
     }
 
@@ -825,6 +849,8 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       if (fullRange) {
         this.recordLastfmTotal(index, firstPage.totalScrobbles);
         index.lastFullBackfillAt = Date.now();
+        // Every page was read, so an unfinished full sync is now filled in
+        delete index.fullSyncIncomplete;
       }
 
       // Back up the current file, then save once
@@ -872,7 +898,8 @@ export class ScrobbleHistorySyncService extends EventEmitter {
   private async fetchPageWithRetry(
     page: number,
     window: { from?: number; to?: number },
-    attempts = 3
+    attempts = 3,
+    label = 'Backfill'
   ): ReturnType<ScrobbleHistorySyncService['fetchScrobblePage']> {
     let lastError: unknown;
     for (let attempt = 1; attempt <= attempts; attempt++) {
@@ -881,7 +908,7 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       } catch (error) {
         lastError = error;
         this.logger.warn(
-          `Backfill page ${page} failed (attempt ${attempt}/${attempts})`,
+          `${label} page ${page} failed (attempt ${attempt}/${attempts})`,
           error
         );
         if (attempt < attempts) {
@@ -892,7 +919,7 @@ export class ScrobbleHistorySyncService extends EventEmitter {
       }
     }
     throw new Error(
-      `Backfill stopped: page ${page} could not be fetched (${lastError instanceof Error ? lastError.message : String(lastError)})`
+      `${label} stopped: page ${page} could not be fetched (${lastError instanceof Error ? lastError.message : String(lastError)})`
     );
   }
 
@@ -913,9 +940,13 @@ export class ScrobbleHistorySyncService extends EventEmitter {
     if (this.isPaused) {
       this.isPaused = false;
       this.logger.info('Sync resumed');
-      // Continue from where we left off - this would require storing state
-      // For simplicity, we'll do an incremental sync
-      await this.startIncrementalSync();
+      // Paging state isn't kept, so a paused full sync starts again; an
+      // incremental one just tops up
+      if (this.pausedFullSync) {
+        await this.startFullSync();
+      } else {
+        await this.startIncrementalSync();
+      }
     }
   }
 

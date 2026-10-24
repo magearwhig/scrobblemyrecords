@@ -22,6 +22,7 @@
   --text-disabled: #999999;
   --text-inverse: #ffffff;
   --text-on-overlay: #ffffff; /* text on a dark scrim over artwork, both themes */
+  --text-on-fill: #1a1a1a; /* text on amber, green or blue fills, both themes */
   --text-accent: #b8892e;
 
   /* --- Status --- */
@@ -982,7 +983,7 @@ select.form-input:disabled {
 
 .status.connected {
   background: var(--success-color);
-  color: white;
+  color: var(--text-on-fill);
 }
 
 .status.disconnected {
@@ -1050,7 +1051,7 @@ select.form-input:disabled {
 
 .success-message {
   background: var(--success-color);
-  color: white;
+  color: var(--text-on-fill);
   padding: 1rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--status-success);
@@ -1080,7 +1081,7 @@ select.form-input:disabled {
 
 .message.success {
   background: var(--success-color);
-  color: white;
+  color: var(--text-on-fill);
   border: 1px solid var(--status-success);
 }
 
@@ -1869,6 +1870,30 @@ select.form-input:disabled {
 
 .mapping-result-item:hover {
   background: var(--bg-secondary);
+}
+
+/* Result rows are buttons so they can be picked with the keyboard */
+button.mapping-result-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+}
+
+button.mapping-result-item:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+button.mapping-result-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.mapping-result-info > span {
+  display: block;
 }
 
 .mapping-result-cover {
@@ -3013,7 +3038,7 @@ select.form-input:disabled {
 .date-range-picker-month.boundary-both {
   background: var(--accent-color);
   border-color: var(--accent-color);
-  color: var(--text-inverse);
+  color: var(--text-on-fill);
 }
 
 .date-range-picker-summary {
@@ -3056,7 +3081,7 @@ select.form-input:disabled {
 .date-range-picker-btn-apply {
   background: var(--accent-color);
   border: 1px solid var(--accent-color);
-  color: var(--text-inverse);
+  color: var(--text-on-fill);
 }
 
 .date-range-picker-btn-apply:hover:not(:disabled) {
@@ -3363,7 +3388,7 @@ select.form-input:disabled {
 
 .notification-type-info {
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-fill);
 }
 
 .notification-type-success {
@@ -3373,7 +3398,7 @@ select.form-input:disabled {
 
 .notification-type-warning {
   background: var(--accent-warning);
-  color: white;
+  color: var(--text-on-fill);
 }
 
 .notification-type-alert {
@@ -3486,7 +3511,7 @@ select.form-input:disabled {
 /* --- Seller Match Play Count Badge (inline with title) --- */
 .seller-match-badge-plays {
   background: var(--accent-color);
-  color: white;
+  color: var(--text-on-fill);
 }
 
 /* --- Seller Match "Last listened" text --- */

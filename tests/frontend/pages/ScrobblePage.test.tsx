@@ -408,8 +408,9 @@ describe('ScrobblePage', () => {
         expect(screen.getByText('3 selected')).toBeInTheDocument();
       });
 
-      // Deselect first track
+      // Deselect first track; each checkbox is named for its track
       const firstTrackCheckbox = screen.getAllByRole('checkbox')[0];
+      expect(firstTrackCheckbox).toHaveAccessibleName(/^Include .+ by /);
       await user.click(firstTrackCheckbox);
 
       expect(screen.getByText('2 selected')).toBeInTheDocument();
@@ -501,6 +502,7 @@ describe('ScrobblePage', () => {
       await user.click(customTimeRadio);
 
       expect(screen.getByDisplayValue('')).toBeInTheDocument(); // Custom time input should appear
+      expect(screen.getByLabelText('Custom scrobble time')).toBeInTheDocument();
     });
 
     it('shows formatted timestamp', async () => {
@@ -615,6 +617,27 @@ describe('ScrobblePage', () => {
         ['Intro / Sweet Jane', 475],
         ['Heroin', 791],
       ]);
+    });
+
+    it('shows tracks Last.fm ignored', async () => {
+      const user = userEvent.setup();
+      mockApi.scrobbleBatch.mockResolvedValue({
+        success: 1,
+        failed: 0,
+        ignored: 1,
+        errors: [
+          'Artist - Track: Scrobble ignored: Artist - Track (timestamp more than 14 days ago)',
+        ],
+      });
+
+      renderScrobblePageWithProviders(authStatus);
+      await user.click(
+        await screen.findByRole('button', { name: /Scrobble 2 Tracks/ })
+      );
+
+      expect(
+        await screen.findByText(/Ignored by Last.fm: 1 tracks/)
+      ).toBeInTheDocument();
     });
 
     it('allows scrobbling selected tracks', async () => {

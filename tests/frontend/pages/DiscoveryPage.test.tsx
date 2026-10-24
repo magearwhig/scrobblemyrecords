@@ -448,6 +448,40 @@ describe('DiscoveryPage', () => {
     });
   });
 
+  it('lets you pick a mapping result with the keyboard', async () => {
+    mockSearchCollection.mockResolvedValue([
+      {
+        id: 7,
+        release: {
+          id: 7,
+          title: 'OK Computer',
+          artist: 'Radiohead',
+          year: 1997,
+          cover_image: '',
+        },
+      },
+    ]);
+    mockCreateDiscoveryAlbumMapping.mockResolvedValue(undefined);
+    renderDiscoveryPage();
+
+    await user.click((await screen.findAllByText('Map'))[0]);
+    await user.type(
+      screen.getByPlaceholderText('Search by artist or album...'),
+      'ok computer{Enter}'
+    );
+    const choice = await screen.findByRole('button', {
+      name: /OK Computer.*Radiohead/,
+    });
+    choice.focus();
+    await user.keyboard('{Enter}');
+
+    await waitFor(() =>
+      expect(mockCreateDiscoveryAlbumMapping).toHaveBeenCalledWith(
+        expect.objectContaining({ collectionId: 7 })
+      )
+    );
+  });
+
   it('shows empty state when no missing albums', async () => {
     mockGetMissingAlbums.mockResolvedValue([]);
 

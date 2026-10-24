@@ -253,6 +253,77 @@ describe('CheckRecordPage', () => {
     expect(screen.queryByText('Comfort Eagle')).not.toBeInTheDocument();
   });
 
+  it('hides the previous answer as soon as the query changes', async () => {
+    let resolveSecond: (r: RecordCheckResult) => void = () => {};
+    mockCheckRecord
+      .mockResolvedValueOnce(
+        result({ query: 'u2', groups: [group({ owned: [copy(1)] })] })
+      )
+      .mockImplementationOnce(
+        () => new Promise<RecordCheckResult>(r => (resolveSecond = r))
+      );
+    renderPage();
+
+    await search('u2');
+    expect(screen.getByText('The Unforgettable Fire')).toBeInTheDocument();
+
+    // While waiting to search, then while the search is out
+    fireEvent.change(
+      screen.getByRole('searchbox', { name: /artist, title or discogs/i }),
+      { target: { value: 'cake' } }
+    );
+    expect(
+      screen.queryByText('The Unforgettable Fire')
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Searching…')).toBeInTheDocument();
+    await act(async () => {
+      jest.advanceTimersByTime(300);
+    });
+    expect(
+      screen.queryByText('The Unforgettable Fire')
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveSecond(
+        result({ query: 'cake', groups: [group({ title: 'Comfort Eagle' })] })
+      );
+    });
+    expect(screen.getByText('Comfort Eagle')).toBeInTheDocument();
+    expect(screen.queryByText('Searching…')).not.toBeInTheDocument();
+  });
+
+  it('says how old the collection is, and warns when it may be out of date', async () => {
+    const daysAgo = (days: number) =>
+      new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    mockCheckRecord
+      .mockResolvedValueOnce(
+        result({
+          collectionCache: {
+            ...result().collectionCache,
+            oldestPageAt: daysAgo(1),
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        result({
+          collectionCache: {
+            ...result().collectionCache,
+            oldestPageAt: daysAgo(30),
+          },
+        })
+      );
+    renderPage();
+
+    await search('cake');
+    expect(screen.getByText(/Collection as of/)).toBeInTheDocument();
+    expect(screen.queryByText(/last loaded/)).not.toBeInTheDocument();
+
+    await search('u2');
+    expect(
+      screen.getByText(/Your collection was last loaded .* Browse Collection/)
+    ).toBeInTheDocument();
+  });
+
   it('warns that a missing record is unconfirmed while the collection is partly loaded', async () => {
     mockCheckRecord.mockResolvedValue(
       result({

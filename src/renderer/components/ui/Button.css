@@ -41,12 +41,12 @@
 /* Primary variant */
 .button--primary {
   background: var(--accent-color);
-  color: var(--text-inverse);
+  color: var(--text-on-fill);
   border-color: var(--accent-color);
 }
 
 .button--primary.text-muted-sm {
-  color: var(--text-inverse);
+  color: var(--text-on-fill);
 }
 
 .button--primary:hover:not(:disabled) {
@@ -80,7 +80,7 @@
 /* Success variant */
 .button--success {
   background: var(--success-color);
-  color: var(--text-inverse);
+  color: var(--text-on-fill);
   border-color: var(--success-color);
 }
 
@@ -109,7 +109,7 @@
 
 .button--warning:hover:not(:disabled) {
   background: var(--accent-warning);
-  color: var(--text-inverse);
+  color: var(--text-on-fill);
 }
 
 /* Ghost variant (no border) */

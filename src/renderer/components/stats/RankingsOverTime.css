@@ -146,7 +146,7 @@
 .rankings-retry-button {
   padding: 0.625rem 1.25rem;
   background: var(--accent-primary);
-  color: var(--text-inverse);
+  color: var(--text-on-fill);
   border: none;
   border-radius: var(--radius-sm);
   font-size: var(--text-base);
@@ -186,6 +186,6 @@
 
   .rankings-tab-active {
     background: var(--accent-primary);
-    color: var(--text-inverse);
+    color: var(--text-on-fill);
   }
 }

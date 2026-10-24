@@ -326,23 +326,27 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
             ) : (
               <div className='mapping-results-list'>
                 {searchResults.map((item, index) => (
-                  <div
+                  <button
+                    type='button'
+                    disabled={mappingInProgress}
                     key={`${item.artist}-${item.album}-${index}`}
                     className='mapping-result-item mapping-result-item-pointer'
                     onClick={() =>
                       !mappingInProgress && handleSelectMapping(item)
                     }
                   >
-                    <div className='mapping-result-info'>
-                      <div className='mapping-result-title'>{item.album}</div>
-                      <div className='mapping-result-artist'>{item.artist}</div>
-                      <div className='mapping-result-stats'>
+                    <span className='mapping-result-info'>
+                      <span className='mapping-result-title'>{item.album}</span>
+                      <span className='mapping-result-artist'>
+                        {item.artist}
+                      </span>
+                      <span className='mapping-result-stats'>
                         <span>{item.playCount} plays</span>
                         <span className='separator'>•</span>
                         <span>Last played: {formatDate(item.lastPlayed)}</span>
-                      </div>
-                    </div>
-                  </div>
+                      </span>
+                    </span>
+                  </button>
                 ))}
               </div>
             )}
@@ -506,7 +510,9 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
                 const isAlreadyMapped = existingMappings.has(mappingKey);
 
                 return (
-                  <div
+                  <button
+                    type='button'
+                    disabled={mappingInProgress || isAlreadyMapped}
                     key={`${item.artist}-${item.album}-${index}`}
                     className={`mapping-result-item ${isAlreadyMapped ? 'mapping-result-item-disabled' : 'mapping-result-item-pointer'}`}
                     onClick={() =>
@@ -515,23 +521,25 @@ const AlbumScrobbleHistory: React.FC<AlbumScrobbleHistoryProps> = ({
                       handleSelectMapping(item)
                     }
                   >
-                    <div className='mapping-result-info'>
-                      <div className='mapping-result-title'>
+                    <span className='mapping-result-info'>
+                      <span className='mapping-result-title'>
                         {item.album}
                         {isAlreadyMapped && (
                           <span className='mapping-badge-mapped'>
                             <Check size={12} aria-hidden='true' /> Mapped
                           </span>
                         )}
-                      </div>
-                      <div className='mapping-result-artist'>{item.artist}</div>
-                      <div className='mapping-result-stats'>
+                      </span>
+                      <span className='mapping-result-artist'>
+                        {item.artist}
+                      </span>
+                      <span className='mapping-result-stats'>
                         <span>{item.playCount} plays</span>
                         <span className='separator'>•</span>
                         <span>Last played: {formatDate(item.lastPlayed)}</span>
-                      </div>
-                    </div>
-                  </div>
+                      </span>
+                    </span>
+                  </button>
                 );
               })}
             </div>

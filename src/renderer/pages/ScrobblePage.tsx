@@ -1,4 +1,4 @@
-import { Check, XCircle } from 'lucide-react';
+import { AlertTriangle, Check, XCircle } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import './ScrobblePage.page.css';
 
@@ -35,6 +35,7 @@ const ScrobblePage: React.FC = () => {
   const [results, setResults] = useState<{
     success: number;
     failed: number;
+    ignored?: number;
     errors?: string[];
   } | null>(null);
   const [error, setError] = useState<string>('');
@@ -409,6 +410,7 @@ const ScrobblePage: React.FC = () => {
               <input
                 type='datetime-local'
                 className='form-input scrobble-datetime-input'
+                aria-label='Custom scrobble time'
                 value={customTimestamp}
                 onChange={e => setCustomTimestamp(e.target.value)}
               />
@@ -459,6 +461,7 @@ const ScrobblePage: React.FC = () => {
                     onChange={() => handleTrackSelection(index)}
                     disabled={scrobbling}
                     className='scrobble-track-checkbox'
+                    aria-label={`Include ${track.track} by ${track.artist}`}
                   />
                   <div className='scrobble-track-info'>
                     <div className='scrobble-track-title'>{track.track}</div>
@@ -503,6 +506,13 @@ const ScrobblePage: React.FC = () => {
                 <div className='scrobble-result-failed'>
                   <XCircle size={14} aria-hidden='true' /> Failed to scrobble:{' '}
                   {results.failed} tracks
+                </div>
+              )}
+              {!!results.ignored && (
+                <div className='scrobble-result-ignored'>
+                  <AlertTriangle size={14} aria-hidden='true' /> Ignored by
+                  Last.fm: {results.ignored} tracks. Retry them from History
+                  after fixing the cause.
                 </div>
               )}
               {results.errors && results.errors.length > 0 && (

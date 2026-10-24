@@ -131,7 +131,7 @@
   font-size: var(--text-base);
   padding: 0.2rem 0.5rem;
   background-color: var(--accent-color);
-  color: white;
+  color: var(--text-on-fill);
   border-radius: var(--radius-lg);
   font-weight: 500;
 }

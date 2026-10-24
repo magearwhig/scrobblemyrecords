@@ -231,3 +231,11 @@
   display: flex;
   gap: 1rem;
 }
+
+.scrobble-result-ignored {
+  color: var(--warning-text);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}

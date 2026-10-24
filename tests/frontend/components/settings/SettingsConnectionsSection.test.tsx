@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import React from 'react';
@@ -371,6 +371,146 @@ describe('SettingsConnectionsSection', () => {
       await waitFor(() => {
         expect(screen.getByText('Failed to clear')).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Popup sign-in', () => {
+    let openSpy: jest.SpyInstance;
+
+    afterEach(() => {
+      openSpy.mockRestore();
+      jest.useRealTimers();
+    });
+
+    it('says when the sign-in window is blocked and lets you try again', async () => {
+      openSpy = jest.spyOn(window, 'open').mockReturnValue(null);
+      (mockApi.getDiscogsAuthUrl as jest.Mock).mockResolvedValue(
+        'https://discogs.example/auth'
+      );
+      renderWithProviders();
+
+      await user.click(
+        screen.getByRole('button', { name: /Connect to Discogs/ })
+      );
+
+      expect(
+        await screen.findByText(/sign-in window was blocked/)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Connect to Discogs/ })
+      ).toBeEnabled();
+    });
+
+    it('stops waiting after five minutes', async () => {
+      jest.useFakeTimers();
+      const popup = { closed: false, close: jest.fn() };
+      openSpy = jest
+        .spyOn(window, 'open')
+        .mockReturnValue(popup as unknown as typeof window);
+      (mockApi.getLastfmAuthUrl as jest.Mock).mockResolvedValue(
+        'https://last.fm.example/auth'
+      );
+      const timedUser = userEvent.setup({
+        advanceTimers: jest.advanceTimersByTime,
+      });
+      renderWithProviders();
+
+      await timedUser.click(
+        screen.getByRole('button', { name: /Connect to Last\.fm/ })
+      );
+      expect(
+        screen.getByRole('button', { name: /Connecting/ })
+      ).toBeInTheDocument();
+      await act(async () => {
+        jest.advanceTimersByTime(300000);
+      });
+
+      expect(
+        screen.getByText('Last.fm authentication timed out')
+      ).toBeInTheDocument();
+      expect(popup.close).toHaveBeenCalled();
+      expect(
+        screen.getByRole('button', { name: /Connect to Last\.fm/ })
+      ).toBeEnabled();
+    });
+
+    it('ignores a late reply from an earlier sign-in attempt', async () => {
+      jest.useFakeTimers();
+      const discogsPopup = { closed: false, close: jest.fn() };
+      const lastfmPopup = { closed: false, close: jest.fn() };
+      openSpy = jest
+        .spyOn(window, 'open')
+        .mockReturnValueOnce(discogsPopup as unknown as typeof window)
+        .mockReturnValueOnce(lastfmPopup as unknown as typeof window);
+      (mockApi.getDiscogsAuthUrl as jest.Mock).mockResolvedValue(
+        'https://discogs.example/auth'
+      );
+      (mockApi.getLastfmAuthUrl as jest.Mock).mockResolvedValue(
+        'https://last.fm.example/auth'
+      );
+      let resolveStatus: (v: unknown) => void = () => {};
+      (mockApi.getAuthStatus as jest.Mock).mockImplementation(
+        () => new Promise(r => (resolveStatus = r))
+      );
+      const timedUser = userEvent.setup({
+        advanceTimers: jest.advanceTimersByTime,
+      });
+      renderWithProviders();
+
+      await timedUser.click(
+        screen.getByRole('button', { name: /Connect to Discogs/ })
+      );
+      discogsPopup.closed = true;
+      await act(async () => {
+        jest.advanceTimersByTime(2500);
+      });
+      await timedUser.click(
+        screen.getByRole('button', { name: /Connect to Last\.fm/ })
+      );
+      await act(async () => {
+        resolveStatus({
+          discogs: { authenticated: true, username: 'digger' },
+          lastfm: { authenticated: false },
+        });
+      });
+
+      expect(
+        screen.queryByText(/Successfully connected to Discogs/)
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Connecting/ })
+      ).toBeInTheDocument();
+    });
+
+    it('connects once the window closes and the account is seen', async () => {
+      jest.useFakeTimers();
+      const popup = { closed: false, close: jest.fn() };
+      openSpy = jest
+        .spyOn(window, 'open')
+        .mockReturnValue(popup as unknown as typeof window);
+      (mockApi.getDiscogsAuthUrl as jest.Mock).mockResolvedValue(
+        'https://discogs.example/auth'
+      );
+      (mockApi.getAuthStatus as jest.Mock).mockResolvedValue({
+        discogs: { authenticated: true, username: 'digger' },
+        lastfm: { authenticated: false },
+      });
+      const timedUser = userEvent.setup({
+        advanceTimers: jest.advanceTimersByTime,
+      });
+      renderWithProviders();
+
+      await timedUser.click(
+        screen.getByRole('button', { name: /Connect to Discogs/ })
+      );
+      popup.closed = true;
+      await act(async () => {
+        jest.advanceTimersByTime(2500);
+      });
+
+      expect(
+        screen.getByText('Successfully connected to Discogs as digger')
+      ).toBeInTheDocument();
     });
   });
 

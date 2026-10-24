@@ -460,7 +460,7 @@
 
 .lastfm-history-view-btn.active {
   background: var(--accent-color);
-  color: white;
+  color: var(--text-on-fill);
 }
 
 /* Albums view: pointer to plays without album info */

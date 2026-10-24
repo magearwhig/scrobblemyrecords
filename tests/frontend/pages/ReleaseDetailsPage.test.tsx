@@ -922,9 +922,7 @@ describe('ReleaseDetailsPage Scrobble Progress and Results', () => {
       expect(screen.getByText('Scrobble Results:')).toBeInTheDocument();
       expect(screen.getByText(/1 ignored/)).toBeInTheDocument();
       expect(
-        screen.getByText(
-          /Ignored scrobbles usually mean the track was scrobbled too recently/
-        )
+        screen.getByText(/Ignored scrobbles aren.t on Last.fm/)
       ).toBeInTheDocument();
     });
 

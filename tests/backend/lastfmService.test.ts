@@ -347,6 +347,27 @@ describe('LastFmService', () => {
       });
     });
 
+    it('says why Last.fm ignored a scrobble', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        sessionKey: 'testsession',
+      });
+      mockAxiosInstance.post.mockResolvedValue({
+        data: {
+          scrobbles: {
+            '@attr': { accepted: 0, ignored: 1 },
+            scrobble: { ignoredMessage: { code: '3', '#text': '' } },
+          },
+        },
+      });
+
+      const result = await lastfmService.scrobbleTrack(mockTrack);
+
+      expect(result.message).toBe(
+        'Scrobble ignored: Test Artist - Test Track (timestamp more than 14 days ago)'
+      );
+    });
+
     it('should handle API errors', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({
         apiKey: 'testkey',
@@ -488,6 +509,32 @@ describe('LastFmService', () => {
         failedTracks: expect.any(Array),
         sessionId: 'session-123',
       });
+    });
+
+    it('leaves a session with ignored tracks retryable', async () => {
+      mockAuthService.getLastFmCredentials.mockResolvedValue({
+        apiKey: 'testkey',
+        sessionKey: 'testsession',
+      });
+      mockAxiosInstance.post
+        .mockResolvedValueOnce({
+          data: { scrobbles: { '@attr': { accepted: 1, ignored: 0 } } },
+        })
+        .mockResolvedValueOnce({
+          data: { scrobbles: { '@attr': { accepted: 0, ignored: 1 } } },
+        });
+
+      const result = await lastfmService.scrobbleBatch(
+        mockTracks.map(t => ({ ...t }))
+      );
+
+      expect(result).toMatchObject({ success: 1, failed: 0, ignored: 1 });
+      expect(result.failedTracks).toHaveLength(1);
+      const calls = mockFileStorage.writeJSON.mock.calls;
+      const saved = calls[calls.length - 1][1] as {
+        status: string;
+      };
+      expect(saved.status).toBe('failed');
     });
 
     it('should handle empty batch', async () => {

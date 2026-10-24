@@ -267,6 +267,11 @@ export interface ScrobbleHistoryIndex {
   lastSyncCompletedAt?: number;
   /** When a full-range backfill last finished (ms) */
   lastFullBackfillAt?: number;
+  /**
+   * Set while a full sync is saved part-way (first sync only); the next sync
+   * runs the full sync again instead of an incremental one
+   */
+  fullSyncIncomplete?: boolean;
   schemaVersion?: number;
 }
 

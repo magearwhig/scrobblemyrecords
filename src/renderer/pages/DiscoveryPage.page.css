@@ -154,7 +154,7 @@
 
 .discovery-tab.active {
   background: var(--accent-color);
-  color: white;
+  color: var(--text-on-fill);
   border-color: var(--accent-color);
 }
 
@@ -178,7 +178,7 @@
 .discovery-badge-wanted,
 .discovery-badge-monitoring {
   background: var(--success-color);
-  color: white;
+  color: var(--text-on-fill);
 }
 
 /* Forgotten Favorites styles */
@@ -252,7 +252,7 @@
   left: 50%;
   transform: translateX(-50%);
   background: var(--success-color);
-  color: white;
+  color: var(--text-on-fill);
   padding: 0.75rem 1.5rem;
   border-radius: var(--radius-md);
   font-size: var(--text-base);
@@ -290,4 +290,29 @@
 .forgotten-collection-badge {
   margin-left: 0.5rem;
   vertical-align: middle;
+}
+
+/* Phones: stack each row and let filters and actions wrap */
+@media (max-width: 768px) {
+  .discovery-controls {
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .missing-item {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  .missing-item-info {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .missing-item-actions {
+    margin-left: 0;
+    flex-shrink: 1;
+    flex-wrap: wrap;
+  }
 }

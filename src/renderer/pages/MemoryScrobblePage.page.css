@@ -246,3 +246,16 @@
   color: var(--text-tertiary);
   font-size: var(--text-sm);
 }
+
+.memory-scrobble-result-ignored {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--warning-text);
+  font-size: var(--text-sm);
+}
+
+.memory-scrobble-result-details {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}

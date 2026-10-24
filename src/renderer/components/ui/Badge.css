@@ -55,7 +55,7 @@
 /* Primary variant */
 .badge--primary {
   background: var(--accent-color);
-  color: var(--text-inverse);
+  color: var(--text-on-fill);
 }
 
 /* Secondary variant */
@@ -67,7 +67,7 @@
 /* Success variant */
 .badge--success {
   background: var(--success-color);
-  color: var(--text-inverse);
+  color: var(--text-on-fill);
 }
 
 /* Warning variant */
@@ -85,7 +85,7 @@
 /* Info variant */
 .badge--info {
   background: var(--status-algo);
-  color: var(--text-inverse);
+  color: var(--text-on-fill);
 }
 
 /* Outline variants */

@@ -297,7 +297,7 @@
   top: 0.5rem;
   right: 0.5rem;
   background-color: var(--accent-color);
-  color: white;
+  color: var(--text-on-fill);
   padding: 0.25rem 0.5rem;
   border-radius: var(--radius-sm);
   font-size: var(--text-xs);
@@ -377,7 +377,7 @@
 
 .badge-success {
   background-color: var(--success-color);
-  color: white;
+  color: var(--text-on-fill);
 }
 
 .badge-warning {
@@ -392,7 +392,7 @@
 
 .badge-info {
   background-color: var(--accent-color);
-  color: white;
+  color: var(--text-on-fill);
 }
 
 .price-range {
@@ -600,7 +600,7 @@
 .new-releases-sync-progress .sync-auto-continue-badge {
   padding: 0.125rem 0.4rem;
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-fill);
   border-radius: var(--radius-sm);
   font-size: var(--text-xs);
   font-weight: 600;
@@ -770,7 +770,7 @@
 
 .new-release-badge.new {
   background: var(--status-success);
-  color: white;
+  color: var(--text-on-fill);
 }
 
 .new-release-format {
@@ -851,5 +851,5 @@
   font-weight: 600;
   border-radius: var(--radius-lg);
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-fill);
 }
