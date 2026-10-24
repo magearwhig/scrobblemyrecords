@@ -65,6 +65,15 @@ describe('WishlistItemCard', () => {
     user = userEvent.setup();
   });
 
+  it('shows no year, not a 0, when the year is unknown', () => {
+    const { container } = render(
+      <WishlistItemCard {...defaultProps} item={createMockItem({ year: 0 })} />
+    );
+
+    expect(container.querySelector('.wishlist-card-year')).toBeNull();
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
+  });
+
   it('renders basic item information', () => {
     // Act
     render(<WishlistItemCard {...defaultProps} />);

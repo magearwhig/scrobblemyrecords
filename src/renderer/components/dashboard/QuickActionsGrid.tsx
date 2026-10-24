@@ -1,7 +1,10 @@
 import { Disc3, Package, Sparkles, Target } from 'lucide-react';
 import React from 'react';
 
-import { DashboardQuickActions } from '../../../shared/types';
+import {
+  DASHBOARD_COUNT_CAP,
+  DashboardQuickActions,
+} from '../../../shared/types';
 import { navigate } from '../../routes';
 
 interface QuickActionsGridProps {
@@ -17,14 +20,18 @@ interface ActionCard {
   formatCount: (count: number) => string;
 }
 
+// A count at the cap is a capped list length, not a total
+const formatCapped = (count: number) =>
+  count >= DASHBOARD_COUNT_CAP ? `${DASHBOARD_COUNT_CAP}+` : `${count}`;
+
 const ACTION_CARDS: ActionCard[] = [
   {
     key: 'newSellerMatches',
     icon: <Target size={20} aria-hidden='true' />,
-    label: 'seller matches',
+    label: 'active seller matches',
     route: '/sellers',
     urgency: 'high',
-    formatCount: count => `${count} new`,
+    formatCount: count => `${count}`,
   },
   {
     key: 'missingAlbumsCount',
@@ -32,7 +39,7 @@ const ACTION_CARDS: ActionCard[] = [
     label: "albums you've played but don't own",
     route: '/discovery',
     urgency: 'medium',
-    formatCount: count => `${count}`,
+    formatCount: formatCapped,
   },
   {
     key: 'wantListCount',
@@ -48,7 +55,7 @@ const ACTION_CARDS: ActionCard[] = [
     label: 'albums need some attention',
     route: '/stats',
     urgency: 'low',
-    formatCount: count => `${count}`,
+    formatCount: formatCapped,
   },
 ];
 

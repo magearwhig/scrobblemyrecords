@@ -914,6 +914,26 @@ describe('CollectionAnalyticsService', () => {
       expect(result.totalLabels).toBe(3);
     });
 
+    it('counts label spellings that group together once', async () => {
+      const items = [
+        createCollectionItem({
+          id: 1,
+          release: { id: 100, label: ['Sub Pop'] },
+        }),
+        createCollectionItem({
+          id: 2,
+          release: { id: 200, label: ['Sub Pop Records'] },
+        }),
+        createCollectionItem({ id: 3, release: { id: 300, label: ['Merge'] } }),
+      ];
+
+      const summary = await service.getCollectionSummary(items);
+      const distribution = await service.getLabelDistribution(items);
+
+      expect(summary.totalLabels).toBe(2);
+      expect(summary.totalLabels).toBe(distribution.totalLabels);
+    });
+
     it('should find oldest and newest releases', async () => {
       // Arrange
       const items = [

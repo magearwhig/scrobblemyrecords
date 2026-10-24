@@ -19,6 +19,7 @@ const logger = createLogger('TrackDetailPage');
 
 /** Page name mapping for back navigation label */
 const PAGE_NAMES: Record<string, string> = {
+  [ROUTES.ALBUM_DETAIL]: 'Album',
   [ROUTES.HOME]: 'Dashboard',
   [ROUTES.STATS]: 'Stats',
   [ROUTES.HISTORY]: 'History',

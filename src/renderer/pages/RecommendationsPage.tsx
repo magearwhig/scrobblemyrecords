@@ -12,6 +12,7 @@ import { AlbumCardSkeleton } from '../components/ui/Skeleton';
 import useEmbeddingStatus from '../hooks/useEmbeddingStatus';
 import {
   createSuccessNotification,
+  createWarningNotification,
   useNotifications,
 } from '../hooks/useNotifications';
 import useRecommendations from '../hooks/useRecommendations';
@@ -63,13 +64,20 @@ const RecommendationsPage: React.FC = () => {
   );
 
   const handleFeedback = useCallback(
-    (
+    async (
       releaseId: number,
       action: 'played' | 'skipped' | 'not_interested',
       releaseTitle: string
     ) => {
-      submitFeedback(releaseId, action);
-      if (action === 'played') {
+      const ok = await submitFeedback(releaseId, action);
+      if (!ok) {
+        addNotification(
+          createWarningNotification(
+            "Couldn't save feedback",
+            `"${releaseTitle}" is still in your recommendations. Try again.`
+          )
+        );
+      } else if (action === 'played') {
         addNotification(
           createSuccessNotification(
             'Marked as played',

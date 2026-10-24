@@ -16,7 +16,9 @@ const VinylVsDigitalSlide: React.FC<VinylVsDigitalSlideProps> = ({
   if (total === 0) {
     return (
       <WrappedSlide>
-        <h2 className='wrapped-slide-heading'>Vinyl vs Digital</h2>
+        <h2 className='wrapped-slide-heading'>
+          Listenography vs Everywhere Else
+        </h2>
         <p className='wrapped-subtitle'>
           No source data available for this period.
         </p>
@@ -26,7 +28,9 @@ const VinylVsDigitalSlide: React.FC<VinylVsDigitalSlideProps> = ({
 
   return (
     <WrappedSlide>
-      <h2 className='wrapped-slide-heading'>Vinyl vs Digital</h2>
+      <h2 className='wrapped-slide-heading'>
+        Listenography vs Everywhere Else
+      </h2>
       <div className='wrapped-source-breakdown'>
         <div className='wrapped-source-bar'>
           <div
@@ -44,14 +48,15 @@ const VinylVsDigitalSlide: React.FC<VinylVsDigitalSlideProps> = ({
           <div className='wrapped-source-item'>
             <span className='wrapped-source-swatch wrapped-source-swatch-vinyl' />
             <span>
-              RecordScrobbles: {crossSource.vinylScrobbles.toLocaleString()} (
+              Scrobbled from Listenography:{' '}
+              {crossSource.vinylScrobbles.toLocaleString()} (
               {crossSource.vinylPercentage}%)
             </span>
           </div>
           <div className='wrapped-source-item'>
             <span className='wrapped-source-swatch wrapped-source-swatch-other' />
             <span>
-              Other: {crossSource.otherScrobbles.toLocaleString()} (
+              Other sources: {crossSource.otherScrobbles.toLocaleString()} (
               {100 - crossSource.vinylPercentage}%)
             </span>
           </div>

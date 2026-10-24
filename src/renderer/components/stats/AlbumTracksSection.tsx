@@ -103,7 +103,7 @@ const AlbumTracksSection: React.FC<AlbumTracksSectionProps> = ({
   return (
     <div className='detail-page-section'>
       <div className='album-tracks-header'>
-        <h3>Tracks</h3>
+        <h3>Most played tracks</h3>
         {tracks.length > 1 && !merging && (
           <Button
             variant='ghost'

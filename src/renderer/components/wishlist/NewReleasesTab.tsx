@@ -388,8 +388,10 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
         <div className='empty-state'>
           <p>No new releases detected.</p>
           <p className='text-secondary'>
-            New vinyl pressings for albums on your wishlist will appear here.
-            Click "Check Now" to scan for new releases.
+            New vinyl pressings for albums on your wishlist will appear here.{' '}
+            {hasMoreBatches
+              ? `${totalMasters - lastCheckedIndex} of ${totalMasters} masters haven't been checked yet — click "Check Next Batch" or "Check All Remaining".`
+              : 'Click "Check Now" to scan again.'}
           </p>
         </div>
       ) : (

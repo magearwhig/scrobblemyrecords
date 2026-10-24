@@ -44,6 +44,7 @@ import {
   ExcludedArtistResponse,
   ExcludedHistoryArtist,
   ExportSnapshotMeta,
+  RecordCheckResult,
   ArtistFilingOverride,
   ArtistFilingRow,
   RecordStoreFilingJobStatus,
@@ -2340,6 +2341,17 @@ class ApiService {
    */
   async getExportMeta(): Promise<ExportSnapshotMeta> {
     const response = await this.api.get('/export/meta');
+    return response.data.data;
+  }
+
+  /**
+   * Check a Record: whether a record is owned, wanted or was traded away,
+   * from an artist/title search or a Discogs release URL or id
+   */
+  async checkRecord(query: string): Promise<RecordCheckResult> {
+    const response = await this.api.get('/lookup/check', {
+      params: { q: query },
+    });
     return response.data.data;
   }
 

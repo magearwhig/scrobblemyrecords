@@ -503,6 +503,15 @@
     padding: 1rem;
   }
 
+  .discard-pile-page .filter-controls {
+    flex-wrap: wrap;
+  }
+
+  .discard-pile-page .search-input {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
   .discard-stats-summary {
     grid-template-columns: repeat(2, 1fr);
   }

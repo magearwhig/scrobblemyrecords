@@ -225,20 +225,10 @@ describe('SuggestionCard', () => {
     expect(screen.getByText(/2020.*•.*Vinyl/)).toBeInTheDocument();
   });
 
-  it('navigates to release details when View in Collection is clicked', async () => {
+  it('stores release data and navigates when Open release is clicked', async () => {
     render(<SuggestionCard suggestion={mockSuggestion} />);
 
-    const viewButton = screen.getByText('View in Collection');
-    await user.click(viewButton);
-
-    expect(window.location.hash).toBe('#release-details');
-  });
-
-  it('stores release data and navigates when Details button is clicked', async () => {
-    render(<SuggestionCard suggestion={mockSuggestion} />);
-
-    const detailsButton = screen.getByText('Details');
-    await user.click(detailsButton);
+    await user.click(screen.getByText('Open release'));
 
     expect(localStorageMock.setItem).toHaveBeenCalled();
     // Component navigates to release-details (without the ID in hash)

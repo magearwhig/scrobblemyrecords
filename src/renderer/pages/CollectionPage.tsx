@@ -1720,7 +1720,7 @@ const CollectionPage: React.FC = () => {
               <strong>{discardModalItem.release.artist}</strong>
               <span> - </span>
               <span>{discardModalItem.release.title}</span>
-              {discardModalItem.release.year && (
+              {!!discardModalItem.release.year && (
                 <span className='text-muted'>
                   {' '}
                   ({discardModalItem.release.year})

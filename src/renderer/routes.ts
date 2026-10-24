@@ -22,6 +22,7 @@ export const ROUTES = {
   RECOMMENDATIONS: 'recommendations',
   MEMORY_SCROBBLE: 'memory-scrobble',
   CRATES: 'crates',
+  CHECK_RECORD: 'check',
 } as const;
 
 /**

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import React from 'react';
@@ -33,6 +33,11 @@ jest.mock('../../../src/renderer/components/NotificationBell', () => ({
   NotificationBell: () => <div data-testid='notification-bell' />,
 }));
 
+const mockAuth = { discogs: { authenticated: false } };
+jest.mock('../../../src/renderer/context/AuthContext', () => ({
+  useAuth: () => ({ authStatus: mockAuth, setAuthStatus: jest.fn() }),
+}));
+
 // Mock lucide-react icons
 jest.mock('lucide-react', () => ({
   Sun: ({ size }: { size: number }) => (
@@ -41,6 +46,9 @@ jest.mock('lucide-react', () => ({
   Moon: ({ size }: { size: number }) => (
     <svg data-testid='moon-icon' data-size={size} />
   ),
+  Menu: () => <svg data-testid='menu-icon' />,
+  ScanSearch: () => <svg data-testid='scan-search-icon' />,
+  X: () => <svg data-testid='close-icon' />,
 }));
 
 const renderHeader = (isDarkMode: boolean = false) => {
@@ -116,5 +124,73 @@ describe('Header', () => {
     renderHeader(false);
     const moonIcon = screen.getByTestId('moon-icon');
     expect(moonIcon).toHaveAttribute('data-size', '18');
+  });
+
+  it('has no menu button outside the phone layout', () => {
+    renderHeader();
+    expect(
+      screen.queryByRole('button', { name: 'Open navigation' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a menu button that toggles the navigation drawer on phones', () => {
+    const onMenuToggle = jest.fn();
+    const { rerender } = render(
+      <Header showMenuButton menuOpen={false} onMenuToggle={onMenuToggle} />
+    );
+
+    const button = screen.getByRole('button', { name: 'Open navigation' });
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(button).toHaveAttribute('aria-controls', 'app-sidebar');
+    button.click();
+    expect(onMenuToggle).toHaveBeenCalledTimes(1);
+
+    rerender(<Header showMenuButton menuOpen onMenuToggle={onMenuToggle} />);
+    expect(
+      screen.getByRole('button', { name: 'Close navigation' })
+    ).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  describe('Check a Record search', () => {
+    beforeEach(() => {
+      mockAuth.discogs.authenticated = true;
+      window.location.hash = '#home';
+    });
+    afterEach(() => {
+      mockAuth.discogs.authenticated = false;
+      window.location.hash = '';
+    });
+
+    it('opens Check a Record with what was typed', () => {
+      render(<Header currentPage='home' />);
+
+      const input = screen.getByRole('textbox', { name: /check a record/i });
+      fireEvent.change(input, { target: { value: 'comfort eagle' } });
+      fireEvent.submit(input);
+
+      expect(window.location.hash).toBe('#check?q=comfort+eagle');
+      expect(input).toHaveValue('');
+    });
+
+    it('is hidden on the Check a Record page and before Discogs is connected', () => {
+      const { rerender } = render(<Header currentPage='check' />);
+      expect(
+        screen.queryByRole('search', { name: /check a record/i })
+      ).not.toBeInTheDocument();
+
+      mockAuth.discogs.authenticated = false;
+      rerender(<Header currentPage='home' />);
+      expect(
+        screen.queryByRole('search', { name: /check a record/i })
+      ).not.toBeInTheDocument();
+    });
+
+    it('is a button on phones', () => {
+      render(<Header currentPage='home' showMenuButton />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Check a record' }));
+
+      expect(window.location.hash).toBe('#check');
+    });
   });
 });

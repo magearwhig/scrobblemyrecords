@@ -2241,6 +2241,9 @@ export interface DashboardQuickStats {
 /**
  * Quick action counts for actionable items
  */
+/** Missing-album and dusty-corner counts on the dashboard stop at this many */
+export const DASHBOARD_COUNT_CAP = 100;
+
 export interface DashboardQuickActions {
   newSellerMatches: number;
   missingAlbumsCount: number;
@@ -3994,6 +3997,92 @@ export interface ExportSnapshotMeta {
   historySyncedAt: string | null;
   /** Identifies whose data it is; no tokens */
   discogsUsername: string | null;
+}
+
+// ============================================
+// Check a Record (site review 2026-10-23, feature #1)
+// ============================================
+
+/** How a result group was found */
+export type RecordCheckMatch = 'release-id' | 'master-id' | 'text' | 'linked';
+
+/** One collection copy in a Check a Record result */
+export interface RecordCheckCopy {
+  rowId: string;
+  releaseId: number;
+  artist: string;
+  title: string;
+  year: number | null;
+  formats: string[];
+  labels: string[];
+  /** ISO date added to the collection */
+  dateAdded: string | null;
+  /** The release the query named (release URL or id queries only) */
+  isQueriedRelease: boolean;
+}
+
+/** One Discogs want or monitored (local) want */
+export interface RecordCheckWant {
+  rowId: string;
+  source: 'discogs-want' | 'local-want';
+  releaseId: number | null;
+  artist: string;
+  title: string;
+  year: number | null;
+  formats: string[];
+  /** Whether the collection already has it (see ExportWishlistRow) */
+  ownedMatch: OwnedMatchStatus;
+  ownedMatchConfidence: MatchConfidence | null;
+  lowestVinylPrice: number | null;
+  priceCurrency: string | null;
+  dateAdded: string | null;
+}
+
+/** One discard pile item: still on the pile, or sold/traded/gifted/removed */
+export interface RecordCheckDiscard {
+  id: string;
+  releaseId: number;
+  artist: string;
+  title: string;
+  year: number | null;
+  status: DiscardStatus;
+  reason: DiscardReason;
+  /** ms */
+  addedAt: number;
+  /** ms */
+  statusChangedAt: number;
+}
+
+/**
+ * One album in the results: rows grouped by confirmed Discogs master (or
+ * release), never merged through name-only or search-guess links
+ */
+export interface RecordCheckGroup {
+  key: string;
+  artist: string;
+  title: string;
+  year: number | null;
+  coverImageUrl: string | null;
+  matchedBy: RecordCheckMatch;
+  owned: RecordCheckCopy[];
+  wants: RecordCheckWant[];
+  monitored: RecordCheckWant[];
+  discards: RecordCheckDiscard[];
+}
+
+export interface RecordCheckResult {
+  query: string;
+  /** Set when the query was a Discogs release URL or id */
+  releaseId: number | null;
+  /** For release queries: whether any cached source knows that release */
+  releaseRecognized: boolean | null;
+  groups: RecordCheckGroup[];
+  /** Groups left out after the cap */
+  hasMore: boolean;
+  /** Without a complete cache, "no match" can't mean "not owned" */
+  collectionCache: ExportCollectionCacheInfo;
+  /** ISO; when the data behind the results was read */
+  generatedAt: string;
 }
 
 // ============================================

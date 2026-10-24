@@ -68,7 +68,7 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
       <div className='wishlist-card-content'>
         <h4 className='wishlist-card-title'>{item.title}</h4>
         <p className='wishlist-card-artist'>{item.artist}</p>
-        {item.year && <p className='wishlist-card-year'>{item.year}</p>}
+        {!!item.year && <p className='wishlist-card-year'>{item.year}</p>}
         <div className='wishlist-card-meta'>
           <span className='wishlist-card-date'>
             Added: {formatDate(item.dateAdded)}

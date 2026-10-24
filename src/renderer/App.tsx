@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 
 import { AuthStatus } from '../shared/types';
 
@@ -15,6 +15,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { useJobPoller } from './hooks/useJobPoller';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { PHONE_MEDIA_QUERY, useMediaQuery } from './hooks/useMediaQuery';
 import { DEFAULT_ROUTE, ROUTE_REDIRECTS, ROUTES, navigate } from './routes';
 import { recordRouteVisit } from './utils/collectionViewSnapshot';
 
@@ -36,6 +37,17 @@ const App: React.FC = () => {
     return saved === 'true';
   });
   const [helpOpen, setHelpOpen] = useState(false);
+  // On phones the sidebar is a drawer, closed until the header menu opens it
+  const isPhone = useMediaQuery(PHONE_MEDIA_QUERY);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Where focus goes once the drawer has closed (and the page is no longer
+  // inert): the chosen page after navigating, the menu button after dismissing
+  const focusAfterCloseRef = useRef<'content' | 'menu' | null>(null);
+  const closeMobileNav = useCallback((reason: 'navigate' | 'dismiss') => {
+    focusAfterCloseRef.current = reason === 'navigate' ? 'content' : 'menu';
+    setMobileNavOpen(false);
+  }, []);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const handleFocusSearch = useCallback(() => {
     const searchInput = document.querySelector<HTMLInputElement>(
@@ -72,6 +84,19 @@ const App: React.FC = () => {
     setSidebarCollapsed(collapsed);
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
   };
+
+  // Leaving phone width closes the drawer, so it isn't open next time
+  useEffect(() => {
+    if (!isPhone) setMobileNavOpen(false);
+  }, [isPhone]);
+
+  useEffect(() => {
+    if (mobileNavOpen || !focusAfterCloseRef.current) return;
+    const target = focusAfterCloseRef.current;
+    focusAfterCloseRef.current = null;
+    if (target === 'content') contentRef.current?.focus();
+    else document.querySelector<HTMLElement>('.header-menu-toggle')?.focus();
+  }, [mobileNavOpen]);
 
   // Runs after child effects, so a newly mounted page can still see the
   // previous route when it initializes.
@@ -110,6 +135,8 @@ const App: React.FC = () => {
       }
 
       setCurrentPage(hash);
+      // Any navigation, from the drawer or a link in the page, closes it
+      setMobileNavOpen(false);
     };
 
     // Set initial page based on hash
@@ -131,17 +158,38 @@ const App: React.FC = () => {
             <JobPollerSetup />
             <div className='app'>
               <SyncStatusBar globalBar />
-              <Header />
+              <Header
+                showMenuButton={isPhone}
+                menuOpen={mobileNavOpen}
+                onMenuToggle={() => setMobileNavOpen(open => !open)}
+                currentPage={currentPage}
+              />
               <div
-                className={`main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+                className={`main-content ${sidebarCollapsed && !isPhone ? 'sidebar-collapsed' : ''}`}
               >
+                {isPhone && mobileNavOpen && (
+                  <div
+                    className='sidebar-backdrop'
+                    onClick={() => closeMobileNav('dismiss')}
+                    aria-hidden='true'
+                  />
+                )}
                 <Sidebar
                   currentPage={currentPage}
                   onPageChange={setCurrentPage}
-                  collapsed={sidebarCollapsed}
+                  collapsed={sidebarCollapsed && !isPhone}
                   onCollapsedChange={handleSidebarCollapsedChange}
+                  isPhone={isPhone}
+                  mobileOpen={mobileNavOpen}
+                  onMobileClose={closeMobileNav}
                 />
-                <div className='content'>
+                <div
+                  className='content'
+                  ref={contentRef}
+                  tabIndex={-1}
+                  // Behind an open drawer: keep keyboard focus out of the page
+                  inert={isPhone && mobileNavOpen ? true : undefined}
+                >
                   <ErrorBoundary>
                     <div key={currentPage} className='page-enter'>
                       <MainContent currentPage={currentPage} />

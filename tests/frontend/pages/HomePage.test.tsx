@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import React from 'react';
@@ -279,6 +279,25 @@ describe('HomePage Dashboard', () => {
       expect(screen.getByText('Top Albums')).toBeInTheDocument();
     });
 
+    it('offers Check a Record from the dashboard', async () => {
+      const authStatus: AuthStatus = {
+        discogs: { authenticated: true, username: 'discogs_user' },
+        lastfm: { authenticated: true, username: 'lastfm_user' },
+      };
+
+      mockApi.healthCheck.mockResolvedValue(undefined);
+      mockApi.getAuthStatus.mockResolvedValue(authStatus);
+      mockApi.getDashboard.mockResolvedValue(createMockDashboardData());
+
+      renderHomePageWithProviders(authStatus);
+
+      expect(await screen.findByText('Holding a record?')).toBeInTheDocument();
+      const input = screen.getByRole('textbox', { name: /check a record/i });
+      fireEvent.change(input, { target: { value: 'boy' } });
+      fireEvent.submit(input);
+      expect(window.location.hash).toBe('#check?q=boy');
+    });
+
     it('shows quick actions when there are actionable items', async () => {
       const authStatus: AuthStatus = {
         discogs: { authenticated: true, username: 'discogs_user' },
@@ -296,8 +315,10 @@ describe('HomePage Dashboard', () => {
       });
 
       // Should show the action items
-      expect(screen.getByText('2 new')).toBeInTheDocument(); // seller matches
-      expect(screen.getByText('seller matches')).toBeInTheDocument();
+      expect(screen.getByText('active seller matches')).toBeInTheDocument();
+      expect(
+        screen.getByText('active seller matches').previousSibling
+      ).toHaveTextContent('2');
     });
   });
 

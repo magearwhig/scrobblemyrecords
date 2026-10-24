@@ -241,20 +241,10 @@ describe('AISuggestionCard', () => {
   });
 
   describe('actions', () => {
-    it('should navigate to release details when View in Collection is clicked', async () => {
+    it('should navigate to release details when Open release is clicked', async () => {
       render(<AISuggestionCard suggestion={mockSuggestion} />);
 
-      await user.click(
-        screen.getByRole('button', { name: 'View in Collection' })
-      );
-
-      expect(window.location.hash).toBe('#release-details');
-    });
-
-    it('should navigate to release details when Details is clicked', async () => {
-      render(<AISuggestionCard suggestion={mockSuggestion} />);
-
-      await user.click(screen.getByRole('button', { name: 'Details' }));
+      await user.click(screen.getByRole('button', { name: 'Open release' }));
 
       expect(window.location.hash).toBe('#release-details');
     });
@@ -283,7 +273,7 @@ describe('AISuggestionCard', () => {
 
       // No action buttons rendered in empty state
       expect(
-        screen.queryByRole('button', { name: 'View in Collection' })
+        screen.queryByRole('button', { name: 'Open release' })
       ).not.toBeInTheDocument();
     });
 

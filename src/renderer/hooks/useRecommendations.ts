@@ -16,7 +16,7 @@ interface UseRecommendationsResult {
   submitFeedback: (
     releaseId: number,
     action: 'played' | 'skipped' | 'not_interested'
-  ) => void;
+  ) => Promise<boolean>;
 }
 
 export function useRecommendations(): UseRecommendationsResult {
@@ -64,14 +64,15 @@ export function useRecommendations(): UseRecommendationsResult {
     async (
       releaseId: number,
       action: 'played' | 'skipped' | 'not_interested'
-    ) => {
+    ): Promise<boolean> => {
       try {
         const api = getApiService();
         await api.submitRecommendationFeedback(releaseId, action);
-        // Optimistically remove the item from the list
+        // Remove the item once the server has recorded the feedback
         setRecommendations(prev =>
           prev.filter(r => r.release.id !== releaseId)
         );
+        return true;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
         log.error('Failed to submit feedback', {
@@ -79,6 +80,7 @@ export function useRecommendations(): UseRecommendationsResult {
           action,
           error: message,
         });
+        return false;
       }
     },
     []
