@@ -428,4 +428,77 @@ describe('Sidebar', () => {
       expect(lastfmStatus).toHaveClass('sidebar-status-disconnected');
     });
   });
+
+  describe('Phone drawer', () => {
+    const authStatus: AuthStatus = {
+      discogs: { authenticated: true, username: 'u' },
+      lastfm: { authenticated: true, username: 'u' },
+    };
+
+    const renderDrawer = (mobileOpen: boolean, onMobileClose = jest.fn()) =>
+      render(
+        <AuthProvider value={createMockAuthContext(authStatus)}>
+          <Sidebar
+            currentPage={ROUTES.COLLECTION}
+            onPageChange={jest.fn()}
+            collapsed={false}
+            onCollapsedChange={jest.fn()}
+            isPhone
+            mobileOpen={mobileOpen}
+            onMobileClose={onMobileClose}
+          />
+        </AuthProvider>
+      );
+
+    it('is off screen and out of the tab order while closed', () => {
+      renderDrawer(false);
+      const nav = screen.getByRole('navigation', {
+        name: 'Main navigation',
+        hidden: true,
+      });
+      expect(nav).toHaveClass('sidebar--drawer');
+      expect(nav).not.toHaveClass('sidebar--drawer-open');
+      expect(nav).toHaveAttribute('inert');
+    });
+
+    it('shows labels, hides the collapse button and focuses the current page when open', () => {
+      renderDrawer(true);
+      const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+      expect(nav).toHaveClass('sidebar--drawer-open');
+      expect(nav).not.toHaveAttribute('inert');
+      expect(screen.getByText('Browse Collection')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /collapse sidebar/i })
+      ).not.toBeInTheDocument();
+      expect(document.activeElement).toHaveTextContent('Browse Collection');
+    });
+
+    it('closes on Escape', async () => {
+      const onMobileClose = jest.fn();
+      renderDrawer(true, onMobileClose);
+      await userEvent.keyboard('{Escape}');
+      expect(onMobileClose).toHaveBeenCalledWith('dismiss');
+    });
+
+    it('leaves Escape to a dialog open over the drawer', async () => {
+      const onMobileClose = jest.fn();
+      renderDrawer(true, onMobileClose);
+      const dialog = document.createElement('div');
+      dialog.setAttribute('role', 'dialog');
+      document.body.appendChild(dialog);
+      try {
+        await userEvent.keyboard('{Escape}');
+        expect(onMobileClose).not.toHaveBeenCalled();
+      } finally {
+        dialog.remove();
+      }
+    });
+
+    it('closes when the current page is picked again', async () => {
+      const onMobileClose = jest.fn();
+      renderDrawer(true, onMobileClose);
+      await userEvent.click(screen.getByText('Browse Collection'));
+      expect(onMobileClose).toHaveBeenCalledWith('navigate');
+    });
+  });
 });

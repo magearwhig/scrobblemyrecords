@@ -41,6 +41,8 @@ jest.mock('lucide-react', () => ({
   Moon: ({ size }: { size: number }) => (
     <svg data-testid='moon-icon' data-size={size} />
   ),
+  Menu: () => <svg data-testid='menu-icon' />,
+  X: () => <svg data-testid='close-icon' />,
 }));
 
 const renderHeader = (isDarkMode: boolean = false) => {
@@ -116,5 +118,30 @@ describe('Header', () => {
     renderHeader(false);
     const moonIcon = screen.getByTestId('moon-icon');
     expect(moonIcon).toHaveAttribute('data-size', '18');
+  });
+
+  it('has no menu button outside the phone layout', () => {
+    renderHeader();
+    expect(
+      screen.queryByRole('button', { name: 'Open navigation' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a menu button that toggles the navigation drawer on phones', () => {
+    const onMenuToggle = jest.fn();
+    const { rerender } = render(
+      <Header showMenuButton menuOpen={false} onMenuToggle={onMenuToggle} />
+    );
+
+    const button = screen.getByRole('button', { name: 'Open navigation' });
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(button).toHaveAttribute('aria-controls', 'app-sidebar');
+    button.click();
+    expect(onMenuToggle).toHaveBeenCalledTimes(1);
+
+    rerender(<Header showMenuButton menuOpen onMenuToggle={onMenuToggle} />);
+    expect(
+      screen.getByRole('button', { name: 'Close navigation' })
+    ).toHaveAttribute('aria-expanded', 'true');
   });
 });

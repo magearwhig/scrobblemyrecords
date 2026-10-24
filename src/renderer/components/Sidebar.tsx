@@ -16,7 +16,7 @@ import {
   Store,
   TrendingUp,
 } from 'lucide-react';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 import { useAuth } from '../context/AuthContext';
 import { ROUTES, navigate } from '../routes';
@@ -27,6 +27,10 @@ interface SidebarProps {
   onPageChange: (page: string) => void;
   collapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
+  /** Phone layout: the sidebar is a drawer over the page */
+  isPhone?: boolean;
+  mobileOpen?: boolean;
+  onMobileClose?: (reason: 'navigate' | 'dismiss') => void;
 }
 
 interface NavItem {
@@ -47,24 +51,34 @@ const Sidebar: React.FC<SidebarProps> = ({
   onPageChange,
   collapsed,
   onCollapsedChange,
+  isPhone = false,
+  mobileOpen = false,
+  onMobileClose,
 }) => {
   const { authStatus } = useAuth();
+  const navRef = useRef<HTMLElement>(null);
 
   const handleToggleCollapse = () => {
     onCollapsedChange(!collapsed);
   };
 
-  // Auto-collapse on narrow viewports
+  // An open drawer takes focus and closes on Escape
   useEffect(() => {
-    const checkViewport = () => {
-      if (window.innerWidth < 768 && !collapsed) {
-        onCollapsedChange(true);
-      }
+    if (!isPhone || !mobileOpen) return;
+    const links = navRef.current;
+    (
+      links?.querySelector<HTMLElement>('.nav-link.active') ??
+      links?.querySelector<HTMLElement>('.nav-link')
+    )?.focus();
+    const onKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      // A dialog over the drawer (keyboard help) takes this Escape
+      if (document.querySelector('[role="dialog"]')) return;
+      onMobileClose?.('dismiss');
     };
-    checkViewport();
-    // Only run on initial mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isPhone, mobileOpen, onMobileClose]);
 
   const discogsReason = !authStatus.discogs.authenticated
     ? 'Connect Discogs first'
@@ -220,6 +234,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                 clearCollectionViewSnapshot();
                 onPageChange(item.id);
                 navigate(item.id);
+                // Also when this is the current page, so no hashchange fires
+                if (isPhone) onMobileClose?.('navigate');
               }
             }}
             disabled={!item.enabled}
@@ -245,7 +261,21 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 
   return (
-    <nav className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
+    <nav
+      ref={navRef}
+      id='app-sidebar'
+      aria-label='Main navigation'
+      className={[
+        'sidebar',
+        collapsed && 'sidebar--collapsed',
+        isPhone && 'sidebar--drawer',
+        isPhone && mobileOpen && 'sidebar--drawer-open',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      // A closed drawer is off screen: keep it out of the tab order
+      inert={isPhone && !mobileOpen ? true : undefined}
+    >
       <div className='sidebar-nav-top'>
         <ul className='nav-menu'>{topNavCategories.map(renderNavCategory)}</ul>
       </div>
@@ -299,20 +329,22 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        <button
-          className='sidebar-toggle'
-          onClick={handleToggleCollapse}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          <span className='sidebar-toggle-icon'>
-            {collapsed ? (
-              <ChevronRight size={18} aria-hidden='true' />
-            ) : (
-              <ChevronLeft size={18} aria-hidden='true' />
-            )}
-          </span>
-        </button>
+        {!isPhone && (
+          <button
+            className='sidebar-toggle'
+            onClick={handleToggleCollapse}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <span className='sidebar-toggle-icon'>
+              {collapsed ? (
+                <ChevronRight size={18} aria-hidden='true' />
+              ) : (
+                <ChevronLeft size={18} aria-hidden='true' />
+              )}
+            </span>
+          </button>
+        )}
       </div>
     </nav>
   );

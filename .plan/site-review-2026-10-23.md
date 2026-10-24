@@ -2,7 +2,7 @@
 
 External product/usability review of the running app (desktop 1280 px and phone 390 px, light + dark).
 Every bug below was re-checked against source on 2026-10-23; all ten are real.
-B2–B10 and all quick wins fixed 2026-10-23 on branch `fix/site-review-bugs`. Extra fixes found along the way: the same zero-year bug in 5 more places, Wrapped custom start dates parsed as UTC, and release details now reloads when only `?id=` changes.
+B1–B10 and all quick wins fixed 2026-10-23 on branch `fix/site-review-bugs`. B1: phone drawer from a header menu button, checked in a 390×844 frame on 14 pages (no sideways scroll; Release Details and Discard Pile filters reflowed). Extra fixes found along the way: the same zero-year bug in 5 more places, Wrapped custom start dates parsed as UTC, and release details now reloads when only `?id=` changes.
 
 Status key: **open** · **done** · **skip**
 
@@ -10,7 +10,7 @@ Status key: **open** · **done** · **skip**
 
 | # | Bug | Sev | Where | Status |
 |---|-----|-----|-------|--------|
-| B1 | Phone (≤768 px): sidebar goes full-width/auto-height, content gets ~48 px. Needs a drawer. | High | `styles.css` @media 768 (~1297), `Sidebar.tsx`, `App.tsx` | open (M) |
+| B1 | Phone (≤768 px): sidebar goes full-width/auto-height, content gets ~48 px. Needs a drawer. | High | `styles.css` @media 768 (~1297), `Sidebar.tsx`, `App.tsx` | done |
 | B2 | `#release-details?id=…` ignored — page only reads `localStorage.selectedRelease`, so Recommendations opens the previously viewed release (or nothing). | High | `RecommendationsPage.tsx:55`, `ReleaseDetailsPage.tsx:~299` | done |
 | B3 | Home Recent Activity row → `collection?release=<id>`, which Collection ignores. | Med | `RecentAlbums.tsx:29` | done |
 | B4 | Shared `.tabs`/`.tab` CSS lives in lazily loaded `SettingsPage.page.css`; tabs elsewhere are unstyled until Settings has been visited. | Med | `SettingsPage.page.css:878` | done |

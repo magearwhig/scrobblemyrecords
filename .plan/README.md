@@ -36,7 +36,7 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | listening-notes-plan.md | Backlog -- #5; album-level notes MVP; not started |
 | done/embedding-rec-system-plan.md | Complete -- embedding recommendation system implemented |
 | done/backlog_ideas.md | Reference -- consolidation proposals implemented |
-| site-review-2026-10-23.md | In progress -- external product/usability review; B2-B10 + 9 quick wins fixed 2026-10-23 (branch fix/site-review-bugs); next: B1 phone drawer, then Check This Record; layout improvements and 17 feature ideas open |
+| site-review-2026-10-23.md | In progress -- external product/usability review; all 10 bugs (B1-B10) + 9 quick wins fixed 2026-10-23 (branch fix/site-review-bugs); next: Check This Record; layout improvements and 17 feature ideas open |
 
 ## Conventions
 

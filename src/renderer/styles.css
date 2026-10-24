@@ -387,6 +387,8 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  /* Mobile browsers: the visible height, without the address bar */
+  height: 100dvh;
 }
 
 .header {
@@ -439,6 +441,8 @@ body {
   flex: 1;
   display: flex;
   overflow: hidden;
+  position: relative; /* anchors the phone drawer */
+  min-height: 0;
 }
 
 .sidebar {
@@ -492,6 +496,70 @@ body {
   align-items: center;
 }
 
+/* Phone navigation drawer (App sets these classes at max-width 768px) */
+.header-menu-toggle {
+  background: transparent;
+  border: none;
+  min-width: auto;
+  padding: 0.5rem;
+  margin-right: var(--space-2);
+  color: var(--text-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-menu-toggle:hover {
+  background: var(--bg-hover);
+}
+
+.sidebar--drawer {
+  position: absolute;
+  overflow-y: auto; /* one scroll for the whole drawer */
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 900;
+  width: min(var(--sidebar-width), 85vw);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition:
+    transform 0.2s ease-in-out,
+    visibility 0s linear 0.2s;
+}
+
+.sidebar--drawer-open {
+  transform: translateX(0);
+  visibility: visible;
+  transition: transform 0.2s ease-in-out;
+}
+
+.sidebar--drawer .nav-link {
+  min-height: 44px;
+}
+
+.sidebar--drawer .sidebar-nav-top {
+  flex: none;
+  overflow: visible;
+}
+
+.sidebar-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 899;
+  background: var(--surface-overlay);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar--drawer,
+  .sidebar--drawer-open {
+    transition: none;
+  }
+}
+
 /* Collapsed Sidebar */
 .sidebar--collapsed {
   width: var(--sidebar-width-collapsed);
@@ -537,9 +605,15 @@ body {
 
 .content {
   flex: 1;
+  min-width: 0;
   padding: 1.5rem;
   overflow-y: auto;
   background: var(--bg-primary);
+}
+
+/* Focused by script after phone navigation; the outline would frame the page */
+.content:focus {
+  outline: none;
 }
 
 /* Navigation */
@@ -1295,13 +1369,14 @@ select.form-input:disabled {
 
 /* Responsive design */
 @media (max-width: 768px) {
-  .main-content {
-    flex-direction: column;
+  /* Phone: the sidebar is a drawer below the header, over the page, so the
+     page keeps the full width and height (see .sidebar--drawer) */
+  .header {
+    padding: 0.5rem var(--space-4);
   }
 
-  .sidebar {
-    width: 100%;
-    height: auto;
+  .content {
+    padding: var(--space-4);
   }
 
   .collection-grid {
