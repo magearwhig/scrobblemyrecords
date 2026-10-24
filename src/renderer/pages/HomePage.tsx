@@ -17,6 +17,7 @@ import {
   MilestoneInfo,
   OnThisDayResult,
 } from '../../shared/types';
+import { CheckRecordSearch } from '../components/checkRecord/CheckRecordSearch';
 import {
   ConnectionStatus,
   DashboardStatCard,
@@ -299,6 +300,17 @@ const HomePage: React.FC = () => {
         authStatus={authStatus}
         hasSyncedHistory={hasSyncedHistory}
       />
+
+      {/* Check a Record: "do I have this?" from the first screen */}
+      {authStatus.discogs.authenticated && (
+        <div className='dashboard-section dashboard-check-record'>
+          <h3 className='dashboard-section-header'>Holding a record?</h3>
+          <p className='dashboard-section-subtitle'>
+            Check whether you own it, want it, or traded it in.
+          </p>
+          <CheckRecordSearch variant='home' />
+        </div>
+      )}
 
       {/* Quick Stats Row */}
       {quickStats && (

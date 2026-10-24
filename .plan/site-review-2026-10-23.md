@@ -51,7 +51,7 @@ Status key: **open** · **done** · **skip**
 
 ## Features (ranked by the reviewer)
 
-1. **Check this record** — one lookup across owned / other version / wanted / monitored / traded, cached data only (M) — **done 2026-10-23**: Check a Record page (`#check`), `GET /api/v1/lookup/check`, `RecordLookupService`. Left for later: a Home shortcut, a header search box that opens it, barcode scanning
+1. **Check this record** — one lookup across owned / other version / wanted / monitored / traded, cached data only (M) — **done 2026-10-23**: Check a Record page (`#check`), `GET /api/v1/lookup/check`, `RecordLookupService`. Home shortcut and header search box added 2026-10-23; barcode scanning skipped (user's call: no cached barcodes, and live camera needs HTTPS)
 2. **Identity-change impact preview** — before/after for artist aliases and compound mappings (L)
 3. **Buying shortlist** — 3–5 albums within a budget, explained by plays, alert threshold, price freshness (M)
 4. **Last listen before letting go** — audition review in the Discard Pile (M)

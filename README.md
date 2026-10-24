@@ -774,7 +774,7 @@ Library > Crates: saved groups of albums you own that keep themselves up to date
 - Listening rules use Last.fm scrobbles from any source, so crates talk about scrobbles recorded, never about records played. Crates and suggestion history are included in backups
 
 ### 🔍 Check a Record
-Holding a record in a shop? **Check a Record** (in the Library section) answers "do I have this?" in one search across your collection, your Discogs wantlist, your monitored wants and your discard pile.
+Holding a record in a shop? **Check a Record** (in the Library section, the search box in the header, or "Holding a record?" on Home) answers "do I have this?" in one search across your collection, your Discogs wantlist, your monitored wants and your discard pile.
 - Search by artist and/or title (a few letters of each word is enough), or paste a Discogs release link or number
 - Each result says whether you own **this pressing**, **another pressing**, have it on your wishlist, or **traded it in / sold it** (with the date)
 - Pressings are grouped by Discogs master; guesses (a monitored want's search match, a same-name match) are shown as "possibly", never as certain

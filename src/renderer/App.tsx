@@ -162,6 +162,7 @@ const App: React.FC = () => {
                 showMenuButton={isPhone}
                 menuOpen={mobileNavOpen}
                 onMenuToggle={() => setMobileNavOpen(open => !open)}
+                currentPage={currentPage}
               />
               <div
                 className={`main-content ${sidebarCollapsed && !isPhone ? 'sidebar-collapsed' : ''}`}

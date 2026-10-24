@@ -1,0 +1,41 @@
+/* Search box that opens Check a Record (header and Home) */
+
+.check-record-search-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+}
+
+.check-record-search-form:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-primary-muted);
+}
+
+.check-record-search-form input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.check-record-search-form--header {
+  width: 240px;
+}
+
+.check-record-search-form--header input {
+  padding: 0.4rem 0;
+  font-size: var(--text-sm);
+}
+
+.check-record-search-form--home input {
+  padding: var(--space-3) 0;
+  /* 16px or more keeps phones from zooming in on focus */
+  font-size: var(--text-md);
+}

@@ -1,9 +1,12 @@
-import { Menu, Moon, Sun, X } from 'lucide-react';
+import { Menu, Moon, ScanSearch, Sun, X } from 'lucide-react';
 import React from 'react';
 
+import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../hooks/useNotifications';
+import { navigate, ROUTES } from '../routes';
 
+import { CheckRecordSearch } from './checkRecord/CheckRecordSearch';
 import { NotificationBell } from './NotificationBell';
 
 interface HeaderProps {
@@ -11,14 +14,20 @@ interface HeaderProps {
   showMenuButton?: boolean;
   menuOpen?: boolean;
   onMenuToggle?: () => void;
+  /** Hides the Check a Record search on that page, which has its own */
+  currentPage?: string;
 }
 
 const Header: React.FC<HeaderProps> = ({
   showMenuButton = false,
   menuOpen = false,
   onMenuToggle,
+  currentPage,
 }) => {
   const { isDarkMode, toggleDarkMode } = useTheme();
+  const { authStatus } = useAuth();
+  const showCheckRecord =
+    authStatus.discogs.authenticated && currentPage !== ROUTES.CHECK_RECORD;
   const {
     notifications,
     unreadCount,
@@ -51,6 +60,21 @@ const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className='header-controls'>
+        {showCheckRecord &&
+          (showMenuButton ? (
+            // Phones: no room for a box, so a button that opens the page
+            <button
+              type='button'
+              onClick={() => navigate(ROUTES.CHECK_RECORD)}
+              className='header-theme-toggle'
+              title='Check a record'
+              aria-label='Check a record'
+            >
+              <ScanSearch size={18} aria-hidden='true' />
+            </button>
+          ) : (
+            <CheckRecordSearch variant='header' />
+          ))}
         <NotificationBell
           notifications={notifications}
           unreadCount={unreadCount}
