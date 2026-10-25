@@ -73,7 +73,7 @@
 .stats-error button {
   padding: 0.5rem 1rem;
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-fill);
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;

@@ -95,7 +95,7 @@
 .discard-pile-page .tab-btn.active {
   background: var(--accent-primary);
   border-color: var(--accent-primary);
-  color: white;
+  color: var(--text-on-fill);
 }
 
 .discard-pile-page .filter-controls {
@@ -322,12 +322,12 @@
 
 .status-badge.status-listed {
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-fill);
 }
 
 .status-badge.status-sold {
   background: var(--status-success);
-  color: var(--text-inverse);
+  color: var(--text-on-fill);
 }
 
 .status-badge.status-gifted {

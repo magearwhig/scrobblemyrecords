@@ -19,6 +19,7 @@ describe('Crates routes', () => {
       | 'createCrate'
       | 'preview'
       | 'cratesForRelease'
+      | 'releaseRuntimes'
       | 'evaluate'
       | 'updateCrate'
       | 'deleteCrate'
@@ -34,6 +35,7 @@ describe('Crates routes', () => {
       createCrate: jest.fn().mockResolvedValue({ id: ID, name: 'New' }),
       preview: jest.fn().mockResolvedValue({ crateId: null, albums: [] }),
       cratesForRelease: jest.fn().mockResolvedValue([]),
+      releaseRuntimes: jest.fn().mockResolvedValue({ 7: 2400 }),
       evaluate: jest.fn().mockResolvedValue({ crate: { id: ID } }),
       updateCrate: jest.fn().mockResolvedValue({ id: ID }),
       deleteCrate: jest.fn().mockResolvedValue(undefined),
@@ -54,6 +56,12 @@ describe('Crates routes', () => {
     const res = await request(app).get('/api/v1/crates');
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ success: true, data: [{ id: ID }] });
+  });
+
+  it('returns release runtimes', async () => {
+    const res = await request(app).get('/api/v1/crates/release-runtimes');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: { 7: 2400 } });
   });
 
   it('returns the templates', async () => {

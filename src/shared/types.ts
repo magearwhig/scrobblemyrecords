@@ -73,6 +73,15 @@ export interface ScrobbleSession {
   };
 }
 
+/** One page of local scrobble sessions, newest first */
+export interface ScrobbleSessionPage {
+  sessions: ScrobbleSession[];
+  /** Sessions matching the search, across all pages */
+  total: number;
+  /** Every session, search or not */
+  unfilteredTotal: number;
+}
+
 export interface CollectionFilterPreset {
   id: string;
   name: string;
@@ -267,6 +276,11 @@ export interface ScrobbleHistoryIndex {
   lastSyncCompletedAt?: number;
   /** When a full-range backfill last finished (ms) */
   lastFullBackfillAt?: number;
+  /**
+   * Set while a full sync is saved part-way (first sync only); the next sync
+   * runs the full sync again instead of an incremental one
+   */
+  fullSyncIncomplete?: boolean;
   schemaVersion?: number;
 }
 
@@ -2793,7 +2807,8 @@ export type CollectionSortBy =
   | 'title'
   | 'year'
   | 'date_added'
-  | 'scrobbles';
+  | 'scrobbles'
+  | 'runtime';
 
 // ============================================
 // Last.fm API Response Types (for renderer)

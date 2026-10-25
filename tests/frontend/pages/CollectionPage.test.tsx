@@ -41,6 +41,7 @@ const mockApiServiceInstance = {
   getScrobbleProgress: jest.fn(),
   getReleaseDetails: jest.fn(),
   getAlbumPlayCounts: jest.fn(),
+  getReleaseRuntimes: jest.fn(),
   getDiscardPileCollectionIds: jest.fn(),
   getCacheProgress: jest.fn(),
   preloadCollection: jest.fn(),
@@ -1515,6 +1516,42 @@ describe('CollectionPage', () => {
       await userEvent.selectOptions(sortSelect, 'scrobbles');
 
       expect(sortSelect).toHaveValue('scrobbles');
+    });
+  });
+
+  describe('Runtime Sort', () => {
+    it('sorts by record length, unknown lengths last', async () => {
+      mockApiServiceInstance.getReleaseRuntimes.mockResolvedValue({
+        101: 2400,
+        103: 1200,
+      });
+      renderWithProviders(<CollectionPage />);
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      await userEvent.selectOptions(
+        screen.getByDisplayValue('Artist'),
+        'runtime'
+      );
+
+      await waitFor(() => {
+        expect(
+          screen
+            .getAllByText(/^Artist [ABC] - Album [ABC]$/)
+            .map(el => el.textContent)
+        ).toEqual([
+          'Artist C - Album C',
+          'Artist A - Album A',
+          'Artist B - Album B',
+        ]);
+      });
+      expect(
+        screen.getByText('1 record without a known length is at the end')
+      ).toBeInTheDocument();
+      expect(mockApiServiceInstance.getReleaseRuntimes).toHaveBeenCalledTimes(
+        1
+      );
     });
   });
 

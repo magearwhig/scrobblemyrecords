@@ -1231,8 +1231,9 @@ const ReleaseDetailsPage: React.FC = () => {
 
             {scrobbleResult.ignored > 0 && (
               <div className='release-details-ignored-note'>
-                <strong>Note:</strong> Ignored scrobbles usually mean the track
-                was scrobbled too recently or is a duplicate.
+                <strong>Note:</strong> Ignored scrobbles aren&apos;t on Last.fm.
+                The reason for each is listed above; retry them from History
+                once it&apos;s fixed.
               </div>
             )}
 

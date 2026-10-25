@@ -34,6 +34,7 @@ const SORT_BY_VALUES: readonly CollectionSortBy[] = [
   'year',
   'date_added',
   'scrobbles',
+  'runtime',
 ];
 
 // Route tracking. Updated from App whenever the rendered page changes.

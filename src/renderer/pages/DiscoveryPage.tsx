@@ -478,7 +478,9 @@ const DiscoveryPage: React.FC = () => {
           ) : (
             <div className='mapping-results-list'>
               {searchResults.map(item => (
-                <div
+                <button
+                  type='button'
+                  disabled={mappingInProgress}
                   key={item.id}
                   className='mapping-result-item'
                   onClick={() =>
@@ -492,20 +494,20 @@ const DiscoveryPage: React.FC = () => {
                       className='mapping-result-cover'
                     />
                   )}
-                  <div className='mapping-result-info'>
-                    <div className='mapping-result-title'>
+                  <span className='mapping-result-info'>
+                    <span className='mapping-result-title'>
                       {item.release.title}
-                    </div>
-                    <div className='mapping-result-artist'>
+                    </span>
+                    <span className='mapping-result-artist'>
                       {item.release.artist}
-                    </div>
+                    </span>
                     {!!item.release.year && (
-                      <div className='mapping-result-year'>
+                      <span className='mapping-result-year'>
                         {item.release.year}
-                      </div>
+                      </span>
                     )}
-                  </div>
-                </div>
+                  </span>
+                </button>
               ))}
             </div>
           )}

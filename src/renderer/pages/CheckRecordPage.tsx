@@ -24,6 +24,10 @@ const logger = createLogger('CheckRecordPage');
 /** Wait this long after typing stops before searching */
 const SEARCH_DELAY_MS = 250;
 
+/** Past this age the cached collection may no longer match Discogs */
+export const STALE_COLLECTION_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const DISCARD_STATUS_LABELS: Record<DiscardStatus, string> = {
   marked: 'On your discard pile',
   listed: 'Listed for sale',
@@ -260,9 +264,13 @@ const ResultCard: React.FC<{
 const CheckRecordPage: React.FC = () => {
   const { state } = useApp();
   const [query, setQuery] = useState(() => getHashParam('q') ?? '');
-  const [result, setResult] = useState<RecordCheckResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Each answer keeps the query it was for, so nothing from an earlier
+  // search shows under a newer one
+  const [answer, setAnswer] = useState<{
+    q: string;
+    result: RecordCheckResult | null;
+    error: string | null;
+  } | null>(null);
   const requestRef = useRef(0);
 
   useEffect(() => {
@@ -277,34 +285,39 @@ const CheckRecordPage: React.FC = () => {
     );
     if (!q) {
       requestRef.current++;
-      setResult(null);
-      setError(null);
-      setLoading(false);
+      setAnswer(null);
       return;
     }
     const request = ++requestRef.current;
     const timer = setTimeout(async () => {
-      setLoading(true);
       try {
         const data = await getApiService(state.serverUrl).checkRecord(q);
         // A slower earlier search must not replace a newer one
         if (request !== requestRef.current) return;
-        setResult(data);
-        setError(null);
+        setAnswer({ q, result: data, error: null });
       } catch (err) {
         if (request !== requestRef.current) return;
         logger.error('Check a record failed', err);
-        // Never leave the previous search's answer under the new query
-        setResult(null);
-        setError(err instanceof Error ? err.message : 'Search failed');
-      } finally {
-        if (request === requestRef.current) setLoading(false);
+        setAnswer({
+          q,
+          result: null,
+          error: err instanceof Error ? err.message : 'Search failed',
+        });
       }
     }, SEARCH_DELAY_MS);
     return () => clearTimeout(timer);
   }, [query, state.serverUrl]);
 
+  const q = query.trim();
+  const current = answer && answer.q === q ? answer : null;
+  const result = current?.result ?? null;
+  const error = current?.error ?? null;
+  const searching = !!q && !current;
   const cache = result?.collectionCache;
+  const cachedAt = cache?.oldestPageAt ? Date.parse(cache.oldestPageAt) : NaN;
+  const staleCollection =
+    cache?.status === 'complete' &&
+    Date.now() - cachedAt > STALE_COLLECTION_DAYS * DAY_MS;
   const isUrlQuery = !!result && /discogs\.com/i.test(result.query);
   const unknownRelease =
     !!result &&
@@ -347,6 +360,13 @@ const CheckRecordPage: React.FC = () => {
         </p>
       )}
 
+      {staleCollection && (
+        <p className='check-record-warning' role='status'>
+          <AlertTriangle size={16} aria-hidden='true' />
+          {`Your collection was last loaded ${formatLocalDateOnly(cachedAt)}, so records added or removed on Discogs since then aren’t reflected. Open Browse Collection to refresh it.`}
+        </p>
+      )}
+
       {error && (
         <p className='check-record-error' role='alert'>
           {error}
@@ -361,7 +381,13 @@ const CheckRecordPage: React.FC = () => {
         </p>
       )}
 
-      {!query.trim() && (
+      {searching && (
+        <p className='check-record-meta' aria-live='polite'>
+          Searching…
+        </p>
+      )}
+
+      {!q && (
         <EmptyState
           icon={<ScanSearch size={32} aria-hidden='true' />}
           title='Holding a record?'
@@ -370,16 +396,21 @@ const CheckRecordPage: React.FC = () => {
         />
       )}
 
-      {result && query.trim() && (
+      {result && (
         <>
           <p className='check-record-meta' aria-live='polite'>
-            {loading
-              ? 'Searching…'
-              : result.groups.length === 0
+            {[
+              result.groups.length === 0
                 ? unknownRelease
                   ? ''
                   : 'No match in your cached collection, wishlist or discard history.'
-                : `${result.groups.length}${result.hasMore ? '+' : ''} ${result.groups.length === 1 ? 'match' : 'matches'}`}
+                : `${result.groups.length}${result.hasMore ? '+' : ''} ${result.groups.length === 1 ? 'match' : 'matches'}`,
+              Number.isFinite(cachedAt) && !staleCollection
+                ? `Collection as of ${formatLocalDateOnly(cachedAt)}`
+                : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </p>
           <ul className='check-record-results'>
             {result.groups.map(group => (

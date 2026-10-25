@@ -185,3 +185,34 @@ export function tracklistMatchTitles(
   }
   return titles;
 }
+
+/** When a batch track starts playing, counted back from the end of listening */
+export interface ScheduledTime {
+  /** Unix seconds */
+  timestamp: number;
+  /** Depends on at least one track length that isn't known */
+  estimated: boolean;
+}
+
+/**
+ * Start times for tracks played back to back, ending at `endTimestamp`.
+ * Each track starts its own length before the next one; an unknown length
+ * counts as DEFAULT_TRACK_SECONDS and marks that time and every earlier one
+ * as estimated.
+ */
+export function scheduleBackFrom(
+  durations: Array<number | undefined>,
+  endTimestamp: number
+): ScheduledTime[] {
+  const times: ScheduledTime[] = new Array(durations.length);
+  let time = endTimestamp;
+  let estimated = false;
+  for (let i = durations.length - 1; i >= 0; i--) {
+    const seconds = durations[i];
+    const known = typeof seconds === 'number' && seconds > 0;
+    if (!known) estimated = true;
+    time -= known ? seconds : DEFAULT_TRACK_SECONDS;
+    times[i] = { timestamp: Math.round(time), estimated };
+  }
+  return times;
+}

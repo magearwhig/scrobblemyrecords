@@ -132,12 +132,12 @@
 
 .wishlist-badge-cd {
   background: var(--accent-warning);
-  color: white;
+  color: var(--text-on-fill);
 }
 
 .wishlist-badge-checking {
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-on-fill);
 }
 
 .wishlist-badge-unknown {

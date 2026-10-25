@@ -321,7 +321,7 @@
 
 .analytics-granularity-btn--active {
   background: var(--accent-color);
-  color: var(--text-inverse);
+  color: var(--text-on-fill);
   border-color: var(--accent-color);
 }
 

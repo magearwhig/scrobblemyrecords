@@ -676,6 +676,112 @@ describe('ScrobbleHistorySyncService', () => {
     // The core functionality is tested via startFullSync tests.
   });
 
+  describe('full sync page failures', () => {
+    const indexFile = 'history/scrobble-history-index.json';
+    const page = (name: string, uts: number, totalPages = 2) => ({
+      data: {
+        recenttracks: {
+          '@attr': { totalPages: String(totalPages), total: '2' },
+          track: [
+            {
+              artist: { '#text': 'Artist' },
+              album: { '#text': 'Album' },
+              name,
+              date: { uts: String(uts) },
+            },
+          ],
+        },
+      },
+    });
+    const complete: ScrobbleHistoryIndex = {
+      lastSyncTimestamp: 5000 * 1000,
+      totalScrobbles: 1,
+      oldestScrobbleDate: 1000,
+      albums: {
+        'old|album': {
+          lastPlayed: 1000,
+          playCount: 1,
+          plays: [{ timestamp: 1000, track: 'Old' }],
+        },
+      },
+      unresolved: {},
+      lastSyncCompletedAt: 1,
+      schemaVersion: 2,
+    };
+
+    beforeEach(async () => {
+      await service.saveSyncSettings({ syncPace: 'fast' });
+    });
+
+    it('retries a failed page and finishes with every page', async () => {
+      mockAxiosInstance.get
+        .mockResolvedValueOnce(page('New', 2000))
+        .mockRejectedValueOnce(new Error('429'))
+        .mockResolvedValueOnce(page('Older', 1500));
+
+      await service.startFullSync();
+
+      const index = (await service.getHistoryIndex())!;
+      expect(index.albums['artist|album'].playCount).toBe(2);
+      expect(index.fullSyncIncomplete).toBeUndefined();
+      expect(service.getSyncStatus().status).toBe('completed');
+    }, 15000);
+
+    it('keeps the existing index when a page keeps failing', async () => {
+      await fileStorage.writeJSON(indexFile, complete);
+      mockAxiosInstance.get
+        .mockResolvedValueOnce(page('New', 2000))
+        .mockRejectedValue(new Error('429'));
+
+      await expect(service.startFullSync()).rejects.toThrow(
+        'Full sync stopped: page 2 could not be fetched'
+      );
+
+      expect(await fileStorage.readJSON(indexFile)).toEqual(complete);
+      expect(service.getSyncStatus().status).toBe('error');
+      // 1 + 3 attempts at page 2
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(4);
+    }, 15000);
+
+    it('treats a partial index as complete after a full backfill', async () => {
+      await fileStorage.writeJSON(indexFile, {
+        ...complete,
+        fullSyncIncomplete: true,
+      });
+      mockAxiosInstance.get.mockResolvedValue(page('New', 2000, 1));
+
+      await service.startBackfill();
+
+      const index = (await service.getHistoryIndex())!;
+      expect(index.fullSyncIncomplete).toBeUndefined();
+      expect(index.albums['artist|album'].playCount).toBe(1);
+    });
+
+    it('marks a first sync that stopped part-way and runs it again next time', async () => {
+      mockAxiosInstance.get
+        .mockResolvedValueOnce(page('New', 2000))
+        .mockRejectedValueOnce(new Error('429'))
+        .mockRejectedValueOnce(new Error('429'))
+        .mockRejectedValueOnce(new Error('429'));
+
+      await expect(service.startFullSync()).rejects.toThrow(
+        'Full sync stopped'
+      );
+      const partial = (await service.getHistoryIndex())!;
+      expect(partial.fullSyncIncomplete).toBe(true);
+      expect(partial.albums['artist|album'].playCount).toBe(1);
+
+      mockAxiosInstance.get
+        .mockResolvedValueOnce(page('New', 2000))
+        .mockResolvedValueOnce(page('Older', 1500));
+      await service.startIncrementalSync();
+
+      const index = (await service.getHistoryIndex())!;
+      expect(index.fullSyncIncomplete).toBeUndefined();
+      expect(index.albums['artist|album'].playCount).toBe(2);
+    }, 20000);
+  });
+
   describe('unresolved (albumless) plays and play identity', () => {
     const page = (
       tracks: Array<{

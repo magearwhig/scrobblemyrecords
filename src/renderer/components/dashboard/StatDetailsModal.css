@@ -14,7 +14,7 @@
 .retry-button {
   padding: 0.5rem 1rem;
   background: var(--accent-color);
-  color: white;
+  color: var(--text-on-fill);
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;

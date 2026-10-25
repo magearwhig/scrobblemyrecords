@@ -460,7 +460,7 @@
 
 .lastfm-history-view-btn.active {
   background: var(--accent-color);
-  color: white;
+  color: var(--text-on-fill);
 }
 
 /* Albums view: pointer to plays without album info */
@@ -478,4 +478,10 @@
   font-size: var(--text-sm);
   text-decoration: underline;
   cursor: pointer;
+}
+
+.history-load-more {
+  display: flex;
+  justify-content: center;
+  margin: var(--space-4) 0;
 }

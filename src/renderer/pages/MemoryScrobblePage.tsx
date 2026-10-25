@@ -85,6 +85,8 @@ const MemoryScrobblePage: React.FC = () => {
   const [scrobbleResult, setScrobbleResult] = useState<{
     success: number;
     failed: number;
+    ignored: number;
+    errors: string[];
   } | null>(null);
   const [isScrobbling, setIsScrobbling] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
@@ -307,11 +309,14 @@ const MemoryScrobblePage: React.FC = () => {
       setScrobbleResult({
         success: result.success,
         failed: result.failed,
+        ignored: result.ignored ?? 0,
+        errors: result.errors ?? [],
       });
       setShowReviewModal(false);
 
-      if (result.failed > 0 && result.failedTracks?.length > 0) {
-        // Keep only the failed tracks in the list for retry
+      // failedTracks includes ignored tracks: neither reached Last.fm
+      if (result.failedTracks?.length > 0) {
+        // Keep only the failed and ignored tracks in the list for retry
         let nextOrder = 1;
         const failedAsMemoryTracks: MemoryScrobbleTrack[] =
           result.failedTracks.map(ft => ({
@@ -650,6 +655,23 @@ const MemoryScrobblePage: React.FC = () => {
               Failed: {scrobbleResult.failed} tracks — they remain in the list
               below so you can retry.
             </div>
+          )}
+          {scrobbleResult.ignored > 0 && (
+            <div className='memory-scrobble-result-ignored'>
+              <AlertTriangle size={16} aria-hidden='true' />
+              Ignored by Last.fm: {scrobbleResult.ignored} tracks — they remain
+              in the list below.
+            </div>
+          )}
+          {scrobbleResult.errors.length > 0 && (
+            <details className='memory-scrobble-result-details'>
+              <summary>Why</summary>
+              <ul>
+                {scrobbleResult.errors.map((message, index) => (
+                  <li key={index}>{message}</li>
+                ))}
+              </ul>
+            </details>
           )}
         </div>
       )}

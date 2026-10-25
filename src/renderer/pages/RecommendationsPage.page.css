@@ -118,12 +118,12 @@
 .listening-window-selector__option--active {
   background: var(--accent-color);
   border-color: var(--accent-color);
-  color: var(--text-inverse);
+  color: var(--text-on-fill);
 }
 
 .listening-window-selector__option--active:hover {
   background: var(--accent-color);
-  color: var(--text-inverse);
+  color: var(--text-on-fill);
 }
 
 .listening-window-selector__option:focus-visible {

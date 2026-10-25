@@ -220,7 +220,7 @@
   padding: var(--space-1) var(--space-3);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
-  color: var(--text-inverse);
+  color: var(--text-on-fill);
   background: var(--accent-primary);
   border: none;
   border-radius: var(--radius-sm);

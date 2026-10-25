@@ -6,6 +6,7 @@ import {
   LastFmTopTrack,
   ScrobbleTrack,
   ScrobbleSession,
+  ScrobbleSessionPage,
 } from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
@@ -40,6 +41,27 @@ export interface LastFmRecentTrack {
   date?: { uts: string; '#text': string };
   image?: Array<{ '#text': string; size: string }>;
   '@attr'?: { nowplaying: string };
+}
+
+/** Last.fm's ignoredMessage codes for track.scrobble */
+const IGNORED_REASONS: Record<string, string> = {
+  '1': 'artist ignored by Last.fm',
+  '2': 'track ignored by Last.fm',
+  '3': 'timestamp more than 14 days ago',
+  '4': 'timestamp in the future',
+  '5': 'daily scrobble limit reached',
+};
+
+/** Why Last.fm ignored a scrobble, from the response's ignoredMessage */
+export function ignoredReason(scrobble: unknown): string {
+  const entry = Array.isArray(scrobble) ? scrobble[0] : scrobble;
+  const ignored = (
+    entry as { ignoredMessage?: { code?: string | number; '#text'?: string } }
+  )?.ignoredMessage;
+  const code = ignored?.code === undefined ? '' : String(ignored.code);
+  return (
+    IGNORED_REASONS[code] || ignored?.['#text'] || 'may be duplicate or invalid'
+  );
 }
 
 export class LastFmService {
@@ -281,7 +303,7 @@ export class LastFmService {
       const message =
         accepted > 0
           ? `Successfully scrobbled ${cleanArtist} - ${cleanTrack}`
-          : `Scrobble ignored: ${cleanArtist} - ${cleanTrack} (may be duplicate or invalid)`;
+          : `Scrobble ignored: ${cleanArtist} - ${cleanTrack} (${ignoredReason(response.data.scrobbles?.scrobble)})`;
 
       this.logger.info('Scrobble result', {
         accepted,
@@ -398,8 +420,10 @@ export class LastFmService {
         }
       }
 
-      // Update session status
-      session.status = results.failed === 0 ? 'completed' : 'failed';
+      // Ignored tracks aren't on Last.fm either, so the session stays
+      // retryable (same rule as the resubmit routes)
+      session.status =
+        results.failed === 0 && results.ignored === 0 ? 'completed' : 'failed';
       session.error =
         results.errors.length > 0 ? results.errors.join('; ') : undefined;
       session.progress = {
@@ -506,6 +530,34 @@ export class LastFmService {
       this.logger.error('Error getting scrobble history', error);
       return [];
     }
+  }
+
+  /**
+   * One page of sessions, newest first. `q` keeps sessions with a track
+   * whose artist, title or album contains it (case ignored).
+   */
+  async getScrobbleHistoryPage(opts: {
+    offset: number;
+    limit: number;
+    q?: string;
+  }): Promise<ScrobbleSessionPage> {
+    const all = await this.getScrobbleHistory();
+    const q = opts.q?.trim().toLowerCase();
+    const matching = q
+      ? all.filter(session =>
+          session.tracks.some(
+            track =>
+              track.artist.toLowerCase().includes(q) ||
+              track.track.toLowerCase().includes(q) ||
+              (track.album?.toLowerCase().includes(q) ?? false)
+          )
+        )
+      : all;
+    return {
+      sessions: matching.slice(opts.offset, opts.offset + opts.limit),
+      total: matching.length,
+      unfilteredTotal: all.length,
+    };
   }
 
   async testConnection(): Promise<{

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
 import ApiService from '../../services/api';
@@ -26,219 +26,124 @@ const SettingsConnectionsSection: React.FC<SettingsConnectionsSectionProps> = ({
   const [discogsUsername, setDiscogsUsername] = useState('');
   const [lastfmToken, setLastfmToken] = useState('');
 
-  const handleDiscogsAuth = async () => {
-    setLoading('discogs');
+  // Timers of the sign-in in progress, so a new attempt, a timeout or leaving
+  // the page stops them
+  const authTimersRef = useRef<{
+    interval?: ReturnType<typeof setInterval>;
+    timeouts: ReturnType<typeof setTimeout>[];
+  }>({ timeouts: [] });
+
+  // Bumped whenever an attempt ends or is replaced; a reply that arrives for
+  // an older attempt is ignored
+  const authAttemptRef = useRef(0);
+
+  const stopAuthTimers = () => {
+    authAttemptRef.current++;
+    const timers = authTimersRef.current;
+    if (timers.interval) clearInterval(timers.interval);
+    timers.timeouts.forEach(clearTimeout);
+    authTimersRef.current = { timeouts: [] };
+  };
+
+  useEffect(() => stopAuthTimers, []);
+
+  /** Sign in through a popup, then poll the backend until it sees the account */
+  const startPopupAuth = async (service: 'discogs' | 'lastfm') => {
+    const name = service === 'discogs' ? 'Discogs' : 'Last.fm';
+    stopAuthTimers();
+    const attempt = authAttemptRef.current;
+    const isCurrent = () => attempt === authAttemptRef.current;
+    setLoading(service);
     setMessage(null);
 
-    try {
-      // Get OAuth URL and open it in a new window
-      const authUrl = await api.getDiscogsAuthUrl();
-      log.debug('Discogs auth URL obtained');
+    const fail = (text: string) => {
+      if (!isCurrent()) return;
+      stopAuthTimers();
+      setMessage({ type: 'error', text });
+      setLoading('');
+    };
+    const later = (fn: () => void, ms: number) => {
+      authTimersRef.current.timeouts.push(setTimeout(fn, ms));
+    };
 
-      // Open auth URL in a new window
+    try {
+      const authUrl =
+        service === 'discogs'
+          ? await api.getDiscogsAuthUrl()
+          : await api.getLastfmAuthUrl();
+      log.debug(`${name} auth URL obtained`);
+      if (!isCurrent()) return;
+
       const authWindow = window.open(
         authUrl,
-        'discogs-auth',
+        `${service}-auth`,
         'width=600,height=600'
       );
-      log.debug('Auth window opened', { success: !!authWindow });
+      log.debug(`${name} auth window opened`, { success: !!authWindow });
+      if (!authWindow) {
+        fail(
+          `The ${name} sign-in window was blocked. Allow pop-ups for this site and try again.`
+        );
+        return;
+      }
 
-      // Poll for authentication success
-      const checkAuth = setInterval(async () => {
+      // Once the popup closes, give the callback a moment, then check a few times
+      const maxRetries = 5;
+      let retryCount = 0;
+      const checkStatus = async () => {
         try {
-          if (authWindow?.closed) {
-            clearInterval(checkAuth);
-            // Wait a moment for the callback to complete, then retry multiple times
-            let retryCount = 0;
-            const maxRetries = 5;
-
-            const checkStatus = async () => {
-              try {
-                log.debug(
-                  `Checking Discogs auth status (attempt ${retryCount + 1})`
-                );
-                const newStatus = await api.getAuthStatus();
-                log.debug('Discogs auth status checked', {
-                  authenticated: newStatus.discogs.authenticated,
-                });
-
-                if (newStatus.discogs.authenticated) {
-                  setAuthStatus(newStatus);
-                  setMessage({
-                    type: 'success',
-                    text: `Successfully connected to Discogs as ${newStatus.discogs.username}`,
-                  });
-                  setLoading('');
-                } else if (retryCount < maxRetries - 1) {
-                  retryCount++;
-                  setTimeout(checkStatus, 2000); // Wait 2 seconds before retry
-                } else {
-                  setMessage({
-                    type: 'error',
-                    text: 'Authentication was cancelled or failed',
-                  });
-                  setLoading('');
-                }
-              } catch {
-                if (retryCount < maxRetries - 1) {
-                  retryCount++;
-                  setTimeout(checkStatus, 2000);
-                } else {
-                  log.error(
-                    'Failed to check Discogs auth status after retries'
-                  );
-                  setMessage({
-                    type: 'error',
-                    text: 'Failed to check authentication status',
-                  });
-                  setLoading('');
-                }
-              }
-            };
-
-            setTimeout(checkStatus, 1000);
+          log.debug(`Checking ${name} auth status (attempt ${retryCount + 1})`);
+          const newStatus = await api.getAuthStatus();
+          if (!isCurrent()) return;
+          if (newStatus[service].authenticated) {
+            stopAuthTimers();
+            setAuthStatus(newStatus);
+            setMessage({
+              type: 'success',
+              text: `Successfully connected to ${name} as ${newStatus[service].username}`,
+            });
+            setLoading('');
+          } else if (retryCount < maxRetries - 1) {
+            retryCount++;
+            later(checkStatus, 2000);
+          } else {
+            fail(`${name} authentication was cancelled or failed`);
           }
         } catch {
-          clearInterval(checkAuth);
-          setMessage({
-            type: 'error',
-            text: 'Failed to check authentication status',
-          });
-          setLoading('');
+          if (!isCurrent()) return;
+          if (retryCount < maxRetries - 1) {
+            retryCount++;
+            later(checkStatus, 2000);
+          } else {
+            log.error(`Failed to check ${name} auth status after retries`);
+            fail(`Failed to check ${name} authentication status`);
+          }
+        }
+      };
+
+      authTimersRef.current.interval = setInterval(() => {
+        if (authWindow.closed) {
+          clearInterval(authTimersRef.current.interval);
+          authTimersRef.current.interval = undefined;
+          later(checkStatus, 1000);
         }
       }, 1000);
 
-      // Timeout after 5 minutes
-      setTimeout(() => {
-        clearInterval(checkAuth);
-        if (authWindow && !authWindow.closed) {
-          authWindow.close();
-        }
-        if (loading === 'discogs') {
-          setMessage({ type: 'error', text: 'Authentication timed out' });
-          setLoading('');
-        }
+      later(() => {
+        if (!authWindow.closed) authWindow.close();
+        fail(`${name} authentication timed out`);
       }, 300000);
     } catch (error) {
-      setMessage({
-        type: 'error',
-        text:
-          error instanceof Error
-            ? error.message
-            : 'Failed to start Discogs authentication',
-      });
-      setLoading('');
-    }
-  };
-
-  const handleLastfmAuth = async () => {
-    setLoading('lastfm');
-    setMessage(null);
-
-    try {
-      // Get auth URL (using environment variable)
-      const authUrl = await api.getLastfmAuthUrl();
-      log.debug('Last.fm auth URL obtained');
-
-      // Open auth URL in a new window
-      const authWindow = window.open(
-        authUrl,
-        'lastfm-auth',
-        'width=600,height=600'
+      fail(
+        error instanceof Error
+          ? error.message
+          : `Failed to start ${name} authentication`
       );
-      log.debug('Last.fm auth window opened', { success: !!authWindow });
-
-      // Poll for authentication success
-      const checkAuth = setInterval(async () => {
-        try {
-          if (authWindow?.closed) {
-            clearInterval(checkAuth);
-            // Wait a moment for the callback to complete, then retry multiple times
-            let retryCount = 0;
-            const maxRetries = 5;
-
-            const checkStatus = async () => {
-              try {
-                log.debug(
-                  `Checking Last.fm auth status (attempt ${retryCount + 1})`
-                );
-                const newStatus = await api.getAuthStatus();
-                log.debug('Last.fm auth status checked', {
-                  authenticated: newStatus.lastfm.authenticated,
-                });
-
-                if (newStatus.lastfm.authenticated) {
-                  setAuthStatus(newStatus);
-                  setMessage({
-                    type: 'success',
-                    text: `Successfully connected to Last.fm as ${newStatus.lastfm.username}`,
-                  });
-                  setLoading('');
-                } else if (retryCount < maxRetries - 1) {
-                  retryCount++;
-                  setTimeout(checkStatus, 2000); // Wait 2 seconds before retry
-                } else {
-                  setMessage({
-                    type: 'error',
-                    text: 'Last.fm authentication was cancelled or failed',
-                  });
-                  setLoading('');
-                }
-              } catch {
-                if (retryCount < maxRetries - 1) {
-                  retryCount++;
-                  setTimeout(checkStatus, 2000);
-                } else {
-                  log.error(
-                    'Failed to check Last.fm auth status after retries'
-                  );
-                  setMessage({
-                    type: 'error',
-                    text: 'Failed to check Last.fm authentication status',
-                  });
-                  setLoading('');
-                }
-              }
-            };
-
-            setTimeout(checkStatus, 1000);
-          }
-        } catch {
-          clearInterval(checkAuth);
-          log.error('Error during Last.fm auth polling');
-          setMessage({
-            type: 'error',
-            text: 'Failed to check Last.fm authentication status',
-          });
-          setLoading('');
-        }
-      }, 1000);
-
-      // Timeout after 5 minutes
-      setTimeout(() => {
-        clearInterval(checkAuth);
-        if (authWindow && !authWindow.closed) {
-          authWindow.close();
-        }
-        if (loading === 'lastfm') {
-          setMessage({
-            type: 'error',
-            text: 'Last.fm authentication timed out',
-          });
-          setLoading('');
-        }
-      }, 300000);
-    } catch (error) {
-      setMessage({
-        type: 'error',
-        text:
-          error instanceof Error
-            ? error.message
-            : 'Failed to start Last.fm authentication',
-      });
-      setLoading('');
     }
   };
+
+  const handleDiscogsAuth = () => startPopupAuth('discogs');
+  const handleLastfmAuth = () => startPopupAuth('lastfm');
 
   const handleDiscogsPersonalTokenAuth = async () => {
     log.debug('Starting Discogs personal token auth');

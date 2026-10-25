@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import React from 'react';
@@ -53,18 +53,45 @@ const createMockAuthContext = (authStatus: AuthStatus) => ({
   setAuthStatus: jest.fn(),
 });
 
-const createMockApiInstance = () => ({
-  getAuthStatus: jest.fn(),
-  getScrobbleHistory: jest.fn(),
-  getUserPreferences: jest.fn().mockResolvedValue({
-    defaultTimestamp: 'now',
-    batchSize: 50,
-    autoScrobble: false,
-    historyDefaultTab: 'sessions', // Keep 'sessions' so existing tests don't break
-    collectionPresets: [],
-  }),
-  updateUserPreferences: jest.fn().mockResolvedValue(undefined),
-});
+const createMockApiInstance = () => {
+  // getScrobbleHistory stands for every session on disk; the page reads
+  // them through getScrobbleHistoryPage, faked here like the server
+  const getScrobbleHistory = jest.fn();
+  const getScrobbleHistoryPage = jest.fn(
+    async (opts: { offset: number; limit: number; q?: string }) => {
+      const all: ScrobbleSession[] = await getScrobbleHistory();
+      const q = opts.q?.trim().toLowerCase();
+      const matching = q
+        ? all.filter(session =>
+            session.tracks.some(
+              track =>
+                track.artist.toLowerCase().includes(q) ||
+                track.track.toLowerCase().includes(q) ||
+                (track.album?.toLowerCase().includes(q) ?? false)
+            )
+          )
+        : all;
+      return {
+        sessions: matching.slice(opts.offset, opts.offset + opts.limit),
+        total: matching.length,
+        unfilteredTotal: all.length,
+      };
+    }
+  );
+  return {
+    getAuthStatus: jest.fn(),
+    getScrobbleHistory,
+    getScrobbleHistoryPage,
+    getUserPreferences: jest.fn().mockResolvedValue({
+      defaultTimestamp: 'now',
+      batchSize: 50,
+      autoScrobble: false,
+      historyDefaultTab: 'sessions', // Keep 'sessions' so existing tests don't break
+      collectionPresets: [],
+    }),
+    updateUserPreferences: jest.fn().mockResolvedValue(undefined),
+  };
+};
 
 const createMockScrobbleSession = (
   id: string,
@@ -448,6 +475,102 @@ describe('HistoryPage', () => {
     });
   });
 
+  describe('Paging', () => {
+    const authStatus: AuthStatus = {
+      discogs: { authenticated: true, username: 'discogs_user' },
+      lastfm: { authenticated: true, username: 'lastfm_user' },
+    };
+
+    it('reads sessions only when their tab is open', async () => {
+      const user = userEvent.setup();
+      mockApi.getUserPreferences.mockResolvedValue({
+        historyDefaultTab: 'lastfm',
+      });
+      mockApi.getScrobbleHistory.mockResolvedValue([
+        createMockScrobbleSession('session1', 'completed'),
+      ]);
+
+      renderHistoryPageWithProviders(authStatus);
+      await waitFor(() =>
+        expect(mockApi.getUserPreferences).toHaveBeenCalled()
+      );
+      expect(mockApi.getScrobbleHistoryPage).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole('tab', { name: /Sessions/ }));
+
+      await waitFor(() =>
+        expect(mockApi.getScrobbleHistoryPage).toHaveBeenCalledTimes(1)
+      );
+      expect(await screen.findByText('View Details')).toBeInTheDocument();
+    });
+
+    it('reloads the current search after an action that started before it', async () => {
+      const user = userEvent.setup();
+      let finishResubmit: () => void = () => {};
+      Object.assign(mockApi, {
+        resubmitScrobbleSession: jest.fn(
+          () => new Promise<void>(resolve => (finishResubmit = resolve))
+        ),
+      });
+      const failed = createMockScrobbleSession('session1', 'failed');
+      const other = {
+        ...createMockScrobbleSession('session2', 'completed'),
+        tracks: [{ artist: 'Wire', track: 'Outdoor Miner', timestamp: 1 }],
+      };
+      mockApi.getScrobbleHistory.mockResolvedValue([failed, other]);
+
+      renderHistoryPageWithProviders(authStatus);
+      await user.click(await screen.findByRole('button', { name: /Resubmit/ }));
+      await user.type(
+        screen.getByLabelText('Search scrobble sessions'),
+        'wire'
+      );
+      expect(
+        await screen.findByText('1 of 2 sessions match')
+      ).toBeInTheDocument();
+
+      await act(async () => finishResubmit());
+
+      await waitFor(() =>
+        expect(mockApi.getScrobbleHistoryPage).toHaveBeenLastCalledWith(
+          expect.objectContaining({ q: 'wire' })
+        )
+      );
+      expect(screen.getByText('1 of 2 sessions match')).toBeInTheDocument();
+      expect(screen.getAllByText('View Details')).toHaveLength(1);
+    });
+
+    it('shows 20 sessions, then more on request', async () => {
+      const user = userEvent.setup();
+      mockApi.getScrobbleHistory.mockResolvedValue(
+        Array.from({ length: 25 }, (_, i) =>
+          createMockScrobbleSession(`session${i + 1}`, 'completed')
+        )
+      );
+
+      renderHistoryPageWithProviders(authStatus);
+
+      expect(
+        await screen.findByRole('button', { name: 'Show more (5 older)' })
+      ).toBeInTheDocument();
+      expect(screen.getAllByText('View Details')).toHaveLength(20);
+
+      await user.click(screen.getByRole('button', { name: /Show more/ }));
+
+      await waitFor(() =>
+        expect(screen.getAllByText('View Details')).toHaveLength(25)
+      );
+      expect(
+        screen.queryByRole('button', { name: /Show more/ })
+      ).not.toBeInTheDocument();
+      expect(mockApi.getScrobbleHistoryPage).toHaveBeenLastCalledWith({
+        offset: 20,
+        limit: 20,
+        q: '',
+      });
+    });
+  });
+
   describe('Large Session Count', () => {
     const authStatus: AuthStatus = {
       discogs: { authenticated: true, username: 'discogs_user' },
@@ -589,6 +712,10 @@ describe('HistoryPage', () => {
       mockApi.getScrobbleHistory.mockResolvedValue(mockSessions);
     });
 
+    // The search goes to the server once typing pauses
+    const settle = () =>
+      act(() => new Promise(resolve => setTimeout(resolve, 350)));
+
     const renderAndWaitForSearch = async () => {
       renderHistoryPageWithProviders(authStatus);
       await waitFor(() => {
@@ -626,6 +753,8 @@ describe('HistoryPage', () => {
 
       await user.type(input, 'radiohead');
 
+      await settle();
+
       expect(screen.getAllByText('View Details').length).toBe(1);
       expect(screen.getByText('1 of 3 sessions match')).toBeInTheDocument();
     });
@@ -635,6 +764,8 @@ describe('HistoryPage', () => {
       const input = await renderAndWaitForSearch();
 
       await user.type(input, 'hyperballad');
+
+      await settle();
 
       expect(screen.getAllByText('View Details').length).toBe(1);
       expect(screen.getByText('1 of 3 sessions match')).toBeInTheDocument();
@@ -646,6 +777,8 @@ describe('HistoryPage', () => {
 
       await user.type(input, 'ok computer');
 
+      await settle();
+
       expect(screen.getAllByText('View Details').length).toBe(1);
       expect(screen.getByText('1 of 3 sessions match')).toBeInTheDocument();
     });
@@ -656,6 +789,7 @@ describe('HistoryPage', () => {
 
       // "old" appears in session s2's track and album only
       await user.type(input, 'old');
+      await settle();
 
       expect(screen.getAllByText('View Details').length).toBe(1);
       expect(screen.getByText('1 of 3 sessions match')).toBeInTheDocument();
@@ -666,6 +800,8 @@ describe('HistoryPage', () => {
       const input = await renderAndWaitForSearch();
 
       await user.type(input, 'zeppelin');
+
+      await settle();
 
       expect(screen.getByText('No Matching Sessions')).toBeInTheDocument();
       expect(
@@ -680,6 +816,8 @@ describe('HistoryPage', () => {
 
       await user.type(input, '   ');
 
+      await settle();
+
       expect(screen.getAllByText('View Details').length).toBe(3);
       expect(screen.queryByText(/sessions match/)).not.toBeInTheDocument();
     });
@@ -689,9 +827,12 @@ describe('HistoryPage', () => {
       const input = await renderAndWaitForSearch();
 
       await user.type(input, 'radiohead');
+
+      await settle();
       expect(screen.getAllByText('View Details').length).toBe(1);
 
       await user.click(screen.getByLabelText('Clear search'));
+      await settle();
 
       expect(input).toHaveValue('');
       expect(screen.getAllByText('View Details').length).toBe(3);
@@ -716,6 +857,8 @@ describe('HistoryPage', () => {
       ).toBeInTheDocument();
 
       await user.type(input, 'radiohead');
+
+      await settle();
 
       expect(
         screen.queryByText(

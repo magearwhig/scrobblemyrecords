@@ -84,6 +84,8 @@ interface CollectionRowsSnapshot {
 interface SharedCollectionRead {
   snapshot: Promise<CollectionSnapshot>;
   rows?: Promise<CollectionRowsSnapshot>;
+  /** Rows without genres and styles (no release files read) */
+  leanRows?: Promise<CollectionRowsSnapshot>;
   users: number;
 }
 
@@ -128,9 +130,18 @@ export class ExportDataService {
   // Public API
   // ============================================
 
-  /** One row per cached collection item, sorted by rowId */
-  async getCollectionRows(): Promise<ExportCollectionRow[]> {
-    return this.withCollection(async read => (await this.rowsOf(read)).rows);
+  /**
+   * One row per cached collection item, sorted by rowId. With
+   * `releaseDetails: false`, genres and styles are null and no
+   * collections/release-{id}.json files are read.
+   */
+  async getCollectionRows(opts?: {
+    releaseDetails?: boolean;
+  }): Promise<ExportCollectionRow[]> {
+    const withDetails = opts?.releaseDetails ?? true;
+    return this.withCollection(
+      async read => (await this.rowsOf(read, withDetails)).rows
+    );
   }
 
   /**
@@ -148,7 +159,8 @@ export class ExportDataService {
       this.wishlistService.getWishlistItems(),
       this.wishlistService.getLocalWantList(),
       this.wishlistService.getVersionsCache(),
-      this.withCollection(read => this.rowsOf(read)),
+      // Owned matching doesn't use genres or styles
+      this.withCollection(read => this.rowsOf(read, false)),
     ]);
 
     const versionsByRelease = indexVersions(versionsCache, wants);
@@ -226,9 +238,20 @@ export class ExportDataService {
     }
   }
 
-  private rowsOf(read: SharedCollectionRead): Promise<CollectionRowsSnapshot> {
-    if (!read.rows) read.rows = this.buildCollectionRows(read.snapshot);
-    return read.rows;
+  private rowsOf(
+    read: SharedCollectionRead,
+    withDetails: boolean
+  ): Promise<CollectionRowsSnapshot> {
+    if (withDetails) {
+      if (!read.rows) read.rows = this.buildCollectionRows(read.snapshot, true);
+      return read.rows;
+    }
+    // Full rows already on the way serve lean callers too
+    if (read.rows) return read.rows;
+    if (!read.leanRows) {
+      read.leanRows = this.buildCollectionRows(read.snapshot, false);
+    }
+    return read.leanRows;
   }
 
   private async readCollection(): Promise<CollectionSnapshot> {
@@ -246,12 +269,15 @@ export class ExportDataService {
   }
 
   private async buildCollectionRows(
-    snapshot: Promise<CollectionSnapshot>
+    snapshot: Promise<CollectionSnapshot>,
+    withDetails: boolean
   ): Promise<CollectionRowsSnapshot> {
     const { items, info } = await snapshot;
-    const details = await this.readReleaseDetails(
-      Array.from(new Set(items.map(item => item.id)))
-    );
+    const details = withDetails
+      ? await this.readReleaseDetails(
+          Array.from(new Set(items.map(item => item.id)))
+        )
+      : new Map<number, { genres?: string[]; styles?: string[] }>();
 
     // Copies of one release share an id; number them by dateAdded, then
     // cache order (the sort is stable)
