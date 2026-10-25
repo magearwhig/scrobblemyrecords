@@ -1112,6 +1112,50 @@ describe('LastFmService', () => {
     });
   });
 
+  describe('getScrobbleHistoryPage', () => {
+    const session = (id: string, timestamp: number, artist: string) => ({
+      id,
+      timestamp,
+      status: 'completed',
+      tracks: [{ artist, track: 'Song', album: 'Record' }],
+    });
+
+    beforeEach(() => {
+      mockFileStorage.listFiles.mockResolvedValue([
+        'session-a.json',
+        'session-b.json',
+        'session-c.json',
+      ]);
+      mockFileStorage.readJSON
+        .mockResolvedValueOnce(session('a', 1, 'Wire'))
+        .mockResolvedValueOnce(session('b', 3, 'Can'))
+        .mockResolvedValueOnce(session('c', 2, 'Wire'));
+    });
+
+    it('returns one page, newest first, with totals', async () => {
+      const page = await lastfmService.getScrobbleHistoryPage({
+        offset: 1,
+        limit: 1,
+      });
+
+      expect(page.sessions.map(s => s.id)).toEqual(['c']);
+      expect(page.total).toBe(3);
+      expect(page.unfilteredTotal).toBe(3);
+    });
+
+    it('searches before paging', async () => {
+      const page = await lastfmService.getScrobbleHistoryPage({
+        offset: 0,
+        limit: 20,
+        q: ' WIRE ',
+      });
+
+      expect(page.sessions.map(s => s.id)).toEqual(['c', 'a']);
+      expect(page.total).toBe(2);
+      expect(page.unfilteredTotal).toBe(3);
+    });
+  });
+
   describe('getUserInfo', () => {
     it('should get user info successfully', async () => {
       mockAuthService.getLastFmCredentials.mockResolvedValue({

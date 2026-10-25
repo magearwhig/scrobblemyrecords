@@ -510,7 +510,7 @@ describe('ScrobblePage', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/Scrobble time: Jan 1, 2023 10:00 AM/)
+          screen.getByText(/Listening ends: Jan 1, 2023 10:00 AM/)
         ).toBeInTheDocument();
       });
     });
@@ -616,6 +616,42 @@ describe('ScrobblePage', () => {
       expect(sent.map(t => [t.track, t.duration])).toEqual([
         ['Intro / Sweet Jane', 475],
         ['Heroin', 791],
+      ]);
+    });
+
+    it('times tracks back from the end by their lengths and marks guesses', async () => {
+      const user = userEvent.setup();
+      mockApi.getReleaseDetails.mockResolvedValue({
+        id: 1,
+        artist: 'Wire',
+        title: 'Pink Flag',
+        tracklist: [
+          { position: 'A1', title: 'Reuters', duration: '3:00' },
+          { position: 'A2', title: 'Field Day', duration: '' },
+          { position: 'A3', title: 'Lowdown', duration: '2:00' },
+        ],
+      });
+      mockApi.scrobbleBatch.mockResolvedValue({ success: 3, failed: 0 });
+
+      renderScrobblePageWithProviders(authStatus);
+
+      expect(
+        await screen.findByText(/1 track has no length on Discogs/)
+      ).toBeInTheDocument();
+      expect(screen.getAllByText(/^~/).length).toBeGreaterThanOrEqual(2);
+
+      await user.click(
+        screen.getByRole('button', { name: /Scrobble 3 Tracks/ })
+      );
+      await waitFor(() => expect(mockApi.scrobbleBatch).toHaveBeenCalled());
+      const [sent, end] = mockApi.scrobbleBatch.mock.calls[0] as [
+        Array<{ timestamp: number }>,
+        number,
+      ];
+      expect(sent.map(t => end - t.timestamp)).toEqual([
+        120 + 180 + 180,
+        120 + 180,
+        120,
       ]);
     });
 

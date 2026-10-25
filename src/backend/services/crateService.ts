@@ -404,6 +404,23 @@ export class CrateService {
     });
   }
 
+  /**
+   * Running time in seconds of each collection release whose cached
+   * tracklist has a length for every track (the runtime crate sorts use)
+   */
+  async releaseRuntimes(): Promise<Record<number, number>> {
+    const table = await this.getTable();
+    const facts = await this.tableBuilder.getFacts(
+      table.albums.flatMap(a => a.copies.map(c => c.releaseId))
+    );
+    const runtimes: Record<number, number> = {};
+    for (const [releaseId, fact] of facts) {
+      if (fact.runtime?.complete)
+        runtimes[releaseId] = fact.runtime.knownSeconds;
+    }
+    return runtimes;
+  }
+
   /** Crates whose members include an album with this release */
   async cratesForRelease(
     releaseId: number

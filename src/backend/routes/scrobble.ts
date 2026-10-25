@@ -7,7 +7,11 @@ import {
   Track,
 } from '../../shared/types';
 import { isCollectionLinked } from '../../shared/utils/albumMapping';
-import { trackSeconds, tracksToScrobble } from '../../shared/utils/tracklist';
+import {
+  scheduleBackFrom,
+  trackSeconds,
+  tracksToScrobble,
+} from '../../shared/utils/tracklist';
 import { artistMappingService } from '../services/artistMappingService';
 import { AuthService } from '../services/authService';
 import { DurationLookupService } from '../services/durationLookupService';
@@ -227,13 +231,19 @@ export default function createScrobbleRouter(
         });
       }
 
-      // Set timestamps for tracks and apply artist mappings
-      const currentTime = baseTimestamp || Math.floor(Date.now() / 1000);
+      // Tracks without a timestamp play back to back by their lengths,
+      // ending at baseTimestamp (now when not given); apply artist mappings
+      const endTime = baseTimestamp || Math.floor(Date.now() / 1000);
+      const schedule = scheduleBackFrom(
+        tracks.map(track =>
+          typeof track.duration === 'number' ? track.duration : undefined
+        ),
+        endTime
+      );
       const tracksWithTimestamps = tracks.map((track, index) => ({
         ...track,
         artist: artistMappingService.getLastfmName(track.artist),
-        timestamp:
-          track.timestamp || currentTime - (tracks.length - index - 1) * 180, // 3 minutes apart
+        timestamp: track.timestamp || schedule[index].timestamp,
       }));
 
       const results = await lastfmService.scrobbleBatch(tracksWithTimestamps);
@@ -360,15 +370,32 @@ export default function createScrobbleRouter(
   });
 
   // Get scrobble history
+  // Local sessions, newest first. With ?limit (and optional offset, q) one
+  // page { sessions, total }; without, every session. Reads local files only.
   router.get('/history', async (req: Request, res: Response) => {
     try {
-      // Check authentication first by testing connection
-      const testResult = await lastfmService.testConnection();
-      if (!testResult.success) {
-        return res.status(500).json({
-          success: false,
-          error: testResult.message,
+      if (req.query.limit !== undefined) {
+        const limit = Number(req.query.limit);
+        const offset = Number(req.query.offset ?? 0);
+        if (
+          !Number.isInteger(limit) ||
+          limit < 1 ||
+          limit > 100 ||
+          !Number.isInteger(offset) ||
+          offset < 0
+        ) {
+          return res.status(400).json({
+            success: false,
+            error: 'limit must be 1-100 and offset 0 or more',
+          });
+        }
+        const q = typeof req.query.q === 'string' ? req.query.q : undefined;
+        const page = await lastfmService.getScrobbleHistoryPage({
+          offset,
+          limit,
+          q,
         });
+        return res.json({ success: true, data: page });
       }
 
       const sessions = await lastfmService.getScrobbleHistory();

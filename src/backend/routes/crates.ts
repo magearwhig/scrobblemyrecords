@@ -12,8 +12,8 @@ const UUID_PATTERN =
  * Create Smart Crates routes with dependency injection
  *
  * IMPORTANT: Route ordering matters in Express!
- * Static routes (/templates, /preview, /for-release, /suggestions) must be
- * defined BEFORE /:id.
+ * Static routes (/templates, /preview, /for-release, /release-runtimes,
+ * /suggestions) must be defined BEFORE /:id.
  */
 export default function createCratesRouter(
   crateService: CrateService,
@@ -145,6 +145,19 @@ export default function createCratesRouter(
       res.json({ success: true, data });
     } catch (error) {
       handleError(res, error, 'finding crates for release');
+    }
+  });
+
+  /**
+   * GET /api/v1/crates/release-runtimes
+   * { [releaseId]: seconds } for releases with a complete cached tracklist
+   */
+  router.get('/release-runtimes', async (_req: Request, res: Response) => {
+    try {
+      const data = await crateService.releaseRuntimes();
+      res.json({ success: true, data });
+    } catch (error) {
+      handleError(res, error, 'reading release runtimes');
     }
   });
 

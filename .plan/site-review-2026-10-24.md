@@ -3,9 +3,9 @@
 Second external review, after round 1 (`site-review-2026-10-23.md`) was merged as PR #20.
 Every bug below was checked against the source before being listed.
 
-**Status (2026-10-24, branch `fix/site-review-round2`):** R1–R7 and all 3 quick wins done.
-R8 skipped: the owner doesn't use the app from other devices. The improvements and feature
-ideas are still open.
+**Status (2026-10-24, branch `fix/site-review-round2`):** R1–R7, all 3 quick wins and all 3
+improvements done, plus a Runtime sort on Browse Collection (owner request). R8 skipped: the
+owner doesn't use the app from other devices. The feature ideas are still open.
 
 Notes on what shipped:
 - R1: a full sync retries each page 3 times and then stops with an error. A complete index
@@ -20,6 +20,16 @@ Notes on what shipped:
 - Contrast: new `--text-on-fill` token (#1a1a1a in both themes), used for text on every
   amber, green or blue fill (27 rules), not just Button and Badge.
 - R7: mapping results are buttons in Discovery and in both Album History mapping lists.
+- Batch timestamps: `scheduleBackFrom` (shared/utils/tracklist.ts) times tracks back from the
+  end time by length (3 min when unknown); the page previews each start time, marks guesses
+  with "~", and sends the times it showed. The route uses the same helper for clients that
+  send none. The last track now starts its own length before the end time (was: at it).
+- Check a Record snapshot: `getCollectionRows({ releaseDetails: false })` skips the release
+  files; wishlist owned-matching uses the same lean rows.
+- History: sessions load only on their tab, 20 at a time (`GET /scrobble/history?limit&offset&q`),
+  search runs on the server. The route no longer calls Last.fm first.
+- Runtime sort: `GET /crates/release-runtimes` (same runtimes crates use: complete cached
+  tracklists only, so about half the collection has none yet and sorts last).
 
 ## Bugs
 
@@ -79,12 +89,12 @@ Notes on what shipped:
 
 ## Improvements
 
-- [ ] Batch timestamps: the route spaces tracks a fixed 180 s apart
+- [x] Batch timestamps: the route spaces tracks a fixed 180 s apart
   (`routes/scrobble.ts:230`) even though track durations are prepared. Use the durations,
   preview the schedule, and mark estimated times.
-- [ ] Lighter Check a Record snapshot: the rebuild goes through export enrichment and reads
+- [x] Lighter Check a Record snapshot: the rebuild goes through export enrichment and reads
   about 1,200 release cache files it doesn't need (`exportDataService.ts:252`, `174`).
-- [ ] History: fetch local sessions only on their tab, and return paged summaries
+- [x] History: fetch local sessions only on their tab, and return paged summaries
   (`HistoryPage.tsx:109`, `lastfmService.ts:493`).
 
 ## New feature ideas

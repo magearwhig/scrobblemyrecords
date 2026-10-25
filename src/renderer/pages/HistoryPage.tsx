@@ -1,5 +1,5 @@
 import { Check, Circle, Clock, FileText, XCircle } from 'lucide-react';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 import './HistoryPage.page.css';
 
@@ -21,6 +21,11 @@ import { formatLocalTimeClean, getTimezoneOffset } from '../utils/dateUtils';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('HistoryPage');
+
+/** Sessions per page; a reload re-reads up to API_MAX_PAGE */
+const PAGE_SIZE = 20;
+const API_MAX_PAGE = 100;
+const SEARCH_DEBOUNCE_MS = 300;
 
 type HistoryTab = 'sessions' | 'lastfm' | 'unresolved';
 
@@ -51,7 +56,11 @@ const HistoryPage: React.FC = () => {
     () => getTabFromUrl() ?? 'lastfm'
   );
   const [sessions, setSessions] = useState<ScrobbleSession[]>([]);
+  /** Sessions matching the search, and all sessions */
+  const [total, setTotal] = useState(0);
+  const [unfilteredTotal, setUnfilteredTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string>('');
   const [selectedSession, setSelectedSession] =
     useState<ScrobbleSession | null>(null);
@@ -60,17 +69,25 @@ const HistoryPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
-  const filteredSessions = useMemo(() => {
-    if (!normalizedQuery) return sessions;
-    return sessions.filter(session =>
-      session.tracks.some(
-        track =>
-          track.artist.toLowerCase().includes(normalizedQuery) ||
-          track.track.toLowerCase().includes(normalizedQuery) ||
-          (track.album?.toLowerCase().includes(normalizedQuery) ?? false)
-      )
+  // The search sent to the server, once typing pauses
+  const [appliedQuery, setAppliedQuery] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(
+      () => setAppliedQuery(normalizedQuery),
+      SEARCH_DEBOUNCE_MS
     );
-  }, [sessions, normalizedQuery]);
+    return () => clearTimeout(timer);
+  }, [normalizedQuery]);
+  // Only the newest request may update the list
+  const requestRef = useRef(0);
+  // Read at call time, so a reload started before a new search (e.g. after
+  // a resubmit) loads the current search and shown count
+  const appliedQueryRef = useRef(appliedQuery);
+  appliedQueryRef.current = appliedQuery;
+  const shownCountRef = useRef(0);
+  shownCountRef.current = sessions.length;
+  // The search the list was last loaded for (null: not loaded yet)
+  const loadedQueryRef = useRef<string | null>(null);
 
   const api = getApiService(state.serverUrl);
 
@@ -106,11 +123,16 @@ const HistoryPage: React.FC = () => {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  // Sessions load only on their tab, and again when the search changes
   useEffect(() => {
-    if (authStatus.lastfm.authenticated) {
+    if (
+      authStatus.lastfm.authenticated &&
+      activeTab === 'sessions' &&
+      loadedQueryRef.current !== appliedQuery
+    ) {
       loadHistory();
     }
-  }, [authStatus.lastfm.authenticated]);
+  }, [authStatus.lastfm.authenticated, activeTab, appliedQuery]);
 
   const checkAuthStatus = async () => {
     try {
@@ -121,19 +143,70 @@ const HistoryPage: React.FC = () => {
     }
   };
 
-  const loadHistory = async () => {
+  /**
+   * Load the first page for the current search. After an action the pages
+   * already shown are re-read (up to API_MAX_PAGE sessions).
+   */
+  const loadHistory = async (keepShown = false) => {
+    const request = ++requestRef.current;
+    const query = appliedQueryRef.current;
+    const limit = keepShown
+      ? Math.min(API_MAX_PAGE, Math.max(PAGE_SIZE, shownCountRef.current))
+      : PAGE_SIZE;
+    loadedQueryRef.current = query;
     setLoading(true);
+    setLoadingMore(false);
     setError('');
 
     try {
-      const history = await api.getScrobbleHistory();
-      setSessions(history);
+      const page = await api.getScrobbleHistoryPage({
+        offset: 0,
+        limit,
+        q: query,
+      });
+      if (request !== requestRef.current) return;
+      setSessions(page.sessions);
+      setTotal(page.total);
+      setUnfilteredTotal(page.unfilteredTotal);
     } catch (error) {
+      if (request !== requestRef.current) return;
+      // Forget the search so returning to the tab tries again
+      loadedQueryRef.current = null;
+      setSessions([]);
+      setTotal(0);
       setError(
         error instanceof Error ? error.message : 'Failed to load history'
       );
     } finally {
-      setLoading(false);
+      if (request === requestRef.current) setLoading(false);
+    }
+  };
+
+  const loadMore = async () => {
+    const request = ++requestRef.current;
+    setLoadingMore(true);
+    setError('');
+    try {
+      const page = await api.getScrobbleHistoryPage({
+        offset: sessions.length,
+        limit: PAGE_SIZE,
+        q: appliedQuery,
+      });
+      if (request !== requestRef.current) return;
+      const shown = new Set(sessions.map(session => session.id));
+      setSessions([
+        ...sessions,
+        ...page.sessions.filter(session => !shown.has(session.id)),
+      ]);
+      setTotal(page.total);
+      setUnfilteredTotal(page.unfilteredTotal);
+    } catch (error) {
+      if (request !== requestRef.current) return;
+      setError(
+        error instanceof Error ? error.message : 'Failed to load more sessions'
+      );
+    } finally {
+      if (request === requestRef.current) setLoadingMore(false);
     }
   };
 
@@ -154,7 +227,7 @@ const HistoryPage: React.FC = () => {
     try {
       await api.deleteScrobbleSession(sessionId);
       // Reload history to reflect the change
-      await loadHistory();
+      await loadHistory(true);
     } catch (error) {
       setError(
         error instanceof Error ? error.message : 'Failed to delete session'
@@ -169,7 +242,7 @@ const HistoryPage: React.FC = () => {
     try {
       await api.resubmitScrobbleSession(sessionId);
       // Reload history to reflect the change
-      await loadHistory();
+      await loadHistory(true);
     } catch (error) {
       setError(
         error instanceof Error ? error.message : 'Failed to resubmit session'
@@ -183,7 +256,7 @@ const HistoryPage: React.FC = () => {
     setActionLoading(`resubmit-track-${sessionId}-${trackIndex}`);
     try {
       await api.resubmitSessionTrack(sessionId, trackIndex);
-      await loadHistory();
+      await loadHistory(true);
     } catch (error) {
       setError(
         error instanceof Error ? error.message : 'Failed to resubmit track'
@@ -219,7 +292,7 @@ const HistoryPage: React.FC = () => {
       );
 
       // Reload history to show the new covers
-      await loadHistory();
+      await loadHistory(true);
     } catch (error) {
       setError(
         error instanceof Error
@@ -360,7 +433,7 @@ const HistoryPage: React.FC = () => {
                 <Button
                   variant='secondary'
                   size='small'
-                  onClick={loadHistory}
+                  onClick={() => loadHistory(true)}
                   disabled={loading}
                 >
                   {loading ? 'Refreshing...' : 'Refresh'}
@@ -368,7 +441,7 @@ const HistoryPage: React.FC = () => {
               </div>
             </div>
 
-            {sessions.length > 0 && (
+            {(unfilteredTotal > 0 || searchQuery) && (
               <div className='history-sessions-search'>
                 <input
                   type='text'
@@ -389,11 +462,14 @@ const HistoryPage: React.FC = () => {
                 )}
               </div>
             )}
-            {normalizedQuery && !loading && sessions.length > 0 && (
-              <div className='history-sessions-search-count'>
-                {filteredSessions.length} of {sessions.length} sessions match
-              </div>
-            )}
+            {appliedQuery &&
+              appliedQuery === normalizedQuery &&
+              !loading &&
+              total > 0 && (
+                <div className='history-sessions-search-count'>
+                  {total} of {unfilteredTotal} sessions match
+                </div>
+              )}
 
             {error && (
               <div className='error-message'>
@@ -401,7 +477,7 @@ const HistoryPage: React.FC = () => {
                 <Button
                   size='small'
                   className='history-error-retry'
-                  onClick={loadHistory}
+                  onClick={() => loadHistory()}
                 >
                   Retry
                 </Button>
@@ -415,7 +491,7 @@ const HistoryPage: React.FC = () => {
             </div>
           )}
 
-          {!loading && sessions.length === 0 && !error && (
+          {!loading && !appliedQuery && sessions.length === 0 && !error && (
             <div className='card'>
               <EmptyState
                 icon={<FileText size={48} aria-hidden='true' />}
@@ -434,20 +510,24 @@ const HistoryPage: React.FC = () => {
             </div>
           )}
 
-          {!loading && sessions.length > 0 && filteredSessions.length === 0 && (
-            <div className='card'>
-              <EmptyState
-                icon={<FileText size={48} aria-hidden='true' />}
-                title='No Matching Sessions'
-                description={`No scrobble sessions contain "${searchQuery.trim()}".`}
-                suggestion='Try a different artist, album, or track name.'
-              />
-            </div>
-          )}
+          {!loading &&
+            !!appliedQuery &&
+            appliedQuery === normalizedQuery &&
+            sessions.length === 0 &&
+            !error && (
+              <div className='card'>
+                <EmptyState
+                  icon={<FileText size={48} aria-hidden='true' />}
+                  title='No Matching Sessions'
+                  description={`No scrobble sessions contain "${searchQuery.trim()}".`}
+                  suggestion='Try a different artist, album, or track name.'
+                />
+              </div>
+            )}
 
-          {filteredSessions.length > 0 && (
+          {sessions.length > 0 && (
             <div className='history-sessions-grid'>
-              {filteredSessions.map(session => (
+              {sessions.map(session => (
                 <ScrobbleSessionCard
                   key={session.id}
                   session={session}
@@ -470,7 +550,21 @@ const HistoryPage: React.FC = () => {
             </div>
           )}
 
-          {!normalizedQuery && sessions.length > 10 && (
+          {sessions.length > 0 && sessions.length < total && (
+            <div className='history-load-more'>
+              <Button
+                variant='secondary'
+                onClick={loadMore}
+                disabled={loadingMore || loading}
+              >
+                {loadingMore
+                  ? 'Loading...'
+                  : `Show more (${total - sessions.length} older)`}
+              </Button>
+            </div>
+          )}
+
+          {!appliedQuery && unfilteredTotal > 10 && (
             <div className='card history-footer'>
               <div className='history-footer-text'>
                 Showing recent sessions. Older sessions may be automatically

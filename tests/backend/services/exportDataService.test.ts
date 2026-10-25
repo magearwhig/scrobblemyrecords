@@ -326,6 +326,24 @@ describe('ExportDataService', () => {
       expect(without.styles).toBeNull();
     });
 
+    it('skips the release files when details are not wanted', async () => {
+      files = {
+        ...pages([item(1)]),
+        'collections/release-1.json': { id: 1, genres: ['Rock'] },
+      };
+      const service = createService();
+
+      const [row] = await service.getCollectionRows({ releaseDetails: false });
+      await service.getWishlistRows();
+
+      expect(row.genres).toBeNull();
+      expect(
+        fileStorage.readJSON.mock.calls.some(([path]) =>
+          String(path).startsWith('collections/release-')
+        )
+      ).toBe(false);
+    });
+
     it('sets masterIdSource to release-data when the master is known', async () => {
       files = pages([item(1, { masterId: 77 })]);
 

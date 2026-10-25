@@ -479,3 +479,9 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+.history-load-more {
+  display: flex;
+  justify-content: center;
+  margin: var(--space-4) 0;
+}

@@ -152,6 +152,11 @@ const CollectionPage: React.FC = () => {
   >(new Map());
   const [loadingPlayCounts, setLoadingPlayCounts] = useState(false);
 
+  // Seconds per release ID, loaded when the runtime sort is first chosen;
+  // only releases whose every cached track has a length are listed
+  const [runtimes, setRuntimes] = useState<Map<number, number> | null>(null);
+  const [loadingRuntimes, setLoadingRuntimes] = useState(false);
+
   // Filter presets state
   const [filterPresets, setFilterPresets] = useState<CollectionFilterPreset[]>(
     []
@@ -538,6 +543,7 @@ const CollectionPage: React.FC = () => {
     filterYearTo,
     filterDateAdded,
     playCounts,
+    runtimes,
   ]);
 
   // Search results are sorted when they arrive; if play counts load afterwards
@@ -548,6 +554,35 @@ const CollectionPage: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playCounts]);
+
+  // Same for runtimes
+  useEffect(() => {
+    if (isSearchMode && sortBy === 'runtime') {
+      setFilteredCollection(prev => sortCollection(prev));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runtimes]);
+
+  // Runtimes come from cached release details, read once per visit
+  useEffect(() => {
+    if (sortBy !== 'runtime' || runtimes || loadingRuntimes) return;
+    setLoadingRuntimes(true);
+    api
+      .getReleaseRuntimes()
+      .then(data =>
+        setRuntimes(
+          new Map(
+            Object.entries(data).map(([id, seconds]) => [Number(id), seconds])
+          )
+        )
+      )
+      .catch(err => {
+        logger.error('Error fetching release runtimes', err);
+        showToast('error', 'Could not load record lengths');
+      })
+      .finally(() => setLoadingRuntimes(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortBy]);
 
   const loadCollection = async (forceReload: boolean = false) => {
     if (!authStatus.discogs.username) {
@@ -690,8 +725,9 @@ const CollectionPage: React.FC = () => {
         itemsPerPage
       );
       logger.info(`Search results: ${results.items.length} items found`);
-      // Apply sorting to search results
-      const sortedResults = sortCollection(results.items);
+      // Sort with the latest play counts and runtimes; this render's
+      // sortCollection may predate them
+      const sortedResults = sortCollectionRef.current(results.items);
       setFilteredCollection(sortedResults);
       setSearchTotalPages(results.totalPages);
       setSearchTotal(results.total);
@@ -1190,6 +1226,16 @@ const CollectionPage: React.FC = () => {
     ).length;
   }, [filteredCollection, selectedAlbums, discardPileIds]);
 
+  // Shown records whose length isn't known (sorted last by runtime)
+  const runtimeUnknownCount = runtimes
+    ? filteredCollection.filter(item => !runtimes.has(item.release.id)).length
+    : 0;
+
+  // Kept current so async callers (search results) sort with fresh data
+  const sortCollectionRef = useRef(
+    (items: CollectionItem[]): CollectionItem[] => items
+  );
+
   const sortCollection = (items: CollectionItem[]): CollectionItem[] => {
     logger.info(`Sorting ${items.length} items by ${sortBy} (${sortOrder})`);
     const sorted = [...items].sort((a, b) => {
@@ -1211,6 +1257,21 @@ const CollectionPage: React.FC = () => {
         const dateA = new Date(a.date_added || '').getTime();
         const dateB = new Date(b.date_added || '').getTime();
         return dateB - dateA;
+      }
+
+      if (sortBy === 'runtime') {
+        // Unknown length last either way; ties by artist, then title
+        const ra = runtimes?.get(a.release.id);
+        const rb = runtimes?.get(b.release.id);
+        if (ra !== rb) {
+          if (ra === undefined) return 1;
+          if (rb === undefined) return -1;
+          return sortOrder === 'asc' ? ra - rb : rb - ra;
+        }
+        return (
+          (a.release.artist || '').localeCompare(b.release.artist || '') ||
+          (a.release.title || '').localeCompare(b.release.title || '')
+        );
       }
 
       // Handle other sort options
@@ -1246,6 +1307,7 @@ const CollectionPage: React.FC = () => {
     logger.info(`Sorted ${sorted.length} items successfully`);
     return sorted;
   };
+  sortCollectionRef.current = sortCollection;
 
   // Get visible items for search mode (browse mode uses VirtualizedCollectionGrid)
   const getVisibleItems = (): CollectionItem[] => {
@@ -1453,12 +1515,28 @@ const CollectionPage: React.FC = () => {
               <option value='year'>Year</option>
               <option value='date_added'>Date Added</option>
               <option value='scrobbles'>Scrobbles (Most Played)</option>
+              <option value='runtime'>Runtime</option>
             </select>
             {sortBy === 'scrobbles' && loadingPlayCounts && (
               <span className='collection-sort-loading'>
                 Loading play counts...
               </span>
             )}
+            {sortBy === 'runtime' && loadingRuntimes && (
+              <span className='collection-sort-loading'>
+                Loading record lengths...
+              </span>
+            )}
+            {sortBy === 'runtime' &&
+              runtimes &&
+              !loadingRuntimes &&
+              runtimeUnknownCount > 0 && (
+                <span className='collection-sort-loading'>
+                  {runtimeUnknownCount === 1
+                    ? '1 record without a known length is at the end'
+                    : `${runtimeUnknownCount} records without a known length are at the end`}
+                </span>
+              )}
             <button
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
               className='collection-sort-order-button'

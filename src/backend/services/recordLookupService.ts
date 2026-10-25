@@ -72,7 +72,9 @@ interface Snapshot {
 
 export interface RecordLookupSources {
   exportData: {
-    getCollectionRows(): Promise<ExportCollectionRow[]>;
+    getCollectionRows(opts?: {
+      releaseDetails?: boolean;
+    }): Promise<ExportCollectionRow[]>;
     getWishlistRows(): Promise<ExportWishlistRow[]>;
     getSnapshotMeta(): Promise<{
       collectionCache: ExportCollectionCacheInfo;
@@ -244,7 +246,8 @@ export class RecordLookupService {
   private async build(): Promise<Snapshot> {
     const { exportData, discardPile } = this.sources;
     const [owned, wants, meta, discards] = await Promise.all([
-      exportData.getCollectionRows(),
+      // Genres and styles aren't searched, so skip the release files
+      exportData.getCollectionRows({ releaseDetails: false }),
       exportData.getWishlistRows(),
       exportData.getSnapshotMeta(),
       discardPile.getDiscardPile(),

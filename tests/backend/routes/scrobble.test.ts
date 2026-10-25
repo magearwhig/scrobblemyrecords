@@ -41,6 +41,7 @@ describe('Scrobble Routes', () => {
 
     // Setup mock methods
     mockLastFmService.getScrobbleHistory = jest.fn();
+    mockLastFmService.getScrobbleHistoryPage = jest.fn();
     mockLastFmService.scrobbleTrack = jest.fn();
     mockLastFmService.scrobbleBatch = jest.fn();
 
@@ -424,6 +425,39 @@ describe('Scrobble Routes', () => {
       );
     });
 
+    it('spaces tracks by their lengths, ending at the base time', async () => {
+      mockLastFmService.scrobbleBatch.mockResolvedValue({
+        success: 3,
+        failed: 0,
+        ignored: 0,
+        errors: [],
+        failedTracks: [],
+        sessionId: 'session-123',
+      });
+
+      await request(app)
+        .post('/api/v1/scrobble/batch')
+        .send({
+          tracks: [
+            { artist: 'A', track: 'One', duration: 300 },
+            { artist: 'A', track: 'Two' },
+            { artist: 'A', track: 'Three', duration: 120 },
+          ],
+          baseTimestamp: 10000,
+        })
+        .expect(200);
+
+      const sent = mockLastFmService.scrobbleBatch.mock.calls[0][0] as Array<{
+        timestamp: number;
+      }>;
+      // Three starts 120 s before the end, Two 3 min (unknown) before that
+      expect(sent.map(t => t.timestamp)).toEqual([
+        10000 - 120 - 180 - 300,
+        10000 - 120 - 180,
+        10000 - 120,
+      ]);
+    });
+
     it('should handle batch scrobbling errors', async () => {
       mockLastFmService.scrobbleBatch.mockRejectedValue(
         new Error('Batch failed')
@@ -710,6 +744,33 @@ describe('Scrobble Routes', () => {
 
       expect(response.body.success).toBe(true);
       expect(response.body.data).toEqual([]);
+    });
+
+    it('returns one page when a limit is given', async () => {
+      mockLastFmService.getScrobbleHistoryPage.mockResolvedValue({
+        sessions: [],
+        total: 0,
+        unfilteredTotal: 4,
+      });
+
+      const response = await request(app)
+        .get('/api/v1/scrobble/history?limit=20&offset=40&q=wire')
+        .expect(200);
+
+      expect(mockLastFmService.getScrobbleHistoryPage).toHaveBeenCalledWith({
+        offset: 40,
+        limit: 20,
+        q: 'wire',
+      });
+      expect(response.body.data.unfilteredTotal).toBe(4);
+      expect(mockLastFmService.testConnection).not.toHaveBeenCalled();
+    });
+
+    it('rejects a bad page size', async () => {
+      await request(app).get('/api/v1/scrobble/history?limit=0').expect(400);
+      await request(app)
+        .get('/api/v1/scrobble/history?limit=20&offset=-1')
+        .expect(400);
     });
 
     it('should handle file read errors gracefully', async () => {

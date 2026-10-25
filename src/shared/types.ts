@@ -73,6 +73,15 @@ export interface ScrobbleSession {
   };
 }
 
+/** One page of local scrobble sessions, newest first */
+export interface ScrobbleSessionPage {
+  sessions: ScrobbleSession[];
+  /** Sessions matching the search, across all pages */
+  total: number;
+  /** Every session, search or not */
+  unfilteredTotal: number;
+}
+
 export interface CollectionFilterPreset {
   id: string;
   name: string;
@@ -2798,7 +2807,8 @@ export type CollectionSortBy =
   | 'title'
   | 'year'
   | 'date_added'
-  | 'scrobbles';
+  | 'scrobbles'
+  | 'runtime';
 
 // ============================================
 // Last.fm API Response Types (for renderer)

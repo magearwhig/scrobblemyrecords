@@ -83,6 +83,7 @@ import {
   ScrobbleArtistMappingStats,
   ScrobbleTrack,
   ScrobbleSession,
+  ScrobbleSessionPage,
   SellerMatch,
   SellerMatchesResponse,
   SellerMonitoringSettings,
@@ -451,6 +452,22 @@ class ApiService {
 
   async getScrobbleHistory(): Promise<ScrobbleSession[]> {
     const response = await this.api.get('/scrobble/history');
+    return response.data.data;
+  }
+
+  /** One page of local sessions, newest first, optionally searched */
+  async getScrobbleHistoryPage(opts: {
+    offset: number;
+    limit: number;
+    q?: string;
+  }): Promise<ScrobbleSessionPage> {
+    const response = await this.api.get('/scrobble/history', {
+      params: {
+        offset: opts.offset,
+        limit: opts.limit,
+        q: opts.q || undefined,
+      },
+    });
     return response.data.data;
   }
 
@@ -2954,6 +2971,12 @@ class ApiService {
     releaseId: number
   ): Promise<Array<{ id: string; name: string }>> {
     const response = await this.api.get(`/crates/for-release/${releaseId}`);
+    return response.data.data;
+  }
+
+  /** Seconds per release ID, for releases whose every track has a length */
+  async getReleaseRuntimes(): Promise<Record<number, number>> {
+    const response = await this.api.get('/crates/release-runtimes');
     return response.data.data;
   }
 

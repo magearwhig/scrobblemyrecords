@@ -6,6 +6,7 @@ import {
   LastFmTopTrack,
   ScrobbleTrack,
   ScrobbleSession,
+  ScrobbleSessionPage,
 } from '../../shared/types';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
@@ -529,6 +530,34 @@ export class LastFmService {
       this.logger.error('Error getting scrobble history', error);
       return [];
     }
+  }
+
+  /**
+   * One page of sessions, newest first. `q` keeps sessions with a track
+   * whose artist, title or album contains it (case ignored).
+   */
+  async getScrobbleHistoryPage(opts: {
+    offset: number;
+    limit: number;
+    q?: string;
+  }): Promise<ScrobbleSessionPage> {
+    const all = await this.getScrobbleHistory();
+    const q = opts.q?.trim().toLowerCase();
+    const matching = q
+      ? all.filter(session =>
+          session.tracks.some(
+            track =>
+              track.artist.toLowerCase().includes(q) ||
+              track.track.toLowerCase().includes(q) ||
+              (track.album?.toLowerCase().includes(q) ?? false)
+          )
+        )
+      : all;
+    return {
+      sessions: matching.slice(opts.offset, opts.offset + opts.limit),
+      total: matching.length,
+      unfilteredTotal: all.length,
+    };
   }
 
   async testConnection(): Promise<{

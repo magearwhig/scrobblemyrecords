@@ -37,7 +37,7 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | done/embedding-rec-system-plan.md | Complete -- embedding recommendation system implemented |
 | done/backlog_ideas.md | Reference -- consolidation proposals implemented |
 | site-review-2026-10-23.md | In progress -- external product/usability review; all 10 bugs (B1-B10), 9 quick wins and feature 1 (Check a Record) done 2026-10-23, merged 2026-10-24 (PR #20); next: choose between mapping-impact preview and buying shortlist; layout improvements and 17 feature ideas open |
-| site-review-2026-10-24.md | In progress -- round 2 review; R1-R7 and 3 quick wins done 2026-10-24 (branch fix/site-review-round2); R8 (LAN/phone API origin) skipped; 3 improvements and 3 feature ideas open |
+| site-review-2026-10-24.md | In progress -- round 2 review; R1-R7, 3 quick wins, 3 improvements and Browse Collection runtime sort done 2026-10-24 (branch fix/site-review-round2); R8 (LAN/phone API origin) skipped; 3 feature ideas open |
 
 ## Conventions
 

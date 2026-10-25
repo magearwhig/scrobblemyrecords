@@ -481,6 +481,26 @@ describe('CrateService', () => {
       expect(await service.cratesForRelease(102)).toEqual([]);
     });
 
+    it('lists runtimes only for releases with every track length', async () => {
+      const runtime = (knownSeconds: number, complete: boolean) => ({
+        runtime: {
+          knownSeconds,
+          complete,
+          trackCount: 2,
+          tracksWithDuration: complete ? 2 : 1,
+        },
+      });
+      builder.getFacts.mockResolvedValueOnce(
+        new Map<number, { runtime?: ReturnType<typeof runtime>['runtime'] }>([
+          [101, runtime(2400, true)],
+          [102, runtime(600, false)],
+          [103, {}],
+        ])
+      );
+      expect(await service.releaseRuntimes()).toEqual({ 101: 2400 });
+      expect(builder.getFacts).toHaveBeenCalledWith([101, 102, 103, 104]);
+    });
+
     it('invalidate() forgets the album table', () => {
       service.invalidate();
       expect(builder.invalidate).toHaveBeenCalled();

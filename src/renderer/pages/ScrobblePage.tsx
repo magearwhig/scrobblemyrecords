@@ -8,7 +8,12 @@ import {
   ScrobbleProgress,
 } from '../../shared/types';
 import { parseDurationSeconds } from '../../shared/utils/releaseRuntime';
-import { tracksToScrobble } from '../../shared/utils/tracklist';
+import {
+  DEFAULT_TRACK_SECONDS,
+  ScheduledTime,
+  scheduleBackFrom,
+  tracksToScrobble,
+} from '../../shared/utils/tracklist';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { ProgressBar } from '../components/ui/ProgressBar';
@@ -21,6 +26,13 @@ import { formatLocalTimeClean } from '../utils/dateUtils';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('ScrobblePage');
+
+/** Clock time for a track's scheduled start, e.g. "8:42 PM" */
+const formatClock = (timestamp: number): string =>
+  new Date(timestamp * 1000).toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 
 const ScrobblePage: React.FC = () => {
   const { authStatus, setAuthStatus } = useAuth();
@@ -89,12 +101,6 @@ const ScrobblePage: React.FC = () => {
       for (const album of albums) {
         const releaseDetails = await api.getReleaseDetails(album.release.id);
         if (releaseDetails.tracklist) {
-          const trackTimestamp = useCurrentTime
-            ? undefined
-            : customTimestamp
-              ? new Date(customTimestamp).getTime() / 1000
-              : undefined;
-
           // Every track, headings skipped; tracks with parts count as one
           const albumTracks = tracksToScrobble(
             releaseDetails.tracklist,
@@ -104,7 +110,6 @@ const ScrobblePage: React.FC = () => {
             track: track.title,
             album: releaseDetails.title,
             albumCover: album.release.cover_image || releaseDetails.cover_image,
-            timestamp: trackTimestamp,
             duration: parseDurationSeconds(track.duration) ?? undefined,
           }));
 
@@ -133,6 +138,42 @@ const ScrobblePage: React.FC = () => {
     }
     setSelectedTracks(newSelected);
   };
+
+  /** When listening ends: now, or the custom time */
+  const endTimestamp = (): number | undefined =>
+    useCurrentTime
+      ? Math.floor(Date.now() / 1000)
+      : customTimestamp
+        ? Math.floor(new Date(customTimestamp).getTime() / 1000)
+        : undefined;
+
+  /**
+   * Selected tracks played back to back by their lengths, the last one
+   * ending at `end`; keyed by index in preparedTracks
+   */
+  const scheduleSelected = (end: number): Map<number, ScheduledTime> => {
+    const indexes = preparedTracks
+      .map((_, index) => index)
+      .filter(index => selectedTracks.has(index));
+    const times = scheduleBackFrom(
+      indexes.map(index => preparedTracks[index].duration),
+      end
+    );
+    return new Map(indexes.map((index, n) => [index, times[n]]));
+  };
+
+  const previewEnd = endTimestamp();
+  const preview =
+    previewEnd === undefined
+      ? new Map<number, ScheduledTime>()
+      : scheduleSelected(previewEnd);
+  const unknownLengths = preparedTracks.filter(
+    (track, index) => selectedTracks.has(index) && !track.duration
+  ).length;
+  const firstStart =
+    preview.size > 0
+      ? Math.min(...Array.from(preview.values(), t => t.timestamp))
+      : undefined;
 
   const handleSelectAll = () => {
     if (selectedTracks.size === preparedTracks.length) {
@@ -229,21 +270,24 @@ const ScrobblePage: React.FC = () => {
     setResults(null);
 
     try {
-      const tracksToScrobble = preparedTracks.filter((_, index) =>
-        selectedTracks.has(index)
-      );
+      const baseTimestamp = endTimestamp();
+      const schedule =
+        baseTimestamp === undefined
+          ? new Map<number, ScheduledTime>()
+          : scheduleSelected(baseTimestamp);
+      const tracksToScrobble = preparedTracks
+        .map((track, index) => ({ track, index }))
+        .filter(({ index }) => selectedTracks.has(index))
+        .map(({ track, index }) => ({
+          ...track,
+          timestamp: schedule.get(index)?.timestamp,
+        }));
 
       setProgress({
         current: 0,
         total: tracksToScrobble.length,
         status: 'preparing',
       });
-
-      const baseTimestamp = useCurrentTime
-        ? Math.floor(Date.now() / 1000)
-        : customTimestamp
-          ? Math.floor(new Date(customTimestamp).getTime() / 1000)
-          : undefined;
 
       setProgress(prev => (prev ? { ...prev, status: 'scrobbling' } : null));
 
@@ -417,8 +461,15 @@ const ScrobblePage: React.FC = () => {
             )}
 
             <div className='scrobble-timestamp-display'>
-              Scrobble time: {formatTimestamp()}
+              Listening ends: {formatTimestamp()}
             </div>
+            {firstStart !== undefined && (
+              <div className='scrobble-timestamp-display'>
+                Tracks are timed back from then by their lengths, starting at{' '}
+                {unknownLengths > 0 ? '~' : ''}
+                {formatClock(firstStart)}.
+              </div>
+            )}
           </div>
         </div>
 
@@ -469,9 +520,30 @@ const ScrobblePage: React.FC = () => {
                       {track.artist} • {track.album}
                     </div>
                   </div>
+                  {preview.has(index) && (
+                    <span
+                      className='scrobble-track-time'
+                      title={
+                        preview.get(index)?.estimated
+                          ? 'Estimated: a track length from here on is unknown'
+                          : undefined
+                      }
+                    >
+                      {preview.get(index)?.estimated ? '~' : ''}
+                      {formatClock(preview.get(index)?.timestamp ?? 0)}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
+            {unknownLengths > 0 && (
+              <p className='scrobble-estimate-note'>
+                ~ Estimated: {unknownLengths}{' '}
+                {unknownLengths === 1 ? 'track has' : 'tracks have'} no length
+                on Discogs, so each counts as {DEFAULT_TRACK_SECONDS / 60}{' '}
+                minutes.
+              </p>
+            )}
           </div>
         )}
 
