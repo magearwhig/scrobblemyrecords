@@ -37,6 +37,8 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | done/embedding-rec-system-plan.md | Complete -- embedding recommendation system implemented |
 | done/backlog_ideas.md | Reference -- consolidation proposals implemented |
 | site-review-2026-10-23.md | In progress -- external product/usability review; all 10 bugs (B1-B10), 9 quick wins and feature 1 (Check a Record) done 2026-10-23, merged 2026-10-24 (PR #20); next: choose between mapping-impact preview and buying shortlist; layout improvements and 17 feature ideas open |
+| buying-shortlist-plan.md | Planned -- 2026-10-25; site review 1 feature 3: 3-5 wishlist records within a budget from cached prices, plays and alerts; not started |
+| shelf-census-plan.md | Planned -- 2026-10-25; site review 2 idea 2: confirm copies are on the shelf in filing order, report missing/misfiled, last seen; needs Discogs instance_id in the cache first; not started |
 | site-review-2026-10-24.md | In progress -- round 2 review; R1-R7, 3 quick wins, 3 improvements and Browse Collection runtime sort done 2026-10-24 (branch fix/site-review-round2); R8 (LAN/phone API origin) skipped; 3 feature ideas open |
 
 ## Conventions

@@ -101,7 +101,8 @@ Notes on what shipped:
 
 1. "Fits in 40 minutes" picker: suggest records that fit a time slot, from cached durations
    and listening history (M). The reviewer's pick.
-2. Shelf census: check which copies are actually on the shelf (M).
+2. Shelf census: check which copies are actually on the shelf (M). **Planned 2026-10-25**:
+   [shelf-census-plan.md](shelf-census-plan.md).
 3. Warn when a compilation or box set mostly repeats tracks already owned (L).
 
 Reviewer's order: R1 and R2 (history integrity), then R8, then R3–R5, then R6–R7 with the
