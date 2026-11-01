@@ -225,7 +225,7 @@ without a `duration` field.
 - **Breadcrumbs**: Detail pages show navigation breadcrumbs for easy back-navigation
 - **Dark Mode**: Toggle between light and dark themes
 - **Local Timezone**: All times displayed in your local timezone
-- **Sorting Options**: Sort collection by artist, title, year, date added, or scrobble count
+- **Sorting Options**: Sort collection by artist, title, year, date added, scrobble count, or runtime (records without a known length go last)
 - **Artist Name Resolution**: Unified alias graph resolves Discogs/Last.fm name variants across stats, history, and Wrapped
 - **Artist Name Mapping**: Map Discogs artist names to Last.fm names for consistent scrobbling
 - **Disambiguation Warnings**: Alerts when scrobbling artists with Discogs disambiguation suffixes (e.g., "Ghost (32)")
@@ -464,10 +464,21 @@ Sync and manage your Discogs wantlist with vinyl availability tracking:
 
 **Filtering & Sorting:**
 - **Search**: Filter by artist or album (partial, case-insensitive); works with every tab except New Releases
-- **Tabs**: All Items, Has Vinyl, CD Only, Affordable, Price Alerts, Monitoring, New Releases
-- **Sort Options**: Date Added, Price, Artist, Album, Scrobbles (Most Played)
+- **Tabs**: All Items, Has Vinyl, CD Only, Affordable, Price Alerts, Monitoring, Priority, New Releases
+- **Sort Options**: Date Added, Price, Artist, Album, Scrobbles (Most Played), Priority
 - **Include Monitored Toggle**: Merge locally monitored albums into main wishlist view
 - **Affordable Filter**: Show items under your price threshold
+
+**Your Priorities (Priority tab):**
+- **Rank your wishlist**: Drag records into order, click **Move to top**, or type a position, so a record near the bottom doesn't need a long drag. Only the records you rank get a number; the rest stay unranked
+- **Everywhere on the Wishlist**: Ranked records show a "#3" badge on the other tabs, which can also sort by Priority
+- Monitored wants can be ranked too, and your ranking is included in backups
+
+**Buying Shortlist (top of the Priority tab):**
+- **Enter a budget** to get up to 5 records. It goes down your ranking from #1 taking what fits the money left, then fills spare slots with the best unranked records by plays, alert price and time on your wishlist (at most 2 per artist)
+- **Says why**: Each pick lists its reasons, and ranked records it passed over are listed with the reason (over budget, nothing for sale, no price, already owned)
+- Each pick's title and price link to that pressing's Discogs marketplace page
+- Uses saved data only, with the same prices as above: lowest asking price before shipping, any condition, from sellers in any country. Picks can be copies that ship from overseas, so check the listing before relying on the total
 
 **Version Browser:**
 - View all pressings for any master release
@@ -774,7 +785,7 @@ Library > Crates: saved groups of albums you own that keep themselves up to date
 - Listening rules use Last.fm scrobbles from any source, so crates talk about scrobbles recorded, never about records played. Crates and suggestion history are included in backups
 
 ### 🔍 Check a Record
-Holding a record in a shop? **Check a Record** (in the Library section, the search box in the header, or "Holding a record?" on Home) answers "do I have this?" in one search across your collection, your Discogs wantlist, your monitored wants and your discard pile.
+Holding a record in a shop? **Check a Record** (the search box in the header, or "Holding a record?" on Home) answers "do I have this?" in one search across your collection, your Discogs wantlist, your monitored wants and your discard pile.
 - Search by artist and/or title (a few letters of each word is enough), or paste a Discogs release link or number
 - Each result says whether you own **this pressing**, **another pressing**, have it on your wishlist, or **traded it in / sold it** (with the date)
 - Pressings are grouped by Discogs master; guesses (a monitored want's search match, a same-name match) are shown as "possibly", never as certain
