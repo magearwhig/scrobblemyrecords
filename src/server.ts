@@ -40,6 +40,7 @@ import createUnresolvedHistoryRouter from './backend/routes/unresolvedHistory';
 import createWebsitesRouter from './backend/routes/websites';
 import createWishlistRouter from './backend/routes/wishlist';
 import createWrappedRouter from './backend/routes/wrapped';
+import { getAlbumPlayCounts } from './backend/services/albumPlayCountService';
 import { AnalyticsService } from './backend/services/analyticsService';
 import { artistMappingService } from './backend/services/artistMappingService';
 import { ArtistNameResolver } from './backend/services/artistNameResolver';
@@ -47,6 +48,7 @@ import { ArtistSimilarityEnricherService } from './backend/services/artistSimila
 import { ArtistSimilarityStorageService } from './backend/services/artistSimilarityStorageService';
 import { AuthService } from './backend/services/authService';
 import { BackupService } from './backend/services/backupService';
+import { BuyingShortlistService } from './backend/services/buyingShortlistService';
 import { CleanupService } from './backend/services/cleanupService';
 import { CollectionAnalyticsService } from './backend/services/collectionAnalyticsService';
 import { CollectionIndexerService } from './backend/services/collectionIndexerService';
@@ -96,6 +98,7 @@ import { TrackMappingService } from './backend/services/trackMappingService';
 import { UnresolvedHistoryService } from './backend/services/unresolvedHistoryService';
 import { WebsiteMonitoringService } from './backend/services/websiteMonitoringService';
 import { WishlistPriceService } from './backend/services/wishlistPriceService';
+import { WishlistPriorityService } from './backend/services/wishlistPriorityService';
 import { WishlistService } from './backend/services/wishlistService';
 import { WrappedService } from './backend/services/wrappedService';
 import { sendError } from './backend/utils/apiResponse';
@@ -414,6 +417,10 @@ const wishlistPriceService = new WishlistPriceService(
   fileStorage,
   wishlistService
 );
+const wishlistPriorityService = new WishlistPriorityService(
+  fileStorage,
+  wishlistService
+);
 const collectionAnalyticsService = new CollectionAnalyticsService(
   fileStorage,
   authService,
@@ -466,6 +473,16 @@ const exportDataService = new ExportDataService(
   wishlistService,
   historyStorage
 );
+// Records to buy within a budget: the owner's ranking first, then by score
+const buyingShortlistService = new BuyingShortlistService({
+  getPricedWants: async () =>
+    wishlistPriceService.enrichItems(await wishlistService.getWishlistItems()),
+  getSettings: () => wishlistService.getSettings(),
+  getPriorities: () => wishlistPriorityService.getSnapshot(),
+  getWishlistRows: () => exportDataService.getWishlistRows(),
+  getPlayCounts: albums =>
+    getAlbumPlayCounts(albums, { historyStorage, mappingService }),
+});
 // Check a Record: one lookup across collection, wants and discard pile
 const recordLookupService = new RecordLookupService({
   exportData: exportDataService,
@@ -538,7 +555,9 @@ app.use(
     authService,
     wishlistService,
     sellerMonitoringService,
-    wishlistPriceService
+    wishlistPriceService,
+    wishlistPriorityService,
+    buyingShortlistService
   )
 );
 app.use(

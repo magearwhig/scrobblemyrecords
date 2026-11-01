@@ -109,6 +109,9 @@ import {
   WishlistSyncStatus,
   WrappedData,
   WishlistPriceRefreshStatus,
+  WishlistPriorityChange,
+  WishlistPrioritySnapshot,
+  BuyingShortlist,
 } from '../../shared/types';
 import {
   filenameFromContentDisposition,
@@ -1538,6 +1541,25 @@ class ApiService {
 
   async removeWishlistPriceAlert(masterId: number): Promise<void> {
     await this.api.delete(`/wishlist/price-alerts/${masterId}`);
+  }
+
+  async getBuyingShortlist(budget: number): Promise<BuyingShortlist> {
+    const response = await this.api.get('/wishlist/shortlist', {
+      params: { budget },
+    });
+    return response.data.data;
+  }
+
+  async getWishlistPriorities(): Promise<WishlistPrioritySnapshot> {
+    const response = await this.api.get('/wishlist/priorities');
+    return response.data.data;
+  }
+
+  async changeWishlistPriority(
+    change: WishlistPriorityChange
+  ): Promise<WishlistPrioritySnapshot> {
+    const response = await this.api.patch('/wishlist/priorities', change);
+    return response.data.data;
   }
 
   async getWishlistPriceRefreshStatus(): Promise<WishlistPriceRefreshStatus> {

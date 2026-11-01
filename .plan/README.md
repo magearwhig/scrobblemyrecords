@@ -9,7 +9,7 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | done/button-system-consolidation.md | Complete -- all 4 phases, 54 files migrated, legacy .btn CSS removed |
 | done/mapping-resolution-plan.md | Complete -- Feature 16, all 6 phases implemented |
 | done/ui-audit-report.md | Complete -- All 3 phases (design tokens, visual polish, cleanup) implemented March 2026 |
-| tech-debt.md | Active -- 19 open (0 P1, 6 P2, 13 P3), 47 completed; P1 quick wins, M31 and backup mapping files fixed 2026-10-11 |
+| tech-debt.md | Active -- 20 open (0 P1, 6 P2, 14 P3), 47 completed; P1 quick wins, M31 and backup mapping files fixed 2026-10-11; dev-tool audit findings added 2026-11-01 |
 | done/wishlist-enhancements-plan.md | Complete -- all 4 enhancements implemented, tested, verified |
 | cancelled/spotify-integration-plan.md | Cancelled -- Spotify genre enrichment for embeddings |
 | cancelled/smart-scrobble-scheduling-plan.md | Cancelled -- superseded by memory-scrobble-plan |
@@ -36,10 +36,11 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | listening-notes-plan.md | Backlog -- #5; album-level notes MVP; not started |
 | done/embedding-rec-system-plan.md | Complete -- embedding recommendation system implemented |
 | done/backlog_ideas.md | Reference -- consolidation proposals implemented |
-| site-review-2026-10-23.md | In progress -- external product/usability review; all 10 bugs (B1-B10), 9 quick wins and feature 1 (Check a Record) done 2026-10-23, merged 2026-10-24 (PR #20); next: choose between mapping-impact preview and buying shortlist; layout improvements and 17 feature ideas open |
-| buying-shortlist-plan.md | Planned -- 2026-10-25; site review 1 feature 3: 3-5 wishlist records within a budget from cached prices, plays and alerts; not started |
+| site-review-2026-10-23.md | In progress -- external product/usability review; all 10 bugs (B1-B10), 9 quick wins and feature 1 (Check a Record) done 2026-10-23, merged 2026-10-24 (PR #20); buying shortlist (feature 3) merged 2026-11-01 (PR #23); next: mapping-impact preview or discard audition; layout improvements and 15 smaller feature ideas open |
+| done/wishlist-priorities-plan.md | Complete -- merged 2026-11-01 (PR #23); own priority order on the wishlist: drag and drop tab, Move to top, position field, Priority sort |
+| done/buying-shortlist-plan.md | Complete -- merged 2026-11-01 (PR #23); site review 1 feature 3: up to 5 wishlist records within a budget, walks the owner's ranking then fills spare slots by score; prices stay worldwide lowest before shipping (no ships-from data in the Discogs API); optional Phase 3 not built |
 | shelf-census-plan.md | Planned -- 2026-10-25; site review 2 idea 2: confirm copies are on the shelf in filing order, report missing/misfiled, last seen; needs Discogs instance_id in the cache first; not started |
-| site-review-2026-10-24.md | In progress -- round 2 review; R1-R7, 3 quick wins, 3 improvements and Browse Collection runtime sort done 2026-10-24 (branch fix/site-review-round2); R8 (LAN/phone API origin) skipped; 3 feature ideas open |
+| site-review-2026-10-24.md | In progress -- round 2 review; R1-R7, 3 quick wins, 3 improvements and Browse Collection runtime sort merged 2026-10-25 (PR #21); R8 (LAN/phone API origin) skipped; shelf census planned; fits-in-40-minutes picker and compilation overlap warning open |
 
 ## Conventions
 

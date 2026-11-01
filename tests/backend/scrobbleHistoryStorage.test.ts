@@ -174,6 +174,20 @@ describe('ScrobbleHistoryStorage', () => {
   });
 
   describe('fuzzyNormalizeKey', () => {
+    it('should read an ampersand as "and"', () => {
+      expect(storage.fuzzyNormalizeKey('Catherine Wheel', 'Adam And Eve')).toBe(
+        storage.fuzzyNormalizeKey('Catherine Wheel', 'Adam & Eve')
+      );
+      expect(
+        storage.fuzzyNormalizeKey('Joe Strummer & The Mescaleros', 'Streetcore')
+      ).toBe(
+        storage.fuzzyNormalizeKey(
+          'Joe Strummer and the Mescaleros',
+          'Streetcore'
+        )
+      );
+    });
+
     it('should remove Discogs disambiguation numbers', () => {
       // Arrange
       const artist = 'Radiohead (2)';

@@ -3,9 +3,9 @@
 Second external review, after round 1 (`site-review-2026-10-23.md`) was merged as PR #20.
 Every bug below was checked against the source before being listed.
 
-**Status (2026-10-24, branch `fix/site-review-round2`):** R1–R7, all 3 quick wins and all 3
-improvements done, plus a Runtime sort on Browse Collection (owner request). R8 skipped: the
-owner doesn't use the app from other devices. The feature ideas are still open.
+**Status (merged 2026-10-25, PR #21):** R1–R7, all 3 quick wins and all 3 improvements done,
+plus a Runtime sort on Browse Collection (owner request). R8 skipped: the owner doesn't use the
+app from other devices. Shelf census is planned; the other two feature ideas are open.
 
 Notes on what shipped:
 - R1: a full sync retries each page 3 times and then stops with an error. A complete index

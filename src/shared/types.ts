@@ -1244,6 +1244,88 @@ export interface WishlistSettings {
   newReleaseTracking?: WishlistNewReleaseSettings; // Feature 5.5: New release tracking
 }
 
+/** The owner's own order for wishlist records (first = top) */
+export interface WishlistPriorityStore {
+  schemaVersion: 1;
+  /** Ranked record keys; may include records no longer on the wishlist */
+  orderedKeys: string[];
+}
+
+/** One rankable record: a master's wants, a want with no master, or a local want */
+export interface WishlistPriorityRecord {
+  /** "master:{id}" | "release:{id}" | "local:{id}" */
+  key: string;
+  /** 1-based among records that exist now; null = not ranked */
+  rank: number | null;
+  /** A local want is part of this record */
+  monitored: boolean;
+  artist: string;
+  title: string;
+  year?: number;
+  coverImage?: string;
+  masterId?: number;
+  /** Discogs wants in this record (one per pressing) */
+  wantIds: number[];
+  /** Local wants in this record */
+  localIds: string[];
+}
+
+export interface WishlistPrioritySnapshot {
+  ranked: WishlistPriorityRecord[];
+  /** By artist, then title */
+  unranked: WishlistPriorityRecord[];
+}
+
+export type WishlistPriorityChange =
+  /** 1-based; also ranks an unranked record. Past the end means last. */
+  | { action: 'move'; key: string; position: number }
+  | { action: 'unrank'; key: string };
+
+export interface BuyingShortlistReason {
+  kind:
+    | 'priority'
+    | 'plays'
+    | 'alert'
+    | 'wishlist-age'
+    | 'possibly-owned'
+    | 'stale-price';
+  text: string;
+}
+
+/** A record suggested to buy, and why */
+export interface BuyingShortlistPick {
+  key: string;
+  /** The owner's rank; null when picked by score */
+  rank: number | null;
+  artist: string;
+  title: string;
+  coverImage?: string;
+  listing: WishlistLowestListing;
+  reasons: BuyingShortlistReason[];
+}
+
+/** A ranked record the shortlist had to pass over */
+export interface BuyingShortlistSkip {
+  key: string;
+  rank: number;
+  artist: string;
+  title: string;
+  reason: 'over-budget' | 'none-for-sale' | 'no-price' | 'owned';
+  text: string;
+}
+
+export interface BuyingShortlist {
+  budget: number;
+  currency: string;
+  picks: BuyingShortlistPick[];
+  /** Ranked records passed over before the slots filled */
+  skipped: BuyingShortlistSkip[];
+  total: number;
+  leftOver: number;
+  /** The collection isn't fully loaded, so ownership may be incomplete */
+  ownershipUnknown: boolean;
+}
+
 /**
  * Stored wishlist data file
  */
@@ -2078,6 +2160,8 @@ export interface BackupData {
   localWantList: LocalWantItem[];
   /** Price alerts per wishlist master (optional for older backups) */
   wishlistPriceAlerts?: WishlistPriceAlertStore['alerts'];
+  /** The owner's wishlist order (optional for older backups) */
+  wishlistPriorities?: string[];
 
   // Sellers
   monitoredSellers: MonitoredSeller[];
@@ -2159,6 +2243,7 @@ export interface BackupPreview {
   cratesCount?: number;
   crateSuggestionsCount?: number;
   wishlistPriceAlertsCount?: number;
+  wishlistPrioritiesCount?: number;
   artistFilingOverridesCount?: number;
 }
 

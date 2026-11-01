@@ -299,6 +299,9 @@ const SettingsBackupSection: React.FC<SettingsBackupSectionProps> = ({
                   {preview.wishlistPriceAlertsCount} wishlist price alerts
                 </li>
               )}
+              {(preview.wishlistPrioritiesCount ?? 0) > 0 && (
+                <li>{preview.wishlistPrioritiesCount} wishlist priorities</li>
+              )}
               {(preview.hasUserSettings ||
                 preview.hasSuggestionSettings ||
                 preview.hasAiSettings) && <li>All preference settings</li>}
