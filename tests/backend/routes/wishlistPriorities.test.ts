@@ -3,6 +3,7 @@ import request from 'supertest';
 
 import createWishlistRouter from '../../../src/backend/routes/wishlist';
 import { AuthService } from '../../../src/backend/services/authService';
+import { BuyingShortlistService } from '../../../src/backend/services/buyingShortlistService';
 import {
   WishlistPriorityError,
   WishlistPriorityService,
@@ -94,6 +95,78 @@ describe('wishlist priority routes', () => {
     const res = await request(app()).get('/wishlist/priorities');
     expect(res.status).toBe(503);
     expect(res.body.error).toBe('damaged');
+  });
+
+  describe('shortlist', () => {
+    const getShortlist = jest.fn();
+    const shortlistApp = (withService = true) => {
+      const app = express();
+      app.use(
+        '/wishlist',
+        createWishlistRouter(
+          {} as FileStorage,
+          {} as AuthService,
+          {} as WishlistService,
+          undefined,
+          undefined,
+          undefined,
+          withService
+            ? ({ getShortlist } as unknown as BuyingShortlistService)
+            : undefined
+        )
+      );
+      return app;
+    };
+
+    beforeEach(() => getShortlist.mockResolvedValue({ picks: [] }));
+
+    it('returns picks, not caught by the /:masterId routes', async () => {
+      const res = await request(shortlistApp()).get(
+        '/wishlist/shortlist?budget=100&count=4'
+      );
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual({ picks: [] });
+      expect(getShortlist).toHaveBeenCalledWith({ budget: 100, count: 4 });
+    });
+
+    it('leaves the count to the service when absent', async () => {
+      await request(shortlistApp()).get('/wishlist/shortlist?budget=12.5');
+      expect(getShortlist).toHaveBeenCalledWith({
+        budget: 12.5,
+        count: undefined,
+      });
+    });
+
+    it.each([
+      [''],
+      ['?budget=abc'],
+      ['?budget=0'],
+      ['?budget=-5'],
+      ['?budget=Infinity'],
+      ['?budget=10&budget=20'],
+      ['?budget=10&count=2'],
+      ['?budget=10&count=6'],
+      ['?budget=10&count=3.5'],
+    ])('rejects "%s"', async query => {
+      await request(shortlistApp())
+        .get(`/wishlist/shortlist${query}`)
+        .expect(400);
+      expect(getShortlist).not.toHaveBeenCalled();
+    });
+
+    it('says 503 for a damaged ranking or a missing service', async () => {
+      getShortlist.mockRejectedValueOnce(
+        new WishlistPriorityError('damaged', 'corrupt')
+      );
+      const res = await request(shortlistApp()).get(
+        '/wishlist/shortlist?budget=10'
+      );
+      expect(res.status).toBe(503);
+      expect(res.body.error).toBe('damaged');
+      await request(shortlistApp(false))
+        .get('/wishlist/shortlist?budget=10')
+        .expect(503);
+    });
   });
 
   it('says 503 when the service is missing', async () => {

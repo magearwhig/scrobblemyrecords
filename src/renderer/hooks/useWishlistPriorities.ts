@@ -63,6 +63,8 @@ export function useWishlistPriorities(serverUrl: string) {
     useState<WishlistPrioritySnapshot>(EMPTY);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Changes once the server holds an order, not while moves are still queued
+  const [confirmedRanking, setConfirmedRanking] = useState('');
 
   // Read by quick successive actions, ahead of the next render
   const snapshotRef = useRef(snapshot);
@@ -71,6 +73,9 @@ export function useWishlistPriorities(serverUrl: string) {
   const setSnapshot = useCallback((next: WishlistPrioritySnapshot) => {
     snapshotRef.current = next;
     setSnapshotState(next);
+  }, []);
+  const publishConfirmed = useCallback(() => {
+    setConfirmedRanking(confirmedRef.current.ranked.map(r => r.key).join());
   }, []);
   const saveQueue = useRef<Promise<unknown>>(Promise.resolve());
   const savesPending = useRef(0);
@@ -90,6 +95,7 @@ export function useWishlistPriorities(serverUrl: string) {
       if (request !== loadRequest.current || savesPending.current > 0) return;
       confirmedRef.current = next;
       setSnapshot(next);
+      publishConfirmed();
       setLoadError(null);
     } catch (err) {
       if (request !== loadRequest.current) return;
@@ -98,7 +104,7 @@ export function useWishlistPriorities(serverUrl: string) {
     } finally {
       if (request === loadRequest.current) setLoaded(true);
     }
-  }, [api, setSnapshot]);
+  }, [api, publishConfirmed, setSnapshot]);
 
   const save = useCallback(
     (change: WishlistPriorityChange): Promise<boolean> => {
@@ -113,6 +119,7 @@ export function useWishlistPriorities(serverUrl: string) {
           savesPending.current--;
           if (savesPending.current === 0) {
             setSnapshot(saved);
+            publishConfirmed();
             if (reloadAfterSaves.current) void reload();
           }
           return true;
@@ -122,7 +129,10 @@ export function useWishlistPriorities(serverUrl: string) {
             'error',
             errorMessage(err, 'Could not save your priorities')
           );
-          if (savesPending.current === 0) setSnapshot(confirmedRef.current);
+          if (savesPending.current === 0) {
+            setSnapshot(confirmedRef.current);
+            publishConfirmed();
+          }
           await reload();
           return false;
         }
@@ -130,7 +140,7 @@ export function useWishlistPriorities(serverUrl: string) {
       saveQueue.current = run;
       return run;
     },
-    [api, reload, setSnapshot, showToast]
+    [api, publishConfirmed, reload, setSnapshot, showToast]
   );
 
   /**
@@ -221,6 +231,7 @@ export function useWishlistPriorities(serverUrl: string) {
     snapshot,
     loaded,
     loadError,
+    confirmedRanking,
     reload,
     move,
     remove,

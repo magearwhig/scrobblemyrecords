@@ -1060,6 +1060,8 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
       ) : activeTab === 'priority' ? (
         <WishlistPriorityView
           priorities={priorities}
+          serverUrl={state.serverUrl}
+          currency={settings?.currency ?? 'USD'}
           searchQuery={searchQuery}
           matchesSearch={matchesSearch}
         />

@@ -2,6 +2,11 @@ import express, { Request, Response } from 'express';
 
 import { WishlistPriorityChange } from '../../shared/types';
 import { AuthService } from '../services/authService';
+import {
+  BuyingShortlistService,
+  MAX_SHORTLIST_COUNT,
+  MIN_SHORTLIST_COUNT,
+} from '../services/buyingShortlistService';
 import { jobStatusService } from '../services/jobStatusService';
 import { SellerMonitoringService } from '../services/sellerMonitoringService';
 import {
@@ -29,7 +34,8 @@ export default function createWishlistRouter(
   wishlistService: WishlistService,
   sellerMonitoringService?: SellerMonitoringService,
   wishlistPriceService?: WishlistPriceService,
-  wishlistPriorityService?: WishlistPriorityService
+  wishlistPriorityService?: WishlistPriorityService,
+  buyingShortlistService?: BuyingShortlistService
 ) {
   const router = express.Router();
   const logger = createLogger('WishlistRoutes');
@@ -239,6 +245,54 @@ export default function createWishlistRouter(
     try {
       const snapshot = await wishlistPriorityService.applyChange(change);
       res.json({ success: true, data: snapshot });
+    } catch (error) {
+      sendPriorityError(res, error);
+    }
+  });
+
+  // ---- Buying Shortlist ----
+
+  /**
+   * GET /api/v1/wishlist/shortlist?budget=100&count=5
+   * Records to buy within a budget: the owner's ranking first, then by score
+   */
+  router.get('/shortlist', async (req: Request, res: Response) => {
+    if (!buyingShortlistService) {
+      return res.status(503).json({
+        success: false,
+        error: 'The buying shortlist is not available',
+      });
+    }
+    const budget = Number(req.query.budget);
+    if (
+      typeof req.query.budget !== 'string' ||
+      !(budget > 0) ||
+      !isFinite(budget)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: 'budget must be a positive number',
+      });
+    }
+    const count =
+      req.query.count === undefined ? undefined : Number(req.query.count);
+    if (
+      count !== undefined &&
+      (!Number.isInteger(count) ||
+        count < MIN_SHORTLIST_COUNT ||
+        count > MAX_SHORTLIST_COUNT)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: `count must be from ${MIN_SHORTLIST_COUNT} to ${MAX_SHORTLIST_COUNT}`,
+      });
+    }
+    try {
+      const shortlist = await buyingShortlistService.getShortlist({
+        budget,
+        count,
+      });
+      res.json({ success: true, data: shortlist });
     } catch (error) {
       sendPriorityError(res, error);
     }

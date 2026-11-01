@@ -2,7 +2,7 @@
 
 Consolidated from the January–February 2026 audits and the 2026-03-22 consistency audit. **Last re-verified against the code: 2026-10-11** (branch `feat/album-version-merging`, HEAD `0f43ff8`).
 
-**Status: 19 open, 47 completed / resolved.**
+**Status: 20 open, 47 completed / resolved.**
 
 - Open = C1 (coverage, ongoing) + 20 still-open items from the March 2026 audit + 3 new open items from the October 2026 reviews (M31–M33). M32 and M33 came out of the 2026-10-11 planning review (data-export and marketplace plans). H15, found in the same review, was fixed the same day.
 - 2026-10-11 review closed M26 (not applicable) and M29 (resolved). It narrowed H14, M27, M28, M30, L15, L16 and L17 to what is still true.
@@ -33,6 +33,7 @@ Open items are ranked by **what to do next**. The original audit severity is kep
 | M24 | Destructive actions use native `confirm()` | **P2** | Medium | Low | 3 call sites bypass `useConfirmModal`. |
 | L17 | Icon-only buttons missing `aria-label` | **P2** | Low | Low | 2 concrete instances found. Quick a11y fix. |
 | C1-a | `suggestions.ts` route coverage | **P2** | (part of C1) | Medium | Biggest route file (2,242 lines). Coverage last measured Feb 2026. |
+| M34 | `npm audit` findings in dev tools | **P3** | Medium (new) | Low to Medium | 4 high from `task-master-ai`, the rest mostly `minimatch` and `glob`. None are in production dependencies. |
 | H14 | `MemoryScrobblePage` has no skeleton for saved collections | **P3** | High → narrowed | Low | Only 1 of the original 4 pages is still affected. |
 | M21 | Z-index scale tokens | **P3** | Medium | Low | 16 raw values. No bugs reported. |
 | M22 | Breakpoint scale documentation | **P3** | Medium | Low | Documentation only. |
@@ -167,6 +168,17 @@ A backup restore silently loses these. Found while writing [data-export-plan.md]
 - [ ] Optionally rename the field (`suggestedPrice`) with a cache migration, or document the misnomer at the type definition.
 
 ### P3 — opportunistic
+
+#### M34. `npm audit` findings in dev tools (new, 2026-11-01)
+
+`npm audit --omit=dev` finds 0, so the CI security job passes. The full audit reported 41 on
+2026-10-31 (4 high, 34 moderate, 3 low), all in dev tools:
+
+- **4 high:** `task-master-ai` and its `fastmcp`, `openai` and `zod`. The fix is `task-master-ai`
+  0.43.1, marked as a breaking change. Only worth doing while Task Master is in use.
+- **The rest:** mostly `minimatch` and `glob` through eslint, jest, nodemon and `serve`. Don't use
+  `npm audit fix --force`: it suggests old versions (`jest@25`, `eslint-config-prettier@6`). These
+  clear as those tools release updates.
 
 #### H14. Skeleton loading UI (narrowed to `MemoryScrobblePage`)
 

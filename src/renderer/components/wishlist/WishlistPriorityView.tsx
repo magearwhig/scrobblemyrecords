@@ -11,10 +11,13 @@ import { WishlistPriorityRecord } from '../../../shared/types';
 import { useWishlistPriorities } from '../../hooks/useWishlistPriorities';
 import { Button } from '../ui/Button';
 
+import BuyingShortlistPanel from './BuyingShortlistPanel';
 import WishlistPriorityRow from './WishlistPriorityRow';
 
 interface WishlistPriorityViewProps {
   priorities: ReturnType<typeof useWishlistPriorities>;
+  serverUrl: string;
+  currency: string;
   /** Text in the page's search box */
   searchQuery: string;
   matchesSearch: (artist: string, title: string) => boolean;
@@ -22,10 +25,20 @@ interface WishlistPriorityViewProps {
 
 const WishlistPriorityView: React.FC<WishlistPriorityViewProps> = ({
   priorities,
+  serverUrl,
+  currency,
   searchQuery,
   matchesSearch,
 }) => {
-  const { snapshot, loaded, loadError, reload, move, remove } = priorities;
+  const {
+    snapshot,
+    loaded,
+    loadError,
+    confirmedRanking,
+    reload,
+    move,
+    remove,
+  } = priorities;
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const searching = searchQuery.trim() !== '';
 
@@ -103,6 +116,11 @@ const WishlistPriorityView: React.FC<WishlistPriorityViewProps> = ({
 
   return (
     <div className='wishlist-priority'>
+      <BuyingShortlistPanel
+        serverUrl={serverUrl}
+        currency={currency}
+        rankingKey={confirmedRanking}
+      />
       <p className='wishlist-priority-summary'>
         {rankedCount} ranked · {snapshot.unranked.length} not ranked
       </p>

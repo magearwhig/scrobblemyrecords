@@ -1,0 +1,163 @@
+/* Buying shortlist: a budget, and records to buy within it */
+
+.buying-shortlist {
+  max-width: 56rem;
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.buying-shortlist-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.buying-shortlist-form label {
+  font-weight: 600;
+}
+
+.buying-shortlist-budget {
+  width: 6rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.buying-shortlist-hint,
+.buying-shortlist-note,
+.buying-shortlist-pressing,
+.buying-shortlist-artist {
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: var(--text-xs);
+}
+
+.buying-shortlist-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.buying-shortlist-pick {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.buying-shortlist-cover {
+  flex: none;
+  width: 4rem;
+  height: 4rem;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.buying-shortlist-cover-empty {
+  background: var(--card-bg);
+}
+
+.buying-shortlist-details {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.buying-shortlist-title {
+  color: var(--text-primary);
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.buying-shortlist-title:hover,
+.buying-shortlist-title:focus-visible {
+  text-decoration: underline;
+}
+
+.buying-shortlist-price {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+  color: var(--status-success);
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.buying-shortlist-price:hover,
+.buying-shortlist-price:focus-visible {
+  text-decoration: underline;
+}
+
+.buying-shortlist-reasons {
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: var(--text-xs);
+  list-style: none;
+}
+
+.buying-shortlist-reason-priority {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.buying-shortlist-reason-possibly-owned,
+.buying-shortlist-reason-stale-price {
+  color: var(--warning-text);
+}
+
+.buying-shortlist-total {
+  margin: 0;
+  color: var(--text-primary);
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.buying-shortlist-note {
+  margin: var(--space-1) 0 0;
+}
+
+.buying-shortlist-skipped {
+  margin-top: var(--space-3);
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: var(--text-xs);
+}
+
+.buying-shortlist-skipped-heading {
+  margin: 0 0 var(--space-1);
+  color: var(--text-primary);
+  background: transparent;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.buying-shortlist-skipped ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

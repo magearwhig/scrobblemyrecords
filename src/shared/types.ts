@@ -1281,6 +1281,51 @@ export type WishlistPriorityChange =
   | { action: 'move'; key: string; position: number }
   | { action: 'unrank'; key: string };
 
+export interface BuyingShortlistReason {
+  kind:
+    | 'priority'
+    | 'plays'
+    | 'alert'
+    | 'wishlist-age'
+    | 'possibly-owned'
+    | 'stale-price';
+  text: string;
+}
+
+/** A record suggested to buy, and why */
+export interface BuyingShortlistPick {
+  key: string;
+  /** The owner's rank; null when picked by score */
+  rank: number | null;
+  artist: string;
+  title: string;
+  coverImage?: string;
+  listing: WishlistLowestListing;
+  reasons: BuyingShortlistReason[];
+}
+
+/** A ranked record the shortlist had to pass over */
+export interface BuyingShortlistSkip {
+  key: string;
+  rank: number;
+  artist: string;
+  title: string;
+  reason: 'over-budget' | 'none-for-sale' | 'no-price' | 'owned';
+  text: string;
+}
+
+export interface BuyingShortlist {
+  budget: number;
+  currency: string;
+  picks: BuyingShortlistPick[];
+  /** Ranked records passed over before the slots filled */
+  skipped: BuyingShortlistSkip[];
+  total: number;
+  leftOver: number;
+  /** The collection isn't fully loaded, so ownership may be incomplete */
+  ownershipUnknown: boolean;
+}
+
 /**
  * Stored wishlist data file
  */

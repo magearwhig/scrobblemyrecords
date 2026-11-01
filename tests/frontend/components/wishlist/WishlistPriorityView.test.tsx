@@ -16,12 +16,14 @@ import {
 
 const mockGet = jest.fn();
 const mockChange = jest.fn();
+const mockShortlist = jest.fn();
 const mockShowToast = jest.fn();
 let mockDragEnd: ((result: unknown) => void) | undefined;
 
 jest.mock('../../../../src/renderer/services/api', () => {
   const api = {
     getWishlistPriorities: () => mockGet(),
+    getBuyingShortlist: (budget: number) => mockShortlist(budget),
     changeWishlistPriority: (change: unknown) => mockChange(change),
   };
   return { getApiService: () => api };
@@ -93,6 +95,8 @@ const Harness: React.FC<{ query?: string }> = ({ query = '' }) => {
   return (
     <WishlistPriorityView
       priorities={priorities}
+      serverUrl='http://test'
+      currency='USD'
       searchQuery={query}
       matchesSearch={(artist, title) =>
         `${artist} ${title}`.toLowerCase().includes(query.toLowerCase())
@@ -184,7 +188,9 @@ describe('WishlistPriorityView', () => {
     );
     await user.keyboard('2{Enter}');
     expect(rankedTitles()).toEqual(['First', 'Far Down', 'Second']);
-    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('spinbutton', { name: /New position/ })
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /Position 2, change position of/ })
     ).toHaveFocus();
@@ -405,12 +411,55 @@ describe('WishlistPriorityView', () => {
           </button>
           <WishlistPriorityView
             priorities={priorities}
+            serverUrl='http://test'
+            currency='USD'
             searchQuery=''
             matchesSearch={() => true}
           />
         </>
       );
     };
+
+    it('refreshes shortlist picks only once queued moves have saved', async () => {
+      mockShortlist.mockResolvedValue({
+        budget: 50,
+        currency: 'USD',
+        picks: [],
+        skipped: [],
+        total: 0,
+        leftOver: 50,
+        ownershipUnknown: false,
+      });
+      render(<Reloader />);
+      await screen.findByText(/ranked ·/);
+      await user.type(screen.getByLabelText('Budget (USD)'), '50');
+      await user.click(screen.getByRole('button', { name: 'Show picks' }));
+      await waitFor(() => expect(mockShortlist).toHaveBeenCalledTimes(1));
+
+      let finishSave: () => void = () => {};
+      mockChange.mockImplementationOnce(
+        (change: WishlistPriorityChange) =>
+          new Promise(resolve => {
+            finishSave = () => {
+              server = applyChangeToSnapshot(server, change);
+              resolve(server);
+            };
+          })
+      );
+      await user.click(
+        screen.getByRole('button', { name: /Move Artist 3 .* to the top/ })
+      );
+      await user.click(
+        screen.getByRole('button', { name: /Move Artist 4 .* to the top/ })
+      );
+      expect(mockShortlist).toHaveBeenCalledTimes(1);
+
+      await act(async () => finishSave());
+      await waitFor(() => expect(mockChange).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(mockShortlist).toHaveBeenCalledTimes(2));
+      expect(mockChange.mock.results).toHaveLength(2);
+      expect(server.ranked[0].title).toBe('Further');
+    });
 
     it('ignores a read that started before a save', async () => {
       render(<Reloader />);

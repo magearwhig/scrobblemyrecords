@@ -8,10 +8,10 @@ view and an easy way to move a record from near the bottom to the top. This come
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| Phase 1: Priority store, service, routes, backup | Done 2026-10-31 | Branch feat/wishlist-priorities |
+| Phase 1: Priority store, service, routes, backup | Done 2026-10-31 | |
 | Phase 2: Priority tab (drag and drop, Move to top, position field, search) | Done 2026-10-31 | Verified in a browser on a data copy: mouse and keyboard drag, auto-scroll |
 | Phase 3: Priority sort and rank badge on the other tabs | Done 2026-10-31 | |
-| Phase 4: Revise the buying shortlist to follow priorities | Not started | Plan text only until the shortlist is built |
+| Phase 4: Revise the buying shortlist to follow priorities | Done 2026-11-01 | See [buying-shortlist-plan.md](buying-shortlist-plan.md) section 3 |
 
 ---
 

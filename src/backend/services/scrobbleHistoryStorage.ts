@@ -110,6 +110,7 @@ export class ScrobbleHistoryStorage {
    * - "Album (Deluxe Edition)" vs "Album"
    * - "Album [Explicit]" vs "Album"
    * - "Album - EP" vs "Album"
+   * - "Adam & Eve" vs "Adam And Eve"
    * - Extra spaces or punctuation differences
    */
   fuzzyNormalizeKey(artist: string, album: string): string {
@@ -144,8 +145,11 @@ export class ScrobbleHistoryStorage {
         ''
       );
 
-      // Then remove all remaining non-alphanumeric characters
-      return normalized.toLowerCase().replace(/[^a-z0-9]/g, '');
+      // Then read "&" as "and" and remove all remaining non-alphanumeric characters
+      return normalized
+        .toLowerCase()
+        .replace(/&/g, 'and')
+        .replace(/[^a-z0-9]/g, '');
     };
     return `${normalizeString(artist)}|${normalizeString(album)}`;
   }
