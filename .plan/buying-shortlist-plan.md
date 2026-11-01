@@ -5,6 +5,9 @@ Feature 3 from the first site review ([site-review-2026-10-23.md](site-review-20
 Builds on [done/wishlist-price-alerts-plan.md](done/wishlist-price-alerts-plan.md) (the price
 cache and alerts) and on the Check a Record owned matching (`exportDataService` wishlist rows).
 
+> **On hold (2026-10-31):** build [wishlist-priorities-plan.md](wishlist-priorities-plan.md) first.
+> Picks should then follow the owner's order; see section 7 of that plan, which changes section 3 here.
+
 ## Status
 
 | Phase | Status | Notes |

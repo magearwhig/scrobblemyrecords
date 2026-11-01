@@ -21,6 +21,8 @@ interface WishlistItemCardProps {
   playCount: AlbumPlayCountResult | undefined;
   onOpenVersions: (item: EnrichedWishlistItem) => void;
   onOpenMarketplace: (item: EnrichedWishlistItem) => void;
+  /** Position in the owner's priority order, if ranked */
+  rank?: number;
   /** Extra content rendered between the details and the action buttons */
   footer?: React.ReactNode;
   /** Modifier classes added to the card root */
@@ -36,6 +38,7 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
   playCount,
   onOpenVersions,
   onOpenMarketplace,
+  rank,
   footer,
   className,
 }) => {
@@ -51,6 +54,9 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
           <div className='wishlist-card-placeholder'>No Image</div>
         )}
         {getStatusBadge(item.vinylStatus)}
+        {rank !== undefined && (
+          <span className='wishlist-rank-badge'>#{rank}</span>
+        )}
         {isMonitored && (
           <span className='wishlist-badge wishlist-badge-monitored'>
             Monitored

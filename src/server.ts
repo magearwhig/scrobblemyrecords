@@ -96,6 +96,7 @@ import { TrackMappingService } from './backend/services/trackMappingService';
 import { UnresolvedHistoryService } from './backend/services/unresolvedHistoryService';
 import { WebsiteMonitoringService } from './backend/services/websiteMonitoringService';
 import { WishlistPriceService } from './backend/services/wishlistPriceService';
+import { WishlistPriorityService } from './backend/services/wishlistPriorityService';
 import { WishlistService } from './backend/services/wishlistService';
 import { WrappedService } from './backend/services/wrappedService';
 import { sendError } from './backend/utils/apiResponse';
@@ -414,6 +415,10 @@ const wishlistPriceService = new WishlistPriceService(
   fileStorage,
   wishlistService
 );
+const wishlistPriorityService = new WishlistPriorityService(
+  fileStorage,
+  wishlistService
+);
 const collectionAnalyticsService = new CollectionAnalyticsService(
   fileStorage,
   authService,
@@ -538,7 +543,8 @@ app.use(
     authService,
     wishlistService,
     sellerMonitoringService,
-    wishlistPriceService
+    wishlistPriceService,
+    wishlistPriorityService
   )
 );
 app.use(

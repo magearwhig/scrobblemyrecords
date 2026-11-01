@@ -78,6 +78,7 @@ import {
   WebsiteMonitoringSettings,
   WishlistPriceAlert,
   WishlistPriceAlertStore,
+  WishlistPriorityStore,
   WishlistSettings,
 } from '../../shared/types';
 import { atomicWriteFile } from '../utils/atomicWrite';
@@ -108,6 +109,7 @@ const FILE_PATHS = {
   hiddenArtists: 'discovery/hidden-artists.json',
   localWantList: 'wishlist/local-want-list.json',
   wishlistPriceAlerts: 'wishlist/price-alerts.json',
+  wishlistPriorities: 'wishlist/priorities.json',
   monitoredSellers: 'sellers/monitored-sellers.json',
   monitoredLabels: 'labels/monitored-labels.json',
   monitoredWebsites: 'websites/monitored-websites.json',
@@ -538,6 +540,47 @@ export class BackupService {
     return store?.alerts ?? {};
   }
 
+  /** The stored order; null if the file exists but can't be read */
+  private async loadWishlistPriorities(): Promise<string[] | null> {
+    if (!(await this.fileStorage.exists(FILE_PATHS.wishlistPriorities))) {
+      return [];
+    }
+    const store = await this.fileStorage.readJSON<WishlistPriorityStore>(
+      FILE_PATHS.wishlistPriorities
+    );
+    return Array.isArray(store?.orderedKeys) ? store.orderedKeys : null;
+  }
+
+  /**
+   * Import the wishlist order. Merge: the current order stays and keys it
+   * lacks follow it, in backup order. Replace: the backup's order replaces it.
+   */
+  private async importWishlistPriorities(
+    backupKeys: string[],
+    merge: boolean
+  ): Promise<{ added: number; updated: number }> {
+    const valid = [
+      ...new Set(backupKeys.filter(key => typeof key === 'string')),
+    ];
+    const current = merge ? await this.loadWishlistPriorities() : [];
+    if (current === null) {
+      throw new Error(
+        'the current file is damaged, so there is no order to merge into. Use replace to restore it.'
+      );
+    }
+    const known = new Set(current);
+    const added = valid.filter(key => !known.has(key));
+    const store: WishlistPriorityStore = {
+      schemaVersion: 1,
+      orderedKeys: [...current, ...added],
+    };
+    await this.fileStorage.writeJSONWithBackup(
+      FILE_PATHS.wishlistPriorities,
+      store
+    );
+    return { added: added.length, updated: 0 };
+  }
+
   /**
    * Import wishlist price alerts (keyed by master ID). Merge: backup alerts
    * are added, and replace current ones only if updated more recently.
@@ -680,11 +723,13 @@ export class BackupService {
       crates,
       crateSuggestions,
       wishlistPriceAlerts,
+      wishlistPriorities,
       artistFilingOverrides,
     ] = await Promise.all([
       this.loadCrates(),
       this.loadCrateSuggestions(),
       this.loadWishlistPriceAlerts(),
+      this.loadWishlistPriorities(),
       this.loadArtistFilingOverrides(),
     ]);
 
@@ -719,6 +764,7 @@ export class BackupService {
       cratesCount: crates.length,
       crateSuggestionsCount: crateSuggestions.length,
       wishlistPriceAlertsCount: Object.keys(wishlistPriceAlerts).length,
+      wishlistPrioritiesCount: wishlistPriorities?.length ?? 0,
       artistFilingOverridesCount: artistFilingOverrides.length,
     };
   }
@@ -798,6 +844,7 @@ export class BackupService {
 
     const unresolvedHistory = await this.loadUnresolvedHistory();
     const wishlistPriceAlerts = await this.loadWishlistPriceAlerts();
+    const wishlistPriorities = await this.loadWishlistPriorities();
     const crates = await this.loadCrates();
     const crateSuggestions = await this.loadCrateSuggestions();
     const artistFilingOverrides = await this.loadArtistFilingOverrides();
@@ -824,6 +871,7 @@ export class BackupService {
       hiddenArtists,
       localWantList,
       wishlistPriceAlerts,
+      wishlistPriorities: wishlistPriorities ?? undefined,
       monitoredSellers,
       monitoredLabels,
       monitoredWebsites,
@@ -1578,6 +1626,22 @@ export class BackupService {
       } catch (e) {
         errors.push(
           `Wishlist price alerts: ${e instanceof Error ? e.message : e}`
+        );
+      }
+    }
+
+    // Import the wishlist order (optional: older backups lack it)
+    if (data.wishlistPriorities) {
+      try {
+        const result = await this.importWishlistPriorities(
+          data.wishlistPriorities,
+          merge
+        );
+        added += result.added;
+        updated += result.updated;
+      } catch (e) {
+        errors.push(
+          `Wishlist priorities: ${e instanceof Error ? e.message : e}`
         );
       }
     }

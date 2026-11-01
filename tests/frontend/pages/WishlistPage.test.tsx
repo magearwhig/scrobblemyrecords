@@ -34,6 +34,7 @@ const mockRemoveWishlistPriceAlert = jest.fn();
 const mockGetWishlistPriceRefreshStatus = jest.fn();
 const mockShowToast = jest.fn();
 const mockGetExportMeta = jest.fn();
+const mockGetWishlistPriorities = jest.fn();
 
 // Return a stable instance, matching the real singleton ApiService
 jest.mock('../../../src/renderer/services/api', () => {
@@ -53,6 +54,7 @@ jest.mock('../../../src/renderer/services/api', () => {
       removeWishlistPriceAlert: mockRemoveWishlistPriceAlert,
       getWishlistPriceRefreshStatus: mockGetWishlistPriceRefreshStatus,
       getExportMeta: mockGetExportMeta,
+      getWishlistPriorities: mockGetWishlistPriorities,
     });
   return { getApiService: getMockApi };
 });
@@ -222,6 +224,7 @@ describe('WishlistPage', () => {
     );
     mockRemoveWishlistPriceAlert.mockResolvedValue(undefined);
     mockGetExportMeta.mockReturnValue(new Promise(() => {}));
+    mockGetWishlistPriorities.mockResolvedValue({ ranked: [], unranked: [] });
     user = userEvent.setup();
   });
 
@@ -495,6 +498,133 @@ describe('WishlistPage', () => {
 
     // Radiohead has vinyl, so should have Shop button
     expect(screen.getByText('Shop')).toBeInTheDocument();
+  });
+
+  describe('Priority', () => {
+    const want = (
+      id: number,
+      masterId: number,
+      artist: string,
+      dateAdded: string
+    ): EnrichedWishlistItem => ({
+      id,
+      masterId,
+      releaseId: id * 10,
+      artist,
+      title: `${artist} Album`,
+      dateAdded,
+      vinylStatus: 'has_vinyl',
+      vinylVersions: [],
+    });
+    const rankedRecord = (
+      key: string,
+      rank: number,
+      wantIds: number[],
+      localIds: string[] = []
+    ) => ({
+      key,
+      rank,
+      monitored: localIds.length > 0,
+      artist: key,
+      title: key,
+      wantIds,
+      localIds,
+    });
+    const priorityItems = [
+      want(1, 100, 'Newest Unranked', '2026-03-01T00:00:00Z'),
+      want(2, 200, 'Older Unranked', '2026-01-01T00:00:00Z'),
+      want(3, 300, 'Ranked Second', '2025-01-01T00:00:00Z'),
+      want(4, 400, 'Ranked First Old', '2024-01-01T00:00:00Z'),
+      want(5, 400, 'Ranked First New', '2024-06-01T00:00:00Z'),
+    ];
+
+    const artistOrder = () =>
+      [...document.querySelectorAll('.wishlist-card-artist')].map(
+        el => el.textContent
+      );
+
+    beforeEach(() => {
+      mockGetWishlist.mockResolvedValue(priorityItems);
+      mockGetLocalWantList.mockResolvedValue([]);
+      mockGetWishlistPriorities.mockResolvedValue({
+        ranked: [
+          rankedRecord('master:400', 1, [4, 5]),
+          rankedRecord('master:300', 2, [3]),
+        ],
+        unranked: [],
+      });
+    });
+
+    it('sorts ranked records first, pressings together, then the rest by newest', async () => {
+      renderWishlistPage();
+      await screen.findByText('Ranked Second');
+      await user.selectOptions(
+        screen.getByDisplayValue('Date Added'),
+        'priority'
+      );
+      expect(artistOrder()).toEqual([
+        'Ranked First New',
+        'Ranked First Old',
+        'Ranked Second',
+        'Newest Unranked',
+        'Older Unranked',
+      ]);
+    });
+
+    it('keeps the default sort at Date Added', async () => {
+      renderWishlistPage();
+      await screen.findByText('Ranked Second');
+      expect(artistOrder()[0]).toBe('Newest Unranked');
+      expect(screen.getByDisplayValue('Date Added')).toBeInTheDocument();
+    });
+
+    it('shows the rank on ranked cards only, and the count on the tab', async () => {
+      renderWishlistPage();
+      await screen.findByText('#2');
+      expect(screen.getAllByText('#1')).toHaveLength(2);
+      expect(
+        screen.getByRole('button', { name: 'Priority (2)' })
+      ).toBeVisible();
+    });
+
+    it('ranks a merged monitored item by its local want', async () => {
+      mockGetLocalWantList.mockResolvedValue([
+        { ...mockLocalWantItems[0], id: 'other', artist: 'A', album: 'B' },
+        {
+          ...mockLocalWantItems[0],
+          id: 'mine',
+          artist: 'Local Artist',
+          album: 'Local Album',
+        },
+      ]);
+      mockGetWishlistPriorities.mockResolvedValue({
+        ranked: [rankedRecord('local:mine', 1, [], ['mine'])],
+        unranked: [],
+      });
+      renderWishlistPage();
+      await screen.findByText('Ranked Second');
+      await user.click(screen.getByLabelText(/Include monitored/));
+      await user.selectOptions(
+        screen.getByDisplayValue('Date Added'),
+        'priority'
+      );
+      expect(artistOrder()[0]).toBe('Local Artist');
+    });
+
+    it('opens the Priority tab without the sort menu', async () => {
+      renderWishlistPage();
+      await screen.findByText('Ranked Second');
+      await user.click(screen.getByRole('button', { name: 'Priority (2)' }));
+      expect(await screen.findByText(/2 ranked · 0 not ranked/)).toBeVisible();
+      expect(screen.queryByText('Sort by:')).not.toBeInTheDocument();
+    });
+
+    it('still lists the wishlist when priorities fail to load', async () => {
+      mockGetWishlistPriorities.mockRejectedValue(new Error('damaged'));
+      renderWishlistPage();
+      await screen.findByText('Ranked Second');
+      expect(screen.queryByText('#1')).not.toBeInTheDocument();
+    });
   });
 
   describe('Scrobbles Sort', () => {

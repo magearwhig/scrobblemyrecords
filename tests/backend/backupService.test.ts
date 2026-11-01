@@ -670,6 +670,90 @@ describe('BackupService', () => {
       expect(replaced['1'].maxPrice).toBe(30);
     });
 
+    it('backs up and restores the wishlist order (merge and replace)', async () => {
+      const file = 'wishlist/priorities.json';
+      const order = async () =>
+        (await fileStorage.readJSON<{ orderedKeys: string[] }>(file))
+          ?.orderedKeys;
+      await fileStorage.writeJSON(file, {
+        schemaVersion: 1,
+        orderedKeys: ['master:1', 'master:2'],
+      });
+      expect((await service.getBackupPreview()).wishlistPrioritiesCount).toBe(
+        2
+      );
+      const backupJson = await service.exportBackup({
+        includeCredentials: false,
+      });
+      expect(JSON.parse(backupJson).data.wishlistPriorities).toEqual([
+        'master:1',
+        'master:2',
+      ]);
+
+      // Merge keeps the current order; keys it lacks follow it
+      await fileStorage.writeJSON(file, {
+        schemaVersion: 1,
+        orderedKeys: ['master:3', 'master:2'],
+      });
+      await service.importBackup(backupJson, { mode: 'merge' });
+      expect(await order()).toEqual(['master:3', 'master:2', 'master:1']);
+
+      await service.importBackup(backupJson, { mode: 'replace' });
+      expect(await order()).toEqual(['master:1', 'master:2']);
+    });
+
+    it('will not merge into a damaged wishlist order, but can replace it', async () => {
+      const file = 'wishlist/priorities.json';
+      await fileStorage.writeJSON(file, {
+        schemaVersion: 1,
+        orderedKeys: ['master:1'],
+      });
+      const backupJson = await service.exportBackup({
+        includeCredentials: false,
+      });
+
+      await fileStorage.writeJSON(file, { schemaVersion: 1, orderedKeys: 'x' });
+      expect((await service.getBackupPreview()).wishlistPrioritiesCount).toBe(
+        0
+      );
+      const damagedExport = JSON.parse(
+        await service.exportBackup({ includeCredentials: false })
+      );
+      expect(damagedExport.data.wishlistPriorities).toBeUndefined();
+
+      const merged = await service.importBackup(backupJson, { mode: 'merge' });
+      expect(merged.errors.join()).toContain('Wishlist priorities');
+      expect(
+        (await fileStorage.readJSON<{ orderedKeys: unknown }>(file))
+          ?.orderedKeys
+      ).toBe('x');
+
+      await service.importBackup(backupJson, { mode: 'replace' });
+      expect(
+        (await fileStorage.readJSON<{ orderedKeys: unknown }>(file))
+          ?.orderedKeys
+      ).toEqual(['master:1']);
+    });
+
+    it('leaves the wishlist order alone when a backup has none', async () => {
+      const file = 'wishlist/priorities.json';
+      const backup = JSON.parse(
+        await service.exportBackup({ includeCredentials: false })
+      );
+      delete backup.data.wishlistPriorities;
+      await fileStorage.writeJSON(file, {
+        schemaVersion: 1,
+        orderedKeys: ['master:1'],
+      });
+      await service
+        .importBackup(JSON.stringify(backup), { mode: 'replace' })
+        .catch(() => undefined);
+      expect(
+        (await fileStorage.readJSON<{ orderedKeys: string[] }>(file))
+          ?.orderedKeys
+      ).toEqual(['master:1']);
+    });
+
     it('backs up and restores crates, and counts them in the preview', async () => {
       const crate = (id: string, name: string, updatedAt: number) => ({
         id,

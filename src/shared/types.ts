@@ -1244,6 +1244,43 @@ export interface WishlistSettings {
   newReleaseTracking?: WishlistNewReleaseSettings; // Feature 5.5: New release tracking
 }
 
+/** The owner's own order for wishlist records (first = top) */
+export interface WishlistPriorityStore {
+  schemaVersion: 1;
+  /** Ranked record keys; may include records no longer on the wishlist */
+  orderedKeys: string[];
+}
+
+/** One rankable record: a master's wants, a want with no master, or a local want */
+export interface WishlistPriorityRecord {
+  /** "master:{id}" | "release:{id}" | "local:{id}" */
+  key: string;
+  /** 1-based among records that exist now; null = not ranked */
+  rank: number | null;
+  /** A local want is part of this record */
+  monitored: boolean;
+  artist: string;
+  title: string;
+  year?: number;
+  coverImage?: string;
+  masterId?: number;
+  /** Discogs wants in this record (one per pressing) */
+  wantIds: number[];
+  /** Local wants in this record */
+  localIds: string[];
+}
+
+export interface WishlistPrioritySnapshot {
+  ranked: WishlistPriorityRecord[];
+  /** By artist, then title */
+  unranked: WishlistPriorityRecord[];
+}
+
+export type WishlistPriorityChange =
+  /** 1-based; also ranks an unranked record. Past the end means last. */
+  | { action: 'move'; key: string; position: number }
+  | { action: 'unrank'; key: string };
+
 /**
  * Stored wishlist data file
  */
@@ -2078,6 +2115,8 @@ export interface BackupData {
   localWantList: LocalWantItem[];
   /** Price alerts per wishlist master (optional for older backups) */
   wishlistPriceAlerts?: WishlistPriceAlertStore['alerts'];
+  /** The owner's wishlist order (optional for older backups) */
+  wishlistPriorities?: string[];
 
   // Sellers
   monitoredSellers: MonitoredSeller[];
@@ -2159,6 +2198,7 @@ export interface BackupPreview {
   cratesCount?: number;
   crateSuggestionsCount?: number;
   wishlistPriceAlertsCount?: number;
+  wishlistPrioritiesCount?: number;
   artistFilingOverridesCount?: number;
 }
 

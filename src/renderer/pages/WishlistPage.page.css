@@ -151,6 +151,18 @@
   top: 2.2rem;
 }
 
+.wishlist-rank-badge {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent-primary);
+  color: var(--text-on-fill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
 .wishlist-card-image .album-play-count-badge {
   top: auto;
   bottom: 0.5rem;

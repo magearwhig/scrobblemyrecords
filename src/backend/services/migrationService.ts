@@ -253,6 +253,13 @@ export class MigrationService {
       optional: true,
     });
 
+    this.register('wishlist-priorities', {
+      path: 'wishlist/priorities.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
     // Feature 5.5: New Release Tracking Files
     this.register('wishlist-new-releases', {
       path: 'wishlist/new-releases.json',

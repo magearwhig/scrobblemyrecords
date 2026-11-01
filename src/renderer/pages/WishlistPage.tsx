@@ -32,6 +32,7 @@ import { NewReleasesTab } from '../components/wishlist/NewReleasesTab';
 import WishlistPriceAlert, {
   formatCheckedAgo,
 } from '../components/wishlist/WishlistPriceAlert';
+import WishlistPriorityView from '../components/wishlist/WishlistPriorityView';
 import WishlistItemCard from '../components/WishlistItemCard';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -40,6 +41,7 @@ import {
   useNotifications,
   createSuccessNotification,
 } from '../hooks/useNotifications';
+import { useWishlistPriorities } from '../hooks/useWishlistPriorities';
 import { getApiService } from '../services/api';
 import { createLogger } from '../utils/logger';
 
@@ -62,13 +64,20 @@ function getErrorMessage(err: unknown, fallback: string): string {
 
 type TabType =
   | 'all'
+  | 'priority'
   | 'vinyl'
   | 'cd_only'
   | 'affordable'
   | 'price_alerts'
   | 'monitoring'
   | 'new_releases';
-type SortOption = 'date' | 'price' | 'artist' | 'album' | 'scrobbles';
+type SortOption =
+  | 'date'
+  | 'priority'
+  | 'price'
+  | 'artist'
+  | 'album'
+  | 'scrobbles';
 
 interface VersionsModalState {
   isOpen: boolean;
@@ -129,6 +138,9 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
 
   const api = getApiService(state.serverUrl);
 
+  const priorities = useWishlistPriorities(state.serverUrl);
+  const { reload: reloadPriorities, rankByWantId, rankByLocalId } = priorities;
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -163,6 +175,21 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Ranked records come and go with the wants
+  useEffect(() => {
+    void reloadPriorities();
+  }, [items, localWantItems, reloadPriorities]);
+
+  // Merged monitored items have negative IDs: -(index in localWantItems + 1)
+  const rankOf = useCallback(
+    (item: EnrichedWishlistItem): number | undefined => {
+      if (item.id > 0) return rankByWantId.get(item.id);
+      const local = localWantItems[-item.id - 1];
+      return local ? rankByLocalId.get(local.id) : undefined;
+    },
+    [localWantItems, rankByLocalId, rankByWantId]
+  );
 
   // Background price refresh progress; purely informational, so fail silently
   const loadPriceRefreshStatus = useCallback(async () => {
@@ -500,6 +527,15 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
             new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime()
         );
         break;
+      case 'priority':
+        // Ranked first, in order; pressings of a record and the unranked by
+        // newest added
+        filtered.sort(
+          (a, b) =>
+            (rankOf(a) ?? Infinity) - (rankOf(b) ?? Infinity) ||
+            new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime()
+        );
+        break;
       case 'price':
         filtered.sort((a, b) => {
           const priceA = a.lowestVinylPrice ?? Infinity;
@@ -551,6 +587,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
     settings,
     playCounts,
     getPlayCountKey,
+    rankOf,
     includeMonitored,
     normalizeForComparison,
     matchesSearch,
@@ -911,6 +948,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
         {(
           [
             'all',
+            'priority',
             'vinyl',
             'cd_only',
             'affordable',
@@ -925,6 +963,10 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
             onClick={() => setActiveTab(tab)}
           >
             {tab === 'all' && `All (${tabCounts.all})`}
+            {tab === 'priority' &&
+              (priorities.snapshot.ranked.length > 0
+                ? `Priority (${priorities.snapshot.ranked.length})`
+                : 'Priority')}
             {tab === 'vinyl' && `Has Vinyl (${tabCounts.vinyl})`}
             {tab === 'cd_only' && `CD Only (${tabCounts.cd_only})`}
             {tab === 'affordable' && `Affordable (${tabCounts.affordable})`}
@@ -974,44 +1016,53 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
         </div>
       )}
 
-      {/* Sort Options - hide for Monitoring and New Releases tabs */}
-      {activeTab !== 'monitoring' && activeTab !== 'new_releases' && (
-        <div className='wishlist-sort'>
-          <label>Sort by:</label>
-          <select
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value as SortOption)}
-            className='form-select'
-          >
-            <option value='date'>Date Added</option>
-            <option value='scrobbles'>Scrobbles (Most Played)</option>
-            <option value='price'>Price (Low to High)</option>
-            <option value='artist'>Artist</option>
-            <option value='album'>Album</option>
-          </select>
-          {sortBy === 'scrobbles' && loadingPlayCounts && (
-            <span className='wishlist-sort-loading'>
-              Loading play counts...
-            </span>
-          )}
+      {/* Sort Options - hide for Priority, Monitoring and New Releases tabs */}
+      {activeTab !== 'priority' &&
+        activeTab !== 'monitoring' &&
+        activeTab !== 'new_releases' && (
+          <div className='wishlist-sort'>
+            <label>Sort by:</label>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as SortOption)}
+              className='form-select'
+            >
+              <option value='date'>Date Added</option>
+              <option value='priority'>Priority</option>
+              <option value='scrobbles'>Scrobbles (Most Played)</option>
+              <option value='price'>Price (Low to High)</option>
+              <option value='artist'>Artist</option>
+              <option value='album'>Album</option>
+            </select>
+            {sortBy === 'scrobbles' && loadingPlayCounts && (
+              <span className='wishlist-sort-loading'>
+                Loading play counts...
+              </span>
+            )}
 
-          {/* Include Monitored toggle (Phase 2) */}
-          {localWantItems.length > 0 && (
-            <label className='wishlist-toggle'>
-              <input
-                type='checkbox'
-                checked={includeMonitored}
-                onChange={e => setIncludeMonitored(e.target.checked)}
-              />
-              <span>Include monitored ({localWantItems.length})</span>
-            </label>
-          )}
-        </div>
-      )}
+            {/* Include Monitored toggle (Phase 2) */}
+            {localWantItems.length > 0 && (
+              <label className='wishlist-toggle'>
+                <input
+                  type='checkbox'
+                  checked={includeMonitored}
+                  onChange={e => setIncludeMonitored(e.target.checked)}
+                />
+                <span>Include monitored ({localWantItems.length})</span>
+              </label>
+            )}
+          </div>
+        )}
 
       {/* New Releases Tab (Feature 5.5) */}
       {activeTab === 'new_releases' ? (
         <NewReleasesTab onCountChange={setNewReleasesCount} />
+      ) : activeTab === 'priority' ? (
+        <WishlistPriorityView
+          priorities={priorities}
+          searchQuery={searchQuery}
+          matchesSearch={matchesSearch}
+        />
       ) : /* Monitoring Tab - Monitored Albums */
       activeTab === 'monitoring' ? (
         <>
@@ -1062,6 +1113,11 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
                       <div className='wishlist-card-placeholder'>No Image</div>
                     )}
                     {getStatusBadge(item.vinylStatus)}
+                    {rankByLocalId.has(item.id) && (
+                      <span className='wishlist-rank-badge'>
+                        #{rankByLocalId.get(item.id)}
+                      </span>
+                    )}
                   </div>
                   <div className='wishlist-card-content'>
                     <h4 className='wishlist-card-title'>{item.album}</h4>
@@ -1149,6 +1205,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
                   )}
                   onOpenVersions={openVersionsModal}
                   onOpenMarketplace={openDiscogsMarketplace}
+                  rank={rankOf(item)}
                   className={
                     item.priceAlert?.triggered
                       ? 'wishlist-card-price-triggered'

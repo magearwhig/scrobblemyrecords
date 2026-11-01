@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 
+import { WishlistPriorityChange } from '../../shared/types';
 import { AuthService } from '../services/authService';
 import { jobStatusService } from '../services/jobStatusService';
 import { SellerMonitoringService } from '../services/sellerMonitoringService';
@@ -7,6 +8,10 @@ import {
   WishlistPriceAlertError,
   WishlistPriceService,
 } from '../services/wishlistPriceService';
+import {
+  WishlistPriorityError,
+  WishlistPriorityService,
+} from '../services/wishlistPriorityService';
 import { WishlistService } from '../services/wishlistService';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
@@ -23,7 +28,8 @@ export default function createWishlistRouter(
   authService: AuthService,
   wishlistService: WishlistService,
   sellerMonitoringService?: SellerMonitoringService,
-  wishlistPriceService?: WishlistPriceService
+  wishlistPriceService?: WishlistPriceService,
+  wishlistPriorityService?: WishlistPriorityService
 ) {
   const router = express.Router();
   const logger = createLogger('WishlistRoutes');
@@ -161,6 +167,82 @@ export default function createWishlistRouter(
       }
     }
   );
+
+  // ---- Priorities ----
+
+  const priorityServiceUnavailable = (res: Response) =>
+    res.status(503).json({
+      success: false,
+      error: 'Wishlist priorities are not available',
+    });
+
+  const sendPriorityError = (res: Response, error: unknown) => {
+    if (error instanceof WishlistPriorityError) {
+      return res
+        .status(error.code === 'not_found' ? 404 : 503)
+        .json({ success: false, error: error.message });
+    }
+    logger.error('Error with wishlist priorities', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  };
+
+  /** A valid change from a request body, or null */
+  const parsePriorityChange = (
+    body: unknown
+  ): WishlistPriorityChange | null => {
+    const { action, key, position } = (body ?? {}) as Record<string, unknown>;
+    if (typeof key !== 'string' || !key) return null;
+    if (action === 'unrank') return { action, key };
+    if (
+      action === 'move' &&
+      typeof position === 'number' &&
+      Number.isSafeInteger(position) &&
+      position >= 1
+    ) {
+      return { action, key, position };
+    }
+    return null;
+  };
+
+  /**
+   * GET /api/v1/wishlist/priorities
+   * Ranked records in order, and the records not ranked yet
+   */
+  router.get('/priorities', async (_req: Request, res: Response) => {
+    if (!wishlistPriorityService) return priorityServiceUnavailable(res);
+    try {
+      const snapshot = await wishlistPriorityService.getSnapshot();
+      res.json({ success: true, data: snapshot });
+    } catch (error) {
+      sendPriorityError(res, error);
+    }
+  });
+
+  /**
+   * PATCH /api/v1/wishlist/priorities
+   * Body: { action: 'move', key, position } | { action: 'unrank', key }
+   * Returns the updated ranked and unranked records
+   */
+  router.patch('/priorities', async (req: Request, res: Response) => {
+    if (!wishlistPriorityService) return priorityServiceUnavailable(res);
+    const change = parsePriorityChange(req.body);
+    if (!change) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "Expected { action: 'move', key, position } or { action: 'unrank', key }",
+      });
+    }
+    try {
+      const snapshot = await wishlistPriorityService.applyChange(change);
+      res.json({ success: true, data: snapshot });
+    } catch (error) {
+      sendPriorityError(res, error);
+    }
+  });
 
   // ---- Sync Operations ----
 
