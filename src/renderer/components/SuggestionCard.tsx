@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { SuggestionResult, SuggestionFactors } from '../../shared/types';
 import { navigate } from '../routes';
 
+import AlbumLink from './AlbumLink';
+import ArtistLink from './ArtistLink';
 import { Button } from './ui/Button';
 
 interface SuggestionCardProps {
@@ -93,11 +95,11 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
 
       <div className='suggestion-card-content'>
         <div className='suggestion-card-title' title={release.title}>
-          {release.title}
+          <AlbumLink artist={release.artist} album={release.title} />
         </div>
 
         <div className='suggestion-card-artist' title={release.artist}>
-          {release.artist}
+          <ArtistLink artist={release.artist} />
         </div>
 
         <div className='suggestion-card-meta'>

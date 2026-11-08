@@ -3,6 +3,8 @@ import React from 'react';
 
 import { ScrobbleSession, ScrobbleTrack } from '../../shared/types';
 
+import AlbumLink from './AlbumLink';
+import ArtistLink from './ArtistLink';
 import { Button } from './ui/Button';
 
 interface UniqueAlbum {
@@ -191,7 +193,14 @@ const ScrobbleSessionCard: React.FC<ScrobbleSessionCardProps> = ({
                     {track.track}
                   </div>
                   <div className='history-session-track-meta'>
-                    {track.artist} &bull; {track.album}
+                    <ArtistLink artist={track.artist} />
+                    {track.album && (
+                      <>
+                        {' '}
+                        &bull;{' '}
+                        <AlbumLink artist={track.artist} album={track.album} />
+                      </>
+                    )}
                   </div>
                   {track.timestamp && (
                     <div className='history-session-track-timestamp'>

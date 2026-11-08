@@ -4,6 +4,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { RoiScoreItem } from '../../../shared/types';
 import { statsApi } from '../../services/statsApi';
 import { createLogger } from '../../utils/logger';
+import AlbumLink from '../AlbumLink';
+import ArtistLink from '../ArtistLink';
 import { EmptyState } from '../ui/EmptyState';
 import { Skeleton } from '../ui/Skeleton';
 import './CollectionROIChart.css';
@@ -89,8 +91,12 @@ const RoiRow: React.FC<RoiRowProps> = React.memo(
         )}
       </div>
       <div className='roi-chart-info'>
-        <span className='roi-chart-album'>{item.album}</span>
-        <span className='roi-chart-artist'>{item.artist}</span>
+        <span className='roi-chart-album'>
+          <AlbumLink artist={item.artist} album={item.album} />
+        </span>
+        <span className='roi-chart-artist'>
+          <ArtistLink artist={item.artist} />
+        </span>
       </div>
       <div className='roi-chart-stats'>
         <span className='roi-chart-plays'>

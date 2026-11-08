@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 
 import { CrateOverride } from '../../../shared/types';
 import { phrase } from '../../../shared/utils/crateCopy';
+import AlbumLink from '../AlbumLink';
+import ArtistLink from '../ArtistLink';
 import { Button, Modal } from '../ui';
 
 import CrateCover from './CrateCover';
@@ -63,10 +65,13 @@ const CrateStaleOverrides: React.FC<CrateStaleOverridesProps> = ({
             />
             <span className='crate-stale-text'>
               <span className='crate-stale-album'>
-                {override.snapshot.title}
+                <AlbumLink
+                  artist={override.snapshot.artist}
+                  album={override.snapshot.title}
+                />
               </span>
               <span className='crate-stale-artist'>
-                {override.snapshot.artist}
+                <ArtistLink artist={override.snapshot.artist} />
               </span>
             </span>
             <span className='crate-stale-action'>

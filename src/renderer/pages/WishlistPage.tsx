@@ -6,6 +6,7 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
+
 import './WishlistPage.page.css';
 
 import {
@@ -19,6 +20,8 @@ import {
   WishlistSyncStatus,
   VinylStatus,
 } from '../../shared/types';
+import AlbumLink from '../components/AlbumLink';
+import ArtistLink from '../components/ArtistLink';
 import PocketListExportDialog from '../components/PocketListExportDialog';
 import { Modal } from '../components/ui';
 import { Button } from '../components/ui/Button';
@@ -1122,8 +1125,12 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ embedded = false }) => {
                     )}
                   </div>
                   <div className='wishlist-card-content'>
-                    <h4 className='wishlist-card-title'>{item.album}</h4>
-                    <p className='wishlist-card-artist'>{item.artist}</p>
+                    <h4 className='wishlist-card-title'>
+                      <AlbumLink artist={item.artist} album={item.album} />
+                    </h4>
+                    <p className='wishlist-card-artist'>
+                      <ArtistLink artist={item.artist} />
+                    </p>
                     <div className='wishlist-card-meta'>
                       <span className='wishlist-card-date'>
                         Added: {new Date(item.addedAt).toLocaleDateString()}

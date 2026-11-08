@@ -1,6 +1,8 @@
 import React from 'react';
 
 import { OnThisDayResult } from '../../../shared/types';
+import AlbumLink from '../AlbumLink';
+import ArtistLink from '../ArtistLink';
 import { EmptyState } from '../ui/EmptyState';
 import { Skeleton } from '../ui/Skeleton';
 import './OnThisDay.css';
@@ -110,10 +112,10 @@ export const OnThisDay: React.FC<OnThisDayProps> = ({ data, loading }) => {
                     )}
                     <div className='on-this-day-album-info'>
                       <span className='on-this-day-album-title'>
-                        {album.album}
+                        <AlbumLink artist={album.artist} album={album.album} />
                       </span>
                       <span className='on-this-day-album-artist'>
-                        {album.artist}
+                        <ArtistLink artist={album.artist} />
                       </span>
                     </div>
                     <span className='on-this-day-album-plays'>

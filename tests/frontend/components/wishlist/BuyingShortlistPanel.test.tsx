@@ -153,8 +153,14 @@ describe('BuyingShortlistPanel', () => {
     );
     renderPanel();
     await ask();
+    const first = (
+      await screen.findByRole('link', {
+        name: 'View artist details for Artist 1',
+      })
+    ).closest('li');
+    expect(first).toHaveTextContent('#1 Artist 1 – Album 1: Too much');
     expect(
-      await screen.findByText('#1 Artist 1 – Album 1: Too much')
+      screen.getByRole('link', { name: 'View album details for Album 1' })
     ).toBeInTheDocument();
     expect(screen.getByText('and 2 more')).toBeInTheDocument();
     expect(screen.queryByText(/#7 Artist/)).not.toBeInTheDocument();

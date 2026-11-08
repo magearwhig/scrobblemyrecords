@@ -3,6 +3,7 @@ import React from 'react';
 import { SellerMatch } from '../../shared/types';
 import { formatRelativeTime as formatRelativeTimeUtil } from '../utils/dateUtils';
 
+import ArtistLink from './ArtistLink';
 import { Button } from './ui/Button';
 
 interface MatchCardProps {
@@ -47,7 +48,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
       )}
       <div className='seller-match-info'>
         <div className='seller-match-title'>
-          {match.artist} - {match.title}
+          <ArtistLink artist={match.artist} /> - {match.title}
           {playCount != null && playCount > 0 && (
             <span
               className='seller-match-badge seller-match-badge-plays'

@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 
 import { RecommendationResult } from '../../../shared/types';
+import ArtistLink from '../ArtistLink';
 import { Button } from '../ui/Button';
 import { ProgressBar } from '../ui/ProgressBar';
 
@@ -59,7 +60,9 @@ const RecommendationCard: React.FC<RecommendationCardProps> = React.memo(
           >
             {release.title}
           </button>
-          <div className='recommendation-card__artist'>{release.artist}</div>
+          <div className='recommendation-card__artist'>
+            <ArtistLink artist={release.artist} />
+          </div>
           {!!release.year && (
             <div className='recommendation-card__year'>{release.year}</div>
           )}

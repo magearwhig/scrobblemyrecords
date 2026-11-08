@@ -1,6 +1,8 @@
 import React from 'react';
 
 import { MissingAlbum } from '../../../shared/types';
+import AlbumLink from '../AlbumLink';
+import ArtistLink from '../ArtistLink';
 import { Button } from '../ui/Button';
 
 type AlbumSortOption = 'plays' | 'artist' | 'album' | 'recent';
@@ -114,7 +116,7 @@ const MissingAlbumsTab: React.FC<MissingAlbumsTabProps> = ({
             >
               <div className='missing-item-info'>
                 <div className='missing-item-title'>
-                  {album.album}
+                  <AlbumLink artist={album.artist} album={album.album} />
                   {isInDiscogsWishlist(album.artist, album.album) && (
                     <span
                       className='discovery-badge discovery-badge-wishlist'
@@ -132,7 +134,9 @@ const MissingAlbumsTab: React.FC<MissingAlbumsTabProps> = ({
                     </span>
                   )}
                 </div>
-                <div className='missing-item-artist'>{album.artist}</div>
+                <div className='missing-item-artist'>
+                  <ArtistLink artist={album.artist} />
+                </div>
               </div>
               <div className='missing-item-stats'>
                 <span className='missing-item-playcount'>

@@ -5,6 +5,7 @@ import { DashboardRecentAlbum } from '../../../shared/types';
 import { navigate, ROUTES } from '../../routes';
 import { formatLocalTimeClean } from '../../utils/dateUtils';
 import AlbumLink from '../AlbumLink';
+import ArtistLink from '../ArtistLink';
 
 interface RecentAlbumsProps {
   albums: DashboardRecentAlbum[];
@@ -108,7 +109,9 @@ export const RecentAlbums: React.FC<RecentAlbumsProps> = ({
               <div className='dashboard-album-title'>
                 <AlbumLink artist={album.artist} album={album.album} />
               </div>
-              <div className='dashboard-album-artist'>{album.artist}</div>
+              <div className='dashboard-album-artist'>
+                <ArtistLink artist={album.artist} />
+              </div>
             </div>
             <div className='dashboard-album-time'>
               {formatTimestamp(album.lastPlayed)}
