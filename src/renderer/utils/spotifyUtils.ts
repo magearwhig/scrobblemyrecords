@@ -3,6 +3,21 @@
  * Provides simple deep-linking to Spotify without requiring OAuth or API authentication.
  */
 
+import { normalizeForMatching } from '../../shared/utils/trackNormalization';
+
+/**
+ * Plain keyword search for Spotify. Field filters ("track:You Do You
+ * artist:Bear In Heaven") find nothing in the desktop app when a name has
+ * more than one word, so names are joined as keywords, without Discogs
+ * suffixes ("(2)") or edition tags ("[Explicit]", "(Remastered)").
+ */
+function searchQuery(...names: string[]): string {
+  return names
+    .map(name => normalizeForMatching(name))
+    .filter(Boolean)
+    .join(' ');
+}
+
 /**
  * Opens a track on Spotify (desktop app or web player).
  * Tries desktop app first via spotify: URI, falls back to web player.
@@ -16,10 +31,9 @@ export const playTrackOnSpotify = (
   track: string,
   album?: string
 ): void => {
-  // Construct search query
   const query = album
-    ? `track:${track} artist:${artist} album:${album}`
-    : `track:${track} artist:${artist}`;
+    ? searchQuery(artist, track, album)
+    : searchQuery(artist, track);
 
   // Try desktop app first
   const spotifyUri = `spotify:search:${encodeURIComponent(query)}`;
@@ -34,10 +48,7 @@ export const playTrackOnSpotify = (
 
   // Fallback to web player after a short delay (in case desktop app didn't open)
   setTimeout(() => {
-    const webQuery = album
-      ? `${artist} ${track} ${album}`
-      : `${artist} ${track}`;
-    const webUrl = `https://open.spotify.com/search/${encodeURIComponent(webQuery)}`;
+    const webUrl = `https://open.spotify.com/search/${encodeURIComponent(query)}`;
     window.open(webUrl, '_blank');
   }, 500);
 };
@@ -49,8 +60,7 @@ export const playTrackOnSpotify = (
  * @param album - Album name
  */
 export const playAlbumOnSpotify = (artist: string, album: string): void => {
-  // Construct search query for album
-  const query = `album:${album} artist:${artist}`;
+  const query = searchQuery(artist, album);
 
   // Try desktop app first
   const spotifyUri = `spotify:search:${encodeURIComponent(query)}`;
@@ -65,7 +75,7 @@ export const playAlbumOnSpotify = (artist: string, album: string): void => {
 
   // Fallback to web player after a short delay
   setTimeout(() => {
-    const webUrl = `https://open.spotify.com/search/${encodeURIComponent(`${artist} ${album}`)}`;
+    const webUrl = `https://open.spotify.com/search/${encodeURIComponent(query)}`;
     window.open(webUrl, '_blank');
   }, 500);
 };
@@ -76,7 +86,8 @@ export const playAlbumOnSpotify = (artist: string, album: string): void => {
  * @param artist - Artist name
  */
 export const playArtistOnSpotify = (artist: string): void => {
-  const spotifyUri = `spotify:search:${encodeURIComponent(`artist:${artist}`)}`;
+  const query = searchQuery(artist);
+  const spotifyUri = `spotify:search:${encodeURIComponent(query)}`;
 
   // Create a temporary link to trigger the spotify: URI
   const desktopLink = document.createElement('a');
@@ -88,7 +99,7 @@ export const playArtistOnSpotify = (artist: string): void => {
 
   // Fallback to web player after a short delay
   setTimeout(() => {
-    const webUrl = `https://open.spotify.com/search/${encodeURIComponent(artist)}`;
+    const webUrl = `https://open.spotify.com/search/${encodeURIComponent(query)}`;
     window.open(webUrl, '_blank');
   }, 500);
 };

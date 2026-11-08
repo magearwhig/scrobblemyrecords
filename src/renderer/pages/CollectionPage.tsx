@@ -208,6 +208,7 @@ const CollectionPage: React.FC = () => {
 
   // Restore the page scroll position once the restored results have rendered
   const pageRootRef = useRef<HTMLDivElement>(null);
+  const searchRequestRef = useRef(0);
   const pendingPageScrollRef = useRef<number | null>(
     restoredView?.pageScrollTop || null
   );
@@ -714,6 +715,8 @@ const CollectionPage: React.FC = () => {
   const performSearch = async (query: string, page: number = 1) => {
     if (!authStatus.discogs.username) return;
 
+    // A slow search can finish after a newer one; only the latest is shown
+    const request = ++searchRequestRef.current;
     setLoading(true);
     setError('');
 
@@ -724,6 +727,7 @@ const CollectionPage: React.FC = () => {
         page,
         itemsPerPage
       );
+      if (request !== searchRequestRef.current) return;
       logger.info(`Search results: ${results.items.length} items found`);
       // Sort with the latest play counts and runtimes; this render's
       // sortCollection may predate them
@@ -732,9 +736,10 @@ const CollectionPage: React.FC = () => {
       setSearchTotalPages(results.totalPages);
       setSearchTotal(results.total);
     } catch (error) {
+      if (request !== searchRequestRef.current) return;
       setError(error instanceof Error ? error.message : 'Search failed');
     } finally {
-      setLoading(false);
+      if (request === searchRequestRef.current) setLoading(false);
     }
   };
 
@@ -1416,7 +1421,6 @@ const CollectionPage: React.FC = () => {
           onSearch={handleSearch}
           defaultValue={restoredView?.searchQuery}
           placeholder='Search your collection...'
-          disabled={loading}
         />
 
         {/* Filters Section */}

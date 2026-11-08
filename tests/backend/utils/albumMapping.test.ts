@@ -290,6 +290,23 @@ describe('albumMapping utils', () => {
       ]);
     });
 
+    it('includes the copy under its resolved artist', () => {
+      // Discogs "MC Breed, DFC (2)" mapped to Last.fm "MC Breed"
+      const resolveArtist = (name: string) =>
+        name.toLowerCase() === 'mc breed, dfc (2)' ? 'mc breed' : name;
+      const namesFor = createAlbumGroupNameResolver(null, resolveArtist);
+      const owned = { artist: 'MC Breed, DFC (2)', title: 'MC Breed & DFC' };
+      const groupKey = createAlbumCanonicalizer(null, resolveArtist)(
+        owned.artist,
+        owned.title
+      ).key;
+
+      expect(namesFor([owned], groupKey)).toEqual([
+        { artist: 'MC Breed, DFC (2)', album: 'MC Breed & DFC' },
+        { artist: 'mc breed', album: 'MC Breed & DFC' },
+      ]);
+    });
+
     it("includes a mapping's target when only its source title is owned", () => {
       // Owned as the alternate title, merged into the canonical one, with
       // the scrobbles recorded under the canonical title
