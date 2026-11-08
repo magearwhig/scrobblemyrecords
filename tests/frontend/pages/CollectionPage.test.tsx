@@ -458,6 +458,30 @@ describe('CollectionPage', () => {
       });
     });
 
+    it('keeps the search box usable while a search is running', async () => {
+      renderWithProviders(<CollectionPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Artist A - Album A')).toBeInTheDocument();
+      });
+
+      // A search that never finishes
+      mockApiServiceInstance.searchCollectionPaginated.mockReturnValue(
+        new Promise(() => {})
+      );
+      const searchInput = screen.getByTestId('search-input');
+      await userEvent.type(searchInput, 'Artist');
+      await userEvent.click(screen.getByText('Search'));
+
+      await waitFor(() => {
+        expect(
+          mockApiServiceInstance.searchCollectionPaginated
+        ).toHaveBeenCalledWith('testuser', 'Artist', 1, 50);
+      });
+      // A disabled input loses focus and drops what is typed
+      expect(searchInput).not.toBeDisabled();
+    });
+
     it('clears search when query is empty', async () => {
       renderWithProviders(<CollectionPage />);
 

@@ -1170,7 +1170,7 @@ describe('StatsService', () => {
       const warmBlock = {
         warmedAt: Math.floor(Date.now() / 1000),
         syncTimestamp,
-        version: 4,
+        version: 5,
         artistAliasFingerprint: '',
         historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
         streaks: { currentStreak: 5, longestStreak: 10 },
@@ -1244,7 +1244,7 @@ describe('StatsService', () => {
         warm: {
           warmedAt: 0,
           syncTimestamp,
-          version: 4,
+          version: 5,
           artistAliasFingerprint: '',
           historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
           topAlbums: { all: [{ artist: 'cached', album: 'cached' }] },
@@ -1277,7 +1277,7 @@ describe('StatsService', () => {
         warm: {
           warmedAt: 0,
           syncTimestamp,
-          version: 4,
+          version: 5,
           artistAliasFingerprint: '',
           // Built when a rule pointed somewhere else (same counts)
           historyFingerprint: computeHistoryFingerprint(
@@ -1303,7 +1303,7 @@ describe('StatsService', () => {
       const warmBlock = {
         warmedAt: 0,
         syncTimestamp,
-        version: 4,
+        version: 5,
         artistAliasFingerprint: '',
         historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
         // Built when there were no album mappings
@@ -1539,7 +1539,7 @@ describe('StatsService', () => {
       warm: {
         warmedAt: Math.floor(Date.now() / 1000),
         syncTimestamp,
-        version: 4,
+        version: 5,
         artistAliasFingerprint: '',
         historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
         streaks: { currentStreak: 7, longestStreak: 21 },
@@ -4371,6 +4371,57 @@ describe('StatsService', () => {
       ]);
     });
 
+    it('top tracks merge plays recorded under artist aliases', async () => {
+      // "Homeboy Sandman, SonnyJim" is mapped to "Homeboy Sandman"
+      const resolveArtist = (name: string) =>
+        name.toLowerCase() === 'homeboy sandman, sonnyjim'
+          ? 'homeboy sandman'
+          : name.toLowerCase();
+      statsService.setArtistNameResolver({
+        resolveArtist,
+        resolveArtistMulti: (name: string) => [resolveArtist(name)],
+        areSameArtist: (a: string, b: string) =>
+          resolveArtist(a) === resolveArtist(b),
+        getDisplayName: (name: string) =>
+          resolveArtist(name) === 'homeboy sandman' ? 'Homeboy Sandman' : name,
+        getFingerprint: () => 'test',
+      } as unknown as ArtistNameResolver);
+      mockHistoryStorage.getIndex.mockResolvedValue({
+        albums: {
+          'homeboy sandman|soli deo gloria': {
+            lastPlayed: now,
+            playCount: 4,
+            plays: [...plays('Do You Love Me', 3), ...plays('Books', 1, 10)],
+          },
+          'homeboy sandman, sonnyjim|soli deo gloria': {
+            lastPlayed: now,
+            playCount: 4,
+            plays: plays('Do You Love Me?', 4, 20),
+          },
+        },
+        totalScrobbles: 8,
+        lastSyncTimestamp: now,
+        oldestScrobbleDate: 0,
+      });
+
+      const top = await statsService.getTopTracks('all', 10);
+      const detail = await statsService.getArtistDetail(
+        'Homeboy Sandman',
+        'month',
+        []
+      );
+
+      // A merged row is named by its most-played artist spelling
+      expect(top.map(t => [t.artist, t.track, t.playCount])).toEqual([
+        ['Homeboy Sandman, Sonnyjim', 'Do You Love Me?', 7],
+        ['Homeboy Sandman', 'Books', 1],
+      ]);
+      expect(detail.topTracks.map(t => [t.track, t.playCount])).toEqual([
+        ['Do You Love Me?', 7],
+        ['Books', 1],
+      ]);
+    });
+
     it('track detail counts every spelling of the track', async () => {
       useTrackMappings([dirtWork]);
 
@@ -5553,7 +5604,7 @@ describe('StatsService', () => {
           expect.stringContaining('stats-cache'),
           expect.objectContaining({
             warm: expect.objectContaining({
-              version: 4,
+              version: 5,
               historyFingerprint: 'scrobbles:8;unresolved:5',
             }),
           })

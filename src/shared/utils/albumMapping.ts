@@ -85,6 +85,22 @@ export function discogsArtistIdentityKey(artistRaw: string): string {
 }
 
 /**
+ * Resolve an artist through the alias resolver. Discogs-numbered names
+ * ("Afghan Whigs (2)") the resolver doesn't know fall back to the plain name,
+ * so they group with its aliases.
+ */
+function resolveGroupArtist(
+  artist: string,
+  resolveArtist: (artist: string) => string
+): string {
+  const resolved = resolveArtist(artist);
+  const plain = stripDiscogsSuffix(artist);
+  return plain !== artist && resolved.toLowerCase() === artist.toLowerCase()
+    ? resolveArtist(plain)
+    : resolved;
+}
+
+/**
  * Build a resolver from a scrobble history album to the album it is merged
  * into. Mappings are one hop deep, so the mapping target is the canonical
  * album; unmapped albums resolve to themselves. `key` identifies the merged
@@ -100,15 +116,8 @@ export function createAlbumCanonicalizer(
   artist: string,
   album: string
 ) => AlbumName & { key: string; mapping?: AlbumMapping } {
-  // Discogs-numbered names ("Afghan Whigs (2)") the resolver doesn't know
-  // fall back to the plain name, so they group with its aliases
-  const groupArtist = (artist: string) => {
-    const resolved = resolveArtist(artist);
-    const plain = stripDiscogsSuffix(artist);
-    return plain !== artist && resolved.toLowerCase() === artist.toLowerCase()
-      ? resolveArtist(plain)
-      : resolved;
-  };
+  const groupArtist = (artist: string) =>
+    resolveGroupArtist(artist, resolveArtist);
 
   const byHistoryKey = new Map<string, AlbumMapping>();
   for (const mapping of mappings ?? []) {
@@ -171,7 +180,8 @@ export function createCollectionNameResolver(
 /**
  * Build a resolver from an album group (owned copies sharing one
  * createAlbumCanonicalizer key) to every name its plays may be recorded under:
- * each copy's names from createCollectionNameResolver, plus both names (source
+ * each copy's names from createCollectionNameResolver and under its resolved
+ * artist, plus both names (source
  * and target) of every mapping, linked or not, that canonicalizes to the
  * group's key. The second part catches unlinked mappings into a collection
  * name, which the collection resolver alone misses, and plays recorded under a
@@ -210,6 +220,14 @@ export function createAlbumGroupNameResolver(
     };
     for (const copy of copies) {
       collectionNames(copy.artist, copy.title).forEach(add);
+      // Plays recorded under the resolved artist, e.g. a Discogs-to-Last.fm
+      // mapping from "MC Breed, DFC (2)" to "MC Breed"
+      if (resolveArtist) {
+        add({
+          artist: resolveGroupArtist(copy.artist, resolveArtist),
+          album: copy.title,
+        });
+      }
     }
     (mappedByGroupKey.get(groupKey) ?? []).forEach(add);
     return names;

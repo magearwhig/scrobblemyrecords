@@ -56,9 +56,7 @@ describe('spotifyUtils', () => {
     it('constructs correct search query without album', () => {
       playTrackOnSpotify('Radiohead', 'Paranoid Android');
 
-      const expectedQuery = encodeURIComponent(
-        'track:Paranoid Android artist:Radiohead'
-      );
+      const expectedQuery = encodeURIComponent('radiohead paranoid android');
       expect(mockLink.href).toBe(`spotify:search:${expectedQuery}`);
     });
 
@@ -66,7 +64,7 @@ describe('spotifyUtils', () => {
       playTrackOnSpotify('Radiohead', 'Paranoid Android', 'OK Computer');
 
       const expectedQuery = encodeURIComponent(
-        'track:Paranoid Android artist:Radiohead album:OK Computer'
+        'radiohead paranoid android ok computer'
       );
       expect(mockLink.href).toBe(`spotify:search:${expectedQuery}`);
     });
@@ -86,7 +84,7 @@ describe('spotifyUtils', () => {
 
       jest.advanceTimersByTime(500);
 
-      const expectedWebQuery = encodeURIComponent('Radiohead Paranoid Android');
+      const expectedWebQuery = encodeURIComponent('radiohead paranoid android');
       expect(windowOpenSpy).toHaveBeenCalledWith(
         `https://open.spotify.com/search/${expectedWebQuery}`,
         '_blank'
@@ -99,7 +97,7 @@ describe('spotifyUtils', () => {
       jest.advanceTimersByTime(500);
 
       const expectedWebQuery = encodeURIComponent(
-        'Radiohead Paranoid Android OK Computer'
+        'radiohead paranoid android ok computer'
       );
       expect(windowOpenSpy).toHaveBeenCalledWith(
         `https://open.spotify.com/search/${expectedWebQuery}`,
@@ -117,9 +115,7 @@ describe('spotifyUtils', () => {
     it('handles special characters in artist and track names', () => {
       playTrackOnSpotify('Sigur Ros', 'Hoppipolla');
 
-      const expectedQuery = encodeURIComponent(
-        'track:Hoppipolla artist:Sigur Ros'
-      );
+      const expectedQuery = encodeURIComponent('sigur ros hoppipolla');
       expect(mockLink.href).toBe(`spotify:search:${expectedQuery}`);
     });
 
@@ -128,8 +124,35 @@ describe('spotifyUtils', () => {
 
       expect(mockLink.href).toContain('spotify:search:');
       // encodeURIComponent should encode & as %26
-      expect(mockLink.href).toContain(
-        encodeURIComponent('artist:Simon & Garfunkel')
+      expect(mockLink.href).toContain(encodeURIComponent('simon & garfunkel'));
+    });
+
+    it('searches multi-word names as keywords, not field filters', () => {
+      // "track:You Do You artist:Bear In Heaven" finds nothing in the app
+      playTrackOnSpotify(
+        'Bear In Heaven',
+        'You Do You',
+        'Beast Rest Forth Mouth'
+      );
+
+      expect(mockLink.href).toBe(
+        `spotify:search:${encodeURIComponent(
+          'bear in heaven you do you beast rest forth mouth'
+        )}`
+      );
+    });
+
+    it('drops Discogs suffixes and edition tags', () => {
+      playTrackOnSpotify(
+        'Blood Orange (2)',
+        'Uncle ACE [Explicit]',
+        'Cupid Deluxe (Deluxe Edition)'
+      );
+
+      expect(mockLink.href).toBe(
+        `spotify:search:${encodeURIComponent(
+          'blood orange uncle ace cupid deluxe'
+        )}`
       );
     });
   });
@@ -145,9 +168,7 @@ describe('spotifyUtils', () => {
     it('constructs correct album search query', () => {
       playAlbumOnSpotify('Radiohead', 'OK Computer');
 
-      const expectedQuery = encodeURIComponent(
-        'album:OK Computer artist:Radiohead'
-      );
+      const expectedQuery = encodeURIComponent('radiohead ok computer');
       expect(mockLink.href).toBe(`spotify:search:${expectedQuery}`);
     });
 
@@ -166,7 +187,7 @@ describe('spotifyUtils', () => {
 
       jest.advanceTimersByTime(500);
 
-      const expectedWebQuery = encodeURIComponent('Radiohead OK Computer');
+      const expectedWebQuery = encodeURIComponent('radiohead ok computer');
       expect(windowOpenSpy).toHaveBeenCalledWith(
         `https://open.spotify.com/search/${expectedWebQuery}`,
         '_blank'
@@ -183,7 +204,7 @@ describe('spotifyUtils', () => {
     it('handles special characters in names', () => {
       playAlbumOnSpotify('Bjork', 'Homogenic');
 
-      const expectedQuery = encodeURIComponent('album:Homogenic artist:Bjork');
+      const expectedQuery = encodeURIComponent('bjork homogenic');
       expect(mockLink.href).toBe(`spotify:search:${expectedQuery}`);
     });
   });

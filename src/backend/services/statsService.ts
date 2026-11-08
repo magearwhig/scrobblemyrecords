@@ -86,7 +86,7 @@ const AVG_TRACK_DURATION_SECONDS = 210;
  * Bump when a change alters what warm-cached stats contain (e.g. how albums
  * are grouped), so caches built by older code are recomputed.
  */
-const WARM_CACHE_VERSION = 4;
+const WARM_CACHE_VERSION = 5;
 
 // Album shown for unresolved plays; re-exported for existing importers
 export { UNKNOWN_ALBUM_LABEL };
@@ -1217,7 +1217,8 @@ export class StatsService {
     const trackCounts = new Map<
       string,
       {
-        artist: string;
+        // Aliases merge into one row, named by the most-played spelling
+        artists: TrackSpellings;
         album: string | null;
         spellings: TrackSpellings;
         count: number;
@@ -1243,14 +1244,17 @@ export class StatsService {
           if (existing) {
             existing.count++;
             existing.spellings.add(target.track);
+            existing.artists.add(target.artist);
             if (play.timestamp > existing.lastPlayed) {
               existing.lastPlayed = play.timestamp;
             }
           } else {
             const spellings = new TrackSpellings();
             spellings.add(target.track);
+            const artists = new TrackSpellings();
+            artists.add(target.artist);
             trackCounts.set(trackKey, {
-              artist: target.artist,
+              artists,
               album: target.album,
               spellings,
               count: 1,
@@ -1266,7 +1270,7 @@ export class StatsService {
       .sort((a, b) => b.count - a.count)
       .slice(0, limit)
       .map(item => ({
-        artist: this.capitalizeArtist(item.artist),
+        artist: this.capitalizeArtist(item.artists.best),
         album: this.displayAlbum(item.album),
         track: this.capitalizeTitle(item.spellings.best),
         playCount: item.count,
@@ -1962,8 +1966,13 @@ export class StatsService {
     // Cap limit at 100
     const cappedLimit = Math.min(limit, 100);
 
-    // Check cache (keyed by params excluding limit - we store all results)
-    const cacheKey = JSON.stringify({ dormantPeriodDays, minPlayCount });
+    // Check cache (keyed by params excluding limit - we store all results).
+    // Artist aliases decide which plays share a row.
+    const cacheKey = JSON.stringify({
+      dormantPeriodDays,
+      minPlayCount,
+      aliases: this.artistAliasFingerprint(),
+    });
     if (
       this.forgottenFavoritesCache &&
       this.forgottenFavoritesCache.params === cacheKey &&
@@ -1989,7 +1998,8 @@ export class StatsService {
     const trackStats = new Map<
       string,
       {
-        artist: string;
+        // Aliases merge into one row, named by the most-played spelling
+        artists: TrackSpellings;
         album: string | null;
         spellings: TrackSpellings;
         count: number;
@@ -2024,6 +2034,7 @@ export class StatsService {
         if (existing) {
           existing.count++;
           existing.spellings.add(targetTrack);
+          existing.artists.add(targetArtist);
           if (play.timestamp > existing.lastPlayed) {
             existing.lastPlayed = play.timestamp;
           }
@@ -2033,8 +2044,10 @@ export class StatsService {
         } else {
           const spellings = new TrackSpellings();
           spellings.add(targetTrack);
+          const artists = new TrackSpellings();
+          artists.add(targetArtist);
           trackStats.set(trackKey, {
-            artist: targetArtist,
+            artists,
             album: targetAlbum,
             spellings,
             count: 1,
@@ -2052,7 +2065,7 @@ export class StatsService {
       // Must have enough plays AND be dormant (not played since cutoff)
       if (stats.count >= minPlayCount && stats.lastPlayed < cutoffTimestamp) {
         forgottenTracks.push({
-          artist: this.capitalizeArtist(stats.artist),
+          artist: this.capitalizeArtist(stats.artists.best),
           album:
             stats.album === null
               ? UNKNOWN_ALBUM_LABEL
@@ -2903,10 +2916,13 @@ export class StatsService {
     album: string | null,
     track: string
   ): string {
+    // Aliases ("Homeboy Sandman, SonnyJim" mapped to "Homeboy Sandman") share
+    // one row per track
+    const resolved = this.resolveArtistName(artist);
     return album === null
       ? UNRESOLVED_GROUP_PREFIX +
-          createNormalizedTrackKey(artist, UNKNOWN_ALBUM_LABEL, track)
-      : createNormalizedTrackKey(artist, album, track);
+          createNormalizedTrackKey(resolved, UNKNOWN_ALBUM_LABEL, track)
+      : createNormalizedTrackKey(resolved, album, track);
   }
 
   /** Grouping key for an artist's album, or its unresolved plays (album null). */
