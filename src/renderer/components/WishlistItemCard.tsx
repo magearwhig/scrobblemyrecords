@@ -7,6 +7,8 @@ import {
 } from '../../shared/types';
 import { formatRelativeTime } from '../utils/dateUtils';
 
+import AlbumLink from './AlbumLink';
+import ArtistLink from './ArtistLink';
 import { Button } from './ui/Button';
 
 interface WishlistItemCardProps {
@@ -72,8 +74,12 @@ const WishlistItemCard: React.FC<WishlistItemCardProps> = ({
         )}
       </div>
       <div className='wishlist-card-content'>
-        <h4 className='wishlist-card-title'>{item.title}</h4>
-        <p className='wishlist-card-artist'>{item.artist}</p>
+        <h4 className='wishlist-card-title'>
+          <AlbumLink artist={item.artist} album={item.title} />
+        </h4>
+        <p className='wishlist-card-artist'>
+          <ArtistLink artist={item.artist} />
+        </p>
         {!!item.year && <p className='wishlist-card-year'>{item.year}</p>}
         <div className='wishlist-card-meta'>
           <span className='wishlist-card-date'>

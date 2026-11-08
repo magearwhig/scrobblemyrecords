@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './BuyingShortlistPanel.css';
 import { BuyingShortlist } from '../../../shared/types';
 import { getApiService } from '../../services/api';
+import AlbumLink from '../AlbumLink';
+import ArtistLink from '../ArtistLink';
 import { Button } from '../ui/Button';
 
 const BUDGET_KEY = 'wishlistShortlistBudget';
@@ -181,7 +183,9 @@ const BuyingShortlistPanel: React.FC<BuyingShortlistPanelProps> = ({
                   >
                     {pick.title}
                   </a>
-                  <span className='buying-shortlist-artist'>{pick.artist}</span>
+                  <span className='buying-shortlist-artist'>
+                    <ArtistLink artist={pick.artist} />
+                  </span>
                   <a
                     className='buying-shortlist-price'
                     href={`https://www.discogs.com/sell/release/${pick.listing.releaseId}`}
@@ -240,7 +244,9 @@ const BuyingShortlistPanel: React.FC<BuyingShortlistPanelProps> = ({
           <ul>
             {shortlist.skipped.slice(0, SKIPPED_SHOWN).map(skip => (
               <li key={skip.key}>
-                #{skip.rank} {skip.artist} – {skip.title}: {skip.text}
+                #{skip.rank} <ArtistLink artist={skip.artist} /> –{' '}
+                <AlbumLink artist={skip.artist} album={skip.title} />:{' '}
+                {skip.text}
               </li>
             ))}
             {skippedMore > 0 && <li>and {skippedMore} more</li>}

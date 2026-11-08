@@ -7,6 +7,8 @@ import {
   RecordCheckResult,
   RecordCheckWant,
 } from '../../shared/types';
+import AlbumLink from '../components/AlbumLink';
+import ArtistLink from '../components/ArtistLink';
 import { Badge, BadgeVariant } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -172,8 +174,13 @@ const ResultCard: React.FC<{
           </div>
         )}
         <div className='check-record-card-title'>
-          <h2>{group.title}</h2>
-          <p>{details(group.artist, group.year)}</p>
+          <h2>
+            <AlbumLink artist={group.artist} album={group.title} />
+          </h2>
+          <p>
+            <ArtistLink artist={group.artist} />
+            {group.year ? ` · ${group.year}` : ''}
+          </p>
           <Badge variant={headline.variant}>{headline.label}</Badge>
           {group.matchedBy === 'linked' && (
             <p className='check-record-linked'>Related to a match above</p>

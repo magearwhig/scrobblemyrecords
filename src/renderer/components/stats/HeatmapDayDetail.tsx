@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 
 import { DateAlbumsResult } from '../../../shared/types';
+import AlbumLink from '../AlbumLink';
+import ArtistLink from '../ArtistLink';
+
 import './HeatmapDayDetail.css';
 
 interface HeatmapDayDetailProps {
@@ -96,10 +99,10 @@ export const HeatmapDayDetail: React.FC<HeatmapDayDetailProps> = ({
               )}
               <div className='heatmap-day-detail-album-info'>
                 <span className='heatmap-day-detail-album-title'>
-                  {album.album}
+                  <AlbumLink artist={album.artist} album={album.album} />
                 </span>
                 <span className='heatmap-day-detail-album-artist'>
-                  {album.artist}
+                  <ArtistLink artist={album.artist} />
                 </span>
               </div>
               <span className='heatmap-day-detail-album-plays'>

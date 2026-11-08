@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { WrappedTopItem } from '../../../shared/types';
+import ArtistLink from '../ArtistLink';
 
 import WrappedSlide from './WrappedSlide';
 
@@ -32,7 +33,9 @@ const TopArtistsSlide: React.FC<TopArtistsSlideProps> = ({ artists }) => {
               </div>
             )}
             <div className='wrapped-rank-info'>
-              <span className='wrapped-rank-name'>{artist.name}</span>
+              <span className='wrapped-rank-name'>
+                <ArtistLink artist={artist.name} />
+              </span>
               <div className='wrapped-rank-bar-container'>
                 <div
                   className='wrapped-rank-bar'

@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 import { FormatBreakdown } from '../../../shared/types';
+import AlbumLink from '../AlbumLink';
+import ArtistLink from '../ArtistLink';
 
 interface FormatDetailSectionProps {
   formats: FormatBreakdown;
@@ -106,10 +108,13 @@ const FormatDetailSection: React.FC<FormatDetailSectionProps> = ({
             </span>
             {cat.examples.length > 0 && (
               <span className='analytics-detail-variants'>
-                {cat.examples
-                  .slice(0, 3)
-                  .map(ex => `${ex.artist} - ${ex.title}`)
-                  .join(', ')}
+                {cat.examples.slice(0, 3).map((ex, i) => (
+                  <React.Fragment key={`${ex.artist}-${ex.title}-${i}`}>
+                    {i > 0 && ', '}
+                    <ArtistLink artist={ex.artist} /> -{' '}
+                    <AlbumLink artist={ex.artist} album={ex.title} />
+                  </React.Fragment>
+                ))}
               </span>
             )}
           </li>

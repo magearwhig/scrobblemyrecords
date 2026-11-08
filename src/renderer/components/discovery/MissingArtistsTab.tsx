@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { MissingArtist } from '../../../shared/types';
+import ArtistLink from '../ArtistLink';
 import { Button } from '../ui/Button';
 
 type ArtistSortOption = 'plays' | 'artist' | 'albums' | 'recent';
@@ -71,7 +72,9 @@ const MissingArtistsTab: React.FC<MissingArtistsTabProps> = ({
           {sortedArtists.map((artist, index) => (
             <div key={`${artist.artist}-${index}`} className='missing-item'>
               <div className='missing-item-info'>
-                <div className='missing-item-title'>{artist.artist}</div>
+                <div className='missing-item-title'>
+                  <ArtistLink artist={artist.artist} />
+                </div>
                 <div className='missing-item-artist'>
                   {artist.albumCount} album
                   {artist.albumCount > 1 ? 's' : ''} in history

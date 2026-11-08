@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { AISuggestion } from '../../shared/types';
 import { navigate } from '../routes';
 
+import AlbumLink from './AlbumLink';
+import ArtistLink from './ArtistLink';
 import { Button } from './ui/Button';
 
 interface AISuggestionCardProps {
@@ -100,11 +102,11 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
 
       <div className='ai-suggestion-content'>
         <div className='ai-suggestion-title' title={release.title}>
-          {release.title}
+          <AlbumLink artist={release.artist} album={release.title} />
         </div>
 
         <div className='ai-suggestion-artist' title={release.artist}>
-          {release.artist}
+          <ArtistLink artist={release.artist} />
         </div>
 
         <div className='ai-suggestion-meta'>

@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { CrateEvaluation, CrateSuggestion } from '../../../shared/types';
 import { describeCrateRule } from '../../../shared/utils/crateReasons';
 import type ApiService from '../../services/api';
+import AlbumLink from '../AlbumLink';
+import ArtistLink from '../ArtistLink';
 import { Button, Modal } from '../ui';
 
 import CrateCover from './CrateCover';
@@ -140,10 +142,10 @@ const CrateSuggestionPreview: React.FC<CrateSuggestionPreviewProps> = ({
                     />
                     <span className='crate-suggestion-preview-album'>
                       <span className='crate-suggestion-preview-title'>
-                        {album.album}
+                        <AlbumLink artist={album.artist} album={album.album} />
                       </span>
                       <span className='crate-suggestion-preview-artist'>
-                        {album.artist}
+                        <ArtistLink artist={album.artist} />
                       </span>
                     </span>
                   </li>

@@ -13,6 +13,9 @@ import { navigate } from '../../routes';
 import ApiService from '../../services/api';
 import { createLogger } from '../../utils/logger';
 import { playTrackOnSpotify } from '../../utils/spotifyUtils';
+import AlbumLink from '../AlbumLink';
+import ArtistLink from '../ArtistLink';
+import TrackLink from '../TrackLink';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Modal, ModalSection } from '../ui/Modal';
@@ -405,7 +408,11 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
                 >
                   <div className='missing-item-info'>
                     <div className='missing-item-title'>
-                      {track.track}
+                      <TrackLink
+                        artist={track.artist}
+                        track={track.track}
+                        album={track.album || undefined}
+                      />
                       {collectionItem && (
                         <span title='You own this on vinyl! Put it on the turntable.'>
                           <Badge
@@ -419,10 +426,18 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
                       )}
                     </div>
                     <div className='missing-item-artist'>
-                      {track.artist}
+                      <ArtistLink artist={track.artist} />
                       <span className='missing-item-album'>
                         {' '}
-                        &middot; {track.album || '(Single)'}
+                        &middot;{' '}
+                        {track.album ? (
+                          <AlbumLink
+                            artist={track.artist}
+                            album={track.album}
+                          />
+                        ) : (
+                          '(Single)'
+                        )}
                       </span>
                     </div>
                   </div>

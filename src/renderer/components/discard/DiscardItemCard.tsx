@@ -5,6 +5,8 @@ import {
   DiscardReason,
   DiscardStatus,
 } from '../../../shared/types';
+import AlbumLink from '../AlbumLink';
+import ArtistLink from '../ArtistLink';
 import { Button } from '../ui/Button';
 
 const REASON_LABELS: Record<DiscardReason, string> = {
@@ -97,8 +99,12 @@ const DiscardItemCard: React.FC<DiscardItemCardProps> = ({
       </div>
 
       <div className='item-info'>
-        <div className='item-title'>{item.title}</div>
-        <div className='item-artist'>{item.artist}</div>
+        <div className='item-title'>
+          <AlbumLink artist={item.artist} album={item.title} />
+        </div>
+        <div className='item-artist'>
+          <ArtistLink artist={item.artist} />
+        </div>
         {item.format && (
           <div className='item-format'>{item.format.join(', ')}</div>
         )}

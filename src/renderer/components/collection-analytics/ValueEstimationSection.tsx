@@ -14,6 +14,8 @@ import {
 } from '../../../shared/types';
 import { collectionAnalyticsApi } from '../../services/statsApi';
 import { createLogger } from '../../utils/logger';
+import AlbumLink from '../AlbumLink';
+import ArtistLink from '../ArtistLink';
 import { Button } from '../ui/Button';
 import { ProgressBar } from '../ui/ProgressBar';
 
@@ -284,8 +286,12 @@ const ValueEstimationSection: React.FC = () => {
                 <div className='analytics-valuable-cover' />
               )}
               <div className='analytics-valuable-info'>
-                <div className='analytics-valuable-title'>{item.title}</div>
-                <div className='analytics-valuable-artist'>{item.artist}</div>
+                <div className='analytics-valuable-title'>
+                  <AlbumLink artist={item.artist} album={item.title} />
+                </div>
+                <div className='analytics-valuable-artist'>
+                  <ArtistLink artist={item.artist} />
+                </div>
                 <div className='analytics-valuable-meta'>
                   {item.format.join(', ')}
                   {item.year ? ` (${item.year})` : ''}

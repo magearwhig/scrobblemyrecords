@@ -4,6 +4,8 @@ import React from 'react';
 import { CrateEvaluation, CrateRule } from '../../../shared/types';
 import { phraseCount } from '../../../shared/utils/crateCopy';
 import { formatUnknownCount } from '../../../shared/utils/crateReasons';
+import AlbumLink from '../AlbumLink';
+import ArtistLink from '../ArtistLink';
 
 import './CrateMightMatch.css';
 
@@ -58,10 +60,13 @@ const CrateMightMatch: React.FC<CrateMightMatchProps> = ({
               <span>{formatUnknownCount(rule, entry.count)}</span>
               {showSamples && entry.sample.length > 0 && (
                 <span className='crate-might-match-sample'>
-                  {entry.sample
-                    .slice(0, 3)
-                    .map(album => `${album.artist} – ${album.album}`)
-                    .join(', ')}
+                  {entry.sample.slice(0, 3).map((album, i) => (
+                    <React.Fragment key={album.albumKey}>
+                      {i > 0 && ', '}
+                      <ArtistLink artist={album.artist} /> –{' '}
+                      <AlbumLink artist={album.artist} album={album.album} />
+                    </React.Fragment>
+                  ))}
                 </span>
               )}
             </div>

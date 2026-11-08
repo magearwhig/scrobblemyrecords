@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { WishlistNewRelease } from '../../../shared/types';
+import ArtistLink from '../ArtistLink';
 import { Button } from '../ui/Button';
 
 interface Props {
@@ -77,7 +78,9 @@ export const NewReleaseCard: React.FC<Props> = ({ release, onDismiss }) => {
 
       <div className='new-release-card-info'>
         <div className='new-release-title'>
-          <span className='new-release-artist'>{release.artist}</span>
+          <span className='new-release-artist'>
+            <ArtistLink artist={release.artist} />
+          </span>
           <span className='new-release-separator'> - </span>
           <span className='new-release-album'>{release.title}</span>
         </div>

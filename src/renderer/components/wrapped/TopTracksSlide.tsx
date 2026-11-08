@@ -1,6 +1,8 @@
 import React from 'react';
 
 import { WrappedTopItem } from '../../../shared/types';
+import ArtistLink from '../ArtistLink';
+import TrackLink from '../TrackLink';
 
 import WrappedSlide from './WrappedSlide';
 
@@ -23,8 +25,16 @@ const TopTracksSlide: React.FC<TopTracksSlideProps> = ({ tracks }) => {
           >
             <span className='wrapped-rank-number'>{index + 1}</span>
             <div className='wrapped-rank-info'>
-              <span className='wrapped-rank-name'>{track.name}</span>
-              <span className='wrapped-rank-detail'>{track.artist}</span>
+              <span className='wrapped-rank-name'>
+                <TrackLink
+                  artist={track.artist}
+                  track={track.name}
+                  album={track.album}
+                />
+              </span>
+              <span className='wrapped-rank-detail'>
+                <ArtistLink artist={track.artist} />
+              </span>
               <div className='wrapped-rank-bar-container'>
                 <div
                   className='wrapped-rank-bar'

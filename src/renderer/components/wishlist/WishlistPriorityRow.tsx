@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import { WishlistPriorityRecord } from '../../../shared/types';
 import AlbumLink from '../AlbumLink';
+import ArtistLink from '../ArtistLink';
 import { Button } from '../ui/Button';
 
 interface WishlistPriorityRowProps {
@@ -146,7 +147,9 @@ const WishlistPriorityRow: React.FC<WishlistPriorityRowProps> = ({
           album={record.title}
           className='wishlist-priority-title'
         />
-        <span className='wishlist-priority-artist'>{record.artist}</span>
+        <span className='wishlist-priority-artist'>
+          <ArtistLink artist={record.artist} />
+        </span>
       </div>
       <div className='wishlist-priority-tags'>
         {pressings > 1 && (

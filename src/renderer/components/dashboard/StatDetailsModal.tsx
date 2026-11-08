@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { NewArtistDetail } from '../../../shared/types';
 import { statsApi } from '../../services/statsApi';
 import { formatRelativeTime } from '../../utils/dateUtils';
+import ArtistLink from '../ArtistLink';
 import { Modal } from '../ui/Modal';
 
 import './StatDetailsModal.css';
@@ -93,7 +94,9 @@ export const StatDetailsModal: React.FC<StatDetailsModalProps> = ({
               className='stat-details-item'
             >
               <div className='stat-details-item-main'>
-                <div className='stat-details-item-name'>{artist.artist}</div>
+                <div className='stat-details-item-name'>
+                  <ArtistLink artist={artist.artist} />
+                </div>
                 <div className='stat-details-item-meta'>
                   First played{' '}
                   {formatRelativeTime(Math.floor(artist.firstPlayed / 1000))}

@@ -131,15 +131,23 @@ describe('FormatDetailSection', () => {
     render(<FormatDetailSection formats={formats} />);
 
     // Assert: shows first 3 examples from 7" Single
-    expect(
-      screen.getByText(/The Smiths - How Soon Is Now\?/)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Joy Division - Love Will Tear Us Apart/)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/New Order - Blue Monday/)).toBeInTheDocument();
+    // Each example links to its artist and album
+    for (const [artist, album] of [
+      ['The Smiths', 'How Soon Is Now?'],
+      ['Joy Division', 'Love Will Tear Us Apart'],
+      ['New Order', 'Blue Monday'],
+    ]) {
+      expect(
+        screen.getByRole('link', { name: `View artist details for ${artist}` })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('link', { name: `View album details for ${album}` })
+      ).toBeInTheDocument();
+    }
     // 4th example should NOT appear
-    expect(screen.queryByText(/Extra - Extra Item/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'View album details for Extra Item' })
+    ).not.toBeInTheDocument();
   });
 
   it('does not render example section for formats with no examples', () => {

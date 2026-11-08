@@ -4,6 +4,7 @@ import { DustyCornerAlbum } from '../../../shared/types';
 import { Button, IconButton } from '../../components/ui/Button';
 import { navigate } from '../../routes';
 import { playAlbumOnSpotify } from '../../utils/spotifyUtils';
+import ArtistLink from '../ArtistLink';
 import './DustyCornersSection.css';
 
 interface DustyCornersSectionProps {
@@ -145,7 +146,7 @@ export const DustyCornersSection: React.FC<DustyCornersSectionProps> = ({
                 {album.album}
               </div>
               <div className='dusty-corners-artist' title={album.artist}>
-                {album.artist}
+                <ArtistLink artist={album.artist} />
               </div>
               <div className='dusty-corners-last-played'>
                 {formatLastPlayed(album)}

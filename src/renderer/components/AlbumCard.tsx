@@ -4,6 +4,7 @@ import React from 'react';
 import { CollectionItem, DiscogsRelease } from '../../shared/types';
 import { formatRelativeTime } from '../utils/dateUtils';
 
+import AlbumLink from './AlbumLink';
 import ArtistLink from './ArtistLink';
 import { Button } from './ui/Button';
 
@@ -91,7 +92,7 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
 
       <div className='album-card-info'>
         <div className='album-title' title={release.title}>
-          {release.title}
+          <AlbumLink artist={release.artist} album={release.title} />
         </div>
 
         <div className='album-artist' title={release.artist}>

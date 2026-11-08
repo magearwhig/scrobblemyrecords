@@ -2,6 +2,8 @@ import { Disc3 } from 'lucide-react';
 import React from 'react';
 
 import { WrappedTopItem } from '../../../shared/types';
+import AlbumLink from '../AlbumLink';
+import ArtistLink from '../ArtistLink';
 
 import WrappedSlide from './WrappedSlide';
 
@@ -33,8 +35,16 @@ const TopAlbumsSlide: React.FC<TopAlbumsSlideProps> = ({ albums }) => {
               </div>
             )}
             <div className='wrapped-rank-info'>
-              <span className='wrapped-rank-name'>{album.artist}</span>
-              <span className='wrapped-rank-detail'>{album.album}</span>
+              <span className='wrapped-rank-name'>
+                <ArtistLink artist={album.artist} />
+              </span>
+              <span className='wrapped-rank-detail'>
+                {album.album ? (
+                  <AlbumLink artist={album.artist} album={album.album} />
+                ) : (
+                  album.album
+                )}
+              </span>
               <div className='wrapped-rank-bar-container'>
                 <div
                   className='wrapped-rank-bar'

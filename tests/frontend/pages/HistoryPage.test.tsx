@@ -358,9 +358,20 @@ describe('HistoryPage', () => {
       await user.click(viewDetailsButton);
 
       expect(screen.getByText('Track 1')).toBeInTheDocument();
-      expect(screen.getByText('Artist 1 • Album 1')).toBeInTheDocument();
       expect(screen.getByText('Track 2')).toBeInTheDocument();
-      expect(screen.getByText('Artist 2 • Album 2')).toBeInTheDocument();
+      // Artist and album link to their pages
+      for (const n of [1, 2]) {
+        expect(
+          screen.getByRole('link', {
+            name: `View artist details for Artist ${n}`,
+          })
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole('link', {
+            name: `View album details for Album ${n}`,
+          })
+        ).toBeInTheDocument();
+      }
     });
 
     it('can hide session details', async () => {
