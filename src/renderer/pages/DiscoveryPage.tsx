@@ -9,7 +9,6 @@ import {
   LocalWantItem,
   EnrichedWishlistItem,
 } from '../../shared/types';
-import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import { MissingAlbumsTab, MissingArtistsTab } from '../components/discovery';
 import { Modal, ModalFooter } from '../components/ui';
 import { Button } from '../components/ui/Button';
@@ -18,6 +17,11 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { getApiService } from '../services/api';
 import { createLogger } from '../utils/logger';
+import {
+  isInWishlist,
+  WishlistMatchItem,
+  wishlistMatchItem,
+} from '../utils/wishlistMatch';
 
 const logger = createLogger('DiscoveryPage');
 
@@ -62,7 +66,7 @@ const DiscoveryPage: React.FC = () => {
 
   // Discogs wishlist state - store normalized wishlist items for flexible matching
   const [discogsWishlistItems, setDiscogsWishlistItems] = useState<
-    Array<{ artist: string; title: string }>
+    WishlistMatchItem[]
   >([]);
 
   // Sorting state
@@ -102,10 +106,8 @@ const DiscoveryPage: React.FC = () => {
       // Pre-populate discogsWishlistItems with normalized Discogs wantlist items
       // Store as array for flexible matching (handles Last.fm quirks like "Artist & Album Title")
       const normalizedWishlist = discogsWishlist.map(
-        (item: EnrichedWishlistItem) => ({
-          artist: normalizeForMatching(item.artist),
-          title: normalizeForMatching(item.title),
-        })
+        (item: EnrichedWishlistItem) =>
+          wishlistMatchItem(item.artist, item.title)
       );
       setDiscogsWishlistItems(normalizedWishlist);
     } catch (err) {
@@ -129,29 +131,8 @@ const DiscoveryPage: React.FC = () => {
   // Check if album is in Discogs wishlist
   // Handles: case differences, quotes, edition suffixes, and Last.fm quirks
   // where artist name may include album title (e.g., "Andrew Bird & The Mysterious Production Of Eggs")
-  const isInDiscogsWishlist = (artist: string, album: string): boolean => {
-    const normArtist = normalizeForMatching(artist);
-    const normAlbum = normalizeForMatching(album);
-    const combined = `${normArtist} ${normAlbum}`;
-
-    return discogsWishlistItems.some(item => {
-      // Exact match (artist:title)
-      if (normArtist === item.artist && normAlbum === item.title) {
-        return true;
-      }
-      // Handle Last.fm quirk: artist may include album title
-      // e.g., Last.fm artist="Andrew Bird & The Mysterious Production Of Eggs"
-      //       Discogs artist="Andrew Bird", title="The Mysterious Production Of Eggs"
-      if (
-        combined.includes(item.artist) &&
-        combined.includes(item.title) &&
-        item.title.length >= 10 // Avoid false positives with short titles
-      ) {
-        return true;
-      }
-      return false;
-    });
-  };
+  const isInDiscogsWishlist = (artist: string, album: string): boolean =>
+    isInWishlist(discogsWishlistItems, artist, album);
 
   // Generate Last.fm URLs
   const getLastFmArtistUrl = (artist: string): string => {
