@@ -9,11 +9,15 @@ import {
   LocalWantItem,
   EnrichedWishlistItem,
 } from '../../../shared/types';
-import { normalizeForMatching } from '../../../shared/utils/trackNormalization';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { getApiService } from '../../services/api';
 import { createLogger } from '../../utils/logger';
+import {
+  isInWishlist,
+  WishlistMatchItem,
+  wishlistMatchItem,
+} from '../../utils/wishlistMatch';
 import MissingAlbumsTab from '../discovery/MissingAlbumsTab';
 import { EmptyState, ListItemSkeleton, Modal, ModalFooter } from '../ui';
 import { Button } from '../ui/Button';
@@ -51,7 +55,7 @@ const MissingAlbumsContainer: React.FC = () => {
     new Set()
   );
   const [discogsWishlistItems, setDiscogsWishlistItems] = useState<
-    Array<{ artist: string; title: string }>
+    WishlistMatchItem[]
   >([]);
   const [albumSort, setAlbumSort] = useState<AlbumSortOption>('plays');
   const [hideWishlistedAndMonitored, setHideWishlistedAndMonitored] =
@@ -80,10 +84,8 @@ const MissingAlbumsContainer: React.FC = () => {
       setMonitoredAlbums(existingWantedKeys);
 
       const normalizedWishlist = discogsWishlist.map(
-        (item: EnrichedWishlistItem) => ({
-          artist: normalizeForMatching(item.artist),
-          title: normalizeForMatching(item.title),
-        })
+        (item: EnrichedWishlistItem) =>
+          wishlistMatchItem(item.artist, item.title)
       );
       setDiscogsWishlistItems(normalizedWishlist);
     } catch (err) {
@@ -104,22 +106,8 @@ const MissingAlbumsContainer: React.FC = () => {
     return date.toLocaleDateString();
   };
 
-  const isInDiscogsWishlist = (artist: string, album: string): boolean => {
-    const normArtist = normalizeForMatching(artist);
-    const normAlbum = normalizeForMatching(album);
-    const combined = `${normArtist} ${normAlbum}`;
-
-    return discogsWishlistItems.some(item => {
-      if (normArtist === item.artist && normAlbum === item.title) return true;
-      if (
-        combined.includes(item.artist) &&
-        combined.includes(item.title) &&
-        item.title.length >= 10
-      )
-        return true;
-      return false;
-    });
-  };
+  const isInDiscogsWishlist = (artist: string, album: string): boolean =>
+    isInWishlist(discogsWishlistItems, artist, album);
 
   const getLastFmAlbumUrl = (artist: string, album: string): string => {
     return `https://www.last.fm/music/${encodeURIComponent(artist)}/${encodeURIComponent(album)}`;

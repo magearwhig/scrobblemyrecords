@@ -118,6 +118,11 @@
   gap: 1.5rem;
 }
 
+/* Long names inside a section wrap or truncate rather than widen the column */
+.detail-page-content > * {
+  min-width: 0;
+}
+
 /* Card-like section */
 .detail-page-section {
   background: var(--card-bg);
@@ -313,6 +318,19 @@
    ========================================================================== */
 
 @media (max-width: 768px) {
+  /* The page content already has a gutter on a phone */
+  .detail-page {
+    padding: 0;
+  }
+
+  .detail-page-content {
+    gap: var(--space-4);
+  }
+
+  .detail-page-section {
+    padding: var(--space-3);
+  }
+
   .detail-page-header {
     flex-direction: column;
     align-items: center;
@@ -337,12 +355,20 @@
     grid-template-columns: 1fr;
   }
 
+  /* Two stat cards per row */
   .detail-page-stats-row {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
   }
 
   .detail-page-stat-card {
-    min-width: unset;
+    min-width: 0;
+  }
+
+  /* Sections that follow the two-column block on a computer */
+  .detail-page-content + .detail-page-section {
+    margin-top: var(--space-4);
   }
 }
 

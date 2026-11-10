@@ -1382,6 +1382,75 @@ select.form-input:disabled {
 
   .collection-grid {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.75rem;
+  }
+
+  /* Two cards across: a square cover, title, artist and year, one row of
+     compact actions. Tapping the cover opens the details. */
+  .collection-grid .album-card {
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+
+  .collection-grid .album-cover {
+    height: auto;
+    aspect-ratio: 1 / 1;
+  }
+
+  .collection-grid .album-title {
+    font-size: var(--text-sm);
+  }
+
+  .collection-grid .album-artist,
+  .collection-grid .album-year {
+    font-size: var(--text-xs);
+  }
+
+  .collection-grid .album-metadata,
+  .collection-grid .album-last-played {
+    display: none;
+  }
+
+  .collection-grid .album-card-actions {
+    flex-direction: row;
+    margin-top: 0;
+  }
+
+  .collection-grid .album-card-actions > .button {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .collection-grid .album-card-details-button,
+  .collection-grid .album-card-action-label {
+    display: none;
+  }
+
+  .virtualized-collection-grid {
+    height: calc(100dvh - 160px);
+  }
+
+  .card {
+    padding: var(--space-4);
+  }
+
+  /* iPhone Safari zooms in on any text box or menu under 16px when it is
+     tapped, and stays zoomed, cutting off the right of the page. Most
+     inputs here use --text-base (14px) through a class, so this has to
+     win over every one of those classes. */
+  input,
+  select,
+  textarea {
+    font-size: var(--text-md) !important;
+  }
+
+  /* Artist, album and track pages: the page content already has a gutter */
+  .detail-page {
+    padding: 0;
+  }
+
+  .detail-page-section {
+    padding: var(--space-3);
   }
 }
 

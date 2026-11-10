@@ -97,7 +97,39 @@ module.exports = (env, argv) => {
         template: './public/index.html',
         filename: 'index.html',
         title: 'Discogs to Last.fm Scrobbler',
+        // The backend on any host, so a phone opening http://<laptop-ip>:8080
+        // can call http://<laptop-ip>:<backend port>
+        templateParameters: { backendPort: BACKEND_PORT },
       }),
+      // Tells `serve` (npm run start:web) to have browsers recheck the page
+      // on every load, so a phone does not keep showing an old build; the
+      // scripts it loads are content-hashed, so they cache safely
+      {
+        apply(compiler) {
+          compiler.hooks.thisCompilation.tap('ServeConfig', compilation => {
+            compilation.hooks.processAssets.tap(
+              {
+                name: 'ServeConfig',
+                stage: webpack.Compilation.PROCESS_ASSETS_STAGE_ADDITIONAL,
+              },
+              () => {
+                const config = {
+                  headers: [
+                    {
+                      source: '**/*.html',
+                      headers: [{ key: 'Cache-Control', value: 'no-cache' }],
+                    },
+                  ],
+                };
+                compilation.emitAsset(
+                  'serve.json',
+                  new webpack.sources.RawSource(JSON.stringify(config, null, 2))
+                );
+              }
+            );
+          });
+        },
+      },
       new webpack.DefinePlugin({
         'process.env.REACT_APP_BACKEND_PORT': JSON.stringify(BACKEND_PORT),
       }),

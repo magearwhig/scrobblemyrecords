@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-7191%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-7202%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -85,7 +85,7 @@ Create a `.env` file in the project root (it is ignored by git). You can start f
 - `FRONTEND_PORT` (default `8080`, dev server only)
 - `HOST` (default `127.0.0.1`)
 - `DISCOGS_CALLBACK_URL` / `LASTFM_CALLBACK_URL` (if you need custom callback URLs)
-- `FRONTEND_URL` (additional allowed origin for CORS)
+- `FRONTEND_URL` (additional allowed origins for CORS, comma-separated)
 
 > If you change `BACKEND_PORT`, update the callback URLs in your Discogs/Last.fm apps accordingly.
 
@@ -137,7 +137,17 @@ Notes:
   authenticated reverse proxy in front of anything beyond a trusted LAN. See
   [SECURITY.md](SECURITY.md).
 - If you load the React UI from a different origin (e.g. your laptop), set
-  `FRONTEND_URL` so the CORS allowlist accepts it.
+  `FRONTEND_URL` so the CORS allowlist accepts it. List several
+  origins separated by commas.
+- **From a phone on the same Wi-Fi:** run the backend with `HOST=0.0.0.0`,
+  an `API_TOKEN` and `FRONTEND_URL=http://<laptop-ip>:8080`, then open
+  `http://<laptop-ip>:8080` on the phone and paste the token in Settings → API Token.
+  The UI calls the backend on whichever host the page was loaded from, so
+  nothing else needs configuring. Connect Discogs and Last.fm from the
+  laptop, since their sign-in redirects to localhost. The token is remembered
+  in that browser. Pages are laid out for phone screens: two-column collection
+  grid, swipe between records in single view, and text boxes sized so iPhone
+  Safari doesn't zoom in.
 - The `data/` directory is the authoritative store. If you want to migrate
   state from a laptop install, `rsync` `data/` and copy the `ENCRYPTION_KEY`
   from your laptop `.env` so the encrypted tokens decrypt.

@@ -135,6 +135,7 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
         <Button
           variant='secondary'
           size='small'
+          className='album-card-details-button'
           onClick={e => {
             e.stopPropagation();
             onViewDetails(release);
@@ -154,7 +155,8 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
             }}
             title='Add to discard pile'
           >
-            <Package size={14} aria-hidden='true' /> Discard
+            <Package size={14} aria-hidden='true' />
+            <span className='album-card-action-label'> Discard</span>
           </Button>
         )}
 

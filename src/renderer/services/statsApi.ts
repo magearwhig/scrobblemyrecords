@@ -38,8 +38,9 @@ import {
 } from '../../shared/types';
 
 import { authHeader } from './apiToken';
+import { defaultServerUrl } from './serverUrl';
 
-const API_BASE = `http://localhost:${process.env.REACT_APP_BACKEND_PORT || '3001'}/api/v1`;
+const API_BASE = `${defaultServerUrl()}/api/v1`;
 
 /**
  * fetch with the API token attached when the backend requires one.

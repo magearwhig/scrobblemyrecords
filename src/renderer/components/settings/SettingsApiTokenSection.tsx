@@ -60,10 +60,9 @@ const SettingsApiTokenSection: React.FC = () => {
           spellCheck={false}
         />
         <small className='form-helper-text'>
-          Kept for this browser session only, so you will re-enter it after
-          restarting your browser. It is sent as an Authorization header on
-          every request and travels in plaintext over HTTP — use TLS or a
-          reverse proxy outside a trusted network.
+          Remembered in this browser until you clear it. It is sent as an
+          Authorization header on every request and travels in plaintext over
+          HTTP — use TLS or a reverse proxy outside a trusted network.
         </small>
       </div>
 
@@ -80,8 +79,7 @@ const SettingsApiTokenSection: React.FC = () => {
 
       {saved && (
         <p className='form-hint'>
-          <ShieldCheck size={16} aria-hidden='true' /> Token saved for this
-          session.
+          <ShieldCheck size={16} aria-hidden='true' /> Token saved.
         </p>
       )}
     </div>

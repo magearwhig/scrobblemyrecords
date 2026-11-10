@@ -16,6 +16,12 @@ import * as path from 'path';
 
 process.env.NODE_ENV = 'test';
 
+// The server's tests run on loopback without a token, whatever the developer's
+// .env says (dotenv never overrides a variable that is already set, even empty)
+process.env.HOST = '127.0.0.1';
+process.env.API_TOKEN = '';
+process.env.REQUIRE_AUTH = '';
+
 process.env.DATA_DIR = fs.mkdtempSync(
   path.join(os.tmpdir(), 'recordscrobbles-jest-')
 );

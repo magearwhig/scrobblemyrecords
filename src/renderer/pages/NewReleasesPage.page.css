@@ -506,8 +506,9 @@
 
 /* Responsive */
 @media (max-width: 768px) {
+  /* The marketplace page already has a gutter on a phone */
   .new-releases-page {
-    padding: 1rem;
+    padding: 0;
   }
 
   .page-header {
@@ -515,13 +516,56 @@
     align-items: flex-start;
   }
 
-  .filters {
-    flex-direction: column;
+  .new-releases-page .header-actions,
+  .new-releases-actions {
+    flex-wrap: wrap;
+    gap: var(--space-2);
   }
 
+  .filters {
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-3);
+  }
+
+  .filter-group,
+  .checkbox-group {
+    flex-wrap: wrap;
+  }
+
+  .filter-group input[type='text'] {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Two releases across, like the collection grid */
   .releases-grid {
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .release-info {
+    padding: var(--space-2);
+  }
+
+  .release-title {
+    font-size: var(--text-sm);
+  }
+
+  .release-artist,
+  .release-date {
+    font-size: var(--text-xs);
+  }
+
+  .release-actions {
+    flex-direction: column;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
+  }
+
+  .release-actions > * {
+    width: 100%;
+    justify-content: center;
   }
 }
 
