@@ -31,10 +31,21 @@ interface VirtualizedCollectionGridProps {
 
 const CARD_MIN_WIDTH = 280;
 const CARD_GAP = 24; // 1.5rem
-const ROW_HEIGHT = 400; // Slightly above min-height: 380px + gap
+/** Below this width (a phone), cards shrink so two fit side by side */
+const NARROW_WIDTH = 600;
+const NARROW_CARD_MIN_WIDTH = 150;
+const NARROW_CARD_GAP = 12; // 0.75rem
+/** First guess at a row's height; rows are measured once drawn */
+const ROW_HEIGHT = 400;
 
-const getColumnCount = (width: number): number =>
-  Math.max(1, Math.floor((width + CARD_GAP) / (CARD_MIN_WIDTH + CARD_GAP)));
+const getLayout = (width: number): { columns: number; gap: number } => {
+  const narrow = width < NARROW_WIDTH;
+  const min = narrow ? NARROW_CARD_MIN_WIDTH : CARD_MIN_WIDTH;
+  const gap = narrow ? NARROW_CARD_GAP : CARD_GAP;
+  return { columns: Math.max(1, Math.floor((width + gap) / (min + gap))), gap };
+};
+
+const getColumnCount = (width: number): number => getLayout(width).columns;
 
 const VirtualizedCollectionGrid: React.FC<VirtualizedCollectionGridProps> = ({
   items,
@@ -50,11 +61,13 @@ const VirtualizedCollectionGrid: React.FC<VirtualizedCollectionGridProps> = ({
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(4);
+  const [gap, setGap] = useState(CARD_GAP);
 
   const updateColumns = useCallback(() => {
     if (!scrollRef.current) return;
-    const cols = getColumnCount(scrollRef.current.clientWidth);
-    setColumns(prev => (prev === cols ? prev : cols));
+    const layout = getLayout(scrollRef.current.clientWidth);
+    setColumns(prev => (prev === layout.columns ? prev : layout.columns));
+    setGap(layout.gap);
   }, []);
 
   useEffect(() => {
@@ -88,6 +101,11 @@ const VirtualizedCollectionGrid: React.FC<VirtualizedCollectionGridProps> = ({
     overscan: 3,
   });
 
+  // Card heights change with the column width, so re-measure on a new layout
+  useEffect(() => {
+    virtualizer.measure();
+  }, [columns, gap, virtualizer]);
+
   return (
     <div ref={scrollRef} className='virtualized-collection-grid'>
       <div
@@ -104,13 +122,17 @@ const VirtualizedCollectionGrid: React.FC<VirtualizedCollectionGridProps> = ({
           return (
             <div
               key={virtualRow.key}
+              data-index={virtualRow.index}
+              ref={virtualizer.measureElement}
               className='collection-grid'
               style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
                 width: '100%',
-                height: `${virtualRow.size}px`,
+                gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                gap: `${gap}px`,
+                paddingBottom: `${gap}px`,
                 transform: `translateY(${virtualRow.start}px)`,
               }}
             >

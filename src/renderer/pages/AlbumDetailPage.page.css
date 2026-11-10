@@ -90,6 +90,10 @@
   align-items: start;
 }
 
+.album-detail-content-grid > * {
+  min-width: 0;
+}
+
 .album-detail-mappings-column {
   display: flex;
   flex-direction: column;

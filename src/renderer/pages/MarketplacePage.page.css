@@ -542,3 +542,10 @@
   color: var(--accent-danger, #ef4444);
   margin-bottom: 1.5rem;
 }
+
+@media (max-width: 768px) {
+  /* The page content already has a gutter on a phone */
+  .marketplace-page {
+    padding: 0;
+  }
+}

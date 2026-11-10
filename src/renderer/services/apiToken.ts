@@ -5,10 +5,9 @@
  * the LAN) and therefore requires `Authorization: Bearer`. For the ordinary
  * localhost setup the backend requires no token and this stays empty.
  *
- * sessionStorage, deliberately, not localStorage: the token survives a page
- * reload so the remote-backend setup is usable, but not a browser restart, and
- * it is scoped to this tab. Persisting a bearer token indefinitely on disk is a
- * worse trade for a credential that grants full API access on its own.
+ * Kept in localStorage, so it is entered once per browser (a phone on the
+ * home network, say) and lasts until Clear in Settings. A token saved by an
+ * older build in sessionStorage is moved across on first read.
  */
 
 const STORAGE_KEY = 'listenography.apiToken';
@@ -18,7 +17,15 @@ let loaded = false;
 
 function readStorage(): string | null {
   try {
-    return window.sessionStorage.getItem(STORAGE_KEY);
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored) return stored;
+    // Saved for one session by an older build: keep it for good
+    const legacy = window.sessionStorage.getItem(STORAGE_KEY);
+    if (legacy) {
+      window.localStorage.setItem(STORAGE_KEY, legacy);
+      window.sessionStorage.removeItem(STORAGE_KEY);
+    }
+    return legacy;
   } catch {
     // Private browsing or a blocked storage partition — fall back to memory.
     return null;
@@ -39,10 +46,11 @@ export function setApiToken(token: string | null): void {
 
   try {
     if (cachedToken) {
-      window.sessionStorage.setItem(STORAGE_KEY, cachedToken);
+      window.localStorage.setItem(STORAGE_KEY, cachedToken);
     } else {
-      window.sessionStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(STORAGE_KEY);
     }
+    window.sessionStorage.removeItem(STORAGE_KEY);
   } catch {
     // Keep the in-memory value; it still works for this page load.
   }

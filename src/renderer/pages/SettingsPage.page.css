@@ -1194,3 +1194,42 @@
   font-size: var(--text-sm);
   color: var(--text-secondary);
 }
+
+@media (max-width: 768px) {
+  /* All six tabs visible: three per row instead of a row that runs off
+     the edge */
+  .settings-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-width: 0;
+  }
+
+  .settings-tab {
+    justify-content: center;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-1);
+    font-size: var(--text-sm);
+  }
+  /* Suggested mapping: the artist above, its buttons below */
+  .settings-suggestion-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .settings-suggestion-actions {
+    flex-wrap: wrap;
+  }
+
+  .settings-suggestion-actions > .button {
+    max-width: 100%;
+    white-space: normal;
+    text-align: left;
+  }
+
+  /* Hidden albums and artists: long names wrap inside the row */
+  .settings-hidden-info {
+    align-self: stretch;
+    overflow-wrap: anywhere;
+  }
+}

@@ -258,6 +258,9 @@
 }
 
 .collection-view-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.25rem 0.5rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-color);
@@ -268,8 +271,9 @@
 }
 
 .collection-view-button--active {
-  background-color: var(--primary-color);
-  color: white;
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  color: var(--text-on-fill);
 }
 
 .collection-sort-label {
@@ -411,6 +415,8 @@
 .collection-single-card {
   width: 100%;
   max-width: 600px;
+  /* Sideways swipes change the record; vertical ones still scroll */
+  touch-action: pan-y;
 }
 
 .collection-single-hint {
@@ -507,4 +513,94 @@
   margin-top: var(--space-1);
   font-size: var(--text-sm);
   color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  /* Phone: stack the title above the cache controls and tighten the
+     filter and sort rows, so the records start near the top */
+  .collection-header {
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+
+  .collection-title-section h2 {
+    font-size: var(--text-xl);
+    margin-bottom: var(--space-1);
+  }
+
+  .collection-header-stats {
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+  }
+
+  .collection-cache-management {
+    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .collection-filters {
+    gap: var(--space-2);
+    margin: var(--space-2) 0;
+    padding: var(--space-2);
+  }
+
+  .collection-filters-label {
+    display: none;
+  }
+
+  .collection-filter-select,
+  .collection-filter-input {
+    padding-top: var(--space-1);
+    padding-bottom: var(--space-1);
+  }
+
+  /* Room for a four-digit year at the 16px phone input size */
+  .collection-filter-input {
+    width: 84px;
+  }
+
+  .collection-controls {
+    margin: var(--space-2) 0;
+  }
+
+  .collection-controls-group {
+    gap: var(--space-2);
+  }
+
+  .collection-view-label,
+  .collection-sort-label {
+    display: none;
+  }
+
+  .collection-controls-group {
+    flex-wrap: nowrap;
+  }
+
+  .collection-sort-select {
+    flex: 1;
+    min-width: 0;
+    padding-top: var(--space-1);
+    padding-bottom: var(--space-1);
+  }
+
+  .collection-single-view {
+    gap: var(--space-4);
+    padding: var(--space-2) 0;
+  }
+
+  .collection-single-nav {
+    gap: var(--space-4);
+  }
+
+  .collection-single-card .album-cover {
+    height: auto;
+    aspect-ratio: 1 / 1;
+  }
+
+  .collection-single-nav-button {
+    padding: var(--space-2) var(--space-4);
+    min-width: 56px;
+  }
 }

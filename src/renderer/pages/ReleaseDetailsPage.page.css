@@ -505,4 +505,27 @@
   .release-details-auto-timing-buttons {
     flex-wrap: wrap;
   }
+
+  /* The Last.fm name goes on its own line under the artist */
+  .release-details-artist-mapping-badge {
+    display: inline-block;
+    margin: var(--space-1) 0 0;
+    font-size: var(--text-sm);
+  }
+
+  /* Heading on one line, the select and scrobble buttons under it */
+  .release-details-tracks-header {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .release-details-tracks-buttons {
+    flex-wrap: wrap;
+  }
+
+  /* One scroll for the whole page rather than a box inside it */
+  .release-details-tracklist {
+    max-height: none;
+    overflow-y: visible;
+  }
 }

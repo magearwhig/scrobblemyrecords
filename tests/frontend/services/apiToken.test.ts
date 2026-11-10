@@ -23,19 +23,16 @@ describe('apiToken', () => {
       expect(getApiToken()).toBe('secret-token');
     });
 
-    it('persists to sessionStorage, not localStorage', () => {
-      // A bearer token grants full API access on its own; keeping it out of
-      // localStorage means it does not outlive the browser session.
+    it('persists to localStorage so it outlives the browser session', () => {
       setApiToken('secret-token');
 
-      expect(window.sessionStorage.getItem('listenography.apiToken')).toBe(
+      expect(window.localStorage.setItem).toHaveBeenCalledWith(
+        'listenography.apiToken',
         'secret-token'
       );
-      // jsdom's localStorage shim yields undefined rather than null for a
-      // missing key, so assert on the value rather than on null-ness.
-      expect(window.localStorage.getItem('listenography.apiToken')).not.toBe(
-        'secret-token'
-      );
+      expect(
+        window.sessionStorage.getItem('listenography.apiToken')
+      ).toBeNull();
     });
 
     it('trims surrounding whitespace from a pasted token', () => {
@@ -53,6 +50,35 @@ describe('apiToken', () => {
       clearApiToken();
 
       expect(getApiToken()).toBeNull();
+      expect(window.localStorage.removeItem).toHaveBeenCalledWith(
+        'listenography.apiToken'
+      );
+    });
+  });
+
+  describe('loading a saved token', () => {
+    const load = () => {
+      let fresh: typeof import('../../../src/renderer/services/apiToken');
+      jest.isolateModules(() => {
+        fresh = require('../../../src/renderer/services/apiToken');
+      });
+      return fresh!;
+    };
+
+    it('reads the token saved in localStorage', () => {
+      (window.localStorage.getItem as jest.Mock).mockReturnValue('kept-token');
+      expect(load().getApiToken()).toBe('kept-token');
+    });
+
+    it('moves a token an older build saved for the session', () => {
+      (window.localStorage.getItem as jest.Mock).mockReturnValue(null);
+      window.sessionStorage.setItem('listenography.apiToken', 'old-token');
+
+      expect(load().getApiToken()).toBe('old-token');
+      expect(window.localStorage.setItem).toHaveBeenCalledWith(
+        'listenography.apiToken',
+        'old-token'
+      );
       expect(
         window.sessionStorage.getItem('listenography.apiToken')
       ).toBeNull();

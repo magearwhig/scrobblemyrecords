@@ -1,4 +1,14 @@
-import { AlertTriangle, Bookmark, Boxes, FileDown, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  Bookmark,
+  Boxes,
+  ChevronLeft,
+  ChevronRight,
+  FileDown,
+  LayoutGrid,
+  Square,
+  X,
+} from 'lucide-react';
 import React, {
   useState,
   useEffect,
@@ -33,6 +43,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
+import { useSwipe } from '../hooks/useSwipe';
 import { ROUTES, navigate } from '../routes';
 import { getApiService } from '../services/api';
 import {
@@ -178,6 +189,23 @@ const CollectionPage: React.FC = () => {
     itemsPerPage: scrollBatchSize,
     threshold: 600, // Trigger loading earlier for smoother experience
   });
+
+  const showPreviousRecord = useCallback(
+    () =>
+      setCurrentRecordIndex(prev =>
+        prev > 0 ? prev - 1 : filteredCollection.length - 1
+      ),
+    [filteredCollection.length]
+  );
+  const showNextRecord = useCallback(
+    () =>
+      setCurrentRecordIndex(prev =>
+        prev < filteredCollection.length - 1 ? prev + 1 : 0
+      ),
+    [filteredCollection.length]
+  );
+  // Swipe left for the next record, right for the previous one
+  const singleViewSwipe = useSwipe(showNextRecord, showPreviousRecord);
 
   // Keyboard navigation for single record view
   useEffect(() => {
@@ -1496,15 +1524,19 @@ const CollectionPage: React.FC = () => {
                 onClick={() => setViewMode('grid')}
                 className={`collection-view-button${viewMode === 'grid' ? ' collection-view-button--active' : ''}`}
                 title='Grid view'
+                aria-label='Grid view'
+                aria-pressed={viewMode === 'grid'}
               >
-                ⊞
+                <LayoutGrid size={16} aria-hidden='true' />
               </button>
               <button
                 onClick={() => setViewMode('single')}
                 className={`collection-view-button${viewMode === 'single' ? ' collection-view-button--active' : ''}`}
                 title='Single record view'
+                aria-label='Single record view'
+                aria-pressed={viewMode === 'single'}
               >
-                ▭
+                <Square size={16} aria-hidden='true' />
               </button>
             </div>
 
@@ -1513,6 +1545,7 @@ const CollectionPage: React.FC = () => {
               value={sortBy}
               onChange={e => setSortBy(e.target.value as CollectionSortBy)}
               className='collection-sort-select'
+              aria-label='Sort by'
             >
               <option value='artist'>Artist</option>
               <option value='title'>Title</option>
@@ -1663,15 +1696,12 @@ const CollectionPage: React.FC = () => {
           {/* Navigation Controls */}
           <div className='collection-single-nav'>
             <button
-              onClick={() =>
-                setCurrentRecordIndex(prev =>
-                  prev > 0 ? prev - 1 : filteredCollection.length - 1
-                )
-              }
+              onClick={showPreviousRecord}
               className='collection-single-nav-button'
               title='Previous record (←)'
+              aria-label='Previous record'
             >
-              ←
+              <ChevronLeft size={20} aria-hidden='true' />
             </button>
 
             <div className='collection-single-position'>
@@ -1679,20 +1709,17 @@ const CollectionPage: React.FC = () => {
             </div>
 
             <button
-              onClick={() =>
-                setCurrentRecordIndex(prev =>
-                  prev < filteredCollection.length - 1 ? prev + 1 : 0
-                )
-              }
+              onClick={showNextRecord}
               className='collection-single-nav-button'
               title='Next record (→)'
+              aria-label='Next record'
             >
-              →
+              <ChevronRight size={20} aria-hidden='true' />
             </button>
           </div>
 
           {/* Single Album Card */}
-          <div className='collection-single-card'>
+          <div className='collection-single-card' {...singleViewSwipe}>
             {(() => {
               const currentItem =
                 filteredCollection[currentRecordIndex] ?? filteredCollection[0];
@@ -1719,9 +1746,8 @@ const CollectionPage: React.FC = () => {
             })()}
           </div>
 
-          {/* Keyboard hint */}
           <div className='collection-single-hint'>
-            Use ← → arrow keys to navigate
+            Swipe, or use the ← → arrow keys, to move between records
           </div>
         </div>
       )}

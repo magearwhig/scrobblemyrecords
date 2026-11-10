@@ -235,6 +235,26 @@ fs.mkdirSync(resolveDataDir(), { recursive: true });
 // Initialize file storage
 const fileStorage = new FileStorage();
 
+// The built UI, served from the backend's own address so a phone on the
+// network can open http://<laptop-ip>:<port> and call the API on the same
+// origin; Chrome blocks a plain-HTTP page from calling another port on the
+// local network. Mounted before helmet, whose API headers (CSP with
+// upgrade-insecure-requests, img-src 'self') would break the page over HTTP,
+// and before the API token check, so the page loads to ask for the token.
+const webDir = path.join(__dirname, 'web');
+if (fs.existsSync(path.join(webDir, 'index.html'))) {
+  app.use(
+    express.static(webDir, {
+      index: 'index.html',
+      // Recheck the page on every load so a phone never keeps an old build
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html'))
+          res.setHeader('Cache-Control', 'no-cache');
+      },
+    })
+  );
+}
+
 // Security middleware
 app.use(helmet());
 
@@ -253,8 +273,9 @@ app.use(
         'http://127.0.0.1:8080', // Alternative localhost
         'http://localhost:3000', // Test environment
         'http://127.0.0.1:3000', // Alternative test environment
-        process.env.FRONTEND_URL, // Production frontend URL
-      ].filter(Boolean); // Remove undefined entries
+        // Other frontend URLs, comma-separated (e.g. a LAN address for a phone)
+        ...(process.env.FRONTEND_URL ?? '').split(',').map(url => url.trim()),
+      ].filter(Boolean); // Remove empty entries
 
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);

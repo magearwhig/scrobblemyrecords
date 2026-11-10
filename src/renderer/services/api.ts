@@ -120,6 +120,7 @@ import {
 import { createLogger } from '../utils/logger';
 
 import { getApiToken } from './apiToken';
+import { defaultServerUrl } from './serverUrl';
 
 const log = createLogger('ApiService');
 
@@ -127,9 +128,7 @@ class ApiService {
   private api: AxiosInstance;
   private baseUrl: string;
 
-  constructor(
-    baseUrl: string = `http://localhost:${process.env.REACT_APP_BACKEND_PORT || '3001'}`
-  ) {
+  constructor(baseUrl: string = defaultServerUrl()) {
     this.baseUrl = baseUrl;
     this.api = axios.create({
       baseURL: `${baseUrl}/api/v1`,

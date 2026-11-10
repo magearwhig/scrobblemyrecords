@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 
 import { AppState } from '../../shared/types';
+import { defaultServerUrl } from '../services/serverUrl';
 
 type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
@@ -17,7 +18,7 @@ type AppAction =
 const initialState: AppState = {
   loading: false,
   error: null,
-  serverUrl: `http://localhost:${process.env.REACT_APP_BACKEND_PORT || '3001'}`,
+  serverUrl: defaultServerUrl(),
 };
 
 const AppContext = createContext<
@@ -49,10 +50,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   const [state, dispatch] = useReducer(appReducer, initialState);
 
   useEffect(() => {
-    // For web app, server URL is based on environment variable
+    // The backend on the host this page came from
     dispatch({
       type: 'SET_SERVER_URL',
-      payload: `http://localhost:${process.env.REACT_APP_BACKEND_PORT || '3001'}`,
+      payload: defaultServerUrl(),
     });
   }, []);
 
