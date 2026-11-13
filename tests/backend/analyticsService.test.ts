@@ -661,6 +661,62 @@ describe('AnalyticsService', () => {
       // Assert
       expect(missing).toEqual([]);
     });
+
+    it('counts artists joined by artist or album mappings as owned', async () => {
+      const aliases: Record<string, string> = {
+        'the afghan whigs': 'afghan whigs',
+        'arcade fire': 'the arcade fire',
+        'turnstile (2)': 'turnstile',
+      };
+      analyticsService.setArtistNameResolver({
+        resolveArtist: name =>
+          aliases[name.toLowerCase()] ?? name.toLowerCase(),
+      });
+      mockHistoryStorage.getUniqueArtists.mockResolvedValue(
+        new Map([
+          ['afghan whigs', { playCount: 700, albumCount: 5, lastPlayed: 0 }],
+          ['the arcade fire', { playCount: 200, albumCount: 3, lastPlayed: 0 }],
+          ['turnstile', { playCount: 50, albumCount: 2, lastPlayed: 0 }],
+          ['beulah', { playCount: 40, albumCount: 2, lastPlayed: 0 }],
+        ])
+      );
+      const collection = [
+        createMockCollectionItem({ artist: 'The Afghan Whigs' }),
+        createMockCollectionItem({ artist: 'Arcade Fire' }),
+        createMockCollectionItem({ artist: 'Turnstile (2), Someone' }),
+      ];
+
+      const missing = await analyticsService.getMissingArtists(collection);
+
+      expect(missing.map(a => a.artist)).toEqual(['beulah']);
+    });
+    it('counts each artist of a split compound name as owned', async () => {
+      analyticsService.setArtistNameResolver({
+        resolveArtist: name =>
+          name.toLowerCase() === 'ted leo / pharmacists'
+            ? 'ted leo and the pharmacists'
+            : name.toLowerCase(),
+        resolveArtistMulti: name =>
+          ['ted leo / pharmacists', 'ted leo and the pharmacists'].includes(
+            name.toLowerCase()
+          )
+            ? ['ted leo', 'the pharmacists']
+            : [name.toLowerCase()],
+      });
+      mockHistoryStorage.getUniqueArtists.mockResolvedValue(
+        new Map([
+          ['ted leo', { playCount: 300, albumCount: 6, lastPlayed: 0 }],
+          ['the pharmacists', { playCount: 177, albumCount: 6, lastPlayed: 0 }],
+        ])
+      );
+      const collection = [
+        createMockCollectionItem({ artist: 'Ted Leo / Pharmacists' }),
+      ];
+
+      const missing = await analyticsService.getMissingArtists(collection);
+
+      expect(missing).toEqual([]);
+    });
   });
 
   describe('getAnalyticsSummary', () => {

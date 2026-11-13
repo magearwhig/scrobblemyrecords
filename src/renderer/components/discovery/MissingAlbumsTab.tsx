@@ -1,5 +1,7 @@
 import React from 'react';
 
+import './discovery.css';
+
 import { MissingAlbum } from '../../../shared/types';
 import AlbumLink from '../AlbumLink';
 import ArtistLink from '../ArtistLink';

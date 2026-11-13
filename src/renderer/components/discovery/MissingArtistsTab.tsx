@@ -1,5 +1,7 @@
 import React from 'react';
 
+import './discovery.css';
+
 import { MissingArtist } from '../../../shared/types';
 import ArtistLink from '../ArtistLink';
 import { Button } from '../ui/Button';

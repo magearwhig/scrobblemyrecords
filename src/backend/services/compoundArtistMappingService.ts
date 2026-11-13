@@ -10,6 +10,16 @@ const COMPOUND_MAPPINGS_FILE = 'mappings/compound-artist-mappings.json';
 
 const COMPOUND_SEPARATORS = [', ', ' & ', ' and ', ' x ', ' X '];
 
+/**
+ * Separators that auto-detection splits on. "&" and "and" are left out: they
+ * usually join one band's name ("Ted Leo and the Pharmacists", "Peter Bjorn
+ * and John"). Real "&" collaborations can still be added by hand.
+ */
+const AUTO_DETECT_SEPARATORS = [', ', ' x ', ' X '];
+
+/** Name suffixes after a comma that are not another artist ("Bobby Bare, Jr.") */
+const NAME_SUFFIX = /^(jr|sr|ii|iii|iv)\.?$/i;
+
 const log = createLogger('CompoundArtistMappingService');
 
 /**
@@ -31,6 +41,8 @@ export class CompoundArtistMappingService
 {
   private fileStorage: FileStorage;
   private mappings: Map<string, CompoundArtistMapping> = new Map();
+  /** Names the user removed, so auto-detection doesn't add them back */
+  private dismissed: Set<string> = new Set();
   private loaded = false;
 
   constructor(fileStorage: FileStorage) {
@@ -48,6 +60,7 @@ export class CompoundArtistMappingService
   /** Drop the in-memory mappings so the next access reloads from disk. */
   clearCache(): void {
     this.mappings.clear();
+    this.dismissed.clear();
     this.loaded = false;
   }
 
@@ -64,6 +77,9 @@ export class CompoundArtistMappingService
         }
         log.info(`Loaded ${raw.mappings.length} compound artist mappings`);
       }
+      for (const name of raw?.dismissed ?? []) {
+        this.dismissed.add(this.key(name));
+      }
     } catch {
       log.debug('No compound artist mappings file found');
     }
@@ -75,6 +91,7 @@ export class CompoundArtistMappingService
     const store: CompoundArtistMappingsStore = {
       schemaVersion: 1,
       mappings: Array.from(this.mappings.values()),
+      ...(this.dismissed.size > 0 && { dismissed: [...this.dismissed] }),
     };
     await this.fileStorage.writeJSONWithBackup(COMPOUND_MAPPINGS_FILE, store);
   }
@@ -110,6 +127,7 @@ export class CompoundArtistMappingService
     };
 
     this.mappings.set(this.key(compoundName), mapping);
+    this.dismissed.delete(this.key(compoundName));
     await this.save();
 
     log.info(
@@ -122,6 +140,7 @@ export class CompoundArtistMappingService
 
     const removed = this.mappings.delete(this.key(compoundName));
     if (removed) {
+      this.dismissed.add(this.key(compoundName));
       await this.save();
       log.info(`Removed compound mapping: "${compoundName}"`);
     }
@@ -157,11 +176,12 @@ export class CompoundArtistMappingService
       if (!name) continue;
 
       // Check if name contains a compound separator
-      const sep = COMPOUND_SEPARATORS.find(s => name.includes(s));
+      const sep = AUTO_DETECT_SEPARATORS.find(s => name.includes(s));
       if (!sep) continue;
 
       const k = this.key(name);
       if (this.mappings.has(k)) continue; // already known
+      if (this.dismissed.has(k)) continue; // removed by the user
 
       const parts = name
         .split(sep)
@@ -169,6 +189,7 @@ export class CompoundArtistMappingService
         .filter(p => p.length > 0);
 
       if (parts.length <= 1) continue;
+      if (parts.some(p => NAME_SUFFIX.test(p))) continue;
 
       const newMapping: CompoundArtistMapping = {
         compoundName: name,

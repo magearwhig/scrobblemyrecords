@@ -194,7 +194,7 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
 
   const handleDeleteCompoundMapping = async (compoundName: string) => {
     const confirmed = await confirmAction(
-      `Are you sure you want to delete the compound mapping for "${compoundName}"?`,
+      `Stop splitting "${compoundName}"? Its plays will count as one artist, and auto-detect won't add it back.`,
       { title: 'Delete Compound Mapping', confirmLabel: 'Delete' }
     );
     if (!confirmed) return;
@@ -943,8 +943,9 @@ const SettingsMappingsSection: React.FC<SettingsMappingsSectionProps> = ({
           <div className='settings-info-box'>
             Compound artists like &quot;Artist A, Artist B&quot; are
             automatically decomposed so plays appear under each individual
-            artist. Auto-detected mappings are created from your album mapping
-            data.
+            artist. Auto-detect only splits names joined by a comma or &quot; x
+            &quot;, since &quot;&amp;&quot; and &quot;and&quot; usually belong
+            to one band&apos;s name.
           </div>
 
           <div className='settings-actions-row'>

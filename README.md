@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-7202%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-7210%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -449,7 +449,8 @@ Find albums and artists you listen to but don't own on vinyl:
 - **Hide Wishlisted & Monitored**: Toggle to filter out items already being tracked
 
 **Missing Artists Tab:**
-- **Missing Artists**: Artists you love but don't have on vinyl
+- **Missing Artists**: Artists you love but don't have on vinyl. Artist name mappings and album mappings count: an artist you own under another spelling, or as one of the artists on a collaboration, isn't listed
+- **Compound artists**: Auto-detect only splits names joined by a comma or " x " ("Danny Brown, Quadeca"); "&" and "and" are left as one band ("Ted Leo and the Pharmacists"). A split you delete in Settings stays deleted
 - **Play Count Sorting**: Prioritized by how often you listen
 - **Map to Collection**: Map artist to a release in your collection
 

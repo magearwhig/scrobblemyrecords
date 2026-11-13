@@ -1908,6 +1908,8 @@ export interface CompoundArtistMapping {
 export interface CompoundArtistMappingsStore extends VersionedStore {
   schemaVersion: 1;
   mappings: CompoundArtistMapping[];
+  /** Compound names the user removed; auto-detection skips them */
+  dismissed?: string[];
 }
 
 /**
