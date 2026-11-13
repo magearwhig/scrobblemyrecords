@@ -198,22 +198,59 @@ describe('CompoundArtistMappingService', () => {
       expect(detected).toBe(0);
     });
 
-    it('should detect & separator', async () => {
-      const albumMappings: AlbumMapping[] = [
-        {
-          historyArtist: 'Foo & Bar',
-          historyAlbum: 'Album',
-          collectionArtist: 'Foo',
-          collectionAlbum: 'Album',
-          collectionId: 1,
-          createdAt: 1000,
-        },
-      ];
+    const mappingFor = (historyArtist: string): AlbumMapping => ({
+      historyArtist,
+      historyAlbum: 'Album',
+      collectionArtist: 'Foo',
+      collectionAlbum: 'Album',
+      collectionId: 1,
+      createdAt: 1000,
+    });
 
-      const detected = await service.autoDetectFromAlbumMappings(albumMappings);
-      expect(detected).toBe(1);
+    it.each([
+      'Ted Leo & The Pharmacists',
+      'Ben Harper and the Innocent Criminals',
+      'Peter Bjorn and John',
+      'Bobby Bare, Jr.',
+    ])('does not split the band name "%s"', async name => {
+      const detected = await service.autoDetectFromAlbumMappings([
+        mappingFor(name),
+      ]);
+      expect(detected).toBe(0);
+    });
+
+    it('splits " x " collaborations', async () => {
+      await service.autoDetectFromAlbumMappings([mappingFor('Foo x Bar')]);
       const mappings = await service.getAllMappings();
       expect(mappings[0].components).toEqual(['Foo', 'Bar']);
+    });
+
+    it('does not add back a split the user removed', async () => {
+      await service.autoDetectFromAlbumMappings([mappingFor('Foo, Bar')]);
+      await service.removeMapping('foo, bar');
+
+      const detected = await service.autoDetectFromAlbumMappings([
+        mappingFor('Foo, Bar'),
+      ]);
+
+      expect(detected).toBe(0);
+      const calls = mockFileStorage.writeJSONWithBackup.mock.calls;
+      const saved = calls[calls.length - 1][1];
+      expect(saved).toEqual(
+        expect.objectContaining({ dismissed: ['foo, bar'] })
+      );
+    });
+
+    it('adding a split by hand clears its removal', async () => {
+      await service.addMapping('Foo, Bar', ['Foo', 'Bar']);
+      await service.removeMapping('Foo, Bar');
+      await service.addMapping('Foo, Bar', ['Foo', 'Bar']);
+      await service.removeMapping('Foo, Bar');
+      await service.addMapping('Foo, Bar', ['Foo', 'Bar']);
+
+      const calls = mockFileStorage.writeJSONWithBackup.mock.calls;
+      const saved = calls[calls.length - 1][1];
+      expect(saved).not.toHaveProperty('dismissed');
     });
   });
 });

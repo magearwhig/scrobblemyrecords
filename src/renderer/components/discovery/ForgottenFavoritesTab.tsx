@@ -2,6 +2,8 @@
 import { Play } from 'lucide-react';
 import React, { useState, useEffect, useMemo } from 'react';
 
+import './discovery.css';
+
 import {
   CollectionItem,
   ForgottenTrack,

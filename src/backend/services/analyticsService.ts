@@ -8,6 +8,7 @@ import {
   createAlbumCanonicalizer,
   createCollectionNameResolver,
   isCollectionLinked,
+  stripDiscogsSuffix,
 } from '../../shared/utils/albumMapping';
 import { createLogger } from '../utils/logger';
 
@@ -17,6 +18,9 @@ import { MappingService } from './mappingService';
 import { loadAlbumMappings } from './mergedAlbumHistory';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 
+type ArtistResolver = Pick<ArtistNameResolver, 'resolveArtist'> &
+  Partial<Pick<ArtistNameResolver, 'resolveArtistMulti'>>;
+
 /**
  * Service for analyzing listening patterns and generating analytics
  * used by the suggestion algorithm.
@@ -25,8 +29,7 @@ export class AnalyticsService {
   private historyStorage: ScrobbleHistoryStorage;
   private lastFmService: LastFmService;
   private mappingService: MappingService | null = null;
-  private artistNameResolver: Pick<ArtistNameResolver, 'resolveArtist'> | null =
-    null;
+  private artistNameResolver: ArtistResolver | null = null;
   private logger = createLogger('AnalyticsService');
 
   // Cache for expensive computations
@@ -51,9 +54,7 @@ export class AnalyticsService {
   }
 
   /** Optional: group spellings of one artist (see ArtistNameResolver). */
-  setArtistNameResolver(
-    resolver: Pick<ArtistNameResolver, 'resolveArtist'>
-  ): void {
+  setArtistNameResolver(resolver: ArtistResolver): void {
     this.artistNameResolver = resolver;
   }
 
@@ -430,6 +431,36 @@ export class AnalyticsService {
       return [];
     }
 
+    // Every collection artist as the history knows it. History artist names
+    // are already grouped by the artist name resolver (Discogs/Last.fm
+    // artist mappings, album mappings linked to records), so resolving the
+    // collection side the same way lets those mappings count as owned.
+    const ownedKeys = new Set<string>();
+    const resolver = this.artistNameResolver;
+    if (resolver) {
+      for (const item of collection) {
+        const artist = item.release.artist;
+        if (!artist) continue;
+        const names = [
+          artist,
+          ...artist.split(/,|&|\//).map(part => part.trim()),
+        ].filter(Boolean);
+        for (const name of names) {
+          for (const variant of [name, stripDiscogsSuffix(name)]) {
+            ownedKeys.add(
+              this.normalizeForMatch(resolver.resolveArtist(variant))
+            );
+            // History splits a duo or band-with-backing-band name into each
+            // artist ("Ted Leo & The Pharmacists" -> "ted leo", "the
+            // pharmacists"), so owning the record owns each of them
+            for (const part of resolver.resolveArtistMulti?.(variant) ?? []) {
+              ownedKeys.add(this.normalizeForMatch(part));
+            }
+          }
+        }
+      }
+    }
+
     // Find artists in history but not in collection
     const missing: MissingArtist[] = [];
     for (const [artistName, stats] of uniqueArtists) {
@@ -446,6 +477,8 @@ export class AnalyticsService {
           continue;
         }
       }
+
+      if (ownedKeys.has(this.normalizeForMatch(artistName))) continue;
 
       // Check if this artist matches any collection item
       let foundMatch = false;
