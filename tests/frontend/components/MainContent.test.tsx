@@ -54,6 +54,13 @@ jest.mock('../../../src/renderer/pages/ArtistDetailPage', () => ({
   },
 }));
 
+jest.mock('../../../src/renderer/pages/LabelDetailPage', () => ({
+  __esModule: true,
+  default: function MockLabelDetailPage() {
+    return <div data-testid='label-detail-page'>Label Detail Page</div>;
+  },
+}));
+
 jest.mock('../../../src/renderer/pages/TrackDetailPage', () => ({
   __esModule: true,
   default: function MockTrackDetailPage() {
@@ -151,6 +158,12 @@ describe('MainContent', () => {
     render(<MainContent currentPage='settings' />);
 
     expect(await screen.findByTestId('settings-page')).toBeInTheDocument();
+  });
+
+  it('renders LabelDetailPage when currentPage is "label"', async () => {
+    render(<MainContent currentPage='label' />);
+
+    expect(await screen.findByTestId('label-detail-page')).toBeInTheDocument();
   });
 
   it('renders ReleaseDetailsPage when currentPage is "release-details"', async () => {

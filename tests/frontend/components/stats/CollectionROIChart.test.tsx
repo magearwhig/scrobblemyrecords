@@ -112,7 +112,7 @@ describe('CollectionROIChart', () => {
       await screen.findByText('No collection value data available');
       expect(
         screen.getByText(
-          'Run a value scan from Collection Analytics to see ROI scores.'
+          'Scan your collection value above to see plays per dollar.'
         )
       ).toBeInTheDocument();
     });
@@ -202,8 +202,23 @@ describe('CollectionROIChart', () => {
     });
   });
 
+  it('points to the scan on the same page when there are no values', async () => {
+    mockedStatsApi.getCollectionROI.mockResolvedValue({
+      success: true,
+      data: [],
+    });
+
+    render(<CollectionROIChart />);
+
+    expect(
+      await screen.findByText(
+        'Scan your collection value above to see plays per dollar.'
+      )
+    ).toBeInTheDocument();
+  });
+
   describe('API call', () => {
-    it('should call getCollectionROI with default limit', () => {
+    it('asks for every valued record, so both lists cover the whole collection', () => {
       // Arrange
       mockedStatsApi.getCollectionROI.mockResolvedValue({
         success: true,
@@ -214,21 +229,39 @@ describe('CollectionROIChart', () => {
       render(<CollectionROIChart />);
 
       // Assert
-      expect(mockedStatsApi.getCollectionROI).toHaveBeenCalledWith(20);
+      expect(mockedStatsApi.getCollectionROI).toHaveBeenCalledWith();
+    });
+  });
+
+  it('puts the dearest never-played record first under Worst Value', async () => {
+    // Arrange
+    const user = userEvent.setup();
+    const unplayed = (releaseId: number, album: string, price: number) => ({
+      artist: 'Someone',
+      album,
+      playCount: 0,
+      medianPrice: price,
+      currency: 'USD',
+      roiScore: 0,
+      releaseId,
+    });
+    mockedStatsApi.getCollectionROI.mockResolvedValue({
+      success: true,
+      data: [
+        ...mockRoiData,
+        unplayed(4, 'Cheap Unplayed', 5),
+        unplayed(5, 'Dear Unplayed', 90),
+      ],
     });
 
-    it('should pass custom limit to getCollectionROI', () => {
-      // Arrange
-      mockedStatsApi.getCollectionROI.mockResolvedValue({
-        success: true,
-        data: [],
-      });
+    // Act
+    render(<CollectionROIChart />);
+    await screen.findByText('OK Computer');
+    await user.click(screen.getByRole('tab', { name: /worst value/i }));
 
-      // Act
-      render(<CollectionROIChart limit={10} />);
-
-      // Assert
-      expect(mockedStatsApi.getCollectionROI).toHaveBeenCalledWith(10);
-    });
+    // Assert
+    const items = screen.getAllByRole('listitem');
+    expect(items[0]).toHaveTextContent('Dear Unplayed');
+    expect(items[1]).toHaveTextContent('Cheap Unplayed');
   });
 });

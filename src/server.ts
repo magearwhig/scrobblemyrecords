@@ -12,6 +12,7 @@ import morgan from 'morgan';
 dotenv.config();
 
 import { requireApiToken } from './backend/middleware/requireApiToken';
+import createAlbumLabelsRouter from './backend/routes/albumLabels';
 import { createArtistMappingRouter } from './backend/routes/artistMapping';
 import { createAuthRouter } from './backend/routes/auth';
 import createBackupRouter from './backend/routes/backup';
@@ -40,6 +41,10 @@ import createUnresolvedHistoryRouter from './backend/routes/unresolvedHistory';
 import createWebsitesRouter from './backend/routes/websites';
 import createWishlistRouter from './backend/routes/wishlist';
 import createWrappedRouter from './backend/routes/wrapped';
+import {
+  AlbumLabelCandidate,
+  AlbumLabelService,
+} from './backend/services/albumLabelService';
 import { getAlbumPlayCounts } from './backend/services/albumPlayCountService';
 import { AnalyticsService } from './backend/services/analyticsService';
 import { artistMappingService } from './backend/services/artistMappingService';
@@ -459,6 +464,17 @@ const labelMonitoringService = new LabelMonitoringService(
   discogsService
 );
 const musicBrainzService = new MusicBrainzService();
+// Labels for albums you don't own: looked up in the background (MusicBrainz,
+// then Discogs), corrected by you, and counted on label pages
+const albumLabelService = new AlbumLabelService(
+  fileStorage,
+  {
+    musicbrainz: query => musicBrainzService.findAlbumLabels(query),
+    discogs: query => wishlistService.findAlbumLabels(query),
+  },
+  { keyFor: (artist, album) => statsService.albumLabelKey(artist, album) }
+);
+statsService.setAlbumLabelService(albumLabelService);
 const releaseTrackingService = new ReleaseTrackingService(
   fileStorage,
   discogsService,
@@ -826,6 +842,8 @@ async function startServer() {
       await crateService.reload();
       await crateSuggestionService.reload();
       discardPileService.clearCache();
+      // Restored album label overrides
+      albumLabelService.clearCache();
       crateService.invalidate();
       // Restored unresolved-history rules change the derived index
       historyStorage.invalidateCache();
@@ -914,6 +932,34 @@ async function startServer() {
         }
       )
     );
+
+    // Albums whose label is looked up in the background (see albumLabelService)
+    let labelCandidates: { at: number; items: AlbumLabelCandidate[] } | null =
+      null;
+    const getLabelCandidates = async (): Promise<AlbumLabelCandidate[]> => {
+      if (labelCandidates && Date.now() - labelCandidates.at < 5 * 60 * 1000) {
+        return labelCandidates.items;
+      }
+      const username = (await authService.getUserSettings()).discogs.username;
+      const collection = username
+        ? await getAllCachedCollectionItems(username, fileStorage)
+        : [];
+      labelCandidates = {
+        at: Date.now(),
+        items: await statsService.getAlbumLabelCandidates(collection, 3),
+      };
+      return labelCandidates.items;
+    };
+    app.use(
+      '/api/v1/album-labels',
+      createAlbumLabelsRouter(albumLabelService, getLabelCandidates)
+    );
+    // 20 albums a minute, starting two minutes after startup
+    albumLabelService.start(getLabelCandidates, {
+      initialDelayMs: 2 * 60 * 1000,
+      intervalMs: 60 * 1000,
+      batchSize: 20,
+    });
 
     // Mount stats routes now that historyIndexMergeService is available
     app.use(

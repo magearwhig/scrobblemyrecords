@@ -9,6 +9,7 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | done/button-system-consolidation.md | Complete -- all 4 phases, 54 files migrated, legacy .btn CSS removed |
 | done/mapping-resolution-plan.md | Complete -- Feature 16, all 6 phases implemented |
 | done/ui-audit-report.md | Complete -- All 3 phases (design tokens, visual polish, cleanup) implemented March 2026 |
+| discogs-pressings-catalogue-plan.md | In progress -- 2026-11-14; one Discogs pressings catalogue replacing the versions cache, seller release-matching cache and known-pressings baseline; PR 1 (catalogue, single fetch path, migration) and PR 2 (wishlist reads from it, full fetch when no vinyl or monthly) implemented, uncommitted |
 | tech-debt.md | Active -- 20 open (0 P1, 6 P2, 14 P3), 47 completed; P1 quick wins, M31 and backup mapping files fixed 2026-10-11; dev-tool audit findings added 2026-11-01 |
 | done/wishlist-enhancements-plan.md | Complete -- all 4 enhancements implemented, tested, verified |
 | cancelled/spotify-integration-plan.md | Cancelled -- Spotify genre enrichment for embeddings |
@@ -39,9 +40,12 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | site-review-2026-10-23.md | In progress -- external product/usability review; all 10 bugs (B1-B10), 9 quick wins and feature 1 (Check a Record) done 2026-10-23, merged 2026-10-24 (PR #20); buying shortlist (feature 3) merged 2026-11-01 (PR #23); next: mapping-impact preview or discard audition; layout improvements and 15 smaller feature ideas open |
 | done/wishlist-priorities-plan.md | Complete -- merged 2026-11-01 (PR #23); own priority order on the wishlist: drag and drop tab, Move to top, position field, Priority sort |
 | done/buying-shortlist-plan.md | Complete -- merged 2026-11-01 (PR #23); site review 1 feature 3: up to 5 wishlist records within a budget, walks the owner's ranking then fills spare slots by score; prices stay worldwide lowest before shipping (no ships-from data in the Discogs API); optional Phase 3 not built |
-| shelf-census-plan.md | Planned -- 2026-10-25; site review 2 idea 2: confirm copies are on the shelf in filing order, report missing/misfiled, last seen; needs Discogs instance_id in the cache first; not started |
-| site-review-2026-10-24.md | In progress -- round 2 review; R1-R7, 3 quick wins, 3 improvements and Browse Collection runtime sort merged 2026-10-25 (PR #21); R8 (LAN/phone API origin) skipped; shelf census planned; fits-in-40-minutes picker and compilation overlap warning open |
-
+| shelf-census-plan.md | Planned -- 2026-10-25; site review 2 idea 2: confirm copies are on the shelf in filing order, report missing/misfiled, last seen; also checks each copy is the right pressing in Discogs (needs cat#, country, format details, barcode, runout cached); needs Discogs instance_id in the cache first; not started |
+| site-review-2026-10-24.md | In progress -- round 2 review; R1-R7, 3 quick wins, 3 improvements and Browse Collection runtime sort merged 2026-10-25 (PR #21); R8 (LAN/phone API origin) shipped 2026-11-09 (PR #28); shelf census planned; fits-in-40-minutes picker and compilation overlap warning open |
+| label-detail-page-plan.md | Planned -- 2026-11-13; site review 1 idea N7, shaped by the owner: label stats page like the artist page (top artists, albums, tracks); all phases done 2026-11-13: owned copies (61.5% of album plays) plus labels looked up for albums you don't own; original-label mode for owned albums not built |
+| [stats-page-review-2026-11-13.md](stats-page-review-2026-11-13.md) | In progress -- Codex review (11 layout findings, 14 stats ideas, ranked top five); layout fixes and new page order (steps 1 and 2, from both reviews) built 2026-11-13, see its Status; new stats ideas still open |
+| [stats-page-review-2026-11-13-codex.md](stats-page-review-2026-11-13-codex.md) | Archive -- unchanged original Codex review recovered from this chat; 11 findings and 14 ideas; individual screenshot links refer to deleted files, so use the canonical review above for working evidence links |
+| [stats-page-review-2026-11-13-concurrent.md](stats-page-review-2026-11-13-concurrent.md) | Reference -- concurrent review preserved separately when restoring the Codex review at the requested canonical path |
 ## Conventions
 
 **Detail page link convention.** ArtistLink, TrackLink, AlbumLink share a pattern: default-exported components that write `selectedXyz` to localStorage as JSON (or a string for the artist-only case), then call `navigate(ROUTES.XYZ_DETAIL, { from })` so the destination page can render a correct back link. Future detail-page links (e.g. LabelLink) should follow the same pattern.

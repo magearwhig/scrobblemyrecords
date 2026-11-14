@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 import { OnThisDayResult } from '../../../shared/types';
 import AlbumLink from '../AlbumLink';
@@ -14,6 +14,11 @@ interface OnThisDayProps {
   loading?: boolean;
 }
 
+/** Years and albums per year shown before "Show all" */
+const PREVIEW_YEARS = 2;
+const PREVIEW_ALBUMS = 3;
+const ALL_ALBUMS = 5;
+
 /** "Today" for this year's entry, not "0 years ago" */
 const yearsAgoLabel = (yearsAgo: number): string =>
   yearsAgo === 0 ? 'Today' : `${yearsAgo} year${yearsAgo !== 1 ? 's' : ''} ago`;
@@ -22,6 +27,8 @@ const yearsAgoLabel = (yearsAgo: number): string =>
  * Card-based timeline showing what was listened to on this day in previous years
  */
 export const OnThisDay: React.FC<OnThisDayProps> = ({ data, loading }) => {
+  const [showAll, setShowAll] = useState(false);
+
   if (loading) {
     return (
       <div
@@ -69,6 +76,18 @@ export const OnThisDay: React.FC<OnThisDayProps> = ({ data, loading }) => {
   ];
 
   const dateLabel = `${monthNames[data!.date.month - 1]} ${data!.date.day}`;
+  const playedYears = data!.years.filter(y => y.totalScrobbles > 0);
+  const shownYears = showAll
+    ? playedYears
+    : playedYears.slice(0, PREVIEW_YEARS);
+  const albumLimit = showAll ? ALL_ALBUMS : PREVIEW_ALBUMS;
+  // Years or albums the preview leaves out (beyond the five a year shown
+  // when expanded)
+  const hiddenAnything =
+    playedYears.length > PREVIEW_YEARS ||
+    shownYears.some(
+      y => Math.min(y.albums.length, ALL_ALBUMS) > PREVIEW_ALBUMS
+    );
 
   return (
     <div
@@ -77,7 +96,7 @@ export const OnThisDay: React.FC<OnThisDayProps> = ({ data, loading }) => {
     >
       <h3>On This Day &mdash; {dateLabel}</h3>
       <div className='on-this-day-timeline'>
-        {data!.years.map(yearEntry => (
+        {shownYears.map(yearEntry => (
           <div
             key={yearEntry.year}
             className='on-this-day-year-card'
@@ -96,7 +115,7 @@ export const OnThisDay: React.FC<OnThisDayProps> = ({ data, loading }) => {
             </div>
             {yearEntry.albums.length > 0 && (
               <ul className='on-this-day-albums'>
-                {yearEntry.albums.slice(0, 5).map((album, i) => (
+                {yearEntry.albums.slice(0, albumLimit).map((album, i) => (
                   <li
                     key={`${album.artist}-${album.album}-${i}`}
                     className='on-this-day-album'
@@ -125,9 +144,27 @@ export const OnThisDay: React.FC<OnThisDayProps> = ({ data, loading }) => {
                 ))}
               </ul>
             )}
+            {yearEntry.albums.length > albumLimit && (
+              <p className='on-this-day-more'>
+                +{yearEntry.albums.length - albumLimit} more
+              </p>
+            )}
           </div>
         ))}
       </div>
+      {(showAll || hiddenAnything) && (
+        <button
+          type='button'
+          className='on-this-day-toggle'
+          onClick={() => setShowAll(all => !all)}
+        >
+          {showAll
+            ? 'Show fewer'
+            : playedYears.length > PREVIEW_YEARS
+              ? `Show all ${playedYears.length} years`
+              : 'Show more'}
+        </button>
+      )}
     </div>
   );
 };

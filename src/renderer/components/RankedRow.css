@@ -64,6 +64,8 @@
 .ranked-row-info {
   flex: 1;
   min-width: 0;
+  /* Narrow rows (phones, narrow lists) put the badge under the name */
+  container: ranked-row-info / inline-size;
 }
 
 .ranked-row-name {
@@ -86,6 +88,19 @@
 /* Badges (or a badge inside a button) keep their size; the name truncates */
 .ranked-row-name > :not(.ranked-row-name-text) {
   flex-shrink: 0;
+}
+
+/* Too narrow for a name and a badge side by side: without this the badge
+   keeps its size and the name shrinks to nothing */
+@container ranked-row-info (max-width: 15em) {
+  .ranked-row-name {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  .ranked-row-name-text {
+    max-width: 100%;
+  }
 }
 
 .ranked-row-subtitle {

@@ -4,7 +4,7 @@ import * as path from 'path';
 import { CleanupService } from '../../src/backend/services/cleanupService';
 import { TEMP_FILE_PREFIX } from '../../src/backend/utils/atomicWrite';
 import { FileStorage } from '../../src/backend/utils/fileStorage';
-import { SellerMatchesStore, VersionsCache } from '../../src/shared/types';
+import { SellerMatchesStore } from '../../src/shared/types';
 
 describe('CleanupService', () => {
   const testDataDir = './test-data-cleanup';
@@ -38,7 +38,6 @@ describe('CleanupService', () => {
 
       expect(settings.imageCacheMaxAgeMs).toBe(30 * 24 * 60 * 60 * 1000);
       expect(settings.soldMatchMaxAgeMs).toBe(30 * 24 * 60 * 60 * 1000);
-      expect(settings.versionsCacheMaxAgeMs).toBe(7 * 24 * 60 * 60 * 1000);
       expect(settings.inventoryCacheMaxAgeMs).toBe(7 * 24 * 60 * 60 * 1000);
     });
   });
@@ -303,53 +302,21 @@ describe('CleanupService', () => {
     });
   });
 
-  describe('cleanupVersionsCache', () => {
-    it('should remove expired versions cache entries', async () => {
-      // Arrange
-      await fs.mkdir(`${testDataDir}/wishlist`, { recursive: true });
-      const cache: VersionsCache = {
+  describe('pressings catalogue', () => {
+    it('never removes pressings, however old', async () => {
+      await fs.mkdir(`${testDataDir}/discogs`, { recursive: true });
+      const catalogue = JSON.stringify({
         schemaVersion: 1,
-        entries: {
-          1234: {
-            masterId: 1234,
-            versions: [],
-            fetchedAt: daysAgo(10), // 10 days ago - expired (7 day limit)
-          },
-          5678: {
-            masterId: 5678,
-            versions: [],
-            fetchedAt: daysAgo(3), // 3 days ago - fresh
-          },
-        },
-      };
-      await fs.writeFile(
-        `${testDataDir}/wishlist/versions-cache.json`,
-        JSON.stringify(cache)
-      );
+        releases: { 1: { masterId: 10, firstSeenAt: daysAgo(400) } },
+        masters: { 10: { baselineSince: daysAgo(400) } },
+      });
+      await fs.writeFile(`${testDataDir}/discogs/pressings.json`, catalogue);
 
-      // Act
-      const removed = await cleanupService.cleanupVersionsCache();
+      await cleanupService.runCleanup();
 
-      // Assert
-      expect(removed).toBe(1);
-
-      // Verify file was updated
-      const content = JSON.parse(
-        await fs.readFile(
-          `${testDataDir}/wishlist/versions-cache.json`,
-          'utf-8'
-        )
-      );
-      expect(content.entries['1234']).toBeUndefined();
-      expect(content.entries['5678']).toBeDefined();
-    });
-
-    it('should handle missing file gracefully', async () => {
-      // Act
-      const removed = await cleanupService.cleanupVersionsCache();
-
-      // Assert
-      expect(removed).toBe(0);
+      expect(
+        await fs.readFile(`${testDataDir}/discogs/pressings.json`, 'utf-8')
+      ).toBe(catalogue);
     });
   });
 
@@ -457,17 +424,6 @@ describe('CleanupService', () => {
         })
       );
 
-      // Old versions cache
-      await fs.writeFile(
-        `${testDataDir}/wishlist/versions-cache.json`,
-        JSON.stringify({
-          schemaVersion: 1,
-          entries: {
-            123: { masterId: 123, versions: [], fetchedAt: daysAgo(10) },
-          },
-        })
-      );
-
       // Old inventory cache file
       const invPath = `${testDataDir}/sellers/inventory-cache/old.json`;
       await fs.writeFile(invPath, '{}');
@@ -479,7 +435,6 @@ describe('CleanupService', () => {
       // Assert
       expect(report.imagesRemoved).toBe(1);
       expect(report.soldMatchesRemoved).toBe(1);
-      expect(report.versionsCacheEntriesRemoved).toBe(1);
       expect(report.inventoryCacheFilesRemoved).toBe(1);
       expect(report.errors).toHaveLength(0);
       expect(report.durationMs).toBeGreaterThanOrEqual(0);
@@ -509,7 +464,6 @@ describe('CleanupService', () => {
       // Assert
       expect(report.imagesRemoved).toBe(0);
       expect(report.soldMatchesRemoved).toBe(0);
-      expect(report.versionsCacheEntriesRemoved).toBe(0);
       expect(report.inventoryCacheFilesRemoved).toBe(0);
       expect(report.errors).toHaveLength(0);
     });

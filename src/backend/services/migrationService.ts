@@ -232,8 +232,10 @@ export class MigrationService {
       optional: true,
     });
 
-    this.register('versions-cache', {
-      path: 'wishlist/versions-cache.json',
+    // Every Discogs pressing seen (replaces the wishlist versions cache, the
+    // seller release-matching cache and known pressings)
+    this.register('discogs-pressings', {
+      path: 'discogs/pressings.json',
       currentVersion: 1,
       migrations: [],
       optional: true,
@@ -479,6 +481,23 @@ export class MigrationService {
     // ============================================
     this.register('artist-filing-overrides', {
       path: 'mappings/artist-filing-overrides.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    // ============================================
+    // Album labels (label pages: albums you don't own)
+    // ============================================
+    this.register('album-label-overrides', {
+      path: 'mappings/album-label-overrides.json',
+      currentVersion: 1,
+      migrations: [],
+      optional: true,
+    });
+
+    this.register('album-label-cache', {
+      path: 'cache/album-labels.json',
       currentVersion: 1,
       migrations: [],
       optional: true,

@@ -169,6 +169,50 @@ const specs: EndpointSpec[] = [
     expected: DATA,
   },
 
+  // Album labels (label pages: albums you don't own)
+  {
+    name: 'getAlbumLabel',
+    verb: 'get',
+    url: '/album-labels',
+    call: api => api.getAlbumLabel('Spoon', 'Gimme Fiction'),
+    expected: DATA,
+  },
+  {
+    name: 'getAlbumLabelStatus',
+    verb: 'get',
+    url: '/album-labels/status',
+    call: api => api.getAlbumLabelStatus(),
+    expected: DATA,
+  },
+  {
+    name: 'setAlbumLabel',
+    verb: 'put',
+    url: '/album-labels',
+    call: api => api.setAlbumLabel('Spoon', 'Gimme Fiction', ['Merge']),
+    expected: RESOLVES,
+  },
+  {
+    name: 'clearAlbumLabel',
+    verb: 'delete',
+    url: '/album-labels',
+    call: api => api.clearAlbumLabel('Spoon', 'Gimme Fiction'),
+    expected: RESOLVES,
+  },
+  {
+    name: 'confirmAlbumLabel',
+    verb: 'post',
+    url: '/album-labels/confirm',
+    call: api => api.confirmAlbumLabel('Spoon', 'Gimme Fiction'),
+    expected: RESOLVES,
+  },
+  {
+    name: 'rejectAlbumLabel',
+    verb: 'post',
+    url: '/album-labels/reject',
+    call: api => api.rejectAlbumLabel('Spoon', 'Gimme Fiction'),
+    expected: RESOLVES,
+  },
+
   // Suggestions
   {
     name: 'getSuggestions',
@@ -1707,6 +1751,30 @@ describe('ApiService endpoint coverage', () => {
       // Every spec must have actually hit the mocked route
       const history = mock.history[spec.verb] as unknown[];
       expect(history.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('sends the album as query params or body for album label calls', async () => {
+    mock.onGet('/album-labels').reply(200, envelope);
+    mock.onPut('/album-labels').reply(200, { success: true });
+    mock.onDelete('/album-labels').reply(200, { success: true });
+
+    await api.getAlbumLabel('Spoon', 'Gimme Fiction');
+    await api.setAlbumLabel('Spoon', 'Gimme Fiction', ['Merge', 'Sub Pop']);
+    await api.clearAlbumLabel('Spoon', 'Gimme Fiction');
+
+    expect(mock.history.get[0].params).toEqual({
+      artist: 'Spoon',
+      album: 'Gimme Fiction',
+    });
+    expect(JSON.parse(mock.history.put[0].data)).toEqual({
+      artist: 'Spoon',
+      album: 'Gimme Fiction',
+      labels: ['Merge', 'Sub Pop'],
+    });
+    expect(mock.history.delete[0].params).toEqual({
+      artist: 'Spoon',
+      album: 'Gimme Fiction',
     });
   });
 

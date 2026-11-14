@@ -404,3 +404,8 @@
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
+
+/* Plays per dollar (Collection ROI) under the value estimate */
+.analytics-roi {
+  margin-top: var(--space-6);
+}

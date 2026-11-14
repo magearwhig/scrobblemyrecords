@@ -6,6 +6,7 @@ import { formatRelativeTime } from '../utils/dateUtils';
 
 import AlbumLink from './AlbumLink';
 import ArtistLink from './ArtistLink';
+import LabelLink from './LabelLink';
 import { Button } from './ui/Button';
 
 interface AlbumCardProps {
@@ -104,7 +105,14 @@ const AlbumCard: React.FC<AlbumCardProps> = ({
         <div className='album-metadata'>{formatArray(release.format)}</div>
 
         {release.label && release.label.length > 0 && (
-          <div className='album-metadata'>{formatArray(release.label)}</div>
+          <div className='album-metadata'>
+            {release.label.map((name, i) => (
+              <React.Fragment key={`${name}-${i}`}>
+                {i > 0 && ', '}
+                <LabelLink label={name} />
+              </React.Fragment>
+            ))}
+          </div>
         )}
 
         {lastPlayed != null && lastPlayed > 0 && (

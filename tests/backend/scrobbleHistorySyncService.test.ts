@@ -618,6 +618,50 @@ describe('ScrobbleHistorySyncService', () => {
       expect(albumHistory.lastPlayed).toBe(1609545600); // Should be the newer timestamp
     });
 
+    it('saves the album MBID from the newest play that has one', async () => {
+      const older = 'aaaaaaaa-1111-2222-3333-444444444444';
+      const newer = 'bbbbbbbb-1111-2222-3333-444444444444';
+      mockAxiosInstance.get.mockResolvedValueOnce({
+        data: {
+          recenttracks: {
+            '@attr': { totalPages: '1', total: '4' },
+            track: [
+              {
+                artist: { '#text': 'Artist' },
+                album: { '#text': 'Album', mbid: '' },
+                name: 'Track 4',
+                date: { uts: '1609718400' }, // Newest, no MBID
+              },
+              {
+                artist: { '#text': 'Artist' },
+                album: { '#text': 'Album', mbid: newer.toUpperCase() },
+                name: 'Track 3',
+                date: { uts: '1609632000' },
+              },
+              {
+                artist: { '#text': 'Artist' },
+                album: { '#text': 'Album', mbid: older },
+                name: 'Track 2',
+                date: { uts: '1609545600' },
+              },
+              {
+                artist: { '#text': 'Other' },
+                album: { '#text': 'Thing', mbid: 'not-an-mbid' },
+                name: 'Track 1',
+                date: { uts: '1609459200' },
+              },
+            ],
+          },
+        },
+      });
+
+      await service.startFullSync();
+
+      const index = await service.getHistoryIndex();
+      expect(index!.albums['artist|album'].mbid).toBe(newer);
+      expect(index!.albums['other|thing'].mbid).toBeUndefined();
+    });
+
     it('should invalidate history storage cache on save', async () => {
       // Arrange
       mockAxiosInstance.get.mockResolvedValueOnce({

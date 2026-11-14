@@ -1176,7 +1176,7 @@ describe('MusicBrainzService', () => {
           baseURL: 'https://musicbrainz.org/ws/2',
           timeout: 10000,
           headers: expect.objectContaining({
-            'User-Agent': expect.stringContaining('RecordScrobbles'),
+            'User-Agent': expect.stringContaining('Listenography'),
             Accept: 'application/json',
           }),
         })
@@ -1188,7 +1188,7 @@ describe('MusicBrainzService', () => {
           baseURL: 'https://coverartarchive.org',
           timeout: 5000,
           headers: expect.objectContaining({
-            'User-Agent': expect.stringContaining('RecordScrobbles'),
+            'User-Agent': expect.stringContaining('Listenography'),
             Accept: 'application/json',
           }),
         })

@@ -1,5 +1,7 @@
 /* Top List */
 .top-list {
+  /* Rows follow the list's width, not the screen's */
+  container: top-list / inline-size;
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -95,4 +97,15 @@
   min-height: 200px;
   color: var(--text-secondary);
   font-size: var(--text-base);
+}
+
+/* Phone-width lists: a narrower rank and tighter gaps leave the name room */
+@container top-list (max-width: 359px) {
+  .top-list .ranked-row {
+    gap: var(--space-2);
+  }
+
+  .top-list .ranked-row-rank {
+    width: 1.25rem;
+  }
 }

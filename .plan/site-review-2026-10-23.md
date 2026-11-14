@@ -55,6 +55,6 @@ Status key: **open** · **done** · **skip**
 2. **Identity-change impact preview** — before/after for artist aliases and compound mappings (L)
 3. **Buying shortlist** — 3–5 albums within a budget, explained by plays, alert threshold, price freshness (M) — **done, merged 2026-11-01 (PR #23)**: [buying-shortlist-plan.md](done/buying-shortlist-plan.md); follows the owner's ranking from [wishlist-priorities-plan.md](done/wishlist-priorities-plan.md)
 4. **Last listen before letting go** — audition review in the Discard Pile (M)
-5. Others: companion record (N1), per-side listening balance (N2), resume interrupted session (N3), renew-or-retire old wants (N4), post-trade reconsideration (N5), edition tracklist diff (N6), label deep dive (N7), added-month cohorts (N8), owned vs unowned listening (N9), new-release relevance (N10), "why is this play here?" (N11), suspicious-day review (N12), history-gap investigator (N13)
+5. Others: companion record (N1), per-side listening balance (N2), resume interrupted session (N3), renew-or-retire old wants (N4), post-trade reconsideration (N5), edition tracklist diff (N6), label deep dive (N7, planned 2026-11-13: [label-detail-page-plan.md](label-detail-page-plan.md)), added-month cohorts (N8), owned vs unowned listening (N9), new-release relevance (N10), "why is this play here?" (N11), suspicious-day review (N12), history-gap investigator (N13)
 
 Reviewer's suggested order: B1–B3 and the label fixes → Check This Record → mapping preview or buying shortlist → discard audition.

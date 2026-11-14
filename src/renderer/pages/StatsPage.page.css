@@ -3,6 +3,7 @@
 
 /* Stats Page Layout */
 .stats-page {
+  container: stats-page / inline-size;
   padding: 1.5rem;
   max-width: 1400px;
   margin: 0 auto;
@@ -84,12 +85,26 @@
   background: var(--accent-primary-hover);
 }
 
-/* Stats Cards Row */
+/* Overview: four cards, two per row on a phone */
 .stats-cards-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+@container stats-page (max-width: 799px) {
+  .stats-cards-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+}
+
+/* The numbers that used to be cards of their own */
+.stats-summary {
+  margin: 0 0 var(--space-6) 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
 }
 
 /* Stats Section */
@@ -97,67 +112,58 @@
   margin-bottom: 1.5rem;
 }
 
-/* Top Lists Row */
-.stats-top-lists-row {
+/* The year's calendar beside this day in past years, where both fit */
+.stats-activity-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
 }
 
-/* Charts Row */
-.stats-charts-row {
-  display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(400px, 2fr);
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+/* Timeline over calendar in one column */
+.stats-activity-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
 }
 
-@media (max-width: 900px) {
-  .stats-charts-row {
-    grid-template-columns: 1fr;
+@container stats-page (min-width: 1150px) {
+  .stats-activity-row {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 0.75fr);
+    align-items: start;
   }
 }
 
-/* Music DNA section layout */
-.music-dna-section {
-  margin-top: 1.5rem;
+/* Phone: four compact cards in two columns */
+@container stats-page (max-width: 519px) {
+  .stats-cards-row .stat-card,
+  .stats-cards-row .streak-card {
+    padding: var(--space-3);
+  }
+
+  .stats-cards-row .stat-card-icon,
+  .stats-cards-row .streak-card-icon,
+  .stats-cards-row .streak-card-description {
+    display: none;
+  }
+
+  .stats-cards-row .stat-card-value,
+  .stats-cards-row .streak-card-value {
+    font-size: var(--text-2xl);
+  }
+
+  /* In the flow, under the label, instead of on top of it */
+  .stats-cards-row .period-stat-card-selector {
+    position: static;
+    align-self: flex-start;
+    order: 1;
+  }
 }
 
-.music-dna-section h2 {
-  margin: 0 0 1rem 0;
-  font-size: var(--text-xl);
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-/* Note under the top lists about plays without album info */
-.stats-unresolved-note {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  margin: calc(-1 * var(--space-3)) 0 var(--space-6) 0;
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
-.stats-unresolved-note-link {
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--text-accent);
-  font-size: var(--text-sm);
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.stats-unresolved-note-link:hover {
-  color: var(--accent-primary-hover);
-}
-
-.stats-unresolved-note-link:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
+/* Phone: less padding around the page, more room for the lists */
+@media (max-width: 520px) {
+  .stats-page {
+    padding: var(--space-4) var(--space-3);
+  }
 }

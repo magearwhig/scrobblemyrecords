@@ -71,7 +71,10 @@ describe('GenreTreemap', () => {
 
     // Assert
     expect(
-      screen.getByText(/Genre distribution based on your top 30 artists/)
+      // 30 is how many of the most played artists had tags, not "top 30"
+      screen.getByText(
+        'Genre share from the Last.fm tags of 30 of your most played artists.'
+      )
     ).toBeInTheDocument();
   });
 

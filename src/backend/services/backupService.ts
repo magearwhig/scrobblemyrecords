@@ -85,6 +85,11 @@ import { atomicWriteFile } from '../utils/atomicWrite';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
+import {
+  AlbumLabelOverride,
+  AlbumLabelOverridesStore,
+} from './albumLabelService';
+
 const logger = createLogger('BackupService');
 
 // File paths for backup data
@@ -121,6 +126,7 @@ const FILE_PATHS = {
   crates: 'collections/crates.json',
   crateSuggestions: 'collections/crate-suggestions.json',
   artistFilingOverrides: 'mappings/artist-filing-overrides.json',
+  albumLabelOverrides: 'mappings/album-label-overrides.json',
   backupSettings: 'settings/backup-settings.json',
 } as const;
 
@@ -641,6 +647,14 @@ export class BackupService {
     return store?.overrides ?? [];
   }
 
+  /** Labels you set for albums you don't own */
+  private async loadAlbumLabelOverrides(): Promise<AlbumLabelOverride[]> {
+    const store = await this.fileStorage.readJSON<AlbumLabelOverridesStore>(
+      FILE_PATHS.albumLabelOverrides
+    );
+    return Array.isArray(store?.overrides) ? store.overrides : [];
+  }
+
   private async loadCrates(): Promise<Crate[]> {
     const store = await this.fileStorage.readJSON<CratesStore>(
       FILE_PATHS.crates
@@ -725,12 +739,14 @@ export class BackupService {
       wishlistPriceAlerts,
       wishlistPriorities,
       artistFilingOverrides,
+      albumLabelOverrides,
     ] = await Promise.all([
       this.loadCrates(),
       this.loadCrateSuggestions(),
       this.loadWishlistPriceAlerts(),
       this.loadWishlistPriorities(),
       this.loadArtistFilingOverrides(),
+      this.loadAlbumLabelOverrides(),
     ]);
 
     return {
@@ -766,6 +782,7 @@ export class BackupService {
       wishlistPriceAlertsCount: Object.keys(wishlistPriceAlerts).length,
       wishlistPrioritiesCount: wishlistPriorities?.length ?? 0,
       artistFilingOverridesCount: artistFilingOverrides.length,
+      albumLabelOverridesCount: albumLabelOverrides.length,
     };
   }
 
@@ -848,6 +865,7 @@ export class BackupService {
     const crates = await this.loadCrates();
     const crateSuggestions = await this.loadCrateSuggestions();
     const artistFilingOverrides = await this.loadArtistFilingOverrides();
+    const albumLabelOverrides = await this.loadAlbumLabelOverrides();
 
     // Build backup data
     let backupData: BackupData = {
@@ -883,6 +901,7 @@ export class BackupService {
       crates,
       crateSuggestions,
       artistFilingOverrides,
+      albumLabelOverrides,
     };
 
     // Encrypt credentials if included
@@ -1003,6 +1022,7 @@ export class BackupService {
       currentCrates,
       currentCrateSuggestions,
       currentArtistFilingOverrides,
+      currentAlbumLabelOverrides,
     ] = await Promise.all([
       this.loadAlbumMappings(),
       this.loadArtistMappings(),
@@ -1024,6 +1044,7 @@ export class BackupService {
       this.loadCrates(),
       this.loadCrateSuggestions(),
       this.loadArtistFilingOverrides(),
+      this.loadAlbumLabelOverrides(),
     ]);
 
     // Calculate summary
@@ -1133,6 +1154,11 @@ export class BackupService {
         currentArtistFilingOverrides,
         (o: ArtistFilingOverride) => o.key
       ),
+      albumLabelOverrides: this.compareMappings(
+        backup.data.albumLabelOverrides ?? [],
+        currentAlbumLabelOverrides,
+        (o: AlbumLabelOverride) => o.key
+      ),
       settingsWillMerge: true,
     };
 
@@ -1169,6 +1195,7 @@ export class BackupService {
       crates: { new: 0, existing: 0 },
       crateSuggestions: { new: 0, existing: 0 },
       artistFilingOverrides: { new: 0, existing: 0 },
+      albumLabelOverrides: { new: 0, existing: 0 },
       settingsWillMerge: false,
     };
   }
@@ -1868,6 +1895,33 @@ export class BackupService {
       } catch (e) {
         errors.push(
           `Artist filing overrides: ${e instanceof Error ? e.message : e}`
+        );
+      }
+    }
+
+    // Import labels you set for albums ({ schemaVersion, overrides })
+    if (data.albumLabelOverrides) {
+      try {
+        if (!merge && data.albumLabelOverrides.length === 0) {
+          // mergeAndSave skips empty lists; a replace still clears them
+          await this.fileStorage.writeJSONWithBackup(
+            FILE_PATHS.albumLabelOverrides,
+            { schemaVersion: 1, overrides: [] }
+          );
+        }
+        const result = await this.mergeAndSave(
+          FILE_PATHS.albumLabelOverrides,
+          data.albumLabelOverrides,
+          (o: AlbumLabelOverride) => o.key,
+          'overrides',
+          merge,
+          (a, b) => (a.setAt > b.setAt ? a : b)
+        );
+        added += result.added;
+        updated += result.updated;
+      } catch (e) {
+        errors.push(
+          `Album label overrides: ${e instanceof Error ? e.message : e}`
         );
       }
     }

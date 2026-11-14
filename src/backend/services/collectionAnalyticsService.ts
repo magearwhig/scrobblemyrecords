@@ -19,6 +19,7 @@ import {
   ValueScanStatus,
   YearBucket,
 } from '../../shared/types';
+import { labelKey } from '../../shared/utils/labels';
 import { getAllCachedCollectionItems } from '../utils/collectionCache';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
@@ -45,19 +46,6 @@ const FORMAT_CATEGORIES: Record<string, string> = {
   Cassette: 'Cassette',
   File: 'Digital',
 };
-
-const LABEL_SUFFIX_PATTERN =
-  /\s*(Ltd\.?|Inc\.?|Records|Recordings|Music|Rec\.?|Co\.?|Entertainment|Group)\s*$/i;
-
-/** Grouping key for a label, so "Sub Pop" and "Sub Pop Records" count once */
-function labelKey(rawLabel: string): string {
-  const trimmed = rawLabel.trim();
-  const normalized = trimmed
-    .replace(LABEL_SUFFIX_PATTERN, '')
-    .trim()
-    .toLowerCase();
-  return normalized || trimmed.toLowerCase();
-}
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 

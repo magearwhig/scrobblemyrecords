@@ -1,0 +1,107 @@
+/* Stats page rankings: one period control, four lists */
+.stats-rankings {
+  container: stats-rankings / inline-size;
+  margin-bottom: var(--space-6);
+}
+
+.stats-rankings-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.stats-rankings-header h2 {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.stats-rankings-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* The list picker is only for narrow screens, where one list shows */
+.stats-rankings-subject {
+  display: none;
+}
+
+.stats-rankings-subject select {
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+}
+
+/* Two lists per row: wide enough that names fit beside the Owned badges */
+.stats-rankings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+@container stats-rankings (max-width: 699px) {
+  .stats-rankings-subject {
+    display: block;
+  }
+
+  .stats-rankings-list:not(.stats-rankings-list--active) {
+    display: none;
+  }
+}
+
+/* Note about plays without album info */
+.stats-unresolved-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3) 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.stats-unresolved-note-link,
+.stats-rankings-over-time-toggle {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-accent);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.stats-unresolved-note-link {
+  text-decoration: underline;
+}
+
+.stats-rankings-over-time-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.stats-rankings-over-time-toggle:hover {
+  text-decoration: underline;
+}
+
+.stats-unresolved-note-link:hover {
+  color: var(--accent-primary-hover);
+}
+
+.stats-unresolved-note-link:focus-visible,
+.stats-rankings-over-time-toggle:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}

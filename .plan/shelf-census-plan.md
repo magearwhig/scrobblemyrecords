@@ -11,6 +11,7 @@ Builds on [done/record-store-filing-plan.md](done/record-store-filing-plan.md) (
 | Phase | Status | Notes |
 |-------|--------|-------|
 | Phase 0: Stable copy identity (Discogs `instance_id`) in the collection cache | Not started | Needed so a copy's census result survives changes to the collection |
+| Phase 0b: Pressing details (cat#, country, format descriptions, barcode, runout) in the release cache | Not started | Needed for the right-pressing check (section 3b) |
 | Phase 1: Census store, service, routes, backup | Not started | |
 | Phase 2: Census page (walk the shelf in filing order) | Not started | |
 | Phase 3: Results report and "last seen" | Not started | |
@@ -26,16 +27,20 @@ shelf** (the record-store filing used by the Pocket List). Each copy gets one of
 - **Here**
 - **Missing**: not on the shelf
 - **Misfiled**: found, but in the wrong place (optional note: "found under T")
+- **Wrong pressing**: on the shelf, but the copy in hand isn't the release Discogs has
+  marked (a different reissue, colour, country or label). Each row shows the details that
+  tell pressings apart, so this is checked as you go (section 3b)
 
 You can also note records on the shelf that aren't in your Discogs collection.
 
 A census can cover the whole collection or one section ("A", "B–C", "Various",
 "Soundtracks"), and it can be paused and resumed. At the end, the report lists missing
-copies, misfiled ones, records not in Discogs, and copies the Discard Pile says are gone but
+copies, misfiled ones, copies marked as the wrong pressing in Discogs, records not in Discogs, and copies the Discard Pile says are gone but
 Discogs still lists. Every copy keeps a "last seen on the shelf" date.
 
-The owner uses the app on a computer, not a phone (see R8 in the round-2 review), so the page
-is built for keyboard use at a laptop by the shelf, with one key per answer.
+The app works from a phone on the home network since 2026-11-09 (PR #28), so the page is
+built for both: a phone in hand at the shelf (large tap targets, swipe-free, one tap per
+answer, the pressing line readable at phone width) and a laptop with one key per answer.
 
 ---
 
@@ -114,6 +119,89 @@ Out of scope:
 
 Tests: mapping copies `instance_id`/`folder_id`; rows carry `instanceId`; old cache items
 without it give `null`.
+
+---
+
+## 3b. Right pressing: is the Discogs release the copy in hand?
+
+The owner wants the census to confirm not just that a record is there, but that Discogs
+has **the right release** marked: the pressing actually on the shelf, not another
+reissue, colour, country or label of the same album.
+
+### What's cached today (checked 2026-11-13 on real data)
+- Collection cache items carry only `id`, `master_id`, `title`, `artist`, `year`,
+  `format` (names only, e.g. `["Vinyl"]`), `label` (names only) and `cover_image`.
+- The release cache (`data/collections/release-{id}.json`, 1,215 files) adds `genres`,
+  `styles` and `tracklist`. It drops the label `catno`, `country`, format `descriptions`
+  and `text` (e.g. "LP, Album, Reissue", "Dapple Glow"), `identifiers` (barcode,
+  matrix/runout) and `notes`.
+- So today the app can't show anything that tells two pressings apart.
+
+### Phase 0b: keep the pressing details
+1. In `getReleaseDetails` (`discogsService.ts`), also keep `country`, `released`,
+   `labels: { name, catno }[]`, `formats: { name, qty, descriptions, text }[]`,
+   `identifiers: { type, value, description }[]` (Barcode, Matrix / Runout only, to keep
+   files small) and the release `uri` (the discogs.com link).
+2. Cached files without these fields are re-fetched lazily, the same way
+   `needsTracklistRefetch` works today, one per second. A census section loads its
+   pressing details up front, with progress ("Loading pressing details, 40 of 84"), and
+   later sections are fetched in the background while the owner walks the current one.
+3. Discogs basic_information in the collection response already includes `labels[].catno`
+   and `formats[].descriptions`/`text`. Keep those in the collection cache too (Phase 0
+   mapping change), so the walk list can show cat# and colour even before the full
+   release is fetched.
+
+### On the walk screen
+- Each row shows the **pressing line**: label and cat#, country, year, format descriptions
+  and free text (colour, edition), e.g. "Waterlines WL007 · US · 2026 · LP, Album,
+  Limited Edition · Dapple Glow". An expander shows barcode and runout(s) for when the
+  quick details aren't enough.
+- Keys: **H** here (pressing matches), **W** here but **wrong pressing**, **?** here but
+  pressing **not checked** (for when the owner only wants presence this time).
+- The start screen has a "Check pressings" toggle (default on). Off means **H** records
+  presence only, for a quick pass.
+- **W** opens a small form: an optional Discogs release link or id for the copy actually
+  in hand, and a note ("blue vinyl, not black"). If the owner pastes a link, the app
+  fetches that release and shows its pressing line next to the marked one, so the
+  difference is visible. A "Find it on Discogs" link opens the master's versions page
+  (`/master/{master_id}`), filtered to the format, to pick the right one.
+
+### Types (additions to section 4.2)
+```typescript
+export type CensusAnswer = 'here' | 'missing' | 'misfiled' | 'wrong-pressing';
+
+// On CensusEntry:
+pressing?: 'confirmed' | 'wrong' | 'unchecked';
+/** Release the copy in hand actually is, when the owner gave one */
+actualReleaseId?: number;
+
+// On ShelfCensusStore:
+/** Last time each copy's pressing was confirmed to match Discogs */
+pressingConfirmed: Record<string, number>; // instanceId -> ms
+```
+Misfiled copies can also carry `pressing`, since a misfiled copy can be the wrong pressing
+too.
+
+### Report (additions to section 6)
+- **Wrong pressing in Discogs**: each copy with the marked release's pressing line, the
+  actual one (if given) and steps: add the right release to the Discogs collection, then
+  remove the wrong copy. Links to both releases. The app still doesn't edit Discogs.
+- **Pressing never confirmed**: count per section, so a later census can do only those
+  ("Start a pressing check for these 31").
+
+### Moving app data to the corrected release
+Several stores key a collection copy by release id, so swapping the Discogs release
+leaves them pointing at the old id: album mappings (`collectionId`), crates, the Discard
+Pile, track splits remembered per release, hidden releases, filing overrides and
+embeddings (verify the full list against `grep -rn "collectionId\|releaseId"
+src/backend/services` before building).
+- After the next collection reload, the census service notices a wrong-pressing copy whose
+  old release has left the collection and whose `actualReleaseId` (or a new copy of the
+  same master) has arrived. It offers **"Move your mappings and crates to the new
+  pressing"** with a list of what will move. Nothing moves without the owner's OK.
+- The move goes through each owning service (no direct file edits), with a backup first.
+- Tests: detection with and without `actualReleaseId`, with two copies of one master,
+  and that declining leaves everything as it was.
 
 ---
 
@@ -240,6 +328,8 @@ Browse Collection ("Shelf census") and the Pocket List card.
   Elliott"), like the Pocket List. Each row: cover thumbnail, artist, title, year, format and
   label line (enough to tell pressings apart), copy number when there are two ("copy 2 of
   2, added 2024"), and three buttons: Here, Missing, Misfiled.
+- Phone: each row's answer buttons are full-width tap targets (at least 44px), and the
+  current row scrolls into view after each answer.
 - Keyboard: the current row is highlighted; **H** here, **M** missing, **F** misfiled
   (opens the note field), **↑/↓** move, **U** undo the last answer, **N** add a record not
   in Discogs. Answering moves to the next row. Keys are listed in a small help line.
@@ -291,12 +381,15 @@ sort/filter on Browse Collection later (not in this plan).
 
 ## 8. Questions for the owner (defaults used if unanswered)
 
-- **Q1. How do you want to walk it?** Default: laptop by the shelf with keyboard keys. A
-  printable checklist from the Pocket List with a quick "enter what was missing" screen
-  afterwards is the alternative, if the laptop can't sit near the shelves.
+- **Q1. How do you want to walk it?** Default: phone in hand at the shelf, with keyboard
+  keys also working on a laptop. Checking the pressing means reading cat# and runout off
+  the record, which is easier with the phone next to it.
 - **Q2. Misfiled: worth a separate answer?** Default: yes, since the filing rules are the
   app's own and a misfiled copy may mean the rule is wrong (fix it in Settings → filing
   overrides).
 - **Q3. Unanswered copies at finish:** Default: left as unanswered, not counted missing.
 - **Q4. CDs and the cassette:** Default: their own census by format, since they're shelved
   apart from the vinyl.
+- **Q5. Pressing check every census, or once per copy?** Default: on for copies never
+  confirmed, off for copies already confirmed (they keep their date). The owner can turn it
+  on for everything from the start screen.

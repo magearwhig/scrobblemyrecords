@@ -2864,17 +2864,19 @@ button.mapping-result-item:disabled {
 }
 
 /* ==========================================================================
-   Artist Link, Track Link & Album Link
+   Artist Link, Track Link, Album Link & Label Link
    ========================================================================== */
 
-.artist-link {
+.artist-link,
+.label-link {
   color: var(--accent-color);
   cursor: pointer;
   text-decoration: none;
   transition: color 0.15s ease;
 }
 
-.artist-link:hover {
+.artist-link:hover,
+.label-link:hover {
   color: var(--accent-hover);
   text-decoration: underline;
 }
@@ -2972,7 +2974,8 @@ button.mapping-result-item:disabled {
 .detail-page-external-link-btn:focus-visible,
 .artist-link:focus-visible,
 .track-link:focus-visible,
-.album-link:focus-visible {
+.album-link:focus-visible,
+.label-link:focus-visible {
   outline: 2px solid var(--accent-color);
   outline-offset: 2px;
 }

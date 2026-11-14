@@ -155,8 +155,8 @@ export const GenreTreemap: React.FC<GenreTreemapProps> = ({
       <div className='genre-treemap-header'>
         <h3>Your Music DNA</h3>
         <p className='genre-treemap-description'>
-          Genre distribution based on your top {totalArtists} artists' Last.fm
-          tags.
+          Genre share from the Last.fm tags of {totalArtists} of your most
+          played artists.
         </p>
       </div>
       <div className='genre-treemap-chart' role='img' aria-label={srText}>

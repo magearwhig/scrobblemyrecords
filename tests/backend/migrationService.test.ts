@@ -72,6 +72,12 @@ describe('MigrationService', () => {
       expect(files).toContain('user-settings');
     });
 
+    it('registers the album label overrides and lookup cache', () => {
+      const files = migrationService.getRegisteredFiles();
+      expect(files).toContain('album-label-overrides');
+      expect(files).toContain('album-label-cache');
+    });
+
     it('registers the crates file as optional', () => {
       expect(migrationService.getRegisteredFiles()).toContain('crates');
     });

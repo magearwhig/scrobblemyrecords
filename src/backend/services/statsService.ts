@@ -9,6 +9,8 @@ import {
   AlbumMapping,
   AlbumPlayCount,
   ArtistDetailResponse,
+  LabelDetailResponse,
+  LabelPlayCount,
   ArtistPlayCount,
   CalendarHeatmapData,
   CollectionCoverage,
@@ -38,10 +40,18 @@ import {
 import {
   albumNameKey,
   createAlbumCanonicalizer,
+  AlbumName,
+  createAlbumGroupNameResolver,
   createCollectionNameResolver,
   isCollectionLinked,
+  stripDiscogsSuffixes,
 } from '../../shared/utils/albumMapping';
 import { toDisplayName } from '../../shared/utils/displayName';
+import {
+  isPlaceholderLabel,
+  labelDisplayName,
+  labelKey,
+} from '../../shared/utils/labels';
 import {
   createNormalizedTrackKey,
   TrackSpellings,
@@ -57,6 +67,7 @@ import {
 } from '../utils/historyPlays';
 import { createLogger } from '../utils/logger';
 
+import { AlbumLabelCandidate, AlbumLabelService } from './albumLabelService';
 import { artistMappingService } from './artistMappingService';
 import { ArtistNameResolver } from './artistNameResolver';
 import { CompoundArtistMappingServiceLike } from './compoundArtistMappingService';
@@ -165,6 +176,7 @@ export class StatsService {
   private trackMappingService: TrackMappingService | null = null;
   private mappingService: MappingService | null = null;
   private artistNameResolver: ArtistNameResolver | null = null;
+  private albumLabelService: Pick<AlbumLabelService, 'getAll'> | null = null;
   private compoundArtistMappingService: CompoundArtistMappingServiceLike | null =
     null;
   private logger = createLogger('StatsService');
@@ -2289,22 +2301,7 @@ export class StatsService {
         }
 
         // Play trend aggregation
-        const playDate = new Date(play.timestamp * 1000);
-        let periodKey: string;
-        if (trendPeriod === 'month') {
-          periodKey = `${playDate.getFullYear()}-${String(playDate.getMonth() + 1).padStart(2, '0')}`;
-        } else {
-          // Week: use ISO week format YYYY-Www based on Monday start
-          const weekStartDate = this.getStartOfWeek(playDate);
-          const year = weekStartDate.getFullYear();
-          // Calculate ISO week number
-          const jan1 = new Date(year, 0, 1);
-          const daysSinceJan1 = Math.floor(
-            (weekStartDate.getTime() - jan1.getTime()) / (24 * 60 * 60 * 1000)
-          );
-          const weekNum = Math.ceil((daysSinceJan1 + jan1.getDay() + 1) / 7);
-          periodKey = `${year}-W${String(weekNum).padStart(2, '0')}`;
-        }
+        const periodKey = this.trendPeriodKey(play.timestamp, trendPeriod);
         trendCounts.set(periodKey, (trendCounts.get(periodKey) || 0) + 1);
       }
     }
@@ -2376,6 +2373,681 @@ export class StatsService {
       playTrend,
       topTracks,
       albums,
+    };
+  }
+
+  /** Optional: labels looked up for albums you don't own */
+  setAlbumLabelService(service: Pick<AlbumLabelService, 'getAll'>): void {
+    this.albumLabelService = service;
+  }
+
+  /**
+   * Match every owned album to the history albums its plays are under. Copies
+   * of one album (same master, or same artist and title) form one group.
+   * Explicit album mappings claim history first, so an automatic match on
+   * another copy can't take plays the owner mapped elsewhere; each history
+   * album goes to one group at most.
+   */
+  private async matchCollectionToHistory(collection: CollectionItem[]) {
+    type OwnedGroup = {
+      artist: string;
+      album: string;
+      items: CollectionItem[];
+    };
+    const groups: OwnedGroup[] = [];
+    const groupByKey = new Map<string, OwnedGroup>();
+    for (const item of collection) {
+      const artist = stripDiscogsSuffixes(item.release.artist);
+      const keys = [
+        this.historyStorage.fuzzyNormalizeKey(artist, item.release.title),
+        ...(item.release.master_id ? [`master:${item.release.master_id}`] : []),
+      ];
+      let group = keys
+        .map(k => groupByKey.get(k))
+        .find((g): g is OwnedGroup => g !== undefined);
+      if (group) {
+        group.items.push(item);
+      } else {
+        group = { artist, album: item.release.title, items: [item] };
+        groups.push(group);
+      }
+      for (const k of keys) groupByKey.set(k, group);
+    }
+
+    const index = await this.historyStorage.getIndex();
+    const albums = index?.albums ?? {};
+
+    // History albums by fuzzy key, also under the resolved artist so an alias
+    // spelling of the artist still matches
+    const byFuzzyKey = new Map<string, string[]>();
+    const addFuzzy = (fuzzy: string, historyKey: string) => {
+      const keys = byFuzzyKey.get(fuzzy) ?? [];
+      if (!keys.includes(historyKey)) keys.push(historyKey);
+      byFuzzyKey.set(fuzzy, keys);
+    };
+    for (const historyKey of Object.keys(albums)) {
+      const artist = artistFromAlbumKey(historyKey);
+      const album = albumFromAlbumKey(historyKey);
+      addFuzzy(
+        this.historyStorage.fuzzyNormalizeKey(artist, album),
+        historyKey
+      );
+      if (this.artistNameResolver) {
+        addFuzzy(
+          this.historyStorage.fuzzyNormalizeKey(
+            this.resolveArtistName(artist),
+            album
+          ),
+          historyKey
+        );
+      }
+    }
+
+    const mappings = await loadAlbumMappings(this.mappingService);
+    const resolveArtist = this.artistNameResolver
+      ? (name: string) => this.resolveArtistName(name)
+      : undefined;
+    const canonicalize = createAlbumCanonicalizer(mappings, resolveArtist);
+    const groupNamesFor = createAlbumGroupNameResolver(mappings, resolveArtist);
+    const historyKeysFor = (artist: string, album: string): string[] => {
+      const exact = this.historyStorage.normalizeKey(artist, album);
+      const found = new Set<string>();
+      if (albums[exact]) found.add(exact);
+      const fuzzyKeys = [this.historyStorage.fuzzyNormalizeKey(artist, album)];
+      if (this.artistNameResolver) {
+        fuzzyKeys.push(
+          this.historyStorage.fuzzyNormalizeKey(
+            this.resolveArtistName(artist),
+            album
+          )
+        );
+      }
+      for (const fuzzy of fuzzyKeys) {
+        for (const historyKey of byFuzzyKey.get(fuzzy) ?? []) {
+          found.add(historyKey);
+        }
+      }
+      return Array.from(found);
+    };
+
+    const explicitNames = new Map<OwnedGroup, AlbumName[]>();
+    const ownNames = new Map<OwnedGroup, AlbumName[]>();
+    for (const group of groups) {
+      const explicit: AlbumName[] = [];
+      const own: AlbumName[] = [];
+      for (const copy of group.items) {
+        const artist = copy.release.artist;
+        const title = copy.release.title;
+        const { key: canonicalKey } = canonicalize(artist, title);
+        for (const name of groupNamesFor([{ artist, title }], canonicalKey)) {
+          const isOwnName =
+            albumNameKey(name.artist, name.album) ===
+            albumNameKey(artist, title);
+          (isOwnName ? own : explicit).push(name);
+        }
+        for (const mapping of mappings) {
+          if (isCollectionLinked(mapping) && mapping.collectionId === copy.id) {
+            explicit.push({
+              artist: mapping.historyArtist,
+              album: mapping.historyAlbum,
+            });
+          }
+        }
+        // Discogs suffixes on each artist of a collaboration ("A (2), B (3)")
+        own.push({ artist: stripDiscogsSuffixes(artist), album: title });
+      }
+      explicitNames.set(group, explicit);
+      ownNames.set(group, own);
+    }
+
+    const claimed = new Set<string>();
+    const historyKeysByGroup = new Map<OwnedGroup, string[]>(
+      groups.map(group => [group, []])
+    );
+    for (const namesByGroup of [explicitNames, ownNames]) {
+      for (const group of groups) {
+        for (const name of namesByGroup.get(group) ?? []) {
+          for (const historyKey of historyKeysFor(name.artist, name.album)) {
+            if (claimed.has(historyKey)) continue;
+            claimed.add(historyKey);
+            historyKeysByGroup.get(group)!.push(historyKey);
+          }
+        }
+      }
+    }
+
+    /** History albums no owned copy claimed, merged by album mappings */
+    const unowned = new Map<
+      string,
+      { artist: string; album: string; historyKeys: string[] }
+    >();
+    for (const historyKey of Object.keys(albums)) {
+      if (claimed.has(historyKey)) continue;
+      const canonical = canonicalize(
+        artistFromAlbumKey(historyKey),
+        albumFromAlbumKey(historyKey)
+      );
+      // Album key: album mappings, artist aliases and spelling differences
+      // give the same key
+      const key = canonical.key;
+      const entry = unowned.get(key) ?? {
+        artist: canonical.artist.toLowerCase().trim(),
+        album: canonical.album.toLowerCase().trim(),
+        historyKeys: [],
+      };
+      entry.historyKeys.push(historyKey);
+      unowned.set(key, entry);
+    }
+
+    return { albums, groups, historyKeysByGroup, unowned };
+  }
+
+  /**
+   * The album key label lookups are stored under: the album grouping key
+   * after album mappings and artist aliases, so an album page (display
+   * names) and the label pages (history names) agree.
+   */
+  async albumLabelKey(artist: string, album: string): Promise<string> {
+    const resolveArtist = this.artistNameResolver
+      ? (name: string) => this.resolveArtistName(name)
+      : undefined;
+    return createAlbumCanonicalizer(
+      await loadAlbumMappings(this.mappingService),
+      resolveArtist
+    )(artist, album).key;
+  }
+
+  /**
+   * Albums you don't own with at least `minPlays` plays: the ones whose label
+   * is looked up in the background. Keyed (artist, album) the way
+   * AlbumLabelService stores lookups.
+   */
+  async getAlbumLabelCandidates(
+    collection: CollectionItem[],
+    minPlays = 3
+  ): Promise<AlbumLabelCandidate[]> {
+    const { albums, unowned } = await this.matchCollectionToHistory(collection);
+    const candidates: AlbumLabelCandidate[] = [];
+    for (const [key, entry] of unowned) {
+      let playCount = 0;
+      let lastPlayed = 0;
+      let mbid: string | undefined;
+      let mbidPlayed = -1;
+      for (const historyKey of entry.historyKeys) {
+        const history = albums[historyKey];
+        playCount += history.playCount;
+        lastPlayed = Math.max(lastPlayed, history.lastPlayed);
+        if (history.mbid && history.lastPlayed > mbidPlayed) {
+          mbid = history.mbid;
+          mbidPlayed = history.lastPlayed;
+        }
+      }
+      if (playCount < minPlays) continue;
+      const candidate: AlbumLabelCandidate = {
+        key,
+        artist: entry.artist,
+        album: entry.album,
+        playCount,
+        lastPlayed,
+      };
+      if (mbid) candidate.mbid = mbid;
+      candidates.push(candidate);
+    }
+    return candidates.sort((a, b) => b.lastPlayed - a.lastPlayed);
+  }
+
+  /**
+   * The most played labels in a period. Counts the same way as the label
+   * page: an owned album counts to the labels of the copies you own, an album
+   * you don't own to its found or owner-set label (unless `includeUnowned` is
+   * false), a release on two labels to both, and a play once per label.
+   * Placeholder labels ("Not On Label") are left out.
+   */
+  async getTopLabels(
+    period:
+      | 'week'
+      | 'month'
+      | 'year'
+      | 'all'
+      | 'days30'
+      | 'days90'
+      | 'days365'
+      | 'custom',
+    limit: number,
+    collection: CollectionItem[],
+    options: {
+      startDate?: number;
+      endDate?: number;
+      includeUnowned?: boolean;
+    } = {}
+  ): Promise<LabelPlayCount[]> {
+    const custom =
+      period === 'custom' &&
+      options.startDate !== undefined &&
+      options.endDate !== undefined;
+    const start = custom ? options.startDate! : this.getPeriodCutoff(period);
+    const end = custom ? options.endDate! : Date.now() / 1000;
+
+    const { albums, groups, historyKeysByGroup, unowned } =
+      await this.matchCollectionToHistory(collection);
+
+    type Tally = {
+      ownedSpellings: Map<string, number>;
+      lookedUpSpellings: Map<string, number>;
+      plays: Set<string>;
+      ownedPlays: number;
+      albumCount: number;
+      lastPlayed: number;
+      cover?: { url: string; plays: number };
+    };
+    const tallies = new Map<string, Tally>();
+    const tallyFor = (key: string): Tally => {
+      let tally = tallies.get(key);
+      if (!tally) {
+        tally = {
+          ownedSpellings: new Map(),
+          lookedUpSpellings: new Map(),
+          plays: new Set(),
+          ownedPlays: 0,
+          albumCount: 0,
+          lastPlayed: 0,
+        };
+        tallies.set(key, tally);
+      }
+      return tally;
+    };
+    const addSpelling = (spellings: Map<string, number>, raw: string) => {
+      const name = labelDisplayName(raw);
+      spellings.set(name, (spellings.get(name) ?? 0) + 1);
+    };
+
+    /** Plays of these history albums in the period, with their identity */
+    const playsInPeriod = (historyKeys: string[]) => {
+      const found: Array<{ identity: string; timestamp: number }> = [];
+      for (const historyKey of historyKeys) {
+        const resolvedArtist = this.resolveArtistName(
+          artistFromAlbumKey(historyKey)
+        );
+        for (const play of albums[historyKey].plays) {
+          if (play.timestamp < start || play.timestamp > end) continue;
+          found.push({
+            identity: JSON.stringify([
+              resolvedArtist,
+              play.timestamp,
+              (play.track ?? '').toLowerCase().trim(),
+            ]),
+            timestamp: play.timestamp,
+          });
+        }
+      }
+      return found;
+    };
+
+    const credit = (
+      key: string,
+      found: Array<{ identity: string; timestamp: number }>,
+      owned: boolean,
+      coverUrl?: string
+    ) => {
+      const tally = tallyFor(key);
+      let counted = 0;
+      for (const { identity, timestamp } of found) {
+        if (tally.plays.has(identity)) continue;
+        tally.plays.add(identity);
+        counted++;
+        if (owned) tally.ownedPlays++;
+        tally.lastPlayed = Math.max(tally.lastPlayed, timestamp);
+      }
+      if (counted === 0) return;
+      tally.albumCount++;
+      if (coverUrl && (!tally.cover || counted > tally.cover.plays)) {
+        tally.cover = { url: coverUrl, plays: counted };
+      }
+    };
+
+    // Owned albums count to the labels of the copies you own
+    for (const group of groups) {
+      const found = playsInPeriod(historyKeysByGroup.get(group) ?? []);
+      const copiesByLabel = new Map<string, CollectionItem[]>();
+      for (const copy of group.items) {
+        for (const raw of copy.release.label ?? []) {
+          if (isPlaceholderLabel(raw)) continue;
+          const key = labelKey(raw);
+          addSpelling(tallyFor(key).ownedSpellings, raw);
+          const copies = copiesByLabel.get(key) ?? [];
+          if (!copies.includes(copy)) copies.push(copy);
+          copiesByLabel.set(key, copies);
+        }
+      }
+      for (const [key, copies] of copiesByLabel) {
+        credit(key, found, true, copies[0].release.cover_image);
+      }
+    }
+
+    // Albums you don't own, by their found or owner-set label
+    if ((options.includeUnowned ?? true) && this.albumLabelService) {
+      const lookups = await this.albumLabelService.getAll();
+      for (const [albumKey, entry] of unowned) {
+        const info = lookups.get(albumKey);
+        if (!info || (info.status !== 'found' && info.status !== 'override')) {
+          continue;
+        }
+        const keys = new Set<string>();
+        for (const raw of info.labels) {
+          if (isPlaceholderLabel(raw)) continue;
+          const key = labelKey(raw);
+          addSpelling(tallyFor(key).lookedUpSpellings, raw);
+          keys.add(key);
+        }
+        if (keys.size === 0) continue;
+        const found = playsInPeriod(entry.historyKeys);
+        for (const key of keys) credit(key, found, false);
+      }
+    }
+
+    const commonest = (spellings: Map<string, number>) =>
+      Array.from(spellings.entries()).sort(
+        (a, b) => b[1] - a[1] || a[0].localeCompare(b[0])
+      )[0]?.[0];
+
+    return Array.from(tallies.entries())
+      .filter(([, tally]) => tally.plays.size > 0)
+      .map(([key, tally]) => {
+        const row: LabelPlayCount = {
+          label:
+            commonest(tally.ownedSpellings) ??
+            commonest(tally.lookedUpSpellings) ??
+            key,
+          labelKey: key,
+          playCount: tally.plays.size,
+          ownedPlayCount: tally.ownedPlays,
+          albumCount: tally.albumCount,
+          lastPlayed: tally.lastPlayed,
+        };
+        if (tally.cover) row.coverUrl = tally.cover.url;
+        return row;
+      })
+      .sort(
+        (a, b) => b.playCount - a.playCount || a.label.localeCompare(b.label)
+      )
+      .slice(0, limit);
+  }
+
+  /**
+   * Listening stats for one label. Plays of an owned album count to the
+   * labels of that copy (a reissue counts to its reissue label). With
+   * `includeUnowned` (the default), albums you don't own count too, using the
+   * label looked up for them (or set by you); unsure lookups don't count.
+   * Returns null for a placeholder label ("Not On Label") or one with no
+   * owned copies and no looked-up albums.
+   */
+  async getLabelDetail(
+    labelName: string,
+    trendPeriod: 'month' | 'week' = 'month',
+    collection: CollectionItem[],
+    options: { includeUnowned?: boolean } = {}
+  ): Promise<LabelDetailResponse | null> {
+    if (isPlaceholderLabel(labelName)) return null;
+    const key = labelKey(labelName);
+    const includeUnowned = options.includeUnowned ?? true;
+    const onLabel = (raw: string) =>
+      !isPlaceholderLabel(raw) && labelKey(raw) === key;
+
+    const { albums, groups, historyKeysByGroup, unowned } =
+      await this.matchCollectionToHistory(collection);
+
+    type Unit = {
+      artist: string;
+      album: string;
+      owned: boolean;
+      source: LabelDetailResponse['topAlbums'][number]['source'];
+      coverUrl?: string;
+      copies: CollectionItem[];
+      historyKeys: string[];
+    };
+    const units: Unit[] = [];
+    const spellings = new Map<string, number>();
+    const countSpelling = (raw: string) => {
+      const name = labelDisplayName(raw);
+      spellings.set(name, (spellings.get(name) ?? 0) + 1);
+    };
+
+    // Owned albums on this label: the copies on it, and the group's plays
+    let ownedCopyCount = 0;
+    for (const group of groups) {
+      const copies = group.items.filter(copy =>
+        (copy.release.label ?? []).some(onLabel)
+      );
+      if (copies.length === 0) continue;
+      ownedCopyCount += copies.length;
+      for (const copy of copies) {
+        (copy.release.label ?? []).filter(onLabel).forEach(countSpelling);
+      }
+      units.push({
+        artist: group.artist,
+        album: group.album,
+        owned: true,
+        source: 'owned',
+        coverUrl: copies[0].release.cover_image,
+        copies,
+        historyKeys: historyKeysByGroup.get(group) ?? [],
+      });
+    }
+
+    // Albums you don't own, by their looked-up or owner-set label
+    if (includeUnowned && this.albumLabelService) {
+      const lookups = await this.albumLabelService.getAll();
+      for (const [albumKey, entry] of unowned) {
+        const info = lookups.get(albumKey);
+        if (!info || (info.status !== 'found' && info.status !== 'override')) {
+          continue;
+        }
+        const labels = info.labels.filter(onLabel);
+        if (labels.length === 0) continue;
+        if (ownedCopyCount === 0) labels.forEach(countSpelling);
+        units.push({
+          artist: entry.artist,
+          album: entry.album,
+          owned: false,
+          source: info.source,
+          copies: [],
+          historyKeys: entry.historyKeys,
+        });
+      }
+    }
+    if (units.length === 0) return null;
+
+    const [label, ...otherSpellings] = Array.from(spellings.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([name]) => name);
+
+    const mapTrack = await this.createTrackMapper();
+    const now = new Date();
+    const weekStart = this.getStartOfWeek(now).getTime() / 1000;
+    const monthStart = this.getStartOfMonth(now).getTime() / 1000;
+    const yearStart = this.getStartOfYear(now).getTime() / 1000;
+
+    let totalPlayCount = 0;
+    let ownedPlayCount = 0;
+    let firstPlayed: number | null = null;
+    let lastPlayed: number | null = null;
+    let thisWeek = 0;
+    let thisMonth = 0;
+    let thisYear = 0;
+    const trendCounts = new Map<string, number>();
+    const seenPlays = new Set<string>();
+    const artistStats = new Map<
+      string,
+      { playCount: number; lastPlayed: number; albums: Set<number> }
+    >();
+    const trackCounts = new Map<
+      string,
+      {
+        artist: string;
+        album: string;
+        spellings: TrackSpellings;
+        count: number;
+        lastPlayed: number;
+      }
+    >();
+    const topAlbums: LabelDetailResponse['topAlbums'] = [];
+    const unplayedCopies: LabelDetailResponse['unplayedCopies'] = [];
+
+    // The resolver hands back the lowercase key when it has no preferred
+    // spelling; title-case that instead of showing it as is
+    const displayArtist = (name: string) => {
+      const display = this.artistNameResolver?.getDisplayName(name) ?? name;
+      return display === display.toLowerCase()
+        ? this.capitalizeArtist(display)
+        : display;
+    };
+
+    for (const [unitIndex, unit] of units.entries()) {
+      const albumTitle = unit.owned
+        ? unit.album
+        : this.capitalizeTitle(unit.album);
+      let albumPlays = 0;
+      let albumLastPlayed = 0;
+      for (const historyKey of unit.historyKeys) {
+        const historyArtist = artistFromAlbumKey(historyKey);
+        const historyAlbum = albumFromAlbumKey(historyKey);
+        for (const play of albums[historyKey].plays) {
+          const identity = JSON.stringify([
+            this.resolveArtistName(historyArtist),
+            play.timestamp,
+            (play.track ?? '').toLowerCase().trim(),
+          ]);
+          if (seenPlays.has(identity)) continue;
+          seenPlays.add(identity);
+
+          totalPlayCount++;
+          if (unit.owned) ownedPlayCount++;
+          albumPlays++;
+          albumLastPlayed = Math.max(albumLastPlayed, play.timestamp);
+          if (firstPlayed === null || play.timestamp < firstPlayed) {
+            firstPlayed = play.timestamp;
+          }
+          if (lastPlayed === null || play.timestamp > lastPlayed) {
+            lastPlayed = play.timestamp;
+          }
+          if (play.timestamp >= weekStart) thisWeek++;
+          if (play.timestamp >= monthStart) thisMonth++;
+          if (play.timestamp >= yearStart) thisYear++;
+          const periodKey = this.trendPeriodKey(play.timestamp, trendPeriod);
+          trendCounts.set(periodKey, (trendCounts.get(periodKey) ?? 0) + 1);
+
+          // Each artist of a split collaboration gets the play
+          for (const artistKey of this.resolveArtistNames(historyArtist)) {
+            const stats = artistStats.get(artistKey) ?? {
+              playCount: 0,
+              lastPlayed: 0,
+              albums: new Set<number>(),
+            };
+            stats.playCount++;
+            stats.lastPlayed = Math.max(stats.lastPlayed, play.timestamp);
+            stats.albums.add(unitIndex);
+            artistStats.set(artistKey, stats);
+          }
+
+          if (play.track) {
+            const track = mapTrack(
+              historyArtist,
+              historyAlbum,
+              play.track
+            ).track;
+            const trackKey = this.trackGroupKey(
+              historyArtist,
+              albumTitle.toLowerCase(),
+              track
+            );
+            const existing = trackCounts.get(trackKey);
+            if (existing) {
+              existing.count++;
+              existing.spellings.add(track);
+              existing.lastPlayed = Math.max(
+                existing.lastPlayed,
+                play.timestamp
+              );
+            } else {
+              const trackSpellings = new TrackSpellings();
+              trackSpellings.add(track);
+              trackCounts.set(trackKey, {
+                artist: historyArtist,
+                album: albumTitle,
+                spellings: trackSpellings,
+                count: 1,
+                lastPlayed: play.timestamp,
+              });
+            }
+          }
+        }
+      }
+
+      if (albumPlays === 0) {
+        for (const copy of unit.copies) {
+          unplayedCopies.push({
+            artist: stripDiscogsSuffixes(copy.release.artist),
+            album: copy.release.title,
+            releaseId: copy.release.id,
+          });
+        }
+        continue;
+      }
+      topAlbums.push({
+        artist: unit.owned ? unit.artist : displayArtist(unit.artist),
+        album: albumTitle,
+        playCount: albumPlays,
+        lastPlayed: albumLastPlayed,
+        coverUrl: unit.coverUrl,
+        collectionReleaseIds: unit.copies.map(copy => copy.release.id),
+        owned: unit.owned,
+        source: unit.source,
+      });
+    }
+
+    return {
+      labelKey: key,
+      label,
+      otherSpellings,
+      totalPlayCount,
+      ownedPlayCount,
+      lookedUpPlayCount: totalPlayCount - ownedPlayCount,
+      includeUnowned,
+      firstPlayed,
+      lastPlayed,
+      periodCounts: {
+        thisWeek,
+        thisMonth,
+        thisYear,
+        allTime: totalPlayCount,
+      },
+      playTrend: Array.from(trendCounts.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([period, count]) => ({ period, count })),
+      topArtists: Array.from(artistStats.entries())
+        .sort((a, b) => b[1].playCount - a[1].playCount)
+        .slice(0, 20)
+        .map(([artist, stats]) => ({
+          artist: displayArtist(artist),
+          playCount: stats.playCount,
+          albumCount: stats.albums.size,
+          lastPlayed: stats.lastPlayed,
+        })),
+      topAlbums: topAlbums
+        .sort((a, b) => b.playCount - a.playCount)
+        .slice(0, 50),
+      topTracks: Array.from(trackCounts.values())
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 20)
+        .map(t => ({
+          artist: displayArtist(t.artist),
+          track: this.capitalizeTitle(t.spellings.best),
+          album: t.album,
+          playCount: t.count,
+          lastPlayed: t.lastPlayed,
+        })),
+      ownedCopyCount,
+      unplayedCopies,
     };
   }
 
@@ -2937,6 +3609,22 @@ export class StatsService {
     return album === null ? UNKNOWN_ALBUM_LABEL : this.capitalizeTitle(album);
   }
 
+  /** Play trend bucket: 'YYYY-MM', or 'YYYY-Www' with weeks starting Monday */
+  private trendPeriodKey(timestamp: number, period: 'month' | 'week'): string {
+    const playDate = new Date(timestamp * 1000);
+    if (period === 'month') {
+      return `${playDate.getFullYear()}-${String(playDate.getMonth() + 1).padStart(2, '0')}`;
+    }
+    const weekStartDate = this.getStartOfWeek(playDate);
+    const year = weekStartDate.getFullYear();
+    const jan1 = new Date(year, 0, 1);
+    const daysSinceJan1 = Math.floor(
+      (weekStartDate.getTime() - jan1.getTime()) / (24 * 60 * 60 * 1000)
+    );
+    const weekNum = Math.ceil((daysSinceJan1 + jan1.getDay() + 1) / 7);
+    return `${year}-W${String(weekNum).padStart(2, '0')}`;
+  }
+
   private formatDateKey(date: Date): string {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -3000,29 +3688,12 @@ export class StatsService {
    *
    * @param limit - Maximum number of items to return (default: all)
    */
-  async getCollectionROI(limit?: number): Promise<RoiScoreItem[]> {
+  async getCollectionROI(
+    collection: CollectionItem[],
+    limit?: number
+  ): Promise<RoiScoreItem[]> {
     const index = await this.historyStorage.getIndex();
-    if (!index) {
-      return [];
-    }
-
-    // Load collection
-    let collection: CollectionItem[] = [];
-    try {
-      const raw = await this.fileStorage.readJSON<{ items?: CollectionItem[] }>(
-        'collection/releases.json'
-      );
-      if (raw && Array.isArray(raw.items)) {
-        collection = raw.items;
-      } else if (Array.isArray(raw)) {
-        collection = raw as CollectionItem[];
-      }
-    } catch {
-      this.logger.warn('Could not read collection for ROI calculation');
-      return [];
-    }
-
-    if (collection.length === 0) {
+    if (!index || collection.length === 0) {
       return [];
     }
 
@@ -3078,6 +3749,33 @@ export class StatsService {
       }
     }
 
+    // Plays reach one copy of an album; other pressings of it (same master,
+    // or same artist and title) get the album's plays too
+    const albumKeys = (item: CollectionItem): string[] => [
+      this.historyStorage.fuzzyNormalizeKey(
+        stripDiscogsSuffixes(item.release.artist),
+        item.release.title
+      ),
+      ...(item.release.master_id ? [`master:${item.release.master_id}`] : []),
+    ];
+    const albumPlays = new Map<string, number>();
+    for (const { item, plays } of playsByItem.values()) {
+      for (const key of albumKeys(item)) {
+        albumPlays.set(key, (albumPlays.get(key) ?? 0) + plays);
+      }
+    }
+
+    // Owned records with no plays count too (0 plays), so the lowest
+    // values reflect the whole collection, not just what's been played
+    for (const item of collection) {
+      if (playsByItem.has(item.id)) continue;
+      const plays = Math.max(
+        0,
+        ...albumKeys(item).map(key => albumPlays.get(key) ?? 0)
+      );
+      playsByItem.set(item.id, { item, plays });
+    }
+
     const results: RoiScoreItem[] = [];
 
     for (const {
@@ -3108,8 +3806,11 @@ export class StatsService {
       });
     }
 
-    // Sort by roiScore descending
-    results.sort((a, b) => b.roiScore - a.roiScore);
+    // Most plays per unit of value first; among equal scores (records never
+    // played), the dearest last
+    results.sort(
+      (a, b) => b.roiScore - a.roiScore || a.medianPrice - b.medianPrice
+    );
 
     return limit !== undefined ? results.slice(0, limit) : results;
   }

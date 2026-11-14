@@ -9,6 +9,7 @@ import FormatDetailSection from '../components/collection-analytics/FormatDetail
 import LabelDetailSection from '../components/collection-analytics/LabelDetailSection';
 import TimelineDetailSection from '../components/collection-analytics/TimelineDetailSection';
 import ValueEstimationSection from '../components/collection-analytics/ValueEstimationSection';
+import { CollectionROIChart } from '../components/stats/CollectionROIChart';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton } from '../components/ui/Skeleton';
 import { useAuth } from '../context/AuthContext';
@@ -41,6 +42,8 @@ const TAB_LABELS: Record<TabId, string> = {
 const CollectionAnalyticsPage: React.FC = () => {
   const { authStatus } = useAuth();
   const handleTabKeyDown = useTabKeyNavigation();
+  // Bumped when a value scan finishes, to reload plays per dollar
+  const [roiVersion, setRoiVersion] = useState(0);
   const [activeTab, setActiveTab] = useState<TabId>(
     () => getTabFromUrl(VALID_TABS, 'overview') as TabId
   );
@@ -160,7 +163,17 @@ const CollectionAnalyticsPage: React.FC = () => {
       case 'overview':
         return <AnalyticsOverviewSection overview={overview} />;
       case 'value':
-        return <ValueEstimationSection />;
+        return (
+          <>
+            <ValueEstimationSection
+              onScanComplete={() => setRoiVersion(v => v + 1)}
+            />
+            <div className='analytics-roi'>
+              {/* A new key after each scan reloads plays per dollar */}
+              <CollectionROIChart key={roiVersion} />
+            </div>
+          </>
+        );
       case 'formats':
         return <FormatDetailSection formats={overview.formats} />;
       case 'labels':

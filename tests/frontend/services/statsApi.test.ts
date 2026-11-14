@@ -29,6 +29,34 @@ describe('statsApi', () => {
     });
   });
 
+  describe('getLabelDetail', () => {
+    it('fetches a label by name with the trend period', async () => {
+      const mockData = { success: true, data: { label: 'Sub Pop' } };
+      mockJsonResponse(mockData);
+
+      const result = await statsApi.getLabelDetail('Sub Pop / Rough', 'week');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '/stats/label/Sub%20Pop%20%2F%20Rough?trendPeriod=week'
+        )
+      );
+      expect(result).toEqual(mockData);
+    });
+
+    it('can leave out albums you do not own', async () => {
+      mockJsonResponse({ success: true, data: {} });
+
+      await statsApi.getLabelDetail('Merge', 'month', false);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '/stats/label/Merge?trendPeriod=month&includeUnowned=false'
+        )
+      );
+    });
+  });
+
   describe('getStreaks', () => {
     it('should fetch streaks data', async () => {
       const mockData = {
@@ -220,6 +248,35 @@ describe('statsApi', () => {
       );
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('startDate=1704067200')
+      );
+    });
+  });
+
+  describe('getTopLabels', () => {
+    it('fetches top labels for a period', async () => {
+      const mockData = { success: true, data: [] };
+      mockJsonResponse(mockData);
+
+      const result = await statsApi.getTopLabels('year', 5);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/stats/top/labels/year?limit=5')
+      );
+      expect(result).toEqual(mockData);
+    });
+
+    it('includes the date range for a custom period', async () => {
+      mockJsonResponse({ success: true, data: [] });
+
+      await statsApi.getTopLabels('custom', 10, {
+        startDate: 1704067200,
+        endDate: 1706745600,
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '/stats/top/labels/custom?limit=10&startDate=1704067200&endDate=1706745600'
+        )
       );
     });
   });

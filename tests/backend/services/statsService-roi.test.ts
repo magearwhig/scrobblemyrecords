@@ -118,7 +118,7 @@ describe('StatsService.getCollectionROI', () => {
       mockHistoryStorage.getIndex = jest.fn().mockResolvedValue(null);
 
       // Act
-      const result = await service.getCollectionROI();
+      const result = await service.getCollectionROI([]);
 
       // Assert
       expect(result).toEqual([]);
@@ -131,31 +131,42 @@ describe('StatsService.getCollectionROI', () => {
       mockHistoryStorage.getIndex = jest
         .fn()
         .mockResolvedValue(createMockIndex({ 'radiohead|ok computer': 20 }));
-      mockFileStorage.readJSON = jest.fn().mockResolvedValue({ items: [] });
+      mockFileStorage.readJSON = jest
+        .fn()
+        .mockResolvedValue(createMockValueCache({}));
 
       // Act
-      const result = await service.getCollectionROI();
+      const result = await service.getCollectionROI([]);
 
       // Assert
       expect(result).toEqual([]);
     });
   });
 
-  describe('when collection read fails', () => {
-    it('should return empty array gracefully', async () => {
+  describe('the collection', () => {
+    it('uses the collection it is given and reads only the value cache', async () => {
       // Arrange
       mockHistoryStorage.getIndex = jest
         .fn()
         .mockResolvedValue(createMockIndex({ 'radiohead|ok computer': 20 }));
+      const collection = createMockCollection([
+        { id: 1, artist: 'Radiohead', title: 'OK Computer' },
+      ]);
       mockFileStorage.readJSON = jest
         .fn()
-        .mockRejectedValue(new Error('File not found'));
+        .mockResolvedValue(
+          createMockValueCache({ 1: { medianPrice: 10, currency: 'USD' } })
+        );
 
       // Act
-      const result = await service.getCollectionROI();
+      const result = await service.getCollectionROI(collection.items);
 
       // Assert
-      expect(result).toEqual([]);
+      expect(result).toHaveLength(1);
+      expect(mockFileStorage.readJSON).toHaveBeenCalledTimes(1);
+      expect(mockFileStorage.readJSON).toHaveBeenCalledWith(
+        'collection-analytics/value-cache.json'
+      );
     });
   });
 
@@ -168,13 +179,10 @@ describe('StatsService.getCollectionROI', () => {
       const collection = createMockCollection([
         { id: 1, artist: 'Radiohead', title: 'OK Computer' },
       ]);
-      mockFileStorage.readJSON = jest
-        .fn()
-        .mockResolvedValueOnce(collection)
-        .mockResolvedValue(null);
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(null);
 
       // Act
-      const result = await service.getCollectionROI();
+      const result = await service.getCollectionROI(collection.items);
 
       // Assert
       expect(result).toEqual([]);
@@ -198,13 +206,10 @@ describe('StatsService.getCollectionROI', () => {
         1: { medianPrice: 10, currency: 'USD' }, // ROI = 2.0
         2: { medianPrice: 20, currency: 'USD' }, // ROI = 0.5
       });
-      mockFileStorage.readJSON = jest
-        .fn()
-        .mockResolvedValueOnce(collection)
-        .mockResolvedValueOnce(valueCache);
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(valueCache);
 
       // Act
-      const result = await service.getCollectionROI();
+      const result = await service.getCollectionROI(collection.items);
 
       // Assert
       expect(result).toHaveLength(2);
@@ -232,13 +237,10 @@ describe('StatsService.getCollectionROI', () => {
         1: { medianPrice: 10, currency: 'USD' },
       });
       // Release 2 has no entry in value cache
-      mockFileStorage.readJSON = jest
-        .fn()
-        .mockResolvedValueOnce(collection)
-        .mockResolvedValueOnce(valueCache);
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(valueCache);
 
       // Act
-      const result = await service.getCollectionROI();
+      const result = await service.getCollectionROI(collection.items);
 
       // Assert
       expect(result).toHaveLength(1);
@@ -266,39 +268,38 @@ describe('StatsService.getCollectionROI', () => {
           },
         },
       };
-      mockFileStorage.readJSON = jest
-        .fn()
-        .mockResolvedValueOnce(collection)
-        .mockResolvedValueOnce(valueCache);
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(valueCache);
 
       // Act
-      const result = await service.getCollectionROI();
+      const result = await service.getCollectionROI(collection.items);
 
       // Assert
       expect(result).toHaveLength(0);
     });
 
-    it('should skip albums with zero play count', async () => {
+    it('includes valued records never played, last, with no plays', async () => {
       // Arrange
       mockHistoryStorage.getIndex = jest
         .fn()
-        .mockResolvedValue(createMockIndex({ 'radiohead|ok computer': 0 }));
+        .mockResolvedValue(createMockIndex({ 'radiohead|ok computer': 20 }));
       const collection = createMockCollection([
         { id: 1, artist: 'Radiohead', title: 'OK Computer' },
+        { id: 2, artist: 'Pink Floyd', title: 'The Wall' },
       ]);
       const valueCache = createMockValueCache({
         1: { medianPrice: 10, currency: 'USD' },
+        2: { medianPrice: 40, currency: 'USD' },
       });
-      mockFileStorage.readJSON = jest
-        .fn()
-        .mockResolvedValueOnce(collection)
-        .mockResolvedValueOnce(valueCache);
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(valueCache);
 
       // Act
-      const result = await service.getCollectionROI();
+      const result = await service.getCollectionROI(collection.items);
 
       // Assert
-      expect(result).toHaveLength(0);
+      expect(result.map(r => [r.releaseId, r.playCount, r.roiScore])).toEqual([
+        [1, 20, 2],
+        [2, 0, 0],
+      ]);
     });
 
     it('should respect the limit parameter', async () => {
@@ -320,13 +321,10 @@ describe('StatsService.getCollectionROI', () => {
         2: { medianPrice: 10, currency: 'USD' },
         3: { medianPrice: 15, currency: 'USD' },
       });
-      mockFileStorage.readJSON = jest
-        .fn()
-        .mockResolvedValueOnce(collection)
-        .mockResolvedValueOnce(valueCache);
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(valueCache);
 
       // Act
-      const result = await service.getCollectionROI(2);
+      const result = await service.getCollectionROI(collection.items, 2);
 
       // Assert
       expect(result).toHaveLength(2);
@@ -348,16 +346,66 @@ describe('StatsService.getCollectionROI', () => {
       const valueCache = createMockValueCache({
         1: { medianPrice: 10, currency: 'USD' },
       });
-      mockFileStorage.readJSON = jest
-        .fn()
-        .mockResolvedValueOnce(collection)
-        .mockResolvedValueOnce(valueCache);
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(valueCache);
 
       // Act
-      const result = await service.getCollectionROI();
+      const result = await service.getCollectionROI(collection.items);
 
       // Assert
       expect(result[0].coverUrl).toBe('https://example.com/cover.jpg');
+    });
+  });
+
+  describe('several pressings of one album', () => {
+    it("gives each pressing the album's plays instead of calling one unplayed", async () => {
+      // Arrange
+      mockHistoryStorage.getIndex = jest
+        .fn()
+        .mockResolvedValue(createMockIndex({ 'radiohead|ok computer': 20 }));
+      const collection = createMockCollection([
+        { id: 1, artist: 'Radiohead', title: 'OK Computer' },
+        { id: 2, artist: 'Radiohead', title: 'OK Computer' },
+      ]);
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(
+        createMockValueCache({
+          1: { medianPrice: 10, currency: 'USD' },
+          2: { medianPrice: 40, currency: 'USD' },
+        })
+      );
+
+      // Act
+      const result = await service.getCollectionROI(collection.items);
+
+      // Assert
+      expect(result.map(r => [r.releaseId, r.playCount])).toEqual([
+        [1, 20],
+        [2, 20],
+      ]);
+    });
+
+    it('treats copies with the same master as one album', async () => {
+      // Arrange
+      mockHistoryStorage.getIndex = jest
+        .fn()
+        .mockResolvedValue(createMockIndex({ 'radiohead|ok computer': 20 }));
+      const collection = createMockCollection([
+        { id: 1, artist: 'Radiohead', title: 'OK Computer' },
+        { id: 2, artist: 'Radiohead', title: 'OK Computer (OKNOTOK)' },
+      ]);
+      collection.items[0].release.master_id = 77;
+      collection.items[1].release.master_id = 77;
+      mockFileStorage.readJSON = jest.fn().mockResolvedValue(
+        createMockValueCache({
+          1: { medianPrice: 10, currency: 'USD' },
+          2: { medianPrice: 40, currency: 'USD' },
+        })
+      );
+
+      // Act
+      const result = await service.getCollectionROI(collection.items);
+
+      // Assert
+      expect(result.find(r => r.releaseId === 2)?.playCount).toBe(20);
     });
   });
 
@@ -370,17 +418,14 @@ describe('StatsService.getCollectionROI', () => {
           'the go-betweens|tallulah (live)': 4,
         })
       );
-      mockFileStorage.readJSON = jest.fn().mockImplementation((path: string) =>
-        Promise.resolve(
-          path === 'collection/releases.json'
-            ? createMockCollection([
-                { id: 55, artist: 'The Go-Betweens', title: 'Tallulah' },
-              ])
-            : createMockValueCache({
-                55: { medianPrice: 20, currency: 'USD' },
-              })
-        )
-      );
+      const collection = createMockCollection([
+        { id: 55, artist: 'The Go-Betweens', title: 'Tallulah' },
+      ]);
+      mockFileStorage.readJSON = jest
+        .fn()
+        .mockResolvedValue(
+          createMockValueCache({ 55: { medianPrice: 20, currency: 'USD' } })
+        );
       service.setMappingService({
         getAllAlbumMappings: jest.fn().mockResolvedValue([
           {
@@ -395,7 +440,7 @@ describe('StatsService.getCollectionROI', () => {
       } as never);
 
       // Act
-      const result = await service.getCollectionROI();
+      const result = await service.getCollectionROI(collection.items);
 
       // Assert
       expect(result).toHaveLength(1);

@@ -195,7 +195,24 @@ describe('AlbumCard', () => {
     render(<AlbumCard {...defaultProps} item={itemWithMultipleValues} />);
 
     expect(screen.getByText('CD, Digital, Vinyl')).toBeInTheDocument();
-    expect(screen.getByText('Label 1, Label 2')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'View label details for Label 1' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'View label details for Label 2' })
+    ).toBeInTheDocument();
+  });
+
+  it('opens the label page without selecting the card', async () => {
+    const onSelect = jest.fn();
+    render(<AlbumCard {...defaultProps} onSelect={onSelect} />);
+
+    screen
+      .getByRole('link', { name: 'View label details for Test Label' })
+      .click();
+
+    expect(window.location.hash).toMatch(/^#label/);
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it('applies correct styling for selected state', () => {

@@ -1415,7 +1415,7 @@ export class ReleaseTrackingService {
 
         // Check if any result has vinyl
         const masterId = bestMatch.masterId;
-        const versions = await this.wishlistService.getMasterVersions(masterId);
+        const versions = await this.wishlistService.checkMasterVinyl(masterId);
 
         const hasVinyl = versions.some(v => v.hasVinyl);
 
@@ -1531,7 +1531,7 @@ export class ReleaseTrackingService {
 
       // Check if any version has vinyl
       const masterId = bestMatch.masterId;
-      const versions = await this.wishlistService.getMasterVersions(masterId);
+      const versions = await this.wishlistService.checkMasterVinyl(masterId);
 
       const hasVinyl = versions.some(v => v.hasVinyl);
 

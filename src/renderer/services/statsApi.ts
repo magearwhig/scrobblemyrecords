@@ -5,6 +5,8 @@ import {
   AlbumTracksPlayedResponse,
   ApiResponse,
   ArtistDetailResponse,
+  LabelDetailResponse,
+  LabelPlayCount,
   ArtistPlayCount,
   CalendarHeatmapData,
   CollectionAnalyticsOverview,
@@ -172,6 +174,31 @@ export const statsApi = {
       url += `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;
     }
 
+    const response = await authedFetch(url);
+    return response.json();
+  },
+
+  /**
+   * Most played labels for a period (owned albums by their copies' labels,
+   * others by their looked-up label)
+   */
+  async getTopLabels(
+    period:
+      | 'week'
+      | 'month'
+      | 'year'
+      | 'all'
+      | 'days30'
+      | 'days90'
+      | 'days365'
+      | 'custom',
+    limit: number = 10,
+    dateRange?: DateRange
+  ): Promise<ApiResponse<LabelPlayCount[]>> {
+    let url = `${API_BASE}/stats/top/labels/${period}?limit=${limit}`;
+    if (period === 'custom' && dateRange) {
+      url += `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;
+    }
     const response = await authedFetch(url);
     return response.json();
   },
@@ -374,6 +401,25 @@ export const statsApi = {
     const params = new URLSearchParams({ trendPeriod });
     const response = await authedFetch(
       `${API_BASE}/stats/artist/${encodeURIComponent(artistName)}?${params}`
+    );
+    return response.json();
+  },
+
+  /**
+   * Get listening stats for albums you own on a label
+   * @param labelName - Label name as Discogs spells it
+   * @param trendPeriod - Granularity for the play trend chart
+   * @param includeUnowned - Count albums you don't own by looked-up label
+   */
+  async getLabelDetail(
+    labelName: string,
+    trendPeriod: 'month' | 'week' = 'month',
+    includeUnowned = true
+  ): Promise<ApiResponse<LabelDetailResponse>> {
+    const params = new URLSearchParams({ trendPeriod });
+    if (!includeUnowned) params.set('includeUnowned', 'false');
+    const response = await authedFetch(
+      `${API_BASE}/stats/label/${encodeURIComponent(labelName)}?${params}`
     );
     return response.json();
   },

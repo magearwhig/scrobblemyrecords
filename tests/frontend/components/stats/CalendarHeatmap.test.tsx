@@ -301,4 +301,66 @@ describe('CalendarHeatmap', () => {
       expect(cellButtons.length).toBe(0);
     });
   });
+
+  describe('month labels west of UTC', () => {
+    const originalTz = process.env.TZ;
+    beforeEach(() => {
+      process.env.TZ = 'America/Chicago';
+    });
+    afterEach(() => {
+      process.env.TZ = originalTz;
+    });
+
+    it('labels each month once, in order, at the week holding its 1st', () => {
+      const { container } = render(<CalendarHeatmap data={[]} year={2026} />);
+
+      const labels = Array.from(
+        container.querySelectorAll<HTMLElement>('.calendar-heatmap-month-label')
+      );
+      expect(labels.map(l => l.textContent)).toEqual([
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ]);
+      // 2026-01-01 is a Thursday, so Feb 1 (a Sunday) starts week 6 (index 5)
+      // and Mar 1 (a Sunday) starts week 10 (index 9)
+      expect(labels[0].style.gridColumn).toMatch(/^1( \/ auto)?$/);
+      expect(labels[1].style.gridColumn).toMatch(/^6( \/ auto)?$/);
+      expect(labels[2].style.gridColumn).toMatch(/^10( \/ auto)?$/);
+    });
+  });
+
+  it("opens with this week at the right edge, not December's empty weeks", () => {
+    const clientWidth = jest
+      .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockReturnValue(300);
+    const rect = jest
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: Element) {
+        const isThisWeek = this.hasAttribute('data-current-week');
+        return {
+          left: isThisWeek ? 600 : 0,
+          right: isThisWeek ? 612 : 300,
+        } as ReturnType<Element['getBoundingClientRect']>;
+      });
+    const { container } = render(
+      <CalendarHeatmap data={[]} year={currentYear} />
+    );
+
+    expect(container.querySelectorAll('[data-current-week]')).toHaveLength(1);
+    expect(
+      container.querySelector('.calendar-heatmap-grid-container')!.scrollLeft
+    ).toBe(312);
+    clientWidth.mockRestore();
+    rect.mockRestore();
+  });
 });

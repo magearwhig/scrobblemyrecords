@@ -348,6 +348,39 @@ describe('HistoryIndexMergeService', () => {
       expect(writtenIndex.albums['artist|album'].lastPlayed).toBe(1700000000);
     });
 
+    it('keeps the target album MBID, or takes the source one', async () => {
+      const index = createHistoryIndex({
+        'artist|album': {
+          lastPlayed: 1698000000,
+          playCount: 1,
+          plays: [{ timestamp: 1698000000 }],
+        },
+        'artist variant|album': {
+          lastPlayed: 1700000000,
+          playCount: 1,
+          plays: [{ timestamp: 1700000000 }],
+          mbid: 'aaaaaaaa-1111-2222-3333-444444444444',
+        },
+      });
+      mockFileStorage.readJSON.mockResolvedValue(index);
+
+      await service.executeMerge([
+        {
+          sourceKey: 'artist variant|album',
+          targetKey: 'artist|album',
+          sourcePlayCount: 1,
+          targetPlayCount: 1,
+          mergedPlayCount: 2,
+        },
+      ]);
+
+      const writtenIndex = mockFileStorage.writeJSON.mock
+        .calls[0][1] as ScrobbleHistoryIndex;
+      expect(writtenIndex.albums['artist|album'].mbid).toBe(
+        'aaaaaaaa-1111-2222-3333-444444444444'
+      );
+    });
+
     it('should delete source entries from index', async () => {
       // Arrange
       const index = createHistoryIndex({

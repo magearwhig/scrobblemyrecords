@@ -1,4 +1,12 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 
 import '@testing-library/jest-dom';
@@ -27,6 +35,7 @@ jest.mock('../../../src/renderer/services/statsApi', () => ({
     getTopArtists: jest.fn(),
     getTopAlbums: jest.fn(),
     getTopTracks: jest.fn(),
+    getTopLabels: jest.fn(),
     getDustyCorners: jest.fn(),
     getSourceBreakdown: jest.fn(),
     getTimeline: jest.fn(),
@@ -35,6 +44,10 @@ jest.mock('../../../src/renderer/services/statsApi', () => ({
     getRankingsOverTime: jest.fn(),
     getCollectionROI: jest.fn(),
     getTasteDrift: jest.fn(),
+    getOnThisDay: jest.fn(),
+    getGenreDistribution: jest.fn(),
+    getHourlyDistribution: jest.fn(),
+    getDayOfWeekDistribution: jest.fn(),
   },
   imagesApi: {
     batchGetAlbumCovers: jest.fn(),
@@ -213,6 +226,19 @@ describe('StatsPage', () => {
       success: true,
       data: defaultMockData.topTracks,
     });
+    mockStatsApi.getTopLabels.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          label: 'Sub Pop',
+          labelKey: 'sub pop',
+          playCount: 90,
+          ownedPlayCount: 90,
+          albumCount: 7,
+          lastPlayed: 1,
+        },
+      ],
+    });
     mockStatsApi.getDustyCorners.mockResolvedValue({
       success: true,
       data: defaultMockData.dustyCorners,
@@ -289,14 +315,10 @@ describe('StatsPage', () => {
   it('should display all time counts', async () => {
     render(<StatsPage />);
 
-    await waitFor(() => {
-      // Check the All Time stat card is rendered (find by class + text)
-      const statCards = document.querySelectorAll('.stat-card');
-      expect(statCards.length).toBeGreaterThan(0);
-      // The formatted count 10,000 is in a stat card value
-      const allTimeValue = screen.getByText('10,000');
-      expect(allTimeValue).toBeInTheDocument();
-    });
+    // All-time plays are in the summary line under the cards
+    expect(await screen.findByTestId('stats-summary')).toHaveTextContent(
+      '10,000 plays all time'
+    );
   });
 
   it('should display new artists count', async () => {
@@ -324,7 +346,7 @@ describe('StatsPage', () => {
 
     await waitFor(() => {
       // Top lists section is rendered
-      const topListsRow = document.querySelector('.stats-top-lists-row');
+      const topListsRow = document.querySelector('.stats-rankings-grid');
       expect(topListsRow).toBeInTheDocument();
       // Check for Top Artists within the top lists section
       expect(topListsRow).toHaveTextContent('Top Artists');
@@ -335,7 +357,7 @@ describe('StatsPage', () => {
     render(<StatsPage />);
 
     await waitFor(() => {
-      const topListsRow = document.querySelector('.stats-top-lists-row');
+      const topListsRow = document.querySelector('.stats-rankings-grid');
       expect(topListsRow).toHaveTextContent('Top Albums');
       expect(screen.getByText('OK Computer')).toBeInTheDocument();
     });
@@ -423,7 +445,7 @@ describe('StatsPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Stats Dashboard')).toBeInTheDocument();
       // Top lists section still renders
-      const topListsRow = document.querySelector('.stats-top-lists-row');
+      const topListsRow = document.querySelector('.stats-rankings-grid');
       expect(topListsRow).toHaveTextContent('Top Artists');
     });
   });
@@ -452,6 +474,142 @@ describe('StatsPage', () => {
     await waitFor(() => {
       expect(mockImagesApi.batchGetAlbumCovers).toHaveBeenCalled();
     });
+  });
+
+  describe('layout', () => {
+    it('leads with four cards and a summary line instead of more cards', async () => {
+      mockStatsApi.getSourceBreakdown.mockResolvedValue({
+        success: true,
+        data: [
+          { source: 'RecordScrobbles', count: 50, percentage: 5 },
+          { source: 'Other', count: 950, percentage: 95 },
+        ],
+      });
+      render(<StatsPage />);
+
+      const summary = await screen.findByTestId('stats-summary');
+      expect(summary).toHaveTextContent('10,000 plays all time');
+      expect(summary).toHaveTextContent('2,000 this year');
+      expect(summary).toHaveTextContent('500 to 11K');
+      expect(summary).toHaveTextContent('62.8h this month (estimated)');
+      expect(summary).toHaveTextContent('5% scrobbled through this app');
+      const cards = document.querySelectorAll('.stats-cards-row > *');
+      expect(cards).toHaveLength(4);
+      expect(
+        screen.queryByText('Listening This Month')
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText('Milestone Progress')).not.toBeInTheDocument();
+      expect(screen.queryByText('Scrobble Sources')).not.toBeInTheDocument();
+    });
+
+    it('puts the rankings right after the overview', async () => {
+      render(<StatsPage />);
+
+      const rankings = await screen.findByRole('heading', {
+        name: 'Rankings',
+      });
+      const activity = screen.getByText('Listening Activity');
+      expect(
+        rankings.compareDocumentPosition(activity) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    });
+
+    it('leaves plays per dollar to Collection Analytics', async () => {
+      render(<StatsPage />);
+      await screen.findByRole('heading', { name: 'Rankings' });
+
+      expect(
+        screen.queryByLabelText('Collection ROI leaderboard')
+      ).not.toBeInTheDocument();
+      expect(mockStatsApi.getCollectionROI).not.toHaveBeenCalled();
+    });
+
+    it('asks for a four-record Dusty Corners teaser', async () => {
+      render(<StatsPage />);
+
+      expect(
+        await screen.findByRole('button', { name: 'See all in What to Play' })
+      ).toBeInTheDocument();
+      expect(mockStatsApi.getDustyCorners).toHaveBeenCalledWith(4);
+    });
+  });
+
+  it('loads On This Day covers after the page has its text', async () => {
+    const originalObserver = global.IntersectionObserver;
+    global.IntersectionObserver = jest.fn(
+      (
+        cb: (
+          entries: IntersectionObserverEntry[],
+          observer: IntersectionObserver
+        ) => void
+      ) =>
+        ({
+          observe: () =>
+            cb(
+              [{ isIntersecting: true } as IntersectionObserverEntry],
+              {} as IntersectionObserver
+            ),
+          disconnect: jest.fn(),
+          unobserve: jest.fn(),
+        }) as unknown as IntersectionObserver
+    ) as unknown as typeof IntersectionObserver;
+    mockStatsApi.getHourlyDistribution.mockResolvedValue({
+      success: true,
+      data: { distribution: [], peakHour: 0, insight: '' },
+    } as never);
+    mockStatsApi.getDayOfWeekDistribution.mockResolvedValue({
+      success: true,
+      data: {
+        distribution: [],
+        peakDay: 0,
+        weekdayAvg: 0,
+        weekendAvg: 0,
+        insight: '',
+      },
+    } as never);
+    mockStatsApi.getGenreDistribution.mockResolvedValue({
+      success: true,
+      data: { genres: [], totalArtistsAnalyzed: 0, lastUpdated: 1 },
+    } as never);
+    mockStatsApi.getOnThisDay.mockResolvedValue({
+      success: true,
+      data: {
+        date: { month: 11, day: 13 },
+        years: [
+          {
+            year: 2020,
+            yearsAgo: 6,
+            totalScrobbles: 3,
+            albums: [
+              {
+                artist: 'Spoon',
+                album: 'Kill the Moonlight',
+                playCount: 3,
+                coverUrl: null,
+              },
+            ],
+          },
+        ],
+      },
+    });
+    mockImagesApi.batchGetAlbumCovers.mockImplementation(async albums => {
+      const data: Record<string, string | null> = {};
+      if (albums.some(a => a.album === 'Kill the Moonlight')) {
+        data['spoon|kill the moonlight'] = 'https://example.com/ktm.jpg';
+      }
+      return { success: true, data };
+    });
+
+    try {
+      render(<StatsPage />);
+
+      expect(
+        await screen.findByAltText('Spoon - Kill the Moonlight')
+      ).toHaveAttribute('src', 'https://example.com/ktm.jpg');
+    } finally {
+      global.IntersectionObserver = originalObserver;
+    }
   });
 
   it('should handle empty data gracefully', async () => {

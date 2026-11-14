@@ -44,6 +44,9 @@ jest.mock('../../../src/renderer/services/statsApi', () => ({
     getDecades: jest.fn(),
     getGrowth: jest.fn(),
   },
+  statsApi: {
+    getCollectionROI: jest.fn().mockResolvedValue({ success: true, data: [] }),
+  },
 }));
 
 // Mock logger
@@ -358,6 +361,31 @@ describe('CollectionAnalyticsPage', () => {
       'aria-selected',
       'false'
     );
+  });
+
+  it('shows plays per dollar (Collection ROI) on the Value tab', async () => {
+    // Arrange
+    mockCollectionAnalyticsApi.getOverview.mockResolvedValue({
+      success: true,
+      data: createMockOverview(),
+    });
+    mockCollectionAnalyticsApi.getValue.mockResolvedValue({
+      success: true,
+      data: null,
+    } as never);
+    mockCollectionAnalyticsApi.getValueScanStatus.mockResolvedValue({
+      success: true,
+      data: { status: 'idle' },
+    } as never);
+
+    // Act
+    renderWithAuth(<CollectionAnalyticsPage />);
+    await user.click(await screen.findByRole('tab', { name: 'Value' }));
+
+    // Assert
+    expect(
+      await screen.findByLabelText('Collection ROI leaderboard')
+    ).toBeInTheDocument();
   });
 
   it('renders overview content by default', async () => {

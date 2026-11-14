@@ -148,6 +148,7 @@ export class HistoryIndexMergeService {
         targetEntry.lastPlayed,
         sourceEntry.lastPlayed
       );
+      targetEntry.mbid ??= sourceEntry.mbid;
 
       // Remove source entry
       delete index.albums[proposal.sourceKey];

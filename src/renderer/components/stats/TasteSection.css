@@ -1,0 +1,49 @@
+/* Taste: genres or their change over time, one at a time */
+.taste-section {
+  margin-bottom: var(--space-6);
+}
+
+.taste-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.taste-header h2 {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.taste-tabs {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.taste-tab {
+  padding: var(--space-1) var(--space-3);
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.taste-tab:hover {
+  color: var(--text-primary);
+}
+
+.taste-tab--active {
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--text-on-fill);
+}
+
+.taste-tab:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}

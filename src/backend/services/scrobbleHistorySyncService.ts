@@ -33,13 +33,23 @@ export interface StatsCacheWarmer {
 // Last.fm API track response type
 interface LastFmTrack {
   artist: { '#text': string } | string;
-  album: { '#text': string } | string;
+  album: { '#text': string; mbid?: string } | string;
   name: string;
   date?: { uts: string };
   '@attr'?: { nowplaying: string };
 }
 
 const HISTORY_INDEX_FILE = 'history/scrobble-history-index.json';
+
+const MBID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** The album MBID Last.fm sent with a scrobble, if it's a valid one */
+function albumMbid(track: LastFmTrack): string | undefined {
+  if (typeof track.album !== 'object') return undefined;
+  const mbid = track.album.mbid?.trim().toLowerCase();
+  return mbid && MBID_PATTERN.test(mbid) ? mbid : undefined;
+}
 const SYNC_SETTINGS_FILE = 'history/sync-settings.json';
 const SCROBBLES_PER_PAGE = 200; // Last.fm max per page
 /**
@@ -363,11 +373,20 @@ export class ScrobbleHistorySyncService extends EventEmitter {
         }
 
         const key = this.normalizeKey(artist, album);
+        const isNewEntry = !index.albums[key];
         const entry = (index.albums[key] ??= {
           lastPlayed: timestamp,
           playCount: 0,
           plays: [],
         });
+        // Keep the album MBID from the newest play that has one
+        const mbid = albumMbid(track);
+        if (
+          mbid &&
+          (isNewEntry || !entry.mbid || timestamp >= entry.lastPlayed)
+        ) {
+          entry.mbid = mbid;
+        }
         entry.playCount++;
         entry.plays.push({ timestamp, track: trackName });
         if (timestamp > entry.lastPlayed) entry.lastPlayed = timestamp;

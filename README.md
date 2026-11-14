@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-7210%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-7405%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -86,6 +86,7 @@ Create a `.env` file in the project root (it is ignored by git). You can start f
 - `HOST` (default `127.0.0.1`)
 - `DISCOGS_CALLBACK_URL` / `LASTFM_CALLBACK_URL` (if you need custom callback URLs)
 - `FRONTEND_URL` (additional allowed origins for CORS, comma-separated)
+- `MUSICBRAINZ_CONTACT` (an email or URL so MusicBrainz can reach you). **It is sent to MusicBrainz with every request.** Leave it empty to send this project's GitHub page instead. Set it only in your own `.env`; never commit it
 
 > If you change `BACKEND_PORT`, update the callback URLs in your Discogs/Last.fm apps accordingly.
 
@@ -273,27 +274,18 @@ Your personalized dashboard showing key metrics and insights at a glance:
 - Auto-collapses when all services connected
 
 ### 📈 Stats Dashboard
-Comprehensive listening statistics and visualizations:
+Comprehensive listening statistics and visualizations, most-used first:
 
-- **Listening Streak**: Track your daily listening streak and longest streak ever
-- **Scrobble Counts**: Today, this week, this month, this year, and all-time totals
-- **Listening Hours**: Track how many hours you've spent listening
-- **New Artists**: Count of new artists discovered this month
-- **Collection Coverage**: Percentage of your vinyl collection played over various time periods
-- **Calendar Heatmap**: GitHub-style visualization of daily listening activity by year, with click-to-expand day detail showing albums played
-- **Listening Patterns**: Hourly polar chart (24-hour radar) and day-of-week bar chart with personalized insights ("You're an evening listener")
-- **On This Day**: See what you were listening to on this date 1, 2, and 3 years ago
-- **Your Music DNA**: Genre treemap powered by Last.fm artist tags, showing your top genres weighted by listening habits
-- **Top Artists, Albums & Tracks**: Leaderboards with period selection (week/month/year/all-time/custom) with cover art, "Owned" badges and Spotify play buttons. **View all-time** links open the full all-time list on the History page
-- **Custom Date Range**: Pick specific months or custom date ranges for all stats
-- **Milestone Progress**: Track progress toward scrobble milestones (1K, 5K, 10K, etc.)
-- **Plays Without Album Info**: When some plays have no album, a link to the Unresolved tab shows how many and lets you fix them
-- **Dusty Corners**: Albums in your collection you haven't played in 6+ months, with Spotify play buttons
-- **Collection ROI Score**: "Bang for your buck" leaderboard showing plays-per-dollar for albums in your collection with marketplace value data
+- **Overview**: four cards (plays this month, collection coverage, new artists, listening streak) and one line under them with all-time and yearly plays, the next scrobble milestone, estimated listening time (plays times an average track length) and the share scrobbled through this app. Two cards per row on a phone
+- **Rankings**: Top Albums, Labels, Artists and Tracks with one period control for all four (week/month/year/30/90/365 days/all time/custom), cover art, "Owned" badges and Spotify play buttons. On a phone one list shows at a time, picked from a menu. **View all-time** links open the full list on the History page
+  - **Top Labels** count like the label page: albums you own by your copies' labels, others by their looked-up label. Each opens its label page
+  - **Rankings over time** (the animated race) sit behind a button and load only when opened
+  - **Plays without album info**: a note links to the Unresolved tab to fix them
+- **Listening Timeline** and **Calendar Heatmap** (daily activity by year, click a day for its albums; on a narrow screen it opens on this week), beside **On This Day**: the two latest years with plays on this date, with "Show all" for the rest. Covers load after the text
+- **Listening Patterns**: hourly polar chart and day-of-week bar chart with personalized insights ("You're an evening listener")
+- **Taste**: genre share from your most played artists' Last.fm tags (Music DNA), or how it changed by quarter (Taste Drift)
+- **Dusty Corners**: four records you haven't played in 6+ months, with the full list in What to Play
 - **Album Listening Arc**: Monthly play count chart for any album, revealing honeymoon phases, plateaus, and rediscovery
-- **Taste Drift**: Genre trajectory chart showing how your listening taste evolves over time by quarter
-- **Source Breakdown**: See which sources your scrobbles come from
-- **Listening Timeline**: Visualize listening trends over time
 
 ### 📊 Collection Analytics
 Insights into your vinyl collection powered by Discogs data -- no Last.fm sync required:
@@ -305,9 +297,10 @@ Insights into your vinyl collection powered by Discogs data -- no Last.fm sync r
 - **Growth Timeline**: Area chart tracking collection size over time with monthly or yearly granularity
 - **Collection Value Estimation**: Progressive marketplace scan fetches median (VG+), low, and high prices for every release. Includes most/least valuable items, value by decade, and value by format
 - **Scan Progress**: Background scanning with real-time progress bar, ETA, and current-item display. Resumable after interruption with 7-day cache per release
+- **Collection ROI** (Value tab): plays per dollar of market value, best and worst over the whole collection. Records never played count (the dearest of them lead Worst Value), and every pressing of an album shares its plays. Reloads when a value scan finishes
 
-### 🎤 Artist & Track Deep Dives
-Click any artist or track name throughout the app to navigate to a dedicated detail page:
+### 🎤 Artist, Track & Label Deep Dives
+Click any artist, track or label name throughout the app to navigate to a dedicated detail page:
 
 **Artist Detail Page:**
 - Play trend chart with period selector (weekly/monthly/yearly)
@@ -324,6 +317,16 @@ Click any artist or track name throughout the app to navigate to a dedicated det
 - "Appears On" album list with collection badges
 - Clickable artist name linking back to artist detail
 - External links to Last.fm and Spotify
+
+**Label Detail Page:**
+- Click a label name on Release Details, album cards, Collection Analytics' label list or the Stats page's Top Labels
+- Listening on that label: plays this week, month, year and all-time, play trend, top artists, top albums and top tracks
+- "On the shelf, never played" lists owned records on the label with no plays
+- Discogs' disambiguation numbers ("Dirty Looks (4)") are dropped, so they group with the plain name
+- Plays of a record you own count to the label printed on your copy (a reissue counts to its reissue label); albums on two labels count on both; spellings like "Sub Pop" and "Sub Pop Records" are one label
+- Albums you don't own count too, by their label looked up in the background: MusicBrainz first (exactly, when Last.fm sent the album's MusicBrainz ID), then Discogs, taking the label the album first came out on. About 1,700 albums with 3+ plays, 20 a minute from two minutes after the server starts. Switch "Include albums you don't own" off to see owned records only
+- Each album shows where its label came from: Owned, MusicBrainz, Discogs or You set
+- An album you don't own has a Label line on its page: confirm or reject a possible match, set the label yourself (a comma-separated list, or none), or go back to the looked-up one. Your labels are kept in backups
 
 **Clickable Links Across the App:**
 - Stats page top lists (artists, albums, tracks)
@@ -518,6 +521,8 @@ Sync and manage your Discogs wantlist with vinyl availability tracking:
 **New Releases Tab:**
 - Track new vinyl pressings for albums on your wishlist
 - Automatic detection of new versions (pressings) for master releases
+- Every Discogs pressing the app sees is kept in one catalogue (`data/discogs/pressings.json`), shared by the wishlist, new-release checks and seller matching. The first look at a record only learns its pressings; later, any vinyl pressing not in the catalogue, released last year or this year, is flagged (undated ones once every pressing of the record has been seen). Check Next Batch fetches every page of each record once a month so undated pressings are learned, and a record whose newest pressings show no vinyl is checked in full before it is called CD-only
+- Any Discogs fetch of a record's pressings counts: wishlist syncs and seller cache refreshes flag new pressings too, and Check Next Batch skips records fetched in the last week
 - Batch processing respects Discogs API rate limits
 - Filter by source: Discogs Wishlist, Local Want List, or Vinyl Watch List
 - Filter by detection timeframe: 7 days, 30 days, or 90 days
@@ -864,6 +869,7 @@ Protect your user-generated data with manual and automatic backups:
 - Dismissed album merge suggestions
 - Track mappings (track names counted as another track, including album page merges)
 - Compound-artist mappings
+- Labels you set for albums you don't own (label pages)
 - Unresolved history: album assignments for albumless plays, hidden tracks, and excluded artists
 - Artist name mappings (scrobbling and discovery)
 - Hidden albums and artists (Discovery page)
@@ -935,6 +941,7 @@ src/
 │   ├── services/                  # Business logic
 │   │   ├── authService.ts         # Encrypted credential storage
 │   │   ├── discogsService.ts      # Discogs API client (rate-limited)
+│   │   ├── discogsPressingsService.ts # One catalogue of Discogs pressings (versions) for every feature
 │   │   ├── lastfmService.ts       # Last.fm API client
 │   │   ├── analyticsService.ts    # Listening analytics
 │   │   ├── statsService.ts        # Stats calculations

@@ -25,7 +25,6 @@ import {
   CollectionArtistsCacheStore,
   CollectionValueCacheStore,
   SellerMatchesStore,
-  VersionsCache,
 } from '../../shared/types';
 import { isTempFileName, isTempPathActive } from '../utils/atomicWrite';
 import { FileStorage } from '../utils/fileStorage';
@@ -53,7 +52,6 @@ interface ImageCache {
 export interface CleanupReport {
   imagesRemoved: number;
   soldMatchesRemoved: number;
-  versionsCacheEntriesRemoved: number;
   inventoryCacheFilesRemoved: number;
   collectionArtistsCacheCleared: boolean;
   artistTagsEntriesRemoved: number;
@@ -69,7 +67,6 @@ export class CleanupService {
   // Retention periods in milliseconds
   private readonly IMAGE_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
   private readonly SOLD_MATCH_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-  private readonly VERSIONS_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
   private readonly INVENTORY_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
   private readonly COLLECTION_ARTISTS_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
   private readonly ARTIST_TAGS_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -90,7 +87,6 @@ export class CleanupService {
     const report: CleanupReport = {
       imagesRemoved: 0,
       soldMatchesRemoved: 0,
-      versionsCacheEntriesRemoved: 0,
       inventoryCacheFilesRemoved: 0,
       collectionArtistsCacheCleared: false,
       artistTagsEntriesRemoved: 0,
@@ -121,15 +117,6 @@ export class CleanupService {
       report.soldMatchesRemoved = await this.cleanupSoldMatches();
     } catch (e) {
       const msg = `Sold match cleanup failed: ${e instanceof Error ? e.message : String(e)}`;
-      report.errors.push(msg);
-      log.error(msg);
-    }
-
-    // Versions cache (wishlist)
-    try {
-      report.versionsCacheEntriesRemoved = await this.cleanupVersionsCache();
-    } catch (e) {
-      const msg = `Versions cache cleanup failed: ${e instanceof Error ? e.message : String(e)}`;
       report.errors.push(msg);
       log.error(msg);
     }
@@ -187,7 +174,6 @@ export class CleanupService {
       `Cleanup complete in ${report.durationMs}ms: ` +
         `${report.imagesRemoved} image entries, ` +
         `${report.soldMatchesRemoved} sold matches, ` +
-        `${report.versionsCacheEntriesRemoved} version cache entries, ` +
         `${report.inventoryCacheFilesRemoved} inventory cache files removed${
           report.collectionArtistsCacheCleared
             ? ', collection artists cache cleared'
@@ -265,43 +251,6 @@ export class CleanupService {
     if (removed > 0) {
       await this.storage.writeJSONWithBackup('sellers/matches.json', store);
       log.debug(`Removed ${removed} old sold matches`);
-    }
-
-    return removed;
-  }
-
-  /**
-   * Clean up old versions cache entries.
-   * Removes entries where fetchedAt is older than VERSIONS_CACHE_MAX_AGE_MS.
-   *
-   * @returns Number of entries removed
-   */
-  async cleanupVersionsCache(): Promise<number> {
-    const cutoff = nowUnixMs() - this.VERSIONS_CACHE_MAX_AGE_MS;
-
-    const cache = await this.storage.readJSON<VersionsCache>(
-      'wishlist/versions-cache.json'
-    );
-    if (!cache?.entries) return 0;
-
-    let removed = 0;
-
-    // Filter out expired entries
-    for (const masterIdStr of Object.keys(cache.entries)) {
-      const masterId = Number(masterIdStr);
-      const entry = cache.entries[masterId];
-      if (entry && entry.fetchedAt < cutoff) {
-        delete cache.entries[masterId];
-        removed++;
-      }
-    }
-
-    if (removed > 0) {
-      await this.storage.writeJSONWithBackup(
-        'wishlist/versions-cache.json',
-        cache
-      );
-      log.debug(`Removed ${removed} expired versions cache entries`);
     }
 
     return removed;
@@ -477,7 +426,6 @@ export class CleanupService {
   getRetentionSettings(): {
     imageCacheMaxAgeMs: number;
     soldMatchMaxAgeMs: number;
-    versionsCacheMaxAgeMs: number;
     inventoryCacheMaxAgeMs: number;
     collectionArtistsCacheMaxAgeMs: number;
     artistTagsCacheMaxAgeMs: number;
@@ -486,7 +434,6 @@ export class CleanupService {
     return {
       imageCacheMaxAgeMs: this.IMAGE_CACHE_MAX_AGE_MS,
       soldMatchMaxAgeMs: this.SOLD_MATCH_MAX_AGE_MS,
-      versionsCacheMaxAgeMs: this.VERSIONS_CACHE_MAX_AGE_MS,
       inventoryCacheMaxAgeMs: this.INVENTORY_CACHE_MAX_AGE_MS,
       collectionArtistsCacheMaxAgeMs: this.COLLECTION_ARTISTS_CACHE_MAX_AGE_MS,
       artistTagsCacheMaxAgeMs: this.ARTIST_TAGS_CACHE_MAX_AGE_MS,
