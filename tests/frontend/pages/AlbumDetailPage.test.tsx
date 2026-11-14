@@ -100,6 +100,13 @@ jest.mock('../../../src/renderer/services/api', () => ({
   }),
 }));
 
+jest.mock('../../../src/renderer/components/AlbumLabelLine', () => ({
+  __esModule: true,
+  default: ({ artist, album }: { artist: string; album: string }) => (
+    <div data-testid='album-label-line'>{`${artist}|${album}`}</div>
+  ),
+}));
+
 describe('AlbumDetailPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -254,6 +261,33 @@ describe('AlbumDetailPage', () => {
   });
 
   // -------------------------------------------------------------- collection / nav
+
+  it("shows the label line for an album you don't own, by the names it was opened with", async () => {
+    // The page may show other names (e.g. a mapping's target album); the
+    // label key is worked out from the names the album was opened with
+    mockStatsApi.getAlbumDetail.mockResolvedValue({
+      success: true,
+      data: { ...baseAlbumData, artist: 'RADIOHEAD', album: 'Kid A (Mapped)' },
+    });
+
+    render(<AlbumDetailPage />);
+
+    expect(await screen.findByTestId('album-label-line')).toHaveTextContent(
+      'Radiohead|Kid A'
+    );
+  });
+
+  it('leaves the label line out for an owned album', async () => {
+    mockStatsApi.getAlbumDetail.mockResolvedValue({
+      success: true,
+      data: { ...baseAlbumData, inCollection: true, collectionReleaseId: 1 },
+    });
+
+    render(<AlbumDetailPage />);
+    await screen.findByRole('heading', { level: 1 });
+
+    expect(screen.queryByTestId('album-label-line')).not.toBeInTheDocument();
+  });
 
   it('does not render "View in Collection" when inCollection is false', async () => {
     render(<AlbumDetailPage />);

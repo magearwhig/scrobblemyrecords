@@ -552,6 +552,82 @@ export default function createStatsRouter(
   });
 
   /**
+   * GET /api/v1/stats/top/labels/:period
+   * Most played labels for a period (see StatsService.getTopLabels)
+   * Query params:
+   *   limit: number (default: 10)
+   *   startDate, endDate: Unix seconds, for the custom period
+   *   includeUnowned: 'false' to count only albums you own
+   */
+  router.get('/top/labels/:period', async (req: Request, res: Response) => {
+    try {
+      const period = req.params.period as
+        | 'week'
+        | 'month'
+        | 'year'
+        | 'all'
+        | 'days30'
+        | 'days90'
+        | 'days365'
+        | 'custom';
+      const validPeriods = [
+        'week',
+        'month',
+        'year',
+        'all',
+        'days30',
+        'days90',
+        'days365',
+        'custom',
+      ];
+      if (!validPeriods.includes(period)) {
+        return res.status(400).json({
+          success: false,
+          error:
+            'Invalid period. Must be week, month, year, all, days30, days90, days365, or custom',
+        });
+      }
+      const limit = parseInt(req.query.limit as string) || 10;
+      const startDate = req.query.startDate
+        ? parseInt(req.query.startDate as string)
+        : undefined;
+      const endDate = req.query.endDate
+        ? parseInt(req.query.endDate as string)
+        : undefined;
+      if (period === 'custom' && (!startDate || !endDate)) {
+        return res.status(400).json({
+          success: false,
+          error:
+            'Custom period requires startDate and endDate query parameters',
+        });
+      }
+
+      const settings = await authService.getUserSettings();
+      const username = settings.discogs.username;
+      const collection = username ? await loadCollection(username) : [];
+
+      const data = await statsService.getTopLabels(period, limit, collection, {
+        startDate,
+        endDate,
+        includeUnowned: req.query.includeUnowned !== 'false',
+      });
+
+      res.json({
+        success: true,
+        data,
+        period,
+        ...(period === 'custom' && { startDate, endDate }),
+      });
+    } catch (error) {
+      logger.error('Error getting top labels', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
    * GET /api/v1/stats/top/tracks/:period
    * Get top tracks for a time period
    * Query params:
@@ -1172,6 +1248,47 @@ export default function createStatsRouter(
   });
 
   /**
+   * GET /api/v1/stats/label/:labelName
+   * Listening on a label: albums you own on it, plus (unless
+   * includeUnowned=false) albums you don't own by their looked-up label.
+   * 404 for a placeholder label ("Not On Label") or one with nothing on it.
+   * Query params:
+   *   trendPeriod: 'month' | 'week' (default: 'month')
+   *   includeUnowned: 'false' to count owned albums only
+   */
+  router.get('/label/:labelName', async (req: Request, res: Response) => {
+    try {
+      const labelName = req.params.labelName;
+      const trendPeriod = req.query.trendPeriod === 'week' ? 'week' : 'month';
+
+      const settings = await authService.getUserSettings();
+      const username = settings.discogs.username;
+      const collection = username ? await loadCollection(username) : [];
+
+      const data = await statsService.getLabelDetail(
+        labelName,
+        trendPeriod,
+        collection,
+        { includeUnowned: req.query.includeUnowned !== 'false' }
+      );
+      if (!data) {
+        return res.status(404).json({
+          success: false,
+          error: 'No albums on this label in your collection',
+        });
+      }
+
+      res.json({ success: true, data });
+    } catch (error) {
+      logger.error('Error getting label detail', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
    * GET /api/v1/stats/track
    * Get detailed stats for a specific track
    * Query params:
@@ -1414,24 +1531,9 @@ export default function createStatsRouter(
         });
       }
 
+      // Covers are left to the page (the batch image endpoint): fetching one
+      // per album here held the answer up for ten seconds on a cold cache
       const result = await statsService.getOnThisDay(month, day);
-
-      // Enrich with images if ImageService is available
-      if (imageService) {
-        for (const yearEntry of result.years) {
-          await Promise.all(
-            yearEntry.albums.map(async album => {
-              const coverUrl = await imageService.getAlbumCover(
-                album.artist,
-                album.album
-              );
-              if (coverUrl) {
-                album.coverUrl = coverUrl;
-              }
-            })
-          );
-        }
-      }
 
       res.json({
         success: true,
@@ -1507,7 +1609,10 @@ export default function createStatsRouter(
         });
       }
 
-      const data = await statsService.getCollectionROI(limit);
+      const settings = await authService.getUserSettings();
+      const username = settings.discogs.username;
+      const collection = username ? await loadCollection(username) : [];
+      const data = await statsService.getCollectionROI(collection, limit);
       res.json({ success: true, data });
     } catch (error) {
       logger.error('Error getting collection ROI', error);

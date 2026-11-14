@@ -4,8 +4,8 @@ Second external review, after round 1 (`site-review-2026-10-23.md`) was merged a
 Every bug below was checked against the source before being listed.
 
 **Status (merged 2026-10-25, PR #21):** R1–R7, all 3 quick wins and all 3 improvements done,
-plus a Runtime sort on Browse Collection (owner request). R8 skipped: the owner doesn't use the
-app from other devices. Shelf census is planned; the other two feature ideas are open.
+plus a Runtime sort on Browse Collection (owner request). R8 was skipped at the
+time, then shipped 2026-11-09 (PR #28) once the owner started using a phone. Shelf census is planned; the other two feature ideas are open.
 
 Notes on what shipped:
 - R1: a full sync retries each page 3 times and then stops with an error. A complete index
@@ -69,7 +69,7 @@ Notes on what shipped:
 - [x] **R7 (medium): Discovery's Map results can't be chosen with the keyboard.**
   `DiscoveryPage.tsx:481`. Each result is a clickable `div` with no tab stop.
   Fix: use buttons, disabled while saving.
-- [ ] **R8 (high if LAN/phone use is wanted): the frontend always calls `localhost`.**
+- [x] **R8 (high if LAN/phone use is wanted; shipped 2026-11-09, PR #28): the frontend always calls `localhost`.**
   `AppContext.tsx:20`, `statsApi.ts:42`, CSP `connect-src 'self' http://localhost:*`
   (`public/index.html:6`). The README documents a headless backend with `HOST=0.0.0.0`, but
   the UI can't reach it from any other device, a phone included.

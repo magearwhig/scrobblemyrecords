@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import './AlbumDetailPage.page.css';
 
 import { AlbumDetailResponse } from '../../shared/types';
+import AlbumLabelLine from '../components/AlbumLabelLine';
 import ArtistLink from '../components/ArtistLink';
 import AddToCrateMenu from '../components/crates/AddToCrateMenu';
 import { AlbumListeningArc } from '../components/stats/AlbumListeningArc';
@@ -373,6 +374,11 @@ const AlbumDetailPage: React.FC = () => {
           <p className='detail-page-meta album-detail-artist-line'>
             by <ArtistLink artist={displayArtist} />
           </p>
+          {/* Keyed by the names the album was opened with: the server maps
+              them to the album key the label pages use */}
+          {!data.inCollection && albumInfo && (
+            <AlbumLabelLine artist={albumInfo.artist} album={albumInfo.album} />
+          )}
           <p className='detail-page-meta'>
             {data.playCount.toLocaleString()}{' '}
             {data.playCount === 1 ? 'scrobble' : 'scrobbles'}

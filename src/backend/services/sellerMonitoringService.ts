@@ -20,6 +20,10 @@ import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
 import { AuthService } from './authService';
+import {
+  DiscogsPressingsService,
+  MASTER_COMPLETE_FRESH_MS,
+} from './discogsPressingsService';
 import { jobStatusService } from './jobStatusService';
 import { WishlistService } from './wishlistService';
 
@@ -32,21 +36,9 @@ const STALE_MATCH_PRUNE_DAYS = 30;
 // Retry constants for rate limiting
 const MAX_RETRIES = 3;
 
-// How old a master's cached releases can be before we refresh them (in days)
-// This catches new pressings/reissues for albums already in the cache
-const MASTER_RELEASE_REFRESH_DAYS = 30;
-
-// Release cache for mapping release_id -> master_id
-interface ReleaseMasterCache {
-  // Maps release_id -> master_id
-  releaseToMaster: Record<number, number>;
-  // Maps master_id -> { releases: number[], fetchedAt: timestamp }
-  masterToReleases: Record<number, { releases: number[]; fetchedAt: number }>;
-  // When this cache was last updated
-  lastUpdated: number;
-  // Schema version for cache migration
-  schemaVersion?: number;
-}
+// How old a master's pressings list can be before refresh fetches it again;
+// this catches new pressings/reissues for albums already in the catalogue
+const MASTER_RELEASE_REFRESH_MS = MASTER_COMPLETE_FRESH_MS;
 
 // Vinyl format patterns
 const VINYL_FORMATS = [
@@ -75,10 +67,8 @@ export class SellerMonitoringService {
   private readonly SCAN_STATUS_FILE = 'sellers/scan-status.json';
   private readonly SETTINGS_FILE = 'sellers/settings.json';
   private readonly INVENTORY_CACHE_DIR = 'sellers/inventory-cache';
-  private readonly RELEASE_CACHE_FILE = 'sellers/release-master-cache.json';
 
   // In-memory release cache (loaded from file on first use)
-  private releaseCache: ReleaseMasterCache | null = null;
 
   // Release cache refresh progress (in memory - a restart ends the refresh)
   private cacheRefreshStatus: ReleaseCacheRefreshStatus = {
@@ -1216,128 +1206,18 @@ export class SellerMonitoringService {
   // Release-to-Master Cache Methods
   // =====================================================
 
-  /**
-   * Load the release-to-master cache from disk
-   * Handles migration from old schema (arrays) to new schema (objects with timestamps)
-   */
-  private async loadReleaseCache(): Promise<ReleaseMasterCache> {
-    if (this.releaseCache) {
-      return this.releaseCache;
-    }
-
-    try {
-      const cache = await this.fileStorage.readJSON<ReleaseMasterCache>(
-        this.RELEASE_CACHE_FILE
-      );
-      if (cache) {
-        // Check if migration is needed (old schema used arrays, new uses objects)
-        if (cache.schemaVersion !== 2 && cache.masterToReleases) {
-          this.logger.info(
-            'Migrating release cache to new schema with timestamps...'
-          );
-          const migratedMasterToReleases: Record<
-            number,
-            { releases: number[]; fetchedAt: number }
-          > = {};
-
-          for (const [masterId, releases] of Object.entries(
-            cache.masterToReleases
-          )) {
-            // Old format: number[], new format: { releases: number[], fetchedAt: number }
-            if (Array.isArray(releases)) {
-              migratedMasterToReleases[Number(masterId)] = {
-                releases: releases as number[],
-                fetchedAt: cache.lastUpdated || Date.now(), // Use lastUpdated as approximate fetch time
-              };
-            } else {
-              // Already in new format
-              migratedMasterToReleases[Number(masterId)] = releases as {
-                releases: number[];
-                fetchedAt: number;
-              };
-            }
-          }
-
-          cache.masterToReleases = migratedMasterToReleases;
-          cache.schemaVersion = 2;
-          this.logger.info(
-            `Migrated ${Object.keys(migratedMasterToReleases).length} masters to new schema`
-          );
-        }
-
-        this.releaseCache = cache;
-        this.logger.debug(
-          `Loaded release cache: ${Object.keys(cache.releaseToMaster).length} releases, ${Object.keys(cache.masterToReleases).length} masters`
-        );
-        return cache;
-      }
-    } catch {
-      // Cache doesn't exist yet
-    }
-
-    // Initialize empty cache with new schema
-    this.releaseCache = {
-      releaseToMaster: {},
-      masterToReleases: {},
-      lastUpdated: Date.now(),
-      schemaVersion: 2,
-    };
-    return this.releaseCache;
+  /** The Discogs pressings catalogue (owned by the wishlist service) */
+  private get pressings(): DiscogsPressingsService {
+    return this.wishlistService.pressings;
   }
 
-  /**
-   * Save the release-to-master cache to disk
-   */
-  private async saveReleaseCache(): Promise<void> {
-    if (!this.releaseCache) return;
-
-    this.releaseCache.lastUpdated = Date.now();
-    await this.fileStorage.writeJSON(
-      this.RELEASE_CACHE_FILE,
-      this.releaseCache
+  /** When every pressing of a master was last fetched, if within the window */
+  private async isMasterFresh(masterId: number): Promise<boolean> {
+    const { completeCheckedAt } = await this.pressings.masterStatus(masterId);
+    return (
+      completeCheckedAt !== undefined &&
+      Date.now() - completeCheckedAt < MASTER_RELEASE_REFRESH_MS
     );
-    this.logger.debug(
-      `Saved release cache: ${Object.keys(this.releaseCache.releaseToMaster).length} releases`
-    );
-  }
-
-  /**
-   * Add a release->master mapping to the cache
-   * @param releaseId The release ID
-   * @param masterId The master ID
-   * @param updateTimestamp If true, update the fetchedAt timestamp for the master
-   */
-  private addToReleaseCache(
-    releaseId: number,
-    masterId: number,
-    updateTimestamp = false
-  ): void {
-    if (!this.releaseCache) return;
-
-    this.releaseCache.releaseToMaster[releaseId] = masterId;
-
-    // Also update the reverse mapping
-    if (!this.releaseCache.masterToReleases[masterId]) {
-      this.releaseCache.masterToReleases[masterId] = {
-        releases: [],
-        fetchedAt: Date.now(),
-      };
-    }
-    if (
-      !this.releaseCache.masterToReleases[masterId].releases.includes(releaseId)
-    ) {
-      this.releaseCache.masterToReleases[masterId].releases.push(releaseId);
-    }
-    if (updateTimestamp) {
-      this.releaseCache.masterToReleases[masterId].fetchedAt = Date.now();
-    }
-  }
-
-  /**
-   * Get cached master_id for a release, or undefined if not cached
-   */
-  private getCachedMasterId(releaseId: number): number | undefined {
-    return this.releaseCache?.releaseToMaster[releaseId];
   }
 
   /**
@@ -1351,7 +1231,7 @@ export class SellerMonitoringService {
     _wishlistMasterIds: Set<number>
   ): Promise<{ masterId: number | undefined; rateLimited: boolean }> {
     // First check the cache
-    const cachedMasterId = this.getCachedMasterId(releaseId);
+    const cachedMasterId = await this.pressings.masterOf(releaseId);
     if (cachedMasterId !== undefined) {
       return { masterId: cachedMasterId, rateLimited: false };
     }
@@ -1361,78 +1241,34 @@ export class SellerMonitoringService {
     const result = await this.lookupMasterId(releaseId);
     if (result.masterId !== undefined) {
       // Add to cache for future lookups
-      this.addToReleaseCache(releaseId, result.masterId);
+      await this.pressings.noteReleaseMaster(releaseId, result.masterId);
     }
 
     return result;
   }
 
   /**
-   * Fetch all releases for a master_id from Discogs API
-   * This pre-populates the cache so subsequent scans don't need API calls
-   * @returns The release IDs fetched, and whether the fetch failed part-way
+   * Fetch every pressing of a master into the catalogue (which also flags any
+   * not seen before). Masters fetched in full within the refresh window are
+   * read from the catalogue.
+   * @returns The master's release IDs, and whether the fetch failed part-way
    */
   private async fetchReleasesForMaster(
     masterId: number
   ): Promise<{ releaseIds: number[]; failed: boolean }> {
-    const releaseIds: number[] = [];
-    let failed = false;
-    const previousFetchedAt =
-      this.releaseCache?.masterToReleases[masterId]?.fetchedAt;
-
     try {
-      const headers = await this.getAuthHeaders();
-      let page = 1;
-      let hasMore = true;
-      let isFirstRelease = true;
-
-      while (hasMore) {
-        const response = await this.executeWithRetry(
-          () =>
-            this.axios.get(`/masters/${masterId}/versions`, {
-              headers,
-              params: {
-                page,
-                per_page: 100,
-              },
-            }),
-          `fetch versions for master ${masterId} page ${page}`
-        );
-
-        const versions = response.data?.versions || [];
-        for (const version of versions) {
-          if (version.id) {
-            releaseIds.push(version.id);
-            // Update timestamp on first release to mark when we fetched this master
-            this.addToReleaseCache(version.id, masterId, isFirstRelease);
-            isFirstRelease = false;
-          }
-        }
-
-        // Check if there are more pages
-        const pagination = response.data?.pagination;
-        hasMore = pagination && page < pagination.pages;
-        page++;
-      }
-
-      this.logger.debug(
-        `Fetched ${releaseIds.length} releases for master ${masterId}`
+      const { releaseIds, failed } = await this.pressings.getPressings(
+        masterId,
+        { need: 'complete', maxAgeMs: MASTER_RELEASE_REFRESH_MS }
       );
+      return { releaseIds, failed };
     } catch (error) {
-      failed = true;
-      // Pages fetched before the failure bumped fetchedAt; restore it so a
-      // partially fetched master stays stale and is retried next refresh
-      const entry = this.releaseCache?.masterToReleases[masterId];
-      if (entry) {
-        entry.fetchedAt = previousFetchedAt ?? 0;
-      }
       this.logger.warn(
         `Failed to fetch releases for master ${masterId}`,
         error
       );
+      return { releaseIds: [], failed: true };
     }
-
-    return { releaseIds, failed };
   }
 
   /** Whether a seller scan is currently running */
@@ -1454,7 +1290,7 @@ export class SellerMonitoringService {
    * Start pre-populating the release cache in the background with all releases
    * for wishlist master IDs. Makes subsequent inventory scans much faster (no
    * API calls needed). Also refreshes stale masters (older than
-   * MASTER_RELEASE_REFRESH_DAYS) to catch new pressings.
+   * MASTER_COMPLETE_FRESH_MS) to catch new pressings.
    *
    * Returns immediately; poll getReleaseCacheRefreshStatus for progress. If a
    * refresh is already running, returns its status without starting another.
@@ -1496,7 +1332,7 @@ export class SellerMonitoringService {
           jobId,
           mastersProcessed === 0
             ? 'Release matching cache is already up to date'
-            : `Release matching cache refreshed: ${mastersProcessed} masters, ${releasesAdded} new releases${failedText}`
+            : `Release matching cache refreshed: ${mastersProcessed} masters, ${releasesAdded} pressings added${failedText}`
         );
       })
       .catch(error => {
@@ -1519,34 +1355,27 @@ export class SellerMonitoringService {
   }
 
   private async runReleaseCacheRefresh(): Promise<void> {
-    await this.loadReleaseCache();
     const wishlistMasterIds = await this.getWishlistMasterIds();
-    const now = Date.now();
-    const staleThreshold =
-      now - MASTER_RELEASE_REFRESH_DAYS * 24 * 60 * 60 * 1000;
 
     // Work out what needs fetching up front so progress has a real total
     const toFetch: { masterId: number; isStaleRefresh: boolean }[] = [];
     let mastersSkipped = 0;
     for (const masterId of wishlistMasterIds) {
-      const existing = this.releaseCache!.masterToReleases[masterId];
-      const existingReleases = existing?.releases?.length || 0;
-      const isStale = (existing?.fetchedAt || 0) < staleThreshold;
-
-      // Skip if we have recent releases for this master (not stale)
-      if (existingReleases > 0 && !isStale) {
+      if (await this.isMasterFresh(masterId)) {
         mastersSkipped++;
       } else {
-        toFetch.push({ masterId, isStaleRefresh: existingReleases > 0 });
+        const { completeCheckedAt } =
+          await this.pressings.masterStatus(masterId);
+        toFetch.push({
+          masterId,
+          isStaleRefresh: completeCheckedAt !== undefined,
+        });
       }
     }
 
-    const startReleaseCount = Object.keys(
-      this.releaseCache!.releaseToMaster
-    ).length;
-    const releasesAddedSoFar = () =>
-      Object.keys(this.releaseCache!.releaseToMaster).length -
-      startReleaseCount;
+    const startReleaseCount = (await this.pressings.stats()).totalReleases;
+    const releasesAddedSoFar = async () =>
+      (await this.pressings.stats()).totalReleases - startReleaseCount;
 
     this.cacheRefreshStatus = {
       ...this.cacheRefreshStatus,
@@ -1567,24 +1396,21 @@ export class SellerMonitoringService {
         mastersFailed: status.mastersFailed + (failed ? 1 : 0),
         staleRefreshed:
           status.staleRefreshed + (isStaleRefresh && !failed ? 1 : 0),
-        releasesAdded: releasesAddedSoFar(),
+        releasesAdded: await releasesAddedSoFar(),
       };
 
-      // Save periodically in case of interruption
+      // Each master is saved as it is fetched
       if (this.cacheRefreshStatus.mastersProcessed % 10 === 0) {
-        await this.saveReleaseCache();
         this.logger.info(
           `Cache refresh progress: ${this.cacheRefreshStatus.mastersProcessed}/${toFetch.length} masters processed`
         );
       }
     }
 
-    await this.saveReleaseCache();
-
     this.cacheRefreshStatus = {
       ...this.cacheRefreshStatus,
       status: 'completed',
-      releasesAdded: releasesAddedSoFar(),
+      releasesAdded: await releasesAddedSoFar(),
       completedAt: Date.now(),
     };
     const { mastersProcessed, mastersFailed, staleRefreshed, releasesAdded } =
@@ -1608,43 +1434,21 @@ export class SellerMonitoringService {
       return { mastersProcessed: 0, releasesAdded: 0 };
     }
 
-    await this.loadReleaseCache();
-
     this.logger.info(
       `Updating release cache for ${masterIds.length} new masters from wishlist...`
     );
 
     let mastersProcessed = 0;
-    const startReleaseCount = Object.keys(
-      this.releaseCache!.releaseToMaster
-    ).length;
+    const startReleaseCount = (await this.pressings.stats()).totalReleases;
 
     for (const masterId of masterIds) {
-      // Skip if we already have releases for this master
-      const existing = this.releaseCache!.masterToReleases[masterId];
-      if (existing?.releases?.length > 0) {
-        this.logger.debug(
-          `Skipping master ${masterId} - already have ${existing.releases.length} releases cached`
-        );
-        continue;
-      }
-
+      if (await this.isMasterFresh(masterId)) continue;
       await this.fetchReleasesForMaster(masterId);
       mastersProcessed++;
-
-      // Save periodically
-      if (mastersProcessed % 5 === 0) {
-        await this.saveReleaseCache();
-      }
-    }
-
-    if (mastersProcessed > 0) {
-      await this.saveReleaseCache();
     }
 
     const releasesAdded =
-      Object.keys(this.releaseCache!.releaseToMaster).length -
-      startReleaseCount;
+      (await this.pressings.stats()).totalReleases - startReleaseCount;
 
     this.logger.info(
       `Cache update for new wishlist masters complete: ${mastersProcessed} masters, ${releasesAdded} releases added`
@@ -1662,55 +1466,35 @@ export class SellerMonitoringService {
     lastUpdated: number;
     staleMasters: number;
   }> {
-    const cache = await this.loadReleaseCache();
     const wishlistMasterIds = await this.getWishlistMasterIds();
-    const now = Date.now();
-    const staleThreshold =
-      now - MASTER_RELEASE_REFRESH_DAYS * 24 * 60 * 60 * 1000;
-
-    // Only count stale masters that are still on the wishlist
     let staleMasters = 0;
+    let lastUpdated = 0;
     for (const masterId of wishlistMasterIds) {
-      const data = cache.masterToReleases[masterId];
-      if (data && data.fetchedAt < staleThreshold) {
+      const { completeCheckedAt, knownCount } =
+        await this.pressings.masterStatus(masterId);
+      lastUpdated = Math.max(lastUpdated, completeCheckedAt ?? 0);
+      // Only count masters with pressings that are due a full refetch
+      if (knownCount > 0 && !(await this.isMasterFresh(masterId))) {
         staleMasters++;
       }
     }
-
-    return {
-      totalReleases: Object.keys(cache.releaseToMaster).length,
-      totalMasters: Object.keys(cache.masterToReleases).length,
-      lastUpdated: cache.lastUpdated,
-      staleMasters,
-    };
+    const { totalReleases, totalMasters } = await this.pressings.stats();
+    return { totalReleases, totalMasters, lastUpdated, staleMasters };
   }
 
   /**
    * Check if the release cache is "complete" for matching purposes.
-   * Complete means: all wishlist masters have been fetched (no stale masters).
-   * When complete, we can skip API calls for releases not in cache - they're not on wishlist.
+   * Complete means: every wishlist master's pressings were all fetched within
+   * the refresh window. When complete, we can skip API calls for releases
+   * not in the catalogue - they're not on the wishlist (or are pressings
+   * added since, found at the next refresh).
    */
   private async isCacheCompleteForMatching(
     wishlistMasterIds: Set<number>
   ): Promise<boolean> {
-    if (!this.releaseCache) return false;
-
-    const now = Date.now();
-    const staleThreshold =
-      now - MASTER_RELEASE_REFRESH_DAYS * 24 * 60 * 60 * 1000;
-
-    // Check if all wishlist masters are in cache and not stale
     for (const masterId of wishlistMasterIds) {
-      const cached = this.releaseCache.masterToReleases[masterId];
-      if (
-        !cached ||
-        cached.releases.length === 0 ||
-        cached.fetchedAt < staleThreshold
-      ) {
-        return false;
-      }
+      if (!(await this.isMasterFresh(masterId))) return false;
     }
-
     return true;
   }
 
@@ -1797,9 +1581,6 @@ export class SellerMonitoringService {
     const wishlistMasterIds = await this.getWishlistMasterIds();
     const matches: SellerMatch[] = [];
 
-    // Load the persistent release cache
-    await this.loadReleaseCache();
-
     // Map existing matches by listing ID for lookup
     const existingByListingId = new Map<number, SellerMatch>();
     for (const match of existingMatches) {
@@ -1848,9 +1629,9 @@ export class SellerMonitoringService {
         this.logger.info(
           `Scan cancelled during matching at item ${itemsProcessed}/${totalItems}`
         );
-        // Save the release cache with whatever we've accumulated
+        // Save the release lookups made so far
         if (apiCalls > 0) {
-          await this.saveReleaseCache();
+          await this.pressings.flush();
         }
         break; // Exit the loop, return whatever matches we found so far
       }
@@ -1896,7 +1677,7 @@ export class SellerMonitoringService {
       // 2. If cache is complete and not found, skip (not on wishlist)
       // 3. Check session cache (releases looked up this scan)
       // 4. Fall back to API call
-      let masterId = this.getCachedMasterId(item.releaseId);
+      let masterId = await this.pressings.masterOf(item.releaseId);
 
       if (masterId !== undefined) {
         cacheHits++;
@@ -1921,7 +1702,7 @@ export class SellerMonitoringService {
 
         // Add to persistent cache for future scans
         if (masterId !== undefined) {
-          this.addToReleaseCache(item.releaseId, masterId);
+          await this.pressings.noteReleaseMaster(item.releaseId, masterId);
         }
 
         // Log progress every 100 API calls
@@ -1962,7 +1743,7 @@ export class SellerMonitoringService {
 
     // Save the cache to disk (new lookups will be persisted for future scans)
     if (apiCalls > 0) {
-      await this.saveReleaseCache();
+      await this.pressings.flush();
     }
 
     // Final matching progress update

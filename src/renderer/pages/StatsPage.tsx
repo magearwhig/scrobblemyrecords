@@ -1,17 +1,14 @@
-import { BarChart3, Disc3, Info, Music, PlusCircle } from 'lucide-react';
+import { BarChart3, Disc3, PlusCircle } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import './StatsPage.page.css';
 
 import {
-  AlbumPlayCount,
-  ArtistPlayCount,
   CalendarHeatmapData,
   DateAlbumsResult,
   DateRange,
   DayOfWeekDistributionData,
   DustyCornerAlbum,
-  GenreData,
   HourlyDistributionData,
   ListeningHours,
   MilestoneInfo,
@@ -21,45 +18,27 @@ import {
   StreakInfo,
   CollectionCoverage,
   TimelineDataPoint,
-  TrackPlayCount,
 } from '../../shared/types';
 import { CalendarHeatmap } from '../components/stats/CalendarHeatmap';
-import { CollectionROIChart } from '../components/stats/CollectionROIChart';
 import { DayOfWeekChart } from '../components/stats/DayOfWeekChart';
 import { DustyCornersSection } from '../components/stats/DustyCornersSection';
-import { GenreTreemap } from '../components/stats/GenreTreemap';
 import { HeatmapDayDetail } from '../components/stats/HeatmapDayDetail';
 import { HourlyPolarChart } from '../components/stats/HourlyPolarChart';
-import { ListeningHoursCard } from '../components/stats/ListeningHoursCard';
 import { ListeningTimeline } from '../components/stats/ListeningTimeline';
-import { MilestoneProgress } from '../components/stats/MilestoneProgress';
 import { OnThisDay } from '../components/stats/OnThisDay';
 import { PeriodStatCard } from '../components/stats/PeriodStatCard';
-import { RankingsOverTime } from '../components/stats/RankingsOverTime';
-import { SourcePieChart } from '../components/stats/SourcePieChart';
 import { StatCard } from '../components/stats/StatCard';
+import { StatsRankings } from '../components/stats/StatsRankings';
 import { StreakCard } from '../components/stats/StreakCard';
-import { TasteDriftChart } from '../components/stats/TasteDriftChart';
-import { TopList } from '../components/stats/TopList';
+import { TasteSection } from '../components/stats/TasteSection';
 import { Button } from '../components/ui/Button';
 import { StatsPageSkeleton } from '../components/ui/Skeleton';
 import { useCollectionLookup } from '../hooks/useCollectionLookup';
-import { navigate, ROUTES } from '../routes';
-import { getApiService } from '../services/api';
 import { imagesApi, statsApi } from '../services/statsApi';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('StatsPage');
 
-type Period =
-  | 'week'
-  | 'month'
-  | 'year'
-  | 'all'
-  | 'days30'
-  | 'days90'
-  | 'days365'
-  | 'custom';
 type TimelinePeriod =
   | 'week'
   | 'month'
@@ -76,8 +55,64 @@ type CoveragePeriod =
   | 'days90'
   | 'days365';
 
+/** Records in the Dusty Corners teaser */
+const DUSTY_TEASER_COUNT = 4;
+
+/** 75000 -> "75K", 1000000 -> "1M" */
+function shortNumber(value: number): string {
+  if (value >= 1_000_000 && value % 1_000_000 === 0) {
+    return `${value / 1_000_000}M`;
+  }
+  if (value >= 1000 && value % 1000 === 0) return `${value / 1000}K`;
+  return value.toLocaleString();
+}
+
+/** Listening time: minutes under an hour, else hours to one decimal */
+function formatHours(hours: number): string {
+  return hours < 1 ? `${Math.round(hours * 60)}m` : `${hours.toFixed(1)}h`;
+}
+
+/**
+ * The numbers that used to be cards of their own, on one line: all-time and
+ * yearly plays, the next milestone, estimated listening time and the share
+ * scrobbled through this app.
+ */
+const StatsSummary: React.FC<{
+  counts: ScrobbleCounts | null;
+  milestones: MilestoneInfo | null;
+  listeningHours: ListeningHours | null;
+  sources: SourceBreakdownItem[];
+}> = ({ counts, milestones, listeningHours, sources }) => {
+  const parts: string[] = [];
+  if (counts) {
+    parts.push(`${counts.allTime.toLocaleString()} plays all time`);
+    parts.push(`${counts.thisYear.toLocaleString()} this year`);
+  }
+  if (milestones && milestones.scrobblesToNext > 0) {
+    parts.push(
+      `${milestones.scrobblesToNext.toLocaleString()} to ${shortNumber(milestones.nextMilestone)}`
+    );
+  }
+  if (listeningHours) {
+    // Plays times an average track length, not measured time
+    parts.push(
+      `${formatHours(listeningHours.thisMonth)} this month (estimated)`
+    );
+  }
+  const app = sources.find(s => s.source === 'RecordScrobbles');
+  if (app) {
+    parts.push(`${Math.round(app.percentage)}% scrobbled through this app`);
+  }
+  if (parts.length === 0) return null;
+  return (
+    <p className='stats-summary' data-testid='stats-summary'>
+      {parts.join(' · ')}
+    </p>
+  );
+};
+
 export const StatsPage: React.FC = () => {
-  // Collection lookup for "In Collection" badges
+  // Collection lookup for "Owned" badges in the rankings
   const { collectionMap, collectionArtistCounts, collectionArtistCovers } =
     useCollectionLookup();
 
@@ -96,17 +131,7 @@ export const StatsPage: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedDateData, setSelectedDateData] =
     useState<DateAlbumsResult | null>(null);
-  const [topArtists, setTopArtists] = useState<ArtistPlayCount[]>([]);
-  const [topAlbums, setTopAlbums] = useState<AlbumPlayCount[]>([]);
-  const [topTracks, setTopTracks] = useState<TrackPlayCount[]>([]);
-  // Plays without album info (excluded from album stats)
-  const [unresolvedCount, setUnresolvedCount] = useState(0);
-  const [artistPeriod, setArtistPeriod] = useState<Period>('month');
-  const [albumPeriod, setAlbumPeriod] = useState<Period>('month');
-  const [trackPeriod, setTrackPeriod] = useState<Period>('month');
   const [dustyCorners, setDustyCorners] = useState<DustyCornerAlbum[]>([]);
-  const [topListsLoading, setTopListsLoading] = useState(false);
-  const [dustyLoading] = useState(false);
   const [sourceBreakdown, setSourceBreakdown] = useState<SourceBreakdownItem[]>(
     []
   );
@@ -115,11 +140,6 @@ export const StatsPage: React.FC = () => {
   const [timelineDateRange, setTimelineDateRange] = useState<
     DateRange | undefined
   >();
-  const [artistDateRange, setArtistDateRange] = useState<
-    DateRange | undefined
-  >();
-  const [albumDateRange, setAlbumDateRange] = useState<DateRange | undefined>();
-  const [trackDateRange, setTrackDateRange] = useState<DateRange | undefined>();
   const [newArtistsCount, setNewArtistsCount] = useState<number>(0);
   const [listeningHours, setListeningHours] = useState<ListeningHours | null>(
     null
@@ -149,79 +169,19 @@ export const StatsPage: React.FC = () => {
   const onThisDayRef = useRef<HTMLElement>(null);
   const onThisDayFetched = useRef(false);
 
-  // Genre Treemap (lazy loaded)
-  const [genreData, setGenreData] = useState<GenreData[]>([]);
-  const [genreTotalArtists, setGenreTotalArtists] = useState(0);
-  const [genreLoading, setGenreLoading] = useState(false);
-  const genreRef = useRef<HTMLElement>(null);
-  const genreFetched = useRef(false);
-
-  // Fetch and merge album cover images into album list
-  const enrichAlbumsWithImages = useCallback(
-    async (albums: AlbumPlayCount[]): Promise<AlbumPlayCount[]> => {
-      if (albums.length === 0) return albums;
-      try {
-        const albumRequests = albums.map(a => ({
-          artist: a.artist,
-          album: a.album,
-        }));
-        const imagesRes = await imagesApi.batchGetAlbumCovers(albumRequests);
-        if (imagesRes.success && imagesRes.data) {
-          return albums.map(album => {
-            // Key must be lowercase to match backend normalization
-            const key = `${album.artist.toLowerCase().trim()}|${album.album.toLowerCase().trim()}`;
-            const coverUrl = imagesRes.data![key];
-            return coverUrl ? { ...album, coverUrl } : album;
-          });
-        }
-      } catch (err) {
-        logger.error('Failed to fetch album images', err);
-      }
-      return albums;
-    },
-    []
-  );
-
-  // Fetch and merge artist images into artist list
-  const enrichArtistsWithImages = useCallback(
-    async (artists: ArtistPlayCount[]): Promise<ArtistPlayCount[]> => {
-      if (artists.length === 0) return artists;
-      try {
-        const artistNames = artists.map(a => a.artist);
-        const imagesRes = await imagesApi.batchGetArtistImages(artistNames);
-        if (imagesRes.success && imagesRes.data) {
-          return artists.map(artist => {
-            // Key must be lowercase to match backend normalization
-            const imageUrl =
-              imagesRes.data![artist.artist.toLowerCase().trim()];
-            return imageUrl ? { ...artist, imageUrl } : artist;
-          });
-        }
-      } catch (err) {
-        logger.error('Failed to fetch artist images', err);
-      }
-      return artists;
-    },
-    []
-  );
-
-  // Initial data load
+  // Initial data load. The rankings, taste and lazy sections load their own.
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // Load all data in parallel
         const [
           streaksRes,
           countsRes,
           coverageRes,
           milestonesRes,
           heatmapRes,
-          artistsRes,
-          albumsRes,
-          tracksRes,
           dustyRes,
           sourcesRes,
           timelineRes,
@@ -233,10 +193,7 @@ export const StatsPage: React.FC = () => {
           statsApi.getCollectionCoverage(),
           statsApi.getMilestones(),
           statsApi.getHeatmap(heatmapYear),
-          statsApi.getTopArtists(artistPeriod, 10),
-          statsApi.getTopAlbums(albumPeriod, 10),
-          statsApi.getTopTracks(trackPeriod, 10),
-          statsApi.getDustyCorners(20),
+          statsApi.getDustyCorners(DUSTY_TEASER_COUNT),
           statsApi.getSourceBreakdown(),
           statsApi.getTimeline(
             timelinePeriod,
@@ -262,19 +219,6 @@ export const StatsPage: React.FC = () => {
           setNewArtistsCount(newArtistsRes.data!.count);
         if (listeningHoursRes.success)
           setListeningHours(listeningHoursRes.data!);
-
-        // Set initial data then enrich with images
-        if (artistsRes.success && artistsRes.data) {
-          setTopArtists(artistsRes.data);
-          enrichArtistsWithImages(artistsRes.data).then(setTopArtists);
-        }
-        if (albumsRes.success && albumsRes.data) {
-          setTopAlbums(albumsRes.data);
-          enrichAlbumsWithImages(albumsRes.data).then(setTopAlbums);
-        }
-        if (tracksRes.success && tracksRes.data) {
-          setTopTracks(tracksRes.data);
-        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load stats');
       } finally {
@@ -283,17 +227,8 @@ export const StatsPage: React.FC = () => {
     };
 
     loadInitialData();
-  }, [enrichAlbumsWithImages, enrichArtistsWithImages]);
-
-  // Count of plays without album info, for the note under Top Albums
-  useEffect(() => {
-    Promise.resolve()
-      .then(() => getApiService().getUnresolvedHistorySummary())
-      .then(summary => setUnresolvedCount(summary?.unresolvedCount ?? 0))
-      .catch((err: unknown) => {
-        logger.warn('Failed to load unresolved history summary', err);
-      });
-  }, []);
+    // Loads once; later changes go through the handlers below
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Lazy load listening patterns when section scrolls into view
   useEffect(() => {
@@ -305,7 +240,6 @@ export const StatsPage: React.FC = () => {
         if (entries[0].isIntersecting && !listeningPatternsFetched.current) {
           listeningPatternsFetched.current = true;
 
-          // Fetch hourly distribution
           setHourlyLoading(true);
           statsApi
             .getHourlyDistribution()
@@ -323,7 +257,6 @@ export const StatsPage: React.FC = () => {
               setHourlyLoading(false);
             });
 
-          // Fetch day-of-week distribution
           setDayOfWeekLoading(true);
           statsApi
             .getDayOfWeekDistribution()
@@ -344,10 +277,7 @@ export const StatsPage: React.FC = () => {
             });
         }
       },
-      // Trigger when 10% of the section is visible. A low threshold ensures
-      // data starts loading before the user fully scrolls to the section,
-      // reducing perceived latency. A threshold of 0 would trigger too early
-      // (e.g., 1px visible), while 0.5+ would delay loading noticeably.
+      // Start loading once a tenth of the section is visible
       { threshold: 0.1 }
     );
 
@@ -355,7 +285,8 @@ export const StatsPage: React.FC = () => {
     return () => observer.disconnect();
   }, [loading]);
 
-  // Lazy load On This Day when section scrolls into view
+  // Lazy load On This Day when section scrolls into view. The text shows
+  // first; covers come from the batch image endpoint afterwards.
   useEffect(() => {
     const node = onThisDayRef.current;
     if (!node) return;
@@ -368,9 +299,35 @@ export const StatsPage: React.FC = () => {
           statsApi
             .getOnThisDay()
             .then(res => {
-              if (res.success && res.data) {
-                setOnThisDayData(res.data);
-              }
+              if (!res.success || !res.data) return;
+              const result = res.data;
+              setOnThisDayData(result);
+              const albums = result.years.flatMap(y =>
+                y.albums.map(a => ({ artist: a.artist, album: a.album }))
+              );
+              if (albums.length === 0) return;
+              imagesApi
+                .batchGetAlbumCovers(albums)
+                .then(covers => {
+                  if (!covers.success || !covers.data) return;
+                  const coverFor = (artist: string, album: string) =>
+                    covers.data![
+                      `${artist.toLowerCase().trim()}|${album.toLowerCase().trim()}`
+                    ] ?? null;
+                  setOnThisDayData({
+                    ...result,
+                    years: result.years.map(y => ({
+                      ...y,
+                      albums: y.albums.map(a => ({
+                        ...a,
+                        coverUrl: a.coverUrl ?? coverFor(a.artist, a.album),
+                      })),
+                    })),
+                  });
+                })
+                .catch(err => {
+                  logger.error('Failed to load On This Day covers', err);
+                });
             })
             .catch(err => {
               logger.error('Failed to load On This Day data', err);
@@ -386,101 +343,6 @@ export const StatsPage: React.FC = () => {
     observer.observe(node);
     return () => observer.disconnect();
   }, [loading]);
-
-  // Lazy load Genre Treemap when section scrolls into view
-  useEffect(() => {
-    const node = genreRef.current;
-    if (!node) return;
-
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries[0].isIntersecting && !genreFetched.current) {
-          genreFetched.current = true;
-          setGenreLoading(true);
-          statsApi
-            .getGenreDistribution()
-            .then(res => {
-              if (res.success && res.data) {
-                setGenreData(res.data.genres);
-                setGenreTotalArtists(res.data.totalArtistsAnalyzed);
-              }
-            })
-            .catch(err => {
-              logger.error('Failed to load genre distribution', err);
-            })
-            .finally(() => {
-              setGenreLoading(false);
-            });
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [loading]);
-
-  // Handle artist period change
-  const handleArtistPeriodChange = useCallback(
-    async (period: Period, dateRange?: DateRange) => {
-      setArtistPeriod(period);
-      setArtistDateRange(dateRange);
-      setTopListsLoading(true);
-      try {
-        const res = await statsApi.getTopArtists(period, 10, dateRange);
-        if (res.success && res.data) {
-          setTopArtists(res.data);
-          enrichArtistsWithImages(res.data).then(setTopArtists);
-        }
-      } catch (err) {
-        logger.error('Failed to load top artists', err);
-      } finally {
-        setTopListsLoading(false);
-      }
-    },
-    [enrichArtistsWithImages]
-  );
-
-  // Handle album period change
-  const handleAlbumPeriodChange = useCallback(
-    async (period: Period, dateRange?: DateRange) => {
-      setAlbumPeriod(period);
-      setAlbumDateRange(dateRange);
-      setTopListsLoading(true);
-      try {
-        const res = await statsApi.getTopAlbums(period, 10, dateRange);
-        if (res.success && res.data) {
-          setTopAlbums(res.data);
-          enrichAlbumsWithImages(res.data).then(setTopAlbums);
-        }
-      } catch (err) {
-        logger.error('Failed to load top albums', err);
-      } finally {
-        setTopListsLoading(false);
-      }
-    },
-    [enrichAlbumsWithImages]
-  );
-
-  // Handle track period change
-  const handleTrackPeriodChange = useCallback(
-    async (period: Period, dateRange?: DateRange) => {
-      setTrackPeriod(period);
-      setTrackDateRange(dateRange);
-      setTopListsLoading(true);
-      try {
-        const res = await statsApi.getTopTracks(period, 10, dateRange);
-        if (res.success && res.data) {
-          setTopTracks(res.data);
-        }
-      } catch (err) {
-        logger.error('Failed to load top tracks', err);
-      } finally {
-        setTopListsLoading(false);
-      }
-    },
-    []
-  );
 
   // Handle heatmap year change
   const handleYearChange = useCallback(async (year: number) => {
@@ -519,17 +381,14 @@ export const StatsPage: React.FC = () => {
       setTimelinePeriod(period);
       setTimelineDateRange(dateRange);
       try {
-        // Use appropriate granularity for each period:
-        // - week/days30/custom (short): daily data points
-        // - days90: weekly data points
-        // - year/days365: monthly data points
+        // Daily points for short periods, weekly for about a quarter,
+        // monthly for a year
         let granularity: 'day' | 'week' | 'month' = 'month';
         if (period === 'week' || period === 'days30') {
           granularity = 'day';
         } else if (period === 'days90' || period === 'month') {
           granularity = 'week';
         } else if (period === 'custom' && dateRange) {
-          // For custom ranges, use granularity based on range length
           const rangeDays =
             (dateRange.endDate - dateRange.startDate) / (24 * 60 * 60);
           if (rangeDays <= 31) {
@@ -571,32 +430,16 @@ export const StatsPage: React.FC = () => {
         <h1>Stats Dashboard</h1>
       </header>
 
-      {/* Top stat cards row */}
+      {/* Overview: four cards and a summary line */}
       <section className='stats-cards-row'>
-        {streaks && <StreakCard streaks={streaks} />}
         {counts && (
-          <>
-            <StatCard
-              icon={<BarChart3 size={20} aria-hidden='true' />}
-              value={counts.thisMonth}
-              label='This Month'
-              subValue={`${counts.thisWeek} this week`}
-            />
-            <StatCard
-              icon={<Music size={20} aria-hidden='true' />}
-              value={counts.allTime.toLocaleString()}
-              label='All Time'
-              subValue={`${counts.thisYear.toLocaleString()} this year`}
-            />
-          </>
+          <StatCard
+            icon={<BarChart3 size={20} aria-hidden='true' />}
+            value={counts.thisMonth}
+            label='This Month'
+            subValue={`${counts.thisWeek} this week`}
+          />
         )}
-        <StatCard
-          icon={<PlusCircle size={20} aria-hidden='true' />}
-          value={newArtistsCount}
-          label='New Artists'
-          subValue='discovered this month'
-        />
-        {listeningHours && <ListeningHoursCard hours={listeningHours} />}
         {coverage && (
           <PeriodStatCard
             icon={<Disc3 size={20} aria-hidden='true' />}
@@ -631,48 +474,69 @@ export const StatsPage: React.FC = () => {
             onPeriodChange={setCoveragePeriod}
           />
         )}
-      </section>
-
-      {/* Source breakdown and timeline row */}
-      <section className='stats-charts-row'>
-        <SourcePieChart data={sourceBreakdown} />
-        <ListeningTimeline
-          data={timeline}
-          currentPeriod={timelinePeriod}
-          onPeriodChange={handleTimelinePeriodChange}
-          customDateRange={timelineDateRange}
+        <StatCard
+          icon={<PlusCircle size={20} aria-hidden='true' />}
+          value={newArtistsCount}
+          label='New Artists'
+          subValue='discovered this month'
         />
+        {streaks && <StreakCard streaks={streaks} />}
       </section>
+      <StatsSummary
+        counts={counts}
+        milestones={milestones}
+        listeningHours={listeningHours}
+        sources={sourceBreakdown}
+      />
 
-      {/* Calendar heatmap */}
-      <section className='stats-section'>
-        <CalendarHeatmap
-          data={heatmapData}
-          year={heatmapYear}
-          onYearChange={handleYearChange}
-          onDayClick={handleDayClick}
-          selectedDate={selectedDate}
-        />
-        {selectedDate && selectedDateData && (
-          <HeatmapDayDetail
-            date={selectedDateData.date}
-            albums={selectedDateData.albums}
-            totalScrobbles={selectedDateData.totalScrobbles}
-            onClose={() => {
-              const dateToFocus = selectedDate;
-              setSelectedDate('');
-              setSelectedDateData(null);
-              // Return focus to the triggering heatmap cell
-              requestAnimationFrame(() => {
-                const cell = document.querySelector<HTMLElement>(
-                  `.calendar-heatmap-cell[data-date="${dateToFocus}"]`
-                );
-                cell?.focus();
-              });
-            }}
+      {/* Rankings: top albums, labels, artists and tracks */}
+      <StatsRankings
+        collectionMap={collectionMap}
+        collectionArtistCounts={collectionArtistCounts}
+        collectionArtistCovers={collectionArtistCovers}
+      />
+
+      {/* Activity: the timeline and the year's calendar, beside this day in
+          past years */}
+      <div className='stats-activity-row'>
+        <section className='stats-activity-calendar'>
+          <ListeningTimeline
+            data={timeline}
+            currentPeriod={timelinePeriod}
+            onPeriodChange={handleTimelinePeriodChange}
+            customDateRange={timelineDateRange}
           />
-        )}
-      </section>
+          <CalendarHeatmap
+            data={heatmapData}
+            year={heatmapYear}
+            onYearChange={handleYearChange}
+            onDayClick={handleDayClick}
+            selectedDate={selectedDate}
+          />
+          {selectedDate && selectedDateData && (
+            <HeatmapDayDetail
+              date={selectedDateData.date}
+              albums={selectedDateData.albums}
+              totalScrobbles={selectedDateData.totalScrobbles}
+              onClose={() => {
+                const dateToFocus = selectedDate;
+                setSelectedDate('');
+                setSelectedDateData(null);
+                // Return focus to the triggering heatmap cell
+                requestAnimationFrame(() => {
+                  const cell = document.querySelector<HTMLElement>(
+                    `.calendar-heatmap-cell[data-date="${dateToFocus}"]`
+                  );
+                  cell?.focus();
+                });
+              }}
+            />
+          )}
+        </section>
+        <section className='stats-activity-on-this-day' ref={onThisDayRef}>
+          <OnThisDay data={onThisDayData} loading={onThisDayLoading} />
+        </section>
+      </div>
 
       {/* Listening Patterns (lazy loaded on scroll) */}
       <section
@@ -698,107 +562,12 @@ export const StatsPage: React.FC = () => {
         </div>
       </section>
 
-      {/* On This Day (lazy loaded on scroll) */}
-      <section className='stats-section' ref={onThisDayRef}>
-        <OnThisDay data={onThisDayData} loading={onThisDayLoading} />
-      </section>
+      {/* Taste: genres or their change over time */}
+      <TasteSection />
 
-      {/* Genre Treemap (lazy loaded on scroll) */}
-      <section className='stats-section' ref={genreRef}>
-        <GenreTreemap
-          data={genreData}
-          totalArtists={genreTotalArtists}
-          loading={genreLoading}
-        />
-      </section>
-
-      {/* Taste Drift (lazy loaded on scroll) */}
+      {/* Dusty corners teaser; the full list is in What to Play */}
       <section className='stats-section'>
-        <TasteDriftChart />
-      </section>
-
-      {/* Collection ROI (lazy loaded on scroll) */}
-      <section className='stats-section'>
-        <CollectionROIChart />
-      </section>
-
-      {/* Top lists side by side */}
-      <section className='stats-top-lists-row'>
-        <TopList
-          title='Top Artists'
-          type='artists'
-          data={topArtists}
-          currentPeriod={artistPeriod}
-          onPeriodChange={handleArtistPeriodChange}
-          loading={topListsLoading}
-          customDateRange={artistDateRange}
-          collectionArtistCounts={collectionArtistCounts}
-          collectionArtistCovers={collectionArtistCovers}
-        />
-        <TopList
-          title='Top Albums'
-          type='albums'
-          data={topAlbums}
-          currentPeriod={albumPeriod}
-          onPeriodChange={handleAlbumPeriodChange}
-          loading={topListsLoading}
-          customDateRange={albumDateRange}
-          collectionMap={collectionMap}
-        />
-        <TopList
-          title='Top Tracks'
-          type='tracks'
-          data={topTracks}
-          currentPeriod={trackPeriod}
-          onPeriodChange={handleTrackPeriodChange}
-          loading={topListsLoading}
-          customDateRange={trackDateRange}
-        />
-      </section>
-      {unresolvedCount > 0 && (
-        <p className='stats-unresolved-note'>
-          <Info size={16} aria-hidden='true' />
-          <span>
-            {unresolvedCount.toLocaleString()}{' '}
-            {unresolvedCount === 1 ? 'play' : 'plays'} without album info{' '}
-            {unresolvedCount === 1 ? 'is' : 'are'} excluded from album stats.
-          </span>
-          <button
-            type='button'
-            className='stats-unresolved-note-link'
-            onClick={() => navigate(ROUTES.HISTORY, { tab: 'unresolved' })}
-          >
-            Review them
-          </button>
-        </p>
-      )}
-
-      {/* Milestone progress */}
-      {milestones && (
-        <section className='stats-section'>
-          <MilestoneProgress milestones={milestones} />
-        </section>
-      )}
-
-      {/* Dusty corners */}
-      <section className='stats-section'>
-        <DustyCornersSection albums={dustyCorners} loading={dustyLoading} />
-        {dustyCorners.length > 0 && (
-          <Button
-            variant='outline'
-            size='small'
-            onClick={() => {
-              navigate('what-to-play?tab=dusty');
-            }}
-          >
-            View all in What to Play
-          </Button>
-        )}
-      </section>
-
-      {/* Rankings over time */}
-      <section className='stats-section'>
-        <RankingsOverTime />
+        <DustyCornersSection albums={dustyCorners} compact />
       </section>
     </div>
   );

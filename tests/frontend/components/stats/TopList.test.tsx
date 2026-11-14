@@ -5,7 +5,11 @@ import React from 'react';
 import '@testing-library/jest-dom';
 import { TopList } from '../../../../src/renderer/components/stats/TopList';
 import { playArtistOnSpotify } from '../../../../src/renderer/utils/spotifyUtils';
-import { ArtistPlayCount, AlbumPlayCount } from '../../../../src/shared/types';
+import {
+  ArtistPlayCount,
+  AlbumPlayCount,
+  LabelPlayCount,
+} from '../../../../src/shared/types';
 
 jest.mock('../../../../src/renderer/utils/spotifyUtils', () => ({
   playArtistOnSpotify: jest.fn(),
@@ -384,6 +388,15 @@ describe('TopList', () => {
     });
   });
 
+  it('has no period buttons when the page sets the period for every list', () => {
+    render(<TopList title='Top Artists' type='artists' data={mockArtists} />);
+
+    expect(
+      screen.queryByRole('button', { name: 'Month' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Radiohead')).toBeInTheDocument();
+  });
+
   describe('Loading state', () => {
     it('should show loading indicator when loading', () => {
       render(
@@ -562,6 +575,70 @@ describe('TopList', () => {
       );
 
       expect(screen.getByText('Owned')).toBeInTheDocument();
+    });
+  });
+
+  describe('Labels list', () => {
+    const mockLabels: LabelPlayCount[] = [
+      {
+        label: 'Sub Pop',
+        labelKey: 'sub pop',
+        playCount: 90,
+        ownedPlayCount: 60,
+        albumCount: 7,
+        lastPlayed: 1,
+        coverUrl: 'https://example.com/bleach.jpg',
+      },
+      {
+        label: 'Merge Records',
+        labelKey: 'merge',
+        playCount: 40,
+        ownedPlayCount: 0,
+        albumCount: 1,
+        lastPlayed: 1,
+      },
+    ];
+
+    const renderLabels = (data: LabelPlayCount[] = mockLabels) =>
+      render(
+        <TopList
+          title='Top Labels'
+          type='labels'
+          data={data}
+          onPeriodChange={mockOnPeriodChange}
+          currentPeriod='month'
+        />
+      );
+
+    it('links each label to its page and says how many albums it covers', async () => {
+      renderLabels();
+
+      expect(screen.getByText('7 albums')).toBeInTheDocument();
+      expect(screen.getByText('1 album')).toBeInTheDocument();
+      expect(screen.getByText('90')).toBeInTheDocument();
+
+      await user.click(
+        screen.getByRole('link', { name: 'View label details for Sub Pop' })
+      );
+      expect(localStorage.setItem).toHaveBeenCalledWith(
+        'selectedLabel',
+        'Sub Pop'
+      );
+    });
+
+    it('has no Spotify button or all-time history link', () => {
+      renderLabels();
+
+      expect(
+        screen.queryByRole('button', { name: 'Play on Spotify' })
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/View all-time/)).not.toBeInTheDocument();
+    });
+
+    it('says when no labels were played', () => {
+      renderLabels([]);
+
+      expect(screen.getByText('No labels for this period')).toBeInTheDocument();
     });
   });
 });

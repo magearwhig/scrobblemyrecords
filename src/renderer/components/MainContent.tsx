@@ -15,6 +15,7 @@ const CheckRecordPage = React.lazy(() => import('../pages/CheckRecordPage'));
 const DiscardPilePage = React.lazy(() => import('../pages/DiscardPilePage'));
 const DiscoveryPage = React.lazy(() => import('../pages/DiscoveryPage'));
 const HistoryPage = React.lazy(() => import('../pages/HistoryPage'));
+const LabelDetailPage = React.lazy(() => import('../pages/LabelDetailPage'));
 const MarketplacePage = React.lazy(() => import('../pages/MarketplacePage'));
 const RecommendationsPage = React.lazy(
   () => import('../pages/RecommendationsPage')
@@ -48,6 +49,7 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
   const [artistKey, setArtistKey] = useState<string>('0');
   const [trackKey, setTrackKey] = useState<string>('0');
   const [albumKey, setAlbumKey] = useState<string>('0');
+  const [labelKey, setLabelKey] = useState<string>('0');
 
   useEffect(() => {
     // When navigating to detail pages, generate a new key to force remount
@@ -60,6 +62,8 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
       setTrackKey(`track-${Date.now()}`);
     } else if (currentPage === ROUTES.ALBUM_DETAIL) {
       setAlbumKey(`album-${Date.now()}`);
+    } else if (currentPage === ROUTES.LABEL_DETAIL) {
+      setLabelKey(`label-${Date.now()}`);
     }
   }, [currentPage]);
 
@@ -102,6 +106,8 @@ const MainContent: React.FC<MainContentProps> = ({ currentPage }) => {
         return <TrackDetailPage key={trackKey} />;
       case ROUTES.ALBUM_DETAIL:
         return <AlbumDetailPage key={albumKey} />;
+      case ROUTES.LABEL_DETAIL:
+        return <LabelDetailPage key={labelKey} />;
       case ROUTES.RECOMMENDATIONS:
         return <RecommendationsPage />;
       case ROUTES.MEMORY_SCROBBLE:

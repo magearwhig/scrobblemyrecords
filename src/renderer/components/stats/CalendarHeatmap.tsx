@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { CalendarHeatmapData } from '../../../shared/types';
 import './CalendarHeatmap.css';
@@ -137,7 +137,9 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
     weeks.forEach((week, weekIndex) => {
       for (const day of week) {
         if (day.date) {
-          const month = new Date(day.date).getMonth();
+          // Month from the YYYY-MM-DD text: new Date('2026-01-01') is UTC
+          // midnight, which is still December west of Greenwich
+          const month = Number(day.date.slice(5, 7)) - 1;
           if (month !== lastMonth) {
             positions.push({ month: monthLabels[month], weekIndex });
             lastMonth = month;
@@ -171,6 +173,28 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
   );
 
   const currentYear = new Date().getFullYear();
+
+  // On a narrow screen the year scrolls sideways; open with this week at the
+  // right edge rather than on January (or December's empty weeks)
+  const containerRef = useRef<HTMLDivElement>(null);
+  const todayStr = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  })();
+  const currentWeekIndex = weeks.findIndex(week =>
+    week.some(day => day.date === todayStr)
+  );
+  useEffect(() => {
+    const node = containerRef.current;
+    const week = node?.querySelector('[data-current-week]');
+    if (!node || !week) return;
+    const offset =
+      week.getBoundingClientRect().right -
+      node.getBoundingClientRect().left +
+      node.scrollLeft;
+    node.scrollLeft = Math.max(0, offset - node.clientWidth);
+  }, [currentWeekIndex]);
+
   const availableYears = [currentYear - 2, currentYear - 1, currentYear];
 
   return (
@@ -208,7 +232,7 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
           ))}
         </div>
 
-        <div className='calendar-heatmap-grid-container'>
+        <div className='calendar-heatmap-grid-container' ref={containerRef}>
           <div className='calendar-heatmap-month-labels'>
             {monthPositions.map(({ month, weekIndex }) => (
               <div
@@ -223,7 +247,13 @@ export const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({
 
           <div className='calendar-heatmap-grid'>
             {weeks.map((week, weekIndex) => (
-              <div key={weekIndex} className='calendar-heatmap-week'>
+              <div
+                key={weekIndex}
+                className='calendar-heatmap-week'
+                data-current-week={
+                  weekIndex === currentWeekIndex ? true : undefined
+                }
+              >
                 {week.map((day, dayIndex) => {
                   const isClickable = day.count > 0 && onDayClick;
                   const isSelected =

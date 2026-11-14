@@ -32,6 +32,7 @@ import { trackMatchKey } from '../../shared/utils/trackNormalization';
 import AlbumScrobbleHistory from '../components/AlbumScrobbleHistory';
 import ArtistLink from '../components/ArtistLink';
 import AddToCrateMenu from '../components/crates/AddToCrateMenu';
+import LabelLink from '../components/LabelLink';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { ProgressBar } from '../components/ui/ProgressBar';
@@ -977,7 +978,12 @@ const ReleaseDetailsPage: React.FC = () => {
             </p>
             {release.label && release.label.length > 0 && (
               <p className='release-details-metadata'>
-                {release.label.join(', ')}
+                {release.label.map((name, i) => (
+                  <React.Fragment key={`${name}-${i}`}>
+                    {i > 0 && ', '}
+                    <LabelLink label={name} />
+                  </React.Fragment>
+                ))}
               </p>
             )}
             {release.catalog_number && (

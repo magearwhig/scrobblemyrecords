@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import '@testing-library/jest-dom';
@@ -385,6 +385,34 @@ describe('ValueEstimationSection', () => {
 
     // ProgressBar is rendered (via role)
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
+  });
+
+  it('says when a scan finishes, so other value views can reload', async () => {
+    // Arrange: a scan is running, and the next status check finds it done
+    mockApi.getValue.mockResolvedValue({
+      success: true,
+      data: {
+        estimation: null,
+        scanStatus: createScanningScanStatus(),
+        lastScanTimestamp: null,
+        cacheAge: 0,
+      },
+    });
+    mockApi.getValueScanStatus.mockResolvedValue({
+      success: true,
+      data: { ...createIdleScanStatus(), status: 'completed' as const },
+    });
+    const onScanComplete = jest.fn();
+
+    // Act
+    render(<ValueEstimationSection onScanComplete={onScanComplete} />);
+    await waitFor(() => expect(mockApi.getValue).toHaveBeenCalled());
+    await act(async () => {
+      jest.advanceTimersByTime(10_000);
+    });
+
+    // Assert
+    await waitFor(() => expect(onScanComplete).toHaveBeenCalledTimes(1));
   });
 
   it('shows rescan button when estimation exists', async () => {

@@ -14,9 +14,37 @@
 }
 
 .on-this-day-timeline {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  /* Year cards side by side where there is room, so play counts stay next
+     to the names instead of across a full-width row */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
   gap: 1rem;
+}
+
+.on-this-day-more {
+  margin: var(--space-2) 0 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.on-this-day-toggle {
+  margin-top: var(--space-3);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-accent);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.on-this-day-toggle:hover {
+  text-decoration: underline;
+}
+
+.on-this-day-toggle:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .on-this-day-year-card {

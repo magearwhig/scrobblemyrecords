@@ -18,10 +18,12 @@ import {
   WishlistNewReleasesStore,
   WishlistNewReleaseSettings,
   WishlistSettings,
+  StoredWishlistItem,
   WishlistStore,
   WishlistSyncStatus,
   DiscogsRawTrack,
 } from '../../shared/types';
+import { albumMatchName, isPlaceholderLabel } from '../../shared/utils/labels';
 import {
   fromDiscogsTracklist,
   tracklistMatchTitles,
@@ -31,6 +33,10 @@ import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
 import { AuthService } from './authService';
+import {
+  DiscogsPressingsService,
+  MASTER_COMPLETE_FRESH_MS,
+} from './discogsPressingsService';
 
 // Cache expiration times
 const WISHLIST_CACHE_HOURS = 24;
@@ -38,20 +44,7 @@ const VERSIONS_CACHE_DAYS = 7;
 // const PRICE_CACHE_HOURS = 24; // Reserved for future use
 
 // Rate limiting
-const MAX_VERSIONS_PER_MASTER = 50;
 const VINYL_CHECK_BATCH_SIZE = 50; // Check up to 50 items per sync (with rate limiting)
-
-// Vinyl format patterns
-const VINYL_FORMATS = [
-  'vinyl',
-  'lp',
-  '12"',
-  '10"',
-  '7"',
-  "12''",
-  "10''",
-  "7''",
-];
 
 export class WishlistService {
   private fileStorage: FileStorage;
@@ -63,7 +56,6 @@ export class WishlistService {
 
   // Cache file paths
   private readonly WISHLIST_CACHE = 'wishlist/wishlist-items.json';
-  private readonly VERSIONS_CACHE = 'wishlist/versions-cache.json';
   private readonly SETTINGS_FILE = 'wishlist/settings.json';
   private readonly SYNC_STATUS_FILE = 'wishlist/sync-status.json';
   private readonly LOCAL_WANT_LIST_FILE = 'wishlist/local-want-list.json';
@@ -71,21 +63,29 @@ export class WishlistService {
   private readonly NEW_RELEASES_FILE = 'wishlist/new-releases.json';
   private readonly NEW_RELEASE_SYNC_STATUS_FILE =
     'wishlist/new-release-sync-status.json';
+  // A master whose newest pressings were fetched within this window is not
+  // fetched again by the new-pressing check or getMasterVersions
+  private readonly PRESSINGS_FRESH_MS =
+    VERSIONS_CACHE_DAYS * 24 * 60 * 60 * 1000;
 
   // New release checking constants
   private readonly MASTERS_PER_BATCH = 20;
-  private readonly NEW_RELEASE_MAX_VERSIONS = 100; // For new release checking
-  private readonly CHECK_INTERVAL_MS = 1100; // 1.1 sec between API calls
-  private readonly MAX_RETRIES = 3;
-  private readonly INITIAL_BACKOFF_MS = 2000;
-  private readonly MAX_BACKOFF_MS = 60000;
 
   // Track sync state
   private syncInProgress = false;
 
+  /** The Discogs pressings catalogue; shared with seller monitoring */
+  readonly pressings: DiscogsPressingsService;
+
   constructor(fileStorage: FileStorage, authService: AuthService) {
     this.fileStorage = fileStorage;
     this.authService = authService;
+    this.pressings = new DiscogsPressingsService(fileStorage, () =>
+      this.getAuthHeaders()
+    );
+    this.pressings.setDetector((masterId, candidates, context) =>
+      this.raiseNewPressingAlerts(masterId, candidates, context)
+    );
 
     this.oauth = new OAuth({
       consumer: {
@@ -137,22 +137,6 @@ export class WishlistService {
   /**
    * Check if a format indicates vinyl
    */
-  private isVinylFormat(formats: string[]): boolean {
-    const formatStr = formats.join(' ').toLowerCase();
-
-    // Check for vinyl indicators - if ANY vinyl format is present, it's vinyl
-    // The presence of vinyl formats should take priority since we're checking
-    // individual releases, not combined results
-    const hasVinylIndicator = VINYL_FORMATS.some(f => formatStr.includes(f));
-
-    if (hasVinylIndicator) {
-      return true;
-    }
-
-    // No vinyl indicators found
-    return false;
-  }
-
   // ============================================
   // Settings Management
   // ============================================
@@ -416,7 +400,7 @@ export class WishlistService {
         ) {
           // Need to fetch vinyl data - only if within progressive limit
           try {
-            vinylVersions = await this.getMasterVersions(item.masterId);
+            vinylVersions = await this.checkMasterVinyl(item.masterId);
             newVinylChecks++;
             vinylChecked++;
 
@@ -439,6 +423,13 @@ export class WishlistService {
             }
             lastChecked = Date.now();
           } catch (error) {
+            // Couldn't tell: keep what the last sync knew
+            if (existingItem) {
+              vinylStatus = existingItem.vinylStatus;
+              lowestVinylPrice = existingItem.lowestVinylPrice;
+              priceCurrency = existingItem.priceCurrency;
+              lastChecked = existingItem.lastChecked;
+            }
             this.logger.warn(
               `Failed to fetch versions for master ${item.masterId}`,
               error
@@ -469,10 +460,13 @@ export class WishlistService {
       );
 
       // Save to cache
+      // Pressings stay in the catalogue; they are filled in when read
       const store: WishlistStore = {
         schemaVersion: 1,
         lastUpdated: Date.now(),
-        items: enrichedItems,
+        items: enrichedItems.map(
+          ({ vinylVersions: _versions, ...saved }) => saved
+        ),
       };
 
       await this.fileStorage.writeJSON(this.WISHLIST_CACHE, store);
@@ -484,7 +478,7 @@ export class WishlistService {
       for (const localItem of localWantItems) {
         if (localItem.masterId && localItem.vinylStatus === 'unknown') {
           try {
-            const versions = await this.getMasterVersions(localItem.masterId);
+            const versions = await this.checkMasterVinyl(localItem.masterId);
             const hasVinyl = versions.some(v => v.hasVinyl);
             localItem.vinylStatus = hasVinyl ? 'has_vinyl' : 'cd_only';
             localItem.lastChecked = Date.now();
@@ -555,7 +549,9 @@ export class WishlistService {
           this.logger.debug('Wishlist cache is stale');
         }
 
-        return store.items;
+        return await Promise.all(
+          store.items.map(item => this.withPressings(item))
+        );
       }
     } catch {
       this.logger.debug('No wishlist cache found');
@@ -564,137 +560,86 @@ export class WishlistService {
     return [];
   }
 
+  /**
+   * A saved item with its pressings from the catalogue. A vinyl pressing
+   * learned since the last sync (by any feature) shows the record as having
+   * vinyl; no vinyl known keeps the saved status, since the catalogue may
+   * only hold a record's newest pressings.
+   */
+  private async withPressings(
+    item: StoredWishlistItem
+  ): Promise<EnrichedWishlistItem> {
+    let vinylVersions: ReleaseVersion[] = [];
+    if (item.masterId) {
+      try {
+        vinylVersions = await this.pressings.knownVersions(item.masterId);
+      } catch (error) {
+        // An unreadable catalogue hides pressings, not the wishlist
+        this.logger.warn(
+          `Could not read pressings of master ${item.masterId}`,
+          error
+        );
+      }
+    }
+    const vinylStatus = vinylVersions.some(v => v.hasVinyl)
+      ? 'has_vinyl'
+      : item.vinylStatus;
+    return { ...item, vinylVersions, vinylStatus };
+  }
+
   // ============================================
   // Version/Vinyl Checking
   // ============================================
 
   /**
-   * Get all versions of a master release
+   * A master's pressings for deciding whether it has vinyl: from the
+   * catalogue, fetched from Discogs (newest first) when not fetched in the
+   * last week. When the newest pressings include no vinyl, every page is
+   * fetched (at most monthly), so a record with only older vinyl is not taken
+   * for CD-only. Throws when that can't be told (a fetch failed, or the
+   * catalogue can't be read), so callers keep what they knew.
+   */
+  async checkMasterVinyl(masterId: number): Promise<ReleaseVersion[]> {
+    const { versions, failed } = await this.lookUpPressings(masterId);
+    if (failed && !versions.some(v => v.hasVinyl)) {
+      throw new Error(
+        `Could not fetch every pressing of master ${masterId} to rule out vinyl`
+      );
+    }
+    return versions;
+  }
+
+  /**
+   * A master's known pressings, as `checkMasterVinyl` fetches them, for
+   * showing; what is known is returned even if a fetch failed
    */
   async getMasterVersions(masterId: number): Promise<ReleaseVersion[]> {
-    // Check cache first
-    const cachedVersions = await this.getCachedVersions(masterId);
-    if (cachedVersions) {
-      return cachedVersions;
-    }
-
-    this.logger.debug(`Fetching versions for master ${masterId}`);
-
     try {
-      const headers = await this.getAuthHeaders();
-      const versions: ReleaseVersion[] = [];
-      let page = 1;
-      let totalPages = 1;
-
-      while (page <= totalPages && versions.length < MAX_VERSIONS_PER_MASTER) {
-        const response = await this.axios.get(`/masters/${masterId}/versions`, {
-          headers,
-          params: {
-            page,
-            per_page: 50,
-          },
-        });
-
-        const { pagination, versions: versionData } = response.data;
-        totalPages = pagination?.pages || 1;
-
-        for (const v of versionData) {
-          if (versions.length >= MAX_VERSIONS_PER_MASTER) break;
-
-          const format = v.format?.split(', ') || [];
-          const hasVinyl = this.isVinylFormat(format);
-
-          const version: ReleaseVersion = {
-            releaseId: v.id,
-            title: v.title,
-            format,
-            label: v.label,
-            country: v.country,
-            year: v.released ? parseInt(v.released.split('-')[0], 10) : 0,
-            hasVinyl,
-            lastFetched: Date.now(),
-          };
-
-          versions.push(version);
-        }
-
-        page++;
-      }
-
-      // Cache the versions
-      await this.cacheVersions(masterId, versions);
-
-      this.logger.debug(
-        `Found ${versions.length} versions for master ${masterId}`
-      );
-      return versions;
+      return (await this.lookUpPressings(masterId)).versions;
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch versions for master ${masterId}`,
-        error
-      );
+      this.logger.error(`Failed to get versions for master ${masterId}`, error);
       return [];
     }
   }
 
-  /**
-   * Get cached versions for a master
-   */
-  private async getCachedVersions(
+  private async lookUpPressings(
     masterId: number
-  ): Promise<ReleaseVersion[] | null> {
-    try {
-      const cache = await this.fileStorage.readJSON<VersionsCache>(
-        this.VERSIONS_CACHE
-      );
-
-      if (cache && cache.schemaVersion === 1 && cache.entries[masterId]) {
-        const entry = cache.entries[masterId];
-        const cacheAge = Date.now() - entry.fetchedAt;
-        const isValid = cacheAge < VERSIONS_CACHE_DAYS * 24 * 60 * 60 * 1000;
-
-        if (isValid) {
-          this.logger.debug(`Using cached versions for master ${masterId}`);
-          return entry.versions;
-        }
-      }
-    } catch {
-      // Cache doesn't exist or is invalid
+  ): Promise<{ versions: ReleaseVersion[]; failed: boolean }> {
+    const { baselineSince } = await this.pressings.masterStatus(masterId);
+    const newest = await this.pressings.getPressings(masterId, {
+      need: 'newest',
+      maxAgeMs: this.PRESSINGS_FRESH_MS,
+    });
+    if (newest.versions.some(v => v.hasVinyl)) {
+      return { versions: newest.versions, failed: false };
     }
-
-    return null;
-  }
-
-  /**
-   * Cache versions for a master
-   */
-  private async cacheVersions(
-    masterId: number,
-    versions: ReleaseVersion[]
-  ): Promise<void> {
-    let cache: VersionsCache;
-
-    try {
-      const existing = await this.fileStorage.readJSON<VersionsCache>(
-        this.VERSIONS_CACHE
-      );
-
-      if (existing && existing.schemaVersion === 1) {
-        cache = existing;
-      } else {
-        cache = { schemaVersion: 1, entries: {} };
-      }
-    } catch {
-      cache = { schemaVersion: 1, entries: {} };
-    }
-
-    cache.entries[masterId] = {
-      masterId,
-      versions,
-      fetchedAt: Date.now(),
-    };
-
-    await this.fileStorage.writeJSON(this.VERSIONS_CACHE, cache);
+    const complete = await this.pressings.getPressings(masterId, {
+      need: 'complete',
+      maxAgeMs: MASTER_COMPLETE_FRESH_MS,
+      // Part of a first look: the newest fetch just started the baseline
+      learnOnly: baselineSince === undefined,
+    });
+    return { versions: complete.versions, failed: complete.failed };
   }
 
   /**
@@ -854,6 +799,86 @@ export class WishlistService {
   // ============================================
   // Discogs Wantlist API (Add/Remove)
   // ============================================
+
+  /**
+   * The label an album first came out on, from a Discogs release search: the
+   * label of the earliest release (by year) of the best-matching master.
+   * Placeholder labels ("Not On Label") don't count. Null when no result
+   * matches the artist and title.
+   */
+  async findAlbumLabels(query: { artist: string; album: string }): Promise<{
+    labels: string[];
+    status: 'found';
+    matchedArtist?: string;
+    matchedTitle?: string;
+    year?: number;
+  } | null> {
+    const headers = await this.getAuthHeaders();
+    const response = await this.axios.get('/database/search', {
+      headers,
+      params: {
+        artist: query.artist,
+        release_title: query.album,
+        type: 'release',
+        per_page: 50,
+      },
+    });
+    const results: Array<{
+      title: string;
+      year?: string;
+      label?: string[];
+      master_id?: number;
+    }> = response.data?.results ?? [];
+
+    const wantedArtist = albumMatchName(query.artist);
+    const wantedTitle = albumMatchName(query.album);
+    const matches = results
+      .map(result => {
+        const [artistPart, ...titleParts] = result.title.split(' - ');
+        return {
+          ...result,
+          artist: artistPart
+            .replace(/\*$/, '')
+            .replace(/\s*\(\d+\)$/, '')
+            .trim(),
+          album: titleParts.join(' - ').trim(),
+          labels: Array.from(
+            new Set(
+              (result.label ?? [])
+                .map(label => label.trim())
+                .filter(label => label && !isPlaceholderLabel(label))
+            )
+          ),
+          yearNumber: result.year ? parseInt(result.year, 10) : NaN,
+        };
+      })
+      .filter(
+        m =>
+          albumMatchName(m.artist) === wantedArtist &&
+          albumMatchName(m.album) === wantedTitle &&
+          m.labels.length > 0
+      );
+    if (matches.length === 0) return null;
+
+    const masterId = matches[0].master_id;
+    const sameAlbum = masterId
+      ? matches.filter(m => m.master_id === masterId)
+      : matches;
+    const earliest = [...sameAlbum].sort(
+      (a, b) =>
+        (Number.isFinite(a.yearNumber) ? a.yearNumber : 9999) -
+        (Number.isFinite(b.yearNumber) ? b.yearNumber : 9999)
+    )[0];
+    return {
+      labels: earliest.labels,
+      status: 'found',
+      matchedArtist: earliest.artist,
+      matchedTitle: earliest.album,
+      year: Number.isFinite(earliest.yearNumber)
+        ? earliest.yearNumber
+        : undefined,
+    };
+  }
 
   /**
    * Search Discogs for an album by artist and title.
@@ -1268,7 +1293,7 @@ export class WishlistService {
       const previousStatus = item.vinylStatus;
 
       try {
-        const versions = await this.getMasterVersions(item.masterId);
+        const versions = await this.checkMasterVinyl(item.masterId);
         const hasVinyl = versions.some(v => v.hasVinyl);
 
         item.vinylStatus = hasVinyl ? 'has_vinyl' : 'cd_only';
@@ -1330,7 +1355,9 @@ export class WishlistService {
   /**
    * Get all tracked master IDs from wishlist and local want list
    */
-  async getTrackedMasterIds(): Promise<Map<number, TrackedMasterInfo>> {
+  async getTrackedMasterIds({ log = true }: { log?: boolean } = {}): Promise<
+    Map<number, TrackedMasterInfo>
+  > {
     const masterMap = new Map<number, TrackedMasterInfo>();
     const itemsWithoutMasterId: string[] = [];
 
@@ -1381,6 +1408,8 @@ export class WishlistService {
       }
     }
 
+    if (!log) return masterMap;
+
     this.logger.info(
       `Tracked masters: ${masterMap.size} total (${wishlist.length - itemsWithoutMasterId.length} from wishlist, ${localOnlyCount} from local want, ${localOverlapCount} overlap/deduped)`
     );
@@ -1396,137 +1425,75 @@ export class WishlistService {
   }
 
   /**
-   * Get the versions cache (for new release detection comparison)
+   * Detector for the pressings catalogue: raise an alert for each newly seen
+   * pressing of a master someone tracks. Runs inside the catalogue's commit
+   * queue (so it writes new-releases.json directly).
+   *
+   * Alerts need tracking enabled (or `alertOverride`, a manual check), and
+   * want-list records also need want-list tracking. Pressings are remembered
+   * by the catalogue either way, so turning tracking on later doesn't flood
+   * the list.
+   */
+  private async raiseNewPressingAlerts(
+    masterId: number,
+    candidates: ReleaseVersion[],
+    { alertOverride }: { alertOverride: boolean }
+  ): Promise<WishlistNewRelease[]> {
+    const tracked = await this.getTrackedMasterIds({ log: false });
+    const sourceInfo = tracked.get(masterId);
+    if (!sourceInfo) return [];
+
+    const tracking = (await this.getSettings()).newReleaseTracking;
+    const allowed =
+      (alertOverride || !!tracking?.enabled) &&
+      (sourceInfo.source !== 'local_want' || !!tracking?.trackLocalWantList);
+    if (!allowed) return [];
+
+    const store = await this.getNewReleases();
+    const alertIds = new Set(store.releases.map(r => r.id));
+    const now = Date.now();
+    const created: WishlistNewRelease[] = [];
+    for (const version of candidates) {
+      const id = `${masterId}-${version.releaseId}`;
+      if (alertIds.has(id)) continue;
+      alertIds.add(id);
+      created.push({
+        id,
+        masterId,
+        releaseId: version.releaseId,
+        title: version.title,
+        artist: sourceInfo.artistAlbum.split(' - ')[0],
+        year: version.year,
+        country: version.country,
+        format: version.format,
+        label: version.label,
+        catalogNumber: undefined,
+        source: sourceInfo.source,
+        sourceItemId: sourceInfo.itemId,
+        detectedAt: now,
+        notified: false,
+        dismissed: false,
+        discogsUrl: `https://www.discogs.com/release/${version.releaseId}`,
+        coverImage: sourceInfo.coverImage,
+      });
+    }
+
+    if (created.length > 0) {
+      store.releases.push(...created);
+      await this.fileStorage.writeJSONWithBackup(this.NEW_RELEASES_FILE, store);
+      this.logger.info(
+        `${created.length} new pressing(s) for ${sourceInfo.artistAlbum}`
+      );
+    }
+    return created;
+  }
+
+  /**
+   * Every master's pressings from the catalogue, in the old versions-cache
+   * shape (data export)
    */
   async getVersionsCache(): Promise<VersionsCache> {
-    try {
-      const cache = await this.fileStorage.readJSON<VersionsCache>(
-        this.VERSIONS_CACHE
-      );
-      if (cache && cache.schemaVersion === 1) {
-        return cache;
-      }
-    } catch {
-      // Cache doesn't exist
-    }
-    return { schemaVersion: 1, entries: {} };
-  }
-
-  /**
-   * Update versions cache for a master
-   */
-  async updateVersionsCache(
-    masterId: number,
-    versions: ReleaseVersion[]
-  ): Promise<void> {
-    await this.cacheVersions(masterId, versions);
-  }
-
-  /**
-   * Determine if an error is retryable (rate limits, service unavailable, network issues)
-   */
-  private isRetryableError(error: unknown): boolean {
-    if (axios.isAxiosError(error)) {
-      // HTTP errors that are retryable
-      if (error.response?.status === 429 || error.response?.status === 503) {
-        return true;
-      }
-      // Network errors (no response received)
-      if (!error.response && error.code) {
-        const retryableCodes = [
-          'ETIMEDOUT',
-          'ECONNRESET',
-          'ECONNREFUSED',
-          'ENOTFOUND',
-          'EAI_AGAIN',
-        ];
-        return retryableCodes.includes(error.code);
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Fetch master versions with exponential backoff retry
-   */
-  private async fetchMasterVersionsWithRetry(
-    masterId: number
-  ): Promise<ReleaseVersion[]> {
-    let delay = this.INITIAL_BACKOFF_MS;
-
-    for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
-      try {
-        return await this.fetchMasterVersionsPaginated(masterId);
-      } catch (error) {
-        const isRetryable = this.isRetryableError(error);
-
-        if (!isRetryable || attempt === this.MAX_RETRIES) {
-          throw error;
-        }
-
-        this.logger.warn(
-          `Retryable error fetching master ${masterId}, retry ${attempt}/${this.MAX_RETRIES} in ${delay}ms`,
-          error
-        );
-        await new Promise(resolve => setTimeout(resolve, delay));
-        delay = Math.min(delay * 2, this.MAX_BACKOFF_MS);
-      }
-    }
-
-    throw new Error('Max retries exceeded');
-  }
-
-  /**
-   * Fetch master versions with pagination for new release checking
-   * Sorted by newest first, limited to NEW_RELEASE_MAX_VERSIONS
-   */
-  private async fetchMasterVersionsPaginated(
-    masterId: number
-  ): Promise<ReleaseVersion[]> {
-    const allVersions: ReleaseVersion[] = [];
-    let page = 1;
-    const perPage = 50; // Discogs max per page
-
-    while (allVersions.length < this.NEW_RELEASE_MAX_VERSIONS) {
-      const headers = await this.getAuthHeaders();
-      const response = await this.axios.get(`/masters/${masterId}/versions`, {
-        headers,
-        params: {
-          page,
-          per_page: perPage,
-          sort: 'released',
-          sort_order: 'desc',
-        },
-      });
-
-      const versions = response.data.versions || [];
-      if (versions.length === 0) break;
-
-      for (const v of versions) {
-        const format = v.format?.split(', ') || [];
-        allVersions.push({
-          releaseId: v.id,
-          title: v.title,
-          format,
-          label: v.label || '',
-          country: v.country || '',
-          year: v.released ? parseInt(v.released.substring(0, 4), 10) : 0,
-          hasVinyl: this.isVinylFormat(format),
-          lastFetched: Date.now(),
-        });
-
-        if (allVersions.length >= this.NEW_RELEASE_MAX_VERSIONS) break;
-      }
-
-      // Check if there are more pages
-      const pagination = response.data.pagination;
-      if (!pagination || page >= pagination.pages) break;
-
-      page++;
-      await new Promise(r => setTimeout(r, this.CHECK_INTERVAL_MS));
-    }
-
-    return allVersions;
+    return this.pressings.versionsCacheView();
   }
 
   /**
@@ -1594,89 +1561,102 @@ export class WishlistService {
   }
 
   /**
-   * Save new releases to store and update lastCheck timestamp
-   * Always updates lastCheck even if no new releases found
+   * Record when the last new-release check ran
    */
-  private async saveNewReleasesAndUpdateLastCheck(
-    newReleases: WishlistNewRelease[]
-  ): Promise<void> {
-    const store = await this.getNewReleases();
-    if (newReleases.length > 0) {
-      store.releases.push(...newReleases);
-    }
-    store.lastCheck = Date.now();
-    await this.fileStorage.writeJSONWithBackup(this.NEW_RELEASES_FILE, store);
+  private async touchNewReleasesLastCheck(): Promise<void> {
+    await this.pressings.exclusive(async () => {
+      const store = await this.getNewReleases();
+      store.lastCheck = Date.now();
+      await this.fileStorage.writeJSONWithBackup(this.NEW_RELEASES_FILE, store);
+    });
   }
 
   /**
    * Dismiss a new release alert
    */
   async dismissNewRelease(releaseId: string): Promise<void> {
-    const store = await this.getNewReleases();
-    const release = store.releases.find(r => r.id === releaseId);
-    if (release) {
-      release.dismissed = true;
-      await this.fileStorage.writeJSONWithBackup(this.NEW_RELEASES_FILE, store);
-    }
+    return this.pressings.exclusive(async () => {
+      const store = await this.getNewReleases();
+      const release = store.releases.find(r => r.id === releaseId);
+      if (release) {
+        release.dismissed = true;
+        await this.fileStorage.writeJSONWithBackup(
+          this.NEW_RELEASES_FILE,
+          store
+        );
+      }
+    });
   }
 
   /**
    * Dismiss multiple new release alerts at once
    */
   async dismissNewReleasesBulk(releaseIds: string[]): Promise<number> {
-    const store = await this.getNewReleases();
-    let dismissedCount = 0;
+    return this.pressings.exclusive(async () => {
+      const store = await this.getNewReleases();
+      let dismissedCount = 0;
 
-    for (const id of releaseIds) {
-      const release = store.releases.find(r => r.id === id);
-      if (release && !release.dismissed) {
-        release.dismissed = true;
-        dismissedCount++;
+      for (const id of releaseIds) {
+        const release = store.releases.find(r => r.id === id);
+        if (release && !release.dismissed) {
+          release.dismissed = true;
+          dismissedCount++;
+        }
       }
-    }
 
-    if (dismissedCount > 0) {
-      await this.fileStorage.writeJSONWithBackup(this.NEW_RELEASES_FILE, store);
-    }
+      if (dismissedCount > 0) {
+        await this.fileStorage.writeJSONWithBackup(
+          this.NEW_RELEASES_FILE,
+          store
+        );
+      }
 
-    return dismissedCount;
+      return dismissedCount;
+    });
   }
 
   /**
    * Dismiss all non-dismissed new releases
    */
   async dismissAllNewReleases(): Promise<number> {
-    const store = await this.getNewReleases();
-    let dismissedCount = 0;
+    return this.pressings.exclusive(async () => {
+      const store = await this.getNewReleases();
+      let dismissedCount = 0;
 
-    for (const release of store.releases) {
-      if (!release.dismissed) {
-        release.dismissed = true;
-        dismissedCount++;
+      for (const release of store.releases) {
+        if (!release.dismissed) {
+          release.dismissed = true;
+          dismissedCount++;
+        }
       }
-    }
 
-    if (dismissedCount > 0) {
-      await this.fileStorage.writeJSONWithBackup(this.NEW_RELEASES_FILE, store);
-    }
+      if (dismissedCount > 0) {
+        await this.fileStorage.writeJSONWithBackup(
+          this.NEW_RELEASES_FILE,
+          store
+        );
+      }
 
-    return dismissedCount;
+      return dismissedCount;
+    });
   }
 
   /**
    * Remove old dismissed releases (cleanup)
    */
   async cleanupDismissedReleases(maxAgeDays = 90): Promise<number> {
-    const store = await this.getNewReleases();
-    const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
-    const originalCount = store.releases.length;
+    return this.pressings.exclusive(async () => {
+      const store = await this.getNewReleases();
+      const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+      const originalCount = store.releases.length;
 
-    store.releases = store.releases.filter(
-      r => !r.dismissed || r.detectedAt > cutoff
-    );
+      store.releases = store.releases.filter(
+        r => !r.dismissed || r.detectedAt > cutoff
+      );
 
-    await this.fileStorage.writeJSONWithBackup(this.NEW_RELEASES_FILE, store);
-    return originalCount - store.releases.length;
+      await this.fileStorage.writeJSONWithBackup(this.NEW_RELEASES_FILE, store);
+      return originalCount - store.releases.length;
+    });
   }
 
   /**
@@ -1716,9 +1696,6 @@ export class WishlistService {
     });
 
     const newReleases: WishlistNewRelease[] = [];
-    const versionsCache = await this.getVersionsCache();
-    const existingNew = await this.getNewReleases();
-    const existingNewIds = new Set(existingNew.releases.map(r => r.id));
 
     const startIndex = syncStatus.lastCheckedIndex || 0;
     const endIndex = Math.min(
@@ -1750,74 +1727,42 @@ export class WishlistService {
           currentMaster: sourceInfo.artistAlbum,
         });
 
-        // Fetch with retry logic
-        let freshVersions: ReleaseVersion[];
-        try {
-          freshVersions = await this.fetchMasterVersionsWithRetry(masterId);
-        } catch (error) {
-          this.logger.warn(
-            `Failed to fetch versions for master ${masterId}, skipping`,
-            error
-          );
-          continue;
-        }
-
-        // Get cached versions (what we knew about before)
-        const cachedEntry = versionsCache.entries[masterId];
-        const cachedReleaseIds = new Set(
-          cachedEntry?.versions.map(v => v.releaseId) || []
+        // From the catalogue when any feature fetched it in the last week;
+        // otherwise from Discogs, which flags pressings not seen before.
+        // Every page once a month, so undated pressings (missing from
+        // newest-first lists) are learned too.
+        const { completeCheckedAt } =
+          await this.pressings.masterStatus(masterId);
+        const completeDue =
+          completeCheckedAt === undefined ||
+          Date.now() - completeCheckedAt >= MASTER_COMPLETE_FRESH_MS;
+        const result = await this.pressings.getPressings(
+          masterId,
+          completeDue
+            ? {
+                need: 'complete',
+                maxAgeMs: MASTER_COMPLETE_FRESH_MS,
+                alertOverride: force,
+              }
+            : {
+                need: 'newest',
+                maxAgeMs: this.PRESSINGS_FRESH_MS,
+                alertOverride: force,
+              }
         );
-
-        // Find new vinyl releases
-        for (const version of freshVersions) {
-          if (!cachedReleaseIds.has(version.releaseId) && version.hasVinyl) {
-            const releaseId = `${masterId}-${version.releaseId}`;
-
-            // Skip if already tracked
-            if (existingNewIds.has(releaseId)) {
-              continue;
-            }
-
-            const newRelease: WishlistNewRelease = {
-              id: releaseId,
-              masterId,
-              releaseId: version.releaseId,
-              title: version.title,
-              artist: sourceInfo.artistAlbum.split(' - ')[0],
-              year: version.year,
-              country: version.country,
-              format: version.format,
-              label: version.label,
-              catalogNumber: undefined,
-              lowestPrice: version.marketplaceStats?.lowestPrice,
-              priceCurrency: version.marketplaceStats?.currency,
-              numForSale: version.marketplaceStats?.numForSale,
-              source: sourceInfo.source,
-              sourceItemId: sourceInfo.itemId,
-              detectedAt: Date.now(),
-              notified: false,
-              dismissed: false,
-              discogsUrl: `https://www.discogs.com/release/${version.releaseId}`,
-              coverImage: sourceInfo.coverImage,
-            };
-
-            newReleases.push(newRelease);
-            existingNewIds.add(releaseId);
-          }
+        if (result.failed) {
+          this.logger.warn(
+            `Could not fetch every pressing of master ${masterId}; will retry next check`
+          );
         }
-
-        // Update versions cache with fresh data
-        await this.updateVersionsCache(masterId, freshVersions);
-
-        // Rate limiting between masters
-        await new Promise(r => setTimeout(r, this.CHECK_INTERVAL_MS));
+        newReleases.push(...result.alerts);
       }
 
       // Determine if we completed a full cycle
       const completedFullCycle = endIndex >= allMasterIds.length;
 
-      // Save new releases and always update lastCheck timestamp
-      await this.saveNewReleasesAndUpdateLastCheck(newReleases);
+      // Alerts were saved as they were found; record when this check ran
+      await this.touchNewReleasesLastCheck();
 
       // Update sync status
       await this.updateNewReleaseSyncStatus({
@@ -1856,19 +1801,24 @@ export class WishlistService {
    * Mark new releases as notified
    */
   async markNewReleasesAsNotified(releaseIds: string[]): Promise<void> {
-    const store = await this.getNewReleases();
-    let modified = false;
+    return this.pressings.exclusive(async () => {
+      const store = await this.getNewReleases();
+      let modified = false;
 
-    for (const id of releaseIds) {
-      const release = store.releases.find(r => r.id === id);
-      if (release && !release.notified) {
-        release.notified = true;
-        modified = true;
+      for (const id of releaseIds) {
+        const release = store.releases.find(r => r.id === id);
+        if (release && !release.notified) {
+          release.notified = true;
+          modified = true;
+        }
       }
-    }
 
-    if (modified) {
-      await this.fileStorage.writeJSONWithBackup(this.NEW_RELEASES_FILE, store);
-    }
+      if (modified) {
+        await this.fileStorage.writeJSONWithBackup(
+          this.NEW_RELEASES_FILE,
+          store
+        );
+      }
+    });
   }
 }

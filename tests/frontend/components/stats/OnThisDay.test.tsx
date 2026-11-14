@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 
 import '@testing-library/jest-dom';
@@ -191,5 +192,75 @@ describe('OnThisDay', () => {
     expect(
       screen.getByLabelText('On This Day in your listening history')
     ).toBeInTheDocument();
+  });
+
+  describe('preview', () => {
+    const album = (n: number) => ({
+      artist: `Artist ${n}`,
+      album: `Album ${n}`,
+      playCount: 1,
+      coverUrl: null,
+    });
+    const year = (y: number, albums: number, totalScrobbles = albums) => ({
+      year: y,
+      yearsAgo: 2026 - y,
+      totalScrobbles,
+      albums: Array.from({ length: albums }, (_, i) => album(y * 10 + i)),
+    });
+    const many: OnThisDayResult = {
+      date: { month: 11, day: 13 },
+      years: [year(2025, 5), year(2024, 0, 0), year(2023, 4), year(2020, 2)],
+    };
+
+    it('shows the two latest years with plays, three albums each', () => {
+      render(<OnThisDay data={many} />);
+
+      expect(screen.getAllByRole('group')).toHaveLength(2);
+      expect(screen.getByText('2025')).toBeInTheDocument();
+      expect(screen.getByText('2023')).toBeInTheDocument();
+      expect(screen.queryByText('2020')).not.toBeInTheDocument();
+      expect(screen.getAllByRole('listitem')).toHaveLength(6);
+      expect(screen.getByText('+2 more')).toBeInTheDocument();
+    });
+
+    it('shows every year with plays, and up to five albums, when asked', async () => {
+      const user = userEvent.setup();
+      render(<OnThisDay data={many} />);
+
+      await user.click(
+        screen.getByRole('button', { name: 'Show all 3 years' })
+      );
+
+      expect(screen.getAllByRole('group')).toHaveLength(3);
+      expect(screen.getByText('2020')).toBeInTheDocument();
+      expect(screen.getAllByRole('listitem')).toHaveLength(5 + 4 + 2);
+      expect(
+        screen.getByRole('button', { name: 'Show fewer' })
+      ).toBeInTheDocument();
+    });
+
+    it('can still show albums four and five when there are only two years', async () => {
+      const user = userEvent.setup();
+      render(
+        <OnThisDay
+          data={{
+            date: { month: 11, day: 13 },
+            years: [year(2025, 5), year(2023, 1)],
+          }}
+        />
+      );
+      expect(screen.getAllByRole('listitem')).toHaveLength(4);
+
+      await user.click(screen.getByRole('button', { name: 'Show more' }));
+
+      expect(screen.getAllByRole('listitem')).toHaveLength(6);
+      expect(screen.queryByText(/more$/)).not.toBeInTheDocument();
+    });
+
+    it('has no button when every year already shows', () => {
+      render(<OnThisDay data={mockData} />);
+
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    });
   });
 });

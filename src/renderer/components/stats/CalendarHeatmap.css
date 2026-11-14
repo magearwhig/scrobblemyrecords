@@ -79,7 +79,8 @@
 
 .calendar-heatmap-month-labels {
   display: grid;
-  grid-auto-columns: 14px;
+  /* Same pitch as the weeks below: 12px cells with a 2px gap */
+  grid-auto-columns: 12px;
   grid-auto-flow: column;
   gap: 2px;
   height: 16px;

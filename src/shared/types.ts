@@ -253,6 +253,12 @@ export interface AlbumHistoryEntry {
   lastPlayed: number;
   playCount: number;
   plays: ScrobbleHistoryEntry[];
+  /**
+   * MusicBrainz release MBID Last.fm reported for this album, from the newest
+   * play that had one. Saved from 2026-11 on, so older albums may lack it
+   * until a full history sync.
+   */
+  mbid?: string;
 }
 
 export interface ScrobbleHistoryIndex {
@@ -846,6 +852,107 @@ export interface ArtistDetailResponse {
   imageUrl?: string;
 }
 
+// Album labels for label pages (see backend AlbumLabelService)
+
+export type AlbumLabelSource = 'musicbrainz' | 'discogs' | 'override';
+
+/** What the app knows about an unowned album's label */
+export interface AlbumLabelInfo {
+  labels: string[];
+  source: AlbumLabelSource;
+  status: 'found' | 'unsure' | 'none' | 'override';
+  matchedArtist?: string;
+  matchedTitle?: string;
+  year?: number;
+}
+
+export interface AlbumLabelStatus {
+  total: number;
+  checked: number;
+  found: number;
+  unsure: number;
+  notFound: number;
+  overridden: number;
+  pending: number;
+  running: boolean;
+  lastRunAt?: number;
+}
+
+/**
+ * Listening on albums you own on one label (GET /api/v1/stats/label/:name).
+ * Plays count to the labels of the owned copy, so a play of an album on two
+ * labels counts on both and label totals don't add up to total plays.
+ */
+/** One row of the Top Labels list on the stats page */
+export interface LabelPlayCount {
+  /** Most common spelling (from your copies when you own any) */
+  label: string;
+  /** Grouping key (see shared/utils/labels labelKey) */
+  labelKey: string;
+  playCount: number;
+  /** Plays of albums you own on the label */
+  ownedPlayCount: number;
+  /** Albums on the label played in the period */
+  albumCount: number;
+  lastPlayed: number;
+  /** Cover of the most played owned album on the label */
+  coverUrl?: string;
+}
+
+export interface LabelDetailResponse {
+  /** Grouping key (see shared/utils/labels labelKey) */
+  labelKey: string;
+  /** Most common spelling in the collection */
+  label: string;
+  /** Other spellings grouped under this label */
+  otherSpellings: string[];
+  totalPlayCount: number;
+  /** Plays of albums you own on this label */
+  ownedPlayCount: number;
+  /** Plays of albums you don't own, by looked-up or owner-set label */
+  lookedUpPlayCount: number;
+  /** Whether albums you don't own were counted */
+  includeUnowned: boolean;
+  firstPlayed: number | null; // Unix timestamp (seconds)
+  lastPlayed: number | null; // Unix timestamp (seconds)
+  periodCounts: {
+    thisWeek: number;
+    thisMonth: number;
+    thisYear: number;
+    allTime: number;
+  };
+  playTrend: Array<{ period: string; count: number }>;
+  topArtists: Array<{
+    artist: string;
+    playCount: number;
+    albumCount: number;
+    lastPlayed: number;
+  }>;
+  topAlbums: Array<{
+    artist: string;
+    album: string;
+    playCount: number;
+    lastPlayed: number;
+    coverUrl?: string;
+    /** Discogs release ids of the owned copies ([] when not owned) */
+    collectionReleaseIds: number[];
+    owned: boolean;
+    /** Where the label came from: your copy, a lookup, or you */
+    source: 'owned' | 'musicbrainz' | 'discogs' | 'override';
+  }>;
+  topTracks: Array<{
+    artist: string;
+    track: string;
+    album: string;
+    playCount: number;
+    lastPlayed: number;
+  }>;
+  /** Copies in the collection on this label */
+  ownedCopyCount: number;
+  /** Owned albums on this label with no plays */
+  unplayedCopies: Array<{ artist: string; album: string; releaseId: number }>;
+}
+
 export interface TrackDetailResponse {
   artist: string;
   track: string;
@@ -1329,10 +1436,19 @@ export interface BuyingShortlist {
 /**
  * Stored wishlist data file
  */
+/**
+ * A wishlist item as saved. Its pressings live in the Discogs pressings
+ * catalogue and are filled in when read; files saved before that may still
+ * hold a stale `vinylVersions`, which is ignored.
+ */
+export type StoredWishlistItem = Omit<EnrichedWishlistItem, 'vinylVersions'> & {
+  vinylVersions?: ReleaseVersion[];
+};
+
 export interface WishlistStore {
   schemaVersion: 1;
   lastUpdated: number;
-  items: EnrichedWishlistItem[];
+  items: StoredWishlistItem[];
 }
 
 /**
@@ -1378,6 +1494,46 @@ export interface VersionsCacheEntry {
 export interface VersionsCache {
   schemaVersion: 1;
   entries: Record<number, VersionsCacheEntry>; // masterId -> cache entry
+}
+
+/** A pressing's details as listed on its master's versions page */
+export interface DiscogsPressingVersion {
+  title: string;
+  format: string[];
+  label: string;
+  country: string;
+  year: number; // 0 when Discogs has no date
+  hasVinyl: boolean;
+}
+
+export interface DiscogsPressingRow {
+  masterId: number;
+  /** Absent for pressings known only by ID (seller lookups, old caches) */
+  version?: DiscogsPressingVersion;
+  firstSeenAt: number;
+}
+
+export interface DiscogsPressingsMaster {
+  /** First newest-first or complete fetch; nothing is flagged before it */
+  baselineSince?: number;
+  /** A list with every pressing has been seen, so undated ones are known */
+  everComplete?: boolean;
+  /** Last successful newest-first or complete fetch */
+  newestCheckedAt?: number;
+  /** Last successful fetch of every page */
+  completeCheckedAt?: number;
+}
+
+/**
+ * Every Discogs pressing seen, by release ID: the one store of master ->
+ * pressings data (data/discogs/pressings.json). Rows are never removed, so the
+ * pressings of a master before a fetch are what new-pressing detection
+ * compares against.
+ */
+export interface DiscogsPressingsStore {
+  schemaVersion: 1;
+  releases: Record<number, DiscogsPressingRow>;
+  masters: Record<number, DiscogsPressingsMaster>;
 }
 
 // ============================================
@@ -2194,6 +2350,9 @@ export interface BackupData {
 
   /** Record-store "file under" overrides (optional for older backups) */
   artistFilingOverrides?: ArtistFilingOverride[];
+
+  /** Labels you set for albums you don't own (optional for older backups) */
+  albumLabelOverrides?: Array<{ key: string; labels: string[]; setAt: number }>;
 }
 
 /**
@@ -2247,6 +2406,7 @@ export interface BackupPreview {
   wishlistPriceAlertsCount?: number;
   wishlistPrioritiesCount?: number;
   artistFilingOverridesCount?: number;
+  albumLabelOverridesCount?: number;
 }
 
 /**
@@ -2289,6 +2449,7 @@ export interface BackupImportPreview {
     crates?: ImportCategorySummary;
     crateSuggestions?: ImportCategorySummary;
     artistFilingOverrides?: ImportCategorySummary;
+    albumLabelOverrides?: ImportCategorySummary;
     settingsWillMerge: boolean;
   };
 }

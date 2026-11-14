@@ -135,3 +135,33 @@
 .dusty-corners-empty p {
   margin: 0;
 }
+
+/* Compact teaser (Stats page): small rows instead of a cover grid */
+.dusty-corners-section--compact .dusty-corners-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: var(--space-3);
+}
+
+.dusty-corners-section--compact .dusty-corners-card {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+}
+
+.dusty-corners-section--compact .dusty-corners-play-btn {
+  width: auto;
+  margin-top: var(--space-1);
+  padding: var(--space-1);
+}
+
+.dusty-corners-section--compact .dusty-corners-cover {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+}
+
+.dusty-corners-section--compact .dusty-corners-info {
+  flex: 1;
+  min-width: 0;
+}

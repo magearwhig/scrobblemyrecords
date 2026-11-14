@@ -1,0 +1,36 @@
+.album-label-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.album-label-line-summary {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.album-label-line-source {
+  color: var(--text-secondary);
+}
+
+.album-label-line-actions,
+.album-label-line-form {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.album-label-line-input {
+  min-width: 12rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}

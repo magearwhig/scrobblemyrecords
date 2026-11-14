@@ -56,6 +56,9 @@ describe('Stats Analytics Routes', () => {
     mockAuthService = new MockedAuthService(
       mockFileStorage
     ) as jest.Mocked<AuthService>;
+    mockAuthService.getUserSettings = jest
+      .fn()
+      .mockResolvedValue({ discogs: { username: 'testuser' }, lastfm: {} });
     mockStatsService = new MockedStatsService(
       mockFileStorage,
       {} as any
@@ -108,7 +111,10 @@ describe('Stats Analytics Routes', () => {
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data).toEqual(mockRoiData);
-      expect(mockStatsService.getCollectionROI).toHaveBeenCalledWith(undefined);
+      expect(mockStatsService.getCollectionROI).toHaveBeenCalledWith(
+        expect.any(Array),
+        undefined
+      );
     });
 
     it('should pass limit parameter to service', async () => {
@@ -126,7 +132,10 @@ describe('Stats Analytics Routes', () => {
       // Assert
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(mockStatsService.getCollectionROI).toHaveBeenCalledWith(1);
+      expect(mockStatsService.getCollectionROI).toHaveBeenCalledWith(
+        expect.any(Array),
+        1
+      );
     });
 
     it('should return 400 for invalid limit', async () => {

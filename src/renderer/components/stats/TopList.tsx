@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 import {
   AlbumPlayCount,
   ArtistPlayCount,
   CollectionItem,
   DateRange,
+  LabelPlayCount,
   TrackPlayCount,
 } from '../../../shared/types';
 import { toDisplayName } from '../../../shared/utils/displayName';
@@ -17,75 +18,44 @@ import {
 } from '../../utils/spotifyUtils';
 import AlbumLink from '../AlbumLink';
 import ArtistLink from '../ArtistLink';
+import LabelLink from '../LabelLink';
 import { RankedRow } from '../RankedRow';
 import TrackLink from '../TrackLink';
 
-import DateRangePicker from './DateRangePicker';
 import './TopList.css';
 
-type Period =
-  | 'week'
-  | 'month'
-  | 'year'
-  | 'all'
-  | 'days30'
-  | 'days90'
-  | 'days365'
-  | 'custom';
+import { Period, PeriodSelector } from './PeriodSelector';
 
-const VIEW_ALL_LABELS: Record<TopListProps['type'], string> = {
+/** Lists with an all-time view on the history page */
+const VIEW_ALL_LABELS: Partial<Record<TopListProps['type'], string>> = {
   artists: 'Artists',
   albums: 'Albums',
   tracks: 'Tracks',
 };
 
+type TopListItem =
+  | ArtistPlayCount
+  | AlbumPlayCount
+  | TrackPlayCount
+  | LabelPlayCount;
+
 interface TopListProps {
   title: string;
-  type: 'artists' | 'albums' | 'tracks';
-  data: ArtistPlayCount[] | AlbumPlayCount[] | TrackPlayCount[];
-  onPeriodChange: (period: Period, dateRange?: DateRange) => void;
-  currentPeriod: Period;
+  type: 'artists' | 'albums' | 'tracks' | 'labels';
+  data:
+    | ArtistPlayCount[]
+    | AlbumPlayCount[]
+    | TrackPlayCount[]
+    | LabelPlayCount[];
+  /** Without it the list has no period buttons (the page sets the period) */
+  onPeriodChange?: (period: Period, dateRange?: DateRange) => void;
+  currentPeriod?: Period;
   loading?: boolean;
   customDateRange?: DateRange;
   collectionMap?: Map<string, CollectionItem>;
   collectionArtistCounts?: Map<string, number>;
   /** Cover of an owned record per artist, shown when there's no photo */
   collectionArtistCovers?: Map<string, string>;
-}
-
-/**
- * Format date range for display in button
- */
-function formatDateRangeLabel(dateRange: DateRange): string {
-  const start = new Date(dateRange.startDate * 1000);
-  const end = new Date(dateRange.endDate * 1000);
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-
-  const startMonth = start.getMonth();
-  const startYear = start.getFullYear();
-  const endMonth = end.getMonth();
-  const endYear = end.getFullYear();
-
-  if (startYear === endYear && startMonth === endMonth) {
-    return `${months[startMonth]} ${startYear}`;
-  }
-  if (startYear === endYear) {
-    return `${months[startMonth]} - ${months[endMonth]} ${startYear}`;
-  }
-  return `${months[startMonth]} '${String(startYear).slice(-2)} - ${months[endMonth]} '${String(endYear).slice(-2)}`;
 }
 
 /**
@@ -103,27 +73,14 @@ export const TopList: React.FC<TopListProps> = ({
   collectionArtistCounts,
   collectionArtistCovers,
 }) => {
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const isLabelData = (item: TopListItem): item is LabelPlayCount =>
+    'labelKey' in item;
 
-  const periods: Array<{ value: Period; label: string }> = [
-    { value: 'week', label: 'Week' },
-    { value: 'month', label: 'Month' },
-    { value: 'year', label: 'Year' },
-    { value: 'days30', label: '30 Days' },
-    { value: 'days90', label: '90 Days' },
-    { value: 'days365', label: '365 Days' },
-    { value: 'all', label: 'All Time' },
-  ];
-
-  const isAlbumData = (
-    item: ArtistPlayCount | AlbumPlayCount | TrackPlayCount
-  ): item is AlbumPlayCount => {
+  const isAlbumData = (item: TopListItem): item is AlbumPlayCount => {
     return 'album' in item && !('track' in item);
   };
 
-  const isTrackData = (
-    item: ArtistPlayCount | AlbumPlayCount | TrackPlayCount
-  ): item is TrackPlayCount => {
+  const isTrackData = (item: TopListItem): item is TrackPlayCount => {
     return 'track' in item;
   };
 
@@ -134,33 +91,18 @@ export const TopList: React.FC<TopListProps> = ({
     if (type === 'tracks') {
       return 'Your most played tracks by scrobble count.';
     }
+    if (type === 'labels') {
+      return 'Your most played record labels by scrobble count.';
+    }
     return 'Your most played albums by scrobble count.';
   };
 
   const getEmptyMessage = (): string => {
     if (type === 'artists') return 'artists';
     if (type === 'tracks') return 'tracks';
+    if (type === 'labels') return 'labels';
     return 'albums';
   };
-
-  const handlePeriodClick = (period: Period) => {
-    if (period === 'custom') {
-      setShowDatePicker(true);
-    } else {
-      setShowDatePicker(false);
-      onPeriodChange(period);
-    }
-  };
-
-  const handleDateRangeApply = (dateRange: DateRange) => {
-    onPeriodChange('custom', dateRange);
-    setShowDatePicker(false);
-  };
-
-  const customLabel =
-    currentPeriod === 'custom' && customDateRange
-      ? formatDateRangeLabel(customDateRange)
-      : 'Custom';
 
   return (
     <div className='top-list'>
@@ -169,31 +111,13 @@ export const TopList: React.FC<TopListProps> = ({
           <h3>{title}</h3>
           <p className='top-list-description'>{getDescription()}</p>
         </div>
-        <div className='top-list-period-selector-wrapper'>
-          <div className='top-list-period-selector'>
-            {periods.map(period => (
-              <button
-                key={period.value}
-                className={`top-list-period-btn ${currentPeriod === period.value ? 'active' : ''}`}
-                onClick={() => handlePeriodClick(period.value)}
-              >
-                {period.label}
-              </button>
-            ))}
-            <button
-              className={`top-list-period-btn ${currentPeriod === 'custom' ? 'active' : ''}`}
-              onClick={() => handlePeriodClick('custom')}
-            >
-              {customLabel}
-            </button>
-          </div>
-          <DateRangePicker
-            isOpen={showDatePicker}
-            onClose={() => setShowDatePicker(false)}
-            onApply={handleDateRangeApply}
-            initialDateRange={customDateRange}
+        {onPeriodChange && (
+          <PeriodSelector
+            currentPeriod={currentPeriod ?? 'month'}
+            onPeriodChange={onPeriodChange}
+            customDateRange={customDateRange}
           />
-        </div>
+        )}
       </div>
 
       <div className='top-list-content'>
@@ -206,7 +130,23 @@ export const TopList: React.FC<TopListProps> = ({
         ) : (
           <>
             <ol className='ranked-list'>
-              {data.map((item, index) => {
+              {(data as TopListItem[]).map((item, index) => {
+                if (isLabelData(item)) {
+                  return (
+                    <RankedRow
+                      key={item.labelKey}
+                      rank={index + 1}
+                      imageKind='album'
+                      imageUrl={item.coverUrl}
+                      imageAlt={`${item.label} record`}
+                      title={<LabelLink label={item.label} />}
+                      subtitle={`${item.albumCount.toLocaleString()} ${
+                        item.albumCount === 1 ? 'album' : 'albums'
+                      }`}
+                      playCount={item.playCount}
+                    />
+                  );
+                }
                 const artistLink = (
                   <ArtistLink
                     artist={item.artist}
@@ -294,14 +234,16 @@ export const TopList: React.FC<TopListProps> = ({
                 );
               })}
             </ol>
-            <div className='top-list-view-all'>
-              <a
-                href={`#history?view=${type}`}
-                className='top-list-view-all-link'
-              >
-                View all-time {VIEW_ALL_LABELS[type].toLowerCase()}
-              </a>
-            </div>
+            {VIEW_ALL_LABELS[type] && (
+              <div className='top-list-view-all'>
+                <a
+                  href={`#history?view=${type}`}
+                  className='top-list-view-all-link'
+                >
+                  View all-time {VIEW_ALL_LABELS[type].toLowerCase()}
+                </a>
+              </div>
+            )}
           </>
         )}
       </div>

@@ -1,3 +1,4 @@
+import { Play } from 'lucide-react';
 import React from 'react';
 
 import { DustyCornerAlbum } from '../../../shared/types';
@@ -11,7 +12,12 @@ interface DustyCornersSectionProps {
   albums: DustyCornerAlbum[];
   loading?: boolean;
   showAll?: boolean;
+  /** A short teaser (Stats page): four records as small rows, one link */
+  compact?: boolean;
 }
+
+const COMPACT_COUNT = 4;
+const GRID_COUNT = 8;
 
 /**
  * Placeholder SVG for album covers (vinyl record icon)
@@ -61,7 +67,13 @@ export const DustyCornersSection: React.FC<DustyCornersSectionProps> = ({
   albums,
   loading,
   showAll = false,
+  compact = false,
 }) => {
+  const shownCount = showAll
+    ? albums.length
+    : compact
+      ? COMPACT_COUNT
+      : GRID_COUNT;
   const formatLastPlayed = (album: DustyCornerAlbum): string => {
     if (album.daysSincePlay === -1 || album.lastPlayed === 0) {
       return 'Never played';
@@ -100,7 +112,9 @@ export const DustyCornersSection: React.FC<DustyCornersSectionProps> = ({
   }
 
   return (
-    <div className='dusty-corners-section'>
+    <div
+      className={`dusty-corners-section${compact ? ' dusty-corners-section--compact' : ''}`}
+    >
       <div className='dusty-corners-header'>
         <div>
           <h3>Dusty Corners</h3>
@@ -112,7 +126,7 @@ export const DustyCornersSection: React.FC<DustyCornersSectionProps> = ({
       </div>
 
       <div className='dusty-corners-grid'>
-        {(showAll ? albums : albums.slice(0, 8)).map(album => (
+        {albums.slice(0, shownCount).map(album => (
           <div
             key={`${album.artist}-${album.album}`}
             className='dusty-corners-card'
@@ -152,7 +166,7 @@ export const DustyCornersSection: React.FC<DustyCornersSectionProps> = ({
                 {formatLastPlayed(album)}
               </div>
               <IconButton
-                icon={<>&#9654;</>}
+                icon={<Play size={14} aria-hidden='true' />}
                 size='small'
                 className='dusty-corners-play-btn'
                 onClick={e => {
@@ -167,9 +181,22 @@ export const DustyCornersSection: React.FC<DustyCornersSectionProps> = ({
         ))}
       </div>
 
-      {!showAll && albums.length > 8 && (
+      {compact && (
         <div className='dusty-corners-more'>
-          <span>+{albums.length - 8} more albums need some love</span>
+          <Button
+            variant='outline'
+            size='small'
+            onClick={() => {
+              navigate('what-to-play?tab=dusty');
+            }}
+          >
+            See all in What to Play
+          </Button>
+        </div>
+      )}
+      {!showAll && !compact && albums.length > GRID_COUNT && (
+        <div className='dusty-corners-more'>
+          <span>+{albums.length - GRID_COUNT} more albums need some love</span>
           <Button
             variant='outline'
             size='small'

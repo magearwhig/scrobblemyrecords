@@ -328,4 +328,29 @@ describe('RankingsRace', () => {
       expect(playButton).toHaveTextContent('⏸');
     });
   });
+
+  it('shows lowercase history names with display casing', () => {
+    render(
+      <RankingsRace
+        snapshots={[
+          {
+            period: '2024-01',
+            timestamp: 1704067200000,
+            rankings: [
+              {
+                name: 'gimme fiction',
+                artist: 'spoon',
+                count: 3,
+                rank: 1,
+              },
+            ],
+          },
+        ]}
+        type='albums'
+        topN={10}
+      />
+    );
+
+    expect(screen.getByText('Gimme Fiction - Spoon')).toBeInTheDocument();
+  });
 });

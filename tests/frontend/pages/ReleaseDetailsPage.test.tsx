@@ -190,6 +190,16 @@ describe('ReleaseDetailsPage Auto Timing', () => {
     jest.restoreAllMocks();
   });
 
+  it('links the label name to the label page', async () => {
+    renderWithProviders(<ReleaseDetailsPage />);
+
+    expect(
+      await screen.findByRole('link', {
+        name: 'View label details for Test Label',
+      })
+    ).toBeInTheDocument();
+  });
+
   it('should calculate correct auto timing when "Auto Timing (Just Finished)" is clicked', async () => {
     renderWithProviders(<ReleaseDetailsPage />);
 
@@ -1167,7 +1177,11 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
     // Check for detailed release info
     expect(screen.getByText('Test Artist')).toBeInTheDocument();
     expect(screen.getByText('2023 • Vinyl, LP')).toBeInTheDocument();
-    expect(screen.getByText('Label 1, Label 2')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        (_, el) => el?.tagName === 'P' && el.textContent === 'Label 1, Label 2'
+      )
+    ).toBeInTheDocument();
     expect(screen.getByText('Catalog: CAT-001')).toBeInTheDocument();
   });
 

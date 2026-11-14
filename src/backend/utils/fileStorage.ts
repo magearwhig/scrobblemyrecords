@@ -144,7 +144,6 @@ export class FileStorage {
   private readonly REGENERABLE_CACHES: readonly string[] = [
     'images/album-covers.json',
     'images/artist-images.json',
-    'wishlist/versions-cache.json',
     'wishlist/pressing-prices.json',
     'releases/collection-artists-cache.json',
     'cache/artist-tags.json',

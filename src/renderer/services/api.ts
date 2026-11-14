@@ -1,6 +1,8 @@
 import axios, { AxiosInstance } from 'axios';
 
 import {
+  AlbumLabelInfo,
+  AlbumLabelStatus,
   AddDiscardPileItemRequest,
   AlbumIdentifier,
   AlbumMapping,
@@ -641,6 +643,46 @@ class ApiService {
   // ============================================
   // Compound artist mapping methods
   // ============================================
+
+  // Album labels: labels looked up for albums you don't own, and your
+  // corrections to them
+
+  async getAlbumLabel(
+    artist: string,
+    album: string
+  ): Promise<AlbumLabelInfo | null> {
+    const response = await this.api.get('/album-labels', {
+      params: { artist, album },
+    });
+    return response.data.data;
+  }
+
+  async getAlbumLabelStatus(): Promise<AlbumLabelStatus> {
+    const response = await this.api.get('/album-labels/status');
+    return response.data.data;
+  }
+
+  /** Set an album's labels yourself; [] counts it on no label */
+  async setAlbumLabel(
+    artist: string,
+    album: string,
+    labels: string[]
+  ): Promise<void> {
+    await this.api.put('/album-labels', { artist, album, labels });
+  }
+
+  /** Go back to the looked-up label */
+  async clearAlbumLabel(artist: string, album: string): Promise<void> {
+    await this.api.delete('/album-labels', { params: { artist, album } });
+  }
+
+  async confirmAlbumLabel(artist: string, album: string): Promise<void> {
+    await this.api.post('/album-labels/confirm', { artist, album });
+  }
+
+  async rejectAlbumLabel(artist: string, album: string): Promise<void> {
+    await this.api.post('/album-labels/reject', { artist, album });
+  }
 
   async getCompoundArtistMappings(): Promise<{
     mappings: Array<{

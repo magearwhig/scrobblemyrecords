@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 
 import { MusicBrainzArtistMatch, MusicBrainzRelease } from '../../shared/types';
+import { albumMatchName } from '../../shared/utils/labels';
 import { createLogger } from '../utils/logger';
 
 // Rate limiting: MusicBrainz requires 1 request/sec max
@@ -107,6 +108,74 @@ export interface MBReleaseLite {
   originalReleaseDate?: string | null;
 }
 
+/** MusicBrainz's placeholder for a release without a label */
+const MB_NO_LABEL = '[no label]';
+/** A search hit this close counts as "unsure" when names don't match exactly */
+const UNSURE_SCORE = 95;
+
+interface MBLabelRelease {
+  id: string;
+  title: string;
+  score?: number;
+  status?: string;
+  date?: string;
+  'artist-credit'?: Array<{ name?: string; artist?: { name?: string } }>;
+  'release-group'?: { id: string; title?: string };
+  'label-info'?: Array<{ label?: { name?: string } }>;
+}
+
+function creditName(release: {
+  'artist-credit'?: Array<{ name?: string; artist?: { name?: string } }>;
+}): string {
+  return (release['artist-credit'] ?? [])
+    .map(credit => credit.name ?? credit.artist?.name ?? '')
+    .join(', ');
+}
+
+/**
+ * Labels of the earliest official release among `releases`, or null if none
+ * has a label. Releases without a date sort last.
+ */
+function earliestLabels(
+  releases: MBLabelRelease[]
+): { labels: string[]; year?: number; release: MBLabelRelease } | null {
+  const official = releases.filter(
+    r => !r.status || r.status.toLowerCase() === 'official'
+  );
+  // A year-only or month-only date sorts after full dates in that period:
+  // record-club and other secondary editions are often dated by year only
+  const sortDate = (date?: string) =>
+    date ? `${date}-99-99`.slice(0, 10) : '9999-99-99';
+  const sorted = [...official].sort((a, b) =>
+    sortDate(a.date).localeCompare(sortDate(b.date))
+  );
+  for (const release of sorted) {
+    const labels = Array.from(
+      new Set(
+        (release['label-info'] ?? [])
+          .map(info => info.label?.name?.trim() ?? '')
+          .filter(name => name && name.toLowerCase() !== MB_NO_LABEL)
+      )
+    );
+    if (labels.length === 0) continue;
+    const year = release.date ? parseInt(release.date.slice(0, 4), 10) : NaN;
+    return { labels, year: Number.isFinite(year) ? year : undefined, release };
+  }
+  return null;
+}
+
+const PROJECT_URL = 'https://github.com/magearwhig/scrobblemyrecords';
+
+/**
+ * The User-Agent sent to MusicBrainz and the Cover Art Archive. MusicBrainz
+ * asks apps to include a way to contact whoever runs them; this repo is
+ * public, so the contact comes from MUSICBRAINZ_CONTACT in .env, never from
+ * the code. Without it, the public project page is sent instead.
+ */
+export function musicBrainzUserAgent(contact: string | undefined): string {
+  return `Listenography/1.0 ( ${contact?.trim() || PROJECT_URL} )`;
+}
+
 export class MusicBrainzService {
   private axios: AxiosInstance;
   private coverArtAxios: AxiosInstance;
@@ -115,13 +184,20 @@ export class MusicBrainzService {
   private lastCoverArtRequestTime = 0;
 
   constructor() {
+    const contact = process.env.MUSICBRAINZ_CONTACT?.trim();
+    const userAgent = musicBrainzUserAgent(contact);
+    if (contact && process.env.NODE_ENV !== 'test') {
+      this.logger.info(
+        `MusicBrainz requests include your contact "${contact}" (MUSICBRAINZ_CONTACT in .env)`
+      );
+    }
+
     // MusicBrainz API client
     this.axios = axios.create({
       baseURL: 'https://musicbrainz.org/ws/2',
       timeout: 10000,
       headers: {
-        'User-Agent':
-          'RecordScrobbles/1.0 (https://github.com/recordscrobbles)',
+        'User-Agent': userAgent,
         Accept: 'application/json',
       },
     });
@@ -131,8 +207,7 @@ export class MusicBrainzService {
       baseURL: 'https://coverartarchive.org',
       timeout: 5000,
       headers: {
-        'User-Agent':
-          'RecordScrobbles/1.0 (https://github.com/recordscrobbles)',
+        'User-Agent': userAgent,
         Accept: 'application/json',
       },
     });
@@ -575,6 +650,132 @@ export class MusicBrainzService {
       default:
         return 'other';
     }
+  }
+
+  /**
+   * The label an album first came out on: the label of the earliest official
+   * release in its release group. With a release MBID (from Last.fm) the
+   * album is known exactly; otherwise a release search by title and artist
+   * finds it, and a close-but-not-exact hit comes back as "unsure".
+   */
+  async findAlbumLabels(query: {
+    artist: string;
+    album: string;
+    mbid?: string;
+  }): Promise<{
+    labels: string[];
+    status: 'found' | 'unsure';
+    matchedArtist?: string;
+    matchedTitle?: string;
+    year?: number;
+  } | null> {
+    if (query.mbid) {
+      const exact = await this.findLabelsByReleaseMbid(query.mbid);
+      if (exact) return exact;
+    }
+
+    const title = query.album.replace(/\s*[([][^)\]]*[)\]]/g, '').trim();
+    const phrase = (text: string) => text.replace(/[\\"]/g, '\\$&');
+    await this.enforceRateLimit();
+    const response = await this.executeWithBackoff(
+      () =>
+        this.axios.get('/release', {
+          params: {
+            query: `release:"${phrase(title || query.album)}" AND artist:"${phrase(query.artist)}"`,
+            fmt: 'json',
+            limit: 25,
+          },
+        }),
+      `label search ${query.artist} - ${query.album}`
+    );
+    const releases: MBLabelRelease[] = response.data?.releases ?? [];
+    if (releases.length === 0) return null;
+
+    const wantedTitle = albumMatchName(query.album);
+    const wantedArtist = albumMatchName(query.artist);
+    const exact = releases
+      .filter(
+        r =>
+          albumMatchName(r.title) === wantedTitle &&
+          albumMatchName(creditName(r)) === wantedArtist
+      )
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
+    const best =
+      exact ?? [...releases].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
+    if (!exact && (best.score ?? 0) < UNSURE_SCORE) return null;
+
+    // The search shows only some of the album's releases; the first pressing
+    // may not be among them, so read the whole release group
+    const groupId = best['release-group']?.id;
+    const inGroup = groupId ? await this.releaseGroupReleases(groupId) : [best];
+    const earliest = earliestLabels(inGroup);
+    if (!earliest) return null;
+    return {
+      labels: earliest.labels,
+      status: exact ? 'found' : 'unsure',
+      matchedArtist: creditName(best) || undefined,
+      matchedTitle: best.title,
+      year: earliest.year,
+    };
+  }
+
+  /** Every release in a release group, with labels (first 100) */
+  private async releaseGroupReleases(
+    groupId: string
+  ): Promise<MBLabelRelease[]> {
+    await this.enforceRateLimit();
+    const browse = await this.executeWithBackoff(
+      () =>
+        this.axios.get('/release', {
+          params: { 'release-group': groupId, inc: 'labels', limit: 100 },
+        }),
+      `release group ${groupId}`
+    );
+    const releases: MBLabelRelease[] = browse.data?.releases ?? [];
+    // A browse lists only this group; keep that true if the shape changes
+    return releases.filter(
+      r => !r['release-group'] || r['release-group'].id === groupId
+    );
+  }
+
+  /** Earliest official label of the release group a release MBID belongs to */
+  private async findLabelsByReleaseMbid(mbid: string): Promise<{
+    labels: string[];
+    status: 'found';
+    matchedArtist?: string;
+    matchedTitle?: string;
+    year?: number;
+  } | null> {
+    await this.enforceRateLimit();
+    let releaseData: MBLabelRelease;
+    try {
+      const response = await this.executeWithBackoff(
+        () =>
+          this.axios.get(`/release/${mbid}`, {
+            params: { inc: 'release-groups artist-credits' },
+          }),
+        `release ${mbid}`
+      );
+      releaseData = response.data;
+    } catch (error) {
+      // A stale or wrong MBID from Last.fm: fall back to searching
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+    const groupId = releaseData?.['release-group']?.id;
+    if (!groupId) return null;
+
+    const earliest = earliestLabels(await this.releaseGroupReleases(groupId));
+    if (!earliest) return null;
+    return {
+      labels: earliest.labels,
+      status: 'found',
+      matchedArtist: creditName(releaseData) || undefined,
+      matchedTitle: releaseData.title,
+      year: earliest.year,
+    };
   }
 
   /**

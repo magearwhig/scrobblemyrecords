@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 
+import { toDisplayName } from '../../../shared/utils/displayName';
 import './RankingsRace.css';
 
 interface RankingItem {
@@ -178,10 +179,11 @@ export const RankingsRace: React.FC<RankingsRaceProps> = ({
             }
 
             const widthPercent = (item.count / maxCount) * 100;
+            // History names are stored lowercase
             const label =
               type === 'artists'
-                ? item.name
-                : `${item.name}${item.artist ? ` - ${item.artist}` : ''}`;
+                ? toDisplayName(item.name)
+                : `${toDisplayName(item.name)}${item.artist ? ` - ${toDisplayName(item.artist)}` : ''}`;
             // Use rank-1 (0-indexed) for positioning
             const position = (item.rank - 1) * 60;
 

@@ -19,6 +19,7 @@ export const ROUTES = {
   ARTIST_DETAIL: 'artist',
   TRACK_DETAIL: 'track',
   ALBUM_DETAIL: 'album',
+  LABEL_DETAIL: 'label',
   RECOMMENDATIONS: 'recommendations',
   MEMORY_SCROBBLE: 'memory-scrobble',
   CRATES: 'crates',

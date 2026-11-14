@@ -42,7 +42,18 @@ function formatTimeRemaining(ms: number): string {
   return `${minutes}m ${secs}s remaining`;
 }
 
-const ValueEstimationSection: React.FC = () => {
+interface ValueEstimationSectionProps {
+  /** Called when a value scan finishes, so other value views can reload */
+  onScanComplete?: () => void;
+}
+
+const ValueEstimationSection: React.FC<ValueEstimationSectionProps> = ({
+  onScanComplete,
+}) => {
+  // Kept in a ref so the polling callback always calls the latest one
+  const onScanCompleteRef = useRef(onScanComplete);
+  onScanCompleteRef.current = onScanComplete;
+
   const [estimation, setEstimation] =
     useState<CollectionValueEstimation | null>(null);
   const [scanStatus, setScanStatus] = useState<ValueScanStatus>({
@@ -82,12 +93,15 @@ const ValueEstimationSection: React.FC = () => {
     pollRef.current = setInterval(async () => {
       try {
         const res = await collectionAnalyticsApi.getValueScanStatus();
+        // An earlier check already saw the scan finish and stopped polling
+        if (!pollRef.current) return;
         if (res.success && res.data) {
           setScanStatus(res.data);
           if (res.data.status === 'completed' || res.data.status === 'error') {
             stopPolling();
             setScanning(false);
             fetchValueData();
+            if (res.data.status === 'completed') onScanCompleteRef.current?.();
           }
         }
       } catch {

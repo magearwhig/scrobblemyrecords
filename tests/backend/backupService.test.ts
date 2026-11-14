@@ -869,6 +869,54 @@ describe('BackupService', () => {
       ]);
     });
 
+    it('backs up and restores the labels you set for albums', async () => {
+      const FILE = 'mappings/album-label-overrides.json';
+      const override = (key: string, label: string, setAt: number) => ({
+        key,
+        labels: label ? [label] : [],
+        setAt,
+      });
+      await fileStorage.writeJSON(FILE, {
+        schemaVersion: 1,
+        overrides: [override('spoon|gimme fiction', 'Merge', 10)],
+      });
+
+      expect((await service.getBackupPreview()).albumLabelOverridesCount).toBe(
+        1
+      );
+      const backupJson = await service.exportBackup({
+        includeCredentials: false,
+      });
+      expect(JSON.parse(backupJson).data.albumLabelOverrides).toHaveLength(1);
+
+      await fileStorage.writeJSON(FILE, {
+        schemaVersion: 1,
+        overrides: [
+          override('spoon|gimme fiction', '', 50),
+          override('pavement|wowee zowee', 'Matador', 50),
+        ],
+      });
+      const importPreview = await service.previewImport(backupJson);
+      expect(importPreview.summary.albumLabelOverrides).toEqual({
+        new: 0,
+        existing: 1,
+      });
+
+      await service.importBackup(backupJson, { mode: 'merge' });
+      type Store = { overrides: Array<{ key: string; labels: string[] }> };
+      let store = await fileStorage.readJSON<Store>(FILE);
+      expect(store!.overrides.map(o => [o.key, o.labels]).sort()).toEqual([
+        ['pavement|wowee zowee', ['Matador']],
+        ['spoon|gimme fiction', []],
+      ]);
+
+      await service.importBackup(backupJson, { mode: 'replace' });
+      store = await fileStorage.readJSON<Store>(FILE);
+      expect(store!.overrides.map(o => [o.key, o.labels])).toEqual([
+        ['spoon|gimme fiction', ['Merge']],
+      ]);
+    });
+
     it('a replace restore of a backup with no crates clears them', async () => {
       const backupJson = await service.exportBackup({
         includeCredentials: false,

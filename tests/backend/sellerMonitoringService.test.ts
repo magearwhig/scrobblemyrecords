@@ -1,12 +1,14 @@
 import axios from 'axios';
 
 import { AuthService } from '../../src/backend/services/authService';
+import { DiscogsPressingsService } from '../../src/backend/services/discogsPressingsService';
 import { jobStatusService } from '../../src/backend/services/jobStatusService';
 import { SellerMonitoringService } from '../../src/backend/services/sellerMonitoringService';
 import { WishlistService } from '../../src/backend/services/wishlistService';
 import { getDiscogsAxios } from '../../src/backend/utils/discogsAxios';
 import { FileStorage } from '../../src/backend/utils/fileStorage';
 import {
+  DiscogsPressingsStore,
   MonitoredSellersStore,
   SellerMatch,
   SellerMatchesStore,
@@ -55,6 +57,11 @@ describe('SellerMonitoringService', () => {
   let mockAuthService: jest.Mocked<AuthService>;
   let mockWishlistService: jest.Mocked<WishlistService>;
   let mockAxiosInstance: any;
+  let pressings: DiscogsPressingsService;
+  let catalogueFiles: Record<string, unknown>;
+  const LEGACY_SELLER_CACHE = 'sellers/release-master-cache.json';
+  const catalogue = () =>
+    catalogueFiles['discogs/pressings.json'] as DiscogsPressingsStore;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -99,6 +106,34 @@ describe('SellerMonitoringService', () => {
 
     mockedGetDiscogsAxios.mockReturnValue(mockAxiosInstance);
     mockedAxios.isAxiosError.mockReturnValue(false);
+
+    // A real pressings catalogue in memory. A test's old seller-cache seed
+    // (read through mockFileStorage) is imported as the catalogue's legacy data.
+    catalogueFiles = {};
+    const catalogueStorage = {
+      exists: jest.fn(async (path: string) =>
+        path === LEGACY_SELLER_CACHE ? true : catalogueFiles[path] !== undefined
+      ),
+      readJSON: jest.fn(async (path: string) =>
+        catalogueFiles[path] !== undefined
+          ? catalogueFiles[path]
+          : path === LEGACY_SELLER_CACHE
+            ? mockFileStorage.readJSON(path)
+            : null
+      ),
+      writeJSON: jest.fn(async (path: string, data: unknown) => {
+        catalogueFiles[path] = JSON.parse(JSON.stringify(data));
+      }),
+      delete: jest.fn(async () => undefined),
+    } as unknown as FileStorage;
+    pressings = new DiscogsPressingsService(
+      catalogueStorage,
+      async () => ({ Authorization: 'Discogs token=test-token' }),
+      { retryDelayMs: 0 }
+    );
+    Object.defineProperty(mockWishlistService, 'pressings', {
+      value: pressings,
+    });
 
     // Create service instance
     sellerMonitoringService = new SellerMonitoringService(
@@ -829,22 +864,20 @@ describe('SellerMonitoringService', () => {
         .fn()
         .mockResolvedValue([{ masterId: 4 }]);
 
-      mockFileStorage.readJSON.mockImplementation(async (path: string) => {
-        if (path === 'sellers/release-master-cache.json') {
-          return {
-            schemaVersion: 2,
-            lastUpdated: Date.now(),
-            releaseToMaster: { 30: 3, 40: 4 },
-            masterToReleases: {
-              // Fresh - skipped
-              3: { releases: [30], fetchedAt: Date.now() - DAY },
-              // Stale - refreshed
-              4: { releases: [40], fetchedAt: Date.now() - 45 * DAY },
-            },
-          };
-        }
-        return null;
-      });
+      mockFileStorage.readJSON.mockResolvedValue(null);
+      catalogueFiles['discogs/pressings.json'] = {
+        schemaVersion: 1,
+        releases: {
+          30: { masterId: 3, firstSeenAt: 1 },
+          40: { masterId: 4, firstSeenAt: 1 },
+        },
+        masters: {
+          // Fresh - skipped
+          3: { completeCheckedAt: Date.now() - DAY },
+          // Stale - refreshed
+          4: { completeCheckedAt: Date.now() - 45 * DAY },
+        },
+      };
 
       mockAxiosInstance.get.mockImplementation(async (url: string) => {
         if (url === '/masters/1/versions') {
@@ -889,14 +922,26 @@ describe('SellerMonitoringService', () => {
       );
       expect(status.completedAt).toBeDefined();
       expect(sellerMonitoringService.isReleaseCacheRefreshing()).toBe(false);
-      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
-        'sellers/release-master-cache.json',
-        expect.anything()
-      );
+      expect(Object.keys(catalogue().releases).map(Number).sort()).toEqual([
+        10, 11, 30, 40, 41,
+      ]);
       expect(jobStatusService.completeJob).toHaveBeenCalledWith(
         'job-1',
-        'Release matching cache refreshed: 3 masters, 3 new releases, 1 failed'
+        'Release matching cache refreshed: 3 masters, 3 pressings added, 1 failed'
       );
+    });
+
+    it('keeps every pressing it fetches in the pressings catalogue', async () => {
+      sellerMonitoringService.startReleaseCacheRefresh();
+      await jest.advanceTimersByTimeAsync(100);
+
+      expect(await pressings.masterOf(11)).toBe(1);
+      expect(await pressings.masterOf(41)).toBe(4);
+      expect((await pressings.masterStatus(1)).completeCheckedAt).toBeDefined();
+      // Master 2 failed: not marked as fetched
+      expect(
+        (await pressings.masterStatus(2)).completeCheckedAt
+      ).toBeUndefined();
     });
 
     it('does not start a second refresh while one is running', async () => {
@@ -953,14 +998,13 @@ describe('SellerMonitoringService', () => {
       sellerMonitoringService.startReleaseCacheRefresh();
       await jest.advanceTimersByTimeAsync(100);
 
-      const cache = (sellerMonitoringService as any).releaseCache;
-      // Page 1 was cached but the master's timestamp was not advanced
-      expect(cache.releaseToMaster[41]).toBe(4);
-      expect(cache.masterToReleases[4].fetchedAt).toBeLessThanOrEqual(
-        staleFetchedAt
-      );
+      // Page 1 was kept but the master is not marked as fetched
+      expect(await pressings.masterOf(41)).toBe(4);
+      expect(
+        (await pressings.masterStatus(4)).completeCheckedAt
+      ).toBeLessThanOrEqual(staleFetchedAt);
       // A master that failed on its first page is left retryable too
-      expect(cache.masterToReleases[1]).toBeUndefined();
+      expect((await pressings.masterStatus(1)).knownCount).toBe(0);
     });
 
     it('does not let a refresh start while a single seller scan is starting', async () => {
@@ -2861,10 +2905,7 @@ describe('SellerMonitoringService', () => {
 
       // Verify the persistent release cache was NOT populated for this release
       // (rate-limited items should not be cached so they can be retried next scan)
-      const releaseCache = (sellerMonitoringService as any).releaseCache;
-      if (releaseCache) {
-        expect(releaseCache.releaseToMaster[100]).toBeUndefined();
-      }
+      expect(await pressings.masterOf(100)).toBeUndefined();
     });
 
     it('should include rateLimitedCount in matching statistics', async () => {

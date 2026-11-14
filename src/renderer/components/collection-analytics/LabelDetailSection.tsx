@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 
 import { LabelDistribution } from '../../../shared/types';
+import LabelLink from '../LabelLink';
 
 interface LabelDetailSectionProps {
   labels: LabelDistribution;
@@ -113,7 +114,11 @@ const LabelDetailSection: React.FC<LabelDetailSectionProps> = ({ labels }) => {
         {labels.labels.map(label => (
           <li key={label.name} className='analytics-detail-item'>
             <span className='analytics-detail-name'>
-              {label.name === '' ? 'Not On Label' : label.name}
+              {label.name === '' ? (
+                'Not On Label'
+              ) : (
+                <LabelLink label={label.name} />
+              )}
             </span>
             <span className='analytics-detail-count'>
               {label.count.toLocaleString()} ({label.percentage}%)

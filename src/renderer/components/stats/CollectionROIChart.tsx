@@ -12,11 +12,8 @@ import './CollectionROIChart.css';
 
 const logger = createLogger('CollectionROIChart');
 
-const CHART_LIMIT = 20;
-
-interface CollectionROIChartProps {
-  limit?: number;
-}
+/** Rows shown in each list */
+const LIST_LENGTH = 10;
 
 /**
  * Placeholder SVG for album covers
@@ -130,9 +127,7 @@ RoiRow.displayName = 'RoiRow';
  * based on play count per dollar of market value.
  * Lazy-loaded via IntersectionObserver.
  */
-export const CollectionROIChart: React.FC<CollectionROIChartProps> = ({
-  limit = CHART_LIMIT,
-}) => {
+export const CollectionROIChart: React.FC = () => {
   const [data, setData] = useState<RoiScoreItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'best' | 'worst'>('best');
@@ -149,7 +144,8 @@ export const CollectionROIChart: React.FC<CollectionROIChartProps> = ({
           fetchedRef.current = true;
           setLoading(true);
           statsApi
-            .getCollectionROI(limit)
+            // Every valued record: the worst list needs the whole collection
+            .getCollectionROI()
             .then(res => {
               if (res.success && res.data) {
                 setData(res.data);
@@ -168,17 +164,18 @@ export const CollectionROIChart: React.FC<CollectionROIChartProps> = ({
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [limit]);
+  }, []);
 
   // Best value: highest ROI score (most plays per dollar)
   const topItems = [...data]
     .sort((a, b) => b.roiScore - a.roiScore)
-    .slice(0, 10);
+    .slice(0, LIST_LENGTH);
 
-  // Worst value: lowest ROI score (fewest plays per dollar)
+  // Worst value: fewest plays per dollar; among records never played, the
+  // dearest first
   const bottomItems = [...data]
-    .sort((a, b) => a.roiScore - b.roiScore)
-    .slice(0, 10);
+    .sort((a, b) => a.roiScore - b.roiScore || b.medianPrice - a.medianPrice)
+    .slice(0, LIST_LENGTH);
 
   const displayItems = activeTab === 'best' ? topItems : bottomItems;
 
@@ -233,7 +230,7 @@ export const CollectionROIChart: React.FC<CollectionROIChartProps> = ({
       ) : data.length === 0 ? (
         <EmptyState
           title='No collection value data available'
-          description='Run a value scan from Collection Analytics to see ROI scores.'
+          description='Scan your collection value above to see plays per dollar.'
           size='small'
         />
       ) : (

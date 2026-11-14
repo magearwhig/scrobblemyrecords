@@ -66,7 +66,7 @@ describe('ReleaseTrackingService', () => {
       addToWishlist: jest.fn().mockResolvedValue(true),
       searchForRelease: jest.fn().mockResolvedValue([]),
       addToDiscogsWantlist: jest.fn().mockResolvedValue(true),
-      getMasterVersions: jest.fn().mockResolvedValue([]),
+      checkMasterVinyl: jest.fn().mockResolvedValue([]),
       // Main release of master N is 10 × N in these tests
       getMasterMainReleaseId: jest
         .fn()
@@ -2373,7 +2373,7 @@ describe('ReleaseTrackingService', () => {
           formats: ['Vinyl'],
         },
       ]);
-      mockWishlistService.getMasterVersions.mockResolvedValue([
+      mockWishlistService.checkMasterVinyl.mockResolvedValue([
         {
           releaseId: 1,
           title: 'OK Computer',
@@ -2465,7 +2465,7 @@ describe('ReleaseTrackingService', () => {
           formats: ['CD'],
         },
       ]);
-      mockWishlistService.getMasterVersions.mockResolvedValue([
+      mockWishlistService.checkMasterVinyl.mockResolvedValue([
         {
           releaseId: 1,
           title: 'Album',
@@ -2516,7 +2516,7 @@ describe('ReleaseTrackingService', () => {
           formats: ['Vinyl'],
         },
       ]);
-      mockWishlistService.getMasterVersions.mockResolvedValue([
+      mockWishlistService.checkMasterVinyl.mockResolvedValue([
         {
           releaseId: 1,
           title: 'Album',
@@ -2646,7 +2646,7 @@ describe('ReleaseTrackingService', () => {
           formats: ['Vinyl'],
         },
       ]);
-      mockWishlistService.getMasterVersions.mockResolvedValue([
+      mockWishlistService.checkMasterVinyl.mockResolvedValue([
         {
           releaseId: 1,
           title: 'In Rainbows',
@@ -2744,7 +2744,7 @@ describe('ReleaseTrackingService', () => {
           formats: ['Vinyl'],
         },
       ]);
-      mockWishlistService.getMasterVersions.mockResolvedValue([
+      mockWishlistService.checkMasterVinyl.mockResolvedValue([
         {
           releaseId: 1,
           title: 'Discovery',
@@ -2761,7 +2761,7 @@ describe('ReleaseTrackingService', () => {
 
       // Assert
       expect(result?.discogsMasterId).toBe(2);
-      expect(mockWishlistService.getMasterVersions).toHaveBeenCalledWith(2);
+      expect(mockWishlistService.checkMasterVinyl).toHaveBeenCalledWith(2);
     });
 
     it('should mark as not-found if no matching artist', async () => {
@@ -2800,7 +2800,7 @@ describe('ReleaseTrackingService', () => {
 
       // Assert
       expect(result?.vinylStatus).toBe('not-found');
-      expect(mockWishlistService.getMasterVersions).not.toHaveBeenCalled();
+      expect(mockWishlistService.checkMasterVinyl).not.toHaveBeenCalled();
     });
 
     it('should handle errors and mark status as unknown', async () => {
