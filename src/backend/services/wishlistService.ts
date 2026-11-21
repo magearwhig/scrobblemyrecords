@@ -18,6 +18,7 @@ import {
   WishlistNewReleasesStore,
   WishlistNewReleaseSettings,
   WishlistSettings,
+  DiscogsPressingsSummary,
   StoredWishlistItem,
   WishlistStore,
   WishlistSyncStatus,
@@ -70,6 +71,8 @@ export class WishlistService {
 
   // New release checking constants
   private readonly MASTERS_PER_BATCH = 20;
+  // Set before any await, so two checks started together can't both run
+  private newReleaseCheckRunning = false;
 
   // Track sync state
   private syncInProgress = false;
@@ -1662,7 +1665,26 @@ export class WishlistService {
   /**
    * Check for new releases with batching, retry logic, and progress tracking
    */
-  async checkForNewReleases(force = false): Promise<WishlistNewRelease[]> {
+  async checkForNewReleases(
+    force = false,
+    options: { everyRecord?: boolean } = {}
+  ): Promise<WishlistNewRelease[]> {
+    if (this.newReleaseCheckRunning) {
+      this.logger.warn('New release check already in progress');
+      return [];
+    }
+    this.newReleaseCheckRunning = true;
+    try {
+      return await this.runNewReleaseCheck(force, options);
+    } finally {
+      this.newReleaseCheckRunning = false;
+    }
+  }
+
+  private async runNewReleaseCheck(
+    force: boolean,
+    { everyRecord = false }: { everyRecord?: boolean }
+  ): Promise<WishlistNewRelease[]> {
     const settings = await this.getSettings();
     if (!settings.newReleaseTracking?.enabled && !force) {
       return [];
@@ -1690,18 +1712,18 @@ export class WishlistService {
       totalMasters: allMasterIds.length,
       mastersProcessed: 0,
       newReleasesFound: 0,
-      lastCheckedIndex: syncStatus.lastCheckedIndex || 0,
+      lastCheckedIndex: everyRecord ? 0 : syncStatus.lastCheckedIndex || 0,
       progress: 0,
       error: undefined,
     });
 
     const newReleases: WishlistNewRelease[] = [];
 
-    const startIndex = syncStatus.lastCheckedIndex || 0;
-    const endIndex = Math.min(
-      startIndex + this.MASTERS_PER_BATCH,
-      allMasterIds.length
-    );
+    // Every record: one pass over all of them, ignoring the weekly window
+    const startIndex = everyRecord ? 0 : syncStatus.lastCheckedIndex || 0;
+    const endIndex = everyRecord
+      ? allMasterIds.length
+      : Math.min(startIndex + this.MASTERS_PER_BATCH, allMasterIds.length);
 
     try {
       for (let i = startIndex; i < endIndex; i++) {
@@ -1710,8 +1732,11 @@ export class WishlistService {
 
         if (!sourceInfo) continue;
 
-        // Skip if source settings disable this type
+        // Skip if source settings disable this type. Checking every record
+        // still fetches them, so their pressings stay current; the detector
+        // raises no alerts for them.
         if (
+          !everyRecord &&
           sourceInfo.source === 'local_want' &&
           !settings.newReleaseTracking?.trackLocalWantList
         ) {
@@ -1746,7 +1771,7 @@ export class WishlistService {
               }
             : {
                 need: 'newest',
-                maxAgeMs: this.PRESSINGS_FRESH_MS,
+                maxAgeMs: everyRecord ? 0 : this.PRESSINGS_FRESH_MS,
                 alertOverride: force,
               }
         );
@@ -1795,6 +1820,61 @@ export class WishlistService {
       });
       throw error;
     }
+  }
+
+  /** What the pressings catalogue holds for tracked records and sellers */
+  async getPressingsSummary(): Promise<DiscogsPressingsSummary> {
+    const trackedIds = Array.from(
+      (await this.getTrackedMasterIds({ log: false })).keys()
+    );
+    const now = Date.now();
+    const tracked: DiscogsPressingsSummary['tracked'] = {
+      records: trackedIds.length,
+      fetchedInFull: 0,
+      fullFetchDue: 0,
+      nextFullFetchAt: null,
+      newestCheckedThisWeek: 0,
+      releases: 0,
+      releasesWithDetails: 0,
+    };
+    let trackedWithRows = 0;
+    for (const masterId of trackedIds) {
+      const status = await this.pressings.masterStatus(masterId);
+      tracked.releases += status.knownCount;
+      if (status.knownCount > 0) trackedWithRows++;
+      tracked.releasesWithDetails += (
+        await this.pressings.knownVersions(masterId)
+      ).length;
+      const { completeCheckedAt, newestCheckedAt } = status;
+      if (
+        completeCheckedAt !== undefined &&
+        now - completeCheckedAt < MASTER_COMPLETE_FRESH_MS
+      ) {
+        tracked.fetchedInFull++;
+        const dueAt = completeCheckedAt + MASTER_COMPLETE_FRESH_MS;
+        tracked.nextFullFetchAt =
+          tracked.nextFullFetchAt === null
+            ? dueAt
+            : Math.min(tracked.nextFullFetchAt, dueAt);
+      } else {
+        tracked.fullFetchDue++;
+      }
+      const lastNewest = Math.max(
+        newestCheckedAt ?? -Infinity,
+        completeCheckedAt ?? -Infinity
+      );
+      if (now - lastNewest < this.PRESSINGS_FRESH_MS) {
+        tracked.newestCheckedThisWeek++;
+      }
+    }
+    const { totalReleases, totalMasters } = await this.pressings.stats();
+    return {
+      tracked,
+      sellerLookups: {
+        albums: totalMasters - trackedWithRows,
+        releases: totalReleases - tracked.releases,
+      },
+    };
   }
 
   /**

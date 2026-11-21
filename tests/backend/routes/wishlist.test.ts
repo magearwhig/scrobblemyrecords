@@ -897,6 +897,17 @@ describe('Wishlist Routes', () => {
       // Note: checkForNewReleases is called asynchronously
     });
 
+    it('checks every record now when asked', async () => {
+      await request(app)
+        .post('/api/v1/wishlist/new-releases/check')
+        .send({ everyRecord: true });
+
+      expect(mockWishlistService.checkForNewReleases).toHaveBeenCalledWith(
+        true,
+        { everyRecord: true }
+      );
+    });
+
     it('should handle errors gracefully', async () => {
       // Note: Even if the background check fails, the route should return 200
       // because it returns immediately before the check starts
@@ -911,6 +922,31 @@ describe('Wishlist Routes', () => {
 
       // Assert
       expect(response.status).toBe(200);
+    });
+  });
+
+  describe('GET /api/v1/wishlist/pressings/summary', () => {
+    it('returns the pressings summary', async () => {
+      const summary = {
+        tracked: {
+          records: 1,
+          fetchedInFull: 1,
+          fullFetchDue: 0,
+          nextFullFetchAt: 5,
+          newestCheckedThisWeek: 1,
+          releases: 3,
+          releasesWithDetails: 3,
+        },
+        sellerLookups: { albums: 2, releases: 2 },
+      };
+      mockWishlistService.getPressingsSummary.mockResolvedValue(summary);
+
+      const response = await request(app).get(
+        '/api/v1/wishlist/pressings/summary'
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toEqual(summary);
     });
   });
 

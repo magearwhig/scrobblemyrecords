@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './MarketplacePage.page.css';
 
 import {
+  DiscogsPressingsSummary,
   MonitoredSeller,
   ReleaseCacheRefreshStatus,
   SellerScanStatus,
@@ -13,6 +14,7 @@ import { Modal, ModalFooter } from '../components/ui';
 import { Button } from '../components/ui/Button';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { ListItemSkeleton } from '../components/ui/Skeleton';
+import { PressingsSummary } from '../components/wishlist/PressingsSummary';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirmModal } from '../hooks/useConfirmModal';
@@ -66,21 +68,19 @@ const newerRefreshStatus = (
 
 const describeCacheRefresh = (status: ReleaseCacheRefreshStatus): string => {
   if (status.status === 'error') {
-    return `Cache refresh failed: ${status.error || 'Unknown error'}`;
+    return `Pressings refresh failed: ${status.error || 'Unknown error'}`;
   }
   if (status.status === 'idle') {
-    return 'Cache refresh was interrupted (server restarted)';
+    return 'Pressings refresh was interrupted (server restarted)';
   }
   if (status.mastersTotal === 0) {
-    return 'Cache is already up to date';
+    return 'Nothing due: every tracked record was fetched in full in the last 30 days';
   }
   const failed =
     status.mastersFailed > 0 ? `, ${status.mastersFailed} failed` : '';
   const skipped =
-    status.mastersSkipped > 0
-      ? ` (${status.mastersSkipped} already cached)`
-      : '';
-  return `Processed ${status.mastersProcessed} masters, added ${status.releasesAdded} releases${failed}${skipped}`;
+    status.mastersSkipped > 0 ? ` (${status.mastersSkipped} not due yet)` : '';
+  return `Fetched every page of ${status.mastersProcessed} records, ${status.releasesAdded} new pressings${failed}${skipped}`;
 };
 
 const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
@@ -114,6 +114,8 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
     lastUpdated: number;
     staleMasters: number;
   } | null>(null);
+  const [pressingsSummary, setPressingsSummary] =
+    useState<DiscogsPressingsSummary | null>(null);
   const [cacheRefreshStatus, setCacheRefreshStatus] =
     useState<ReleaseCacheRefreshStatus | null>(null);
   const refreshingCache = cacheRefreshStatus?.status === 'running';
@@ -139,6 +141,10 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
           api.getReleaseCacheStats(),
           api.getReleaseCacheRefreshStatus(),
         ]);
+      api
+        .getPressingsSummary()
+        .then(setPressingsSummary)
+        .catch(() => undefined);
       setSellers(sellersData);
       setScanStatus(statusData);
       setCacheStats(cacheStatsData);
@@ -357,6 +363,7 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
       setCacheMessage(describeCacheRefresh(status));
       try {
         setCacheStats(await api.getReleaseCacheStats());
+        setPressingsSummary(await api.getPressingsSummary());
       } catch {
         // Stats will refresh on next load
       }
@@ -516,7 +523,7 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
             title='Uses cached inventory, only fetches new listings from API'
           >
             {refreshingCache
-              ? 'Preparing Cache...'
+              ? 'Fetching Pressings...'
               : scanStatus?.status === 'scanning' ||
                   scanStatus?.status === 'matching'
                 ? 'Scanning...'
@@ -539,68 +546,36 @@ const SellersPage: React.FC<SellersPageProps> = ({ embedded = false }) => {
         </div>
       </div>
 
-      {/* Master/Release Cache Stats */}
+      {/* The shared Discogs pressings catalogue */}
       {cacheStats && (
         <div className='sellers-cache-card'>
-          <div className='sellers-cache-header'>
-            <h3>Release Matching Cache</h3>
-            <span className='sellers-cache-hint'>
-              Pre-fetched release IDs for your wishlist - enables instant
-              matching without API calls
-            </span>
-          </div>
-          <div className='sellers-cache-stats'>
-            <div className='sellers-cache-stat'>
-              <span className='sellers-cache-stat-value'>
-                {cacheStats.totalMasters.toLocaleString()}
-              </span>
-              <span className='sellers-cache-stat-label'>Masters</span>
-            </div>
-            <div className='sellers-cache-stat'>
-              <span className='sellers-cache-stat-value'>
-                {cacheStats.totalReleases.toLocaleString()}
-              </span>
-              <span className='sellers-cache-stat-label'>Releases</span>
-            </div>
-            {cacheStats.staleMasters > 0 && (
-              <div className='sellers-cache-stat sellers-cache-stat-warning'>
-                <span className='sellers-cache-stat-value'>
-                  {cacheStats.staleMasters.toLocaleString()}
-                </span>
-                <span className='sellers-cache-stat-label'>
-                  Stale (30+ days)
-                </span>
-              </div>
-            )}
-          </div>
-          <div className='sellers-cache-actions'>
-            <Button
-              size='small'
-              onClick={handleRefreshCache}
-              disabled={
-                refreshingCache ||
-                scanStatus?.status === 'scanning' ||
-                scanStatus?.status === 'matching'
-              }
-              title='Fetch all release IDs for wishlist masters from Discogs'
-            >
-              {refreshingCache ? 'Building Cache...' : 'Build/Refresh Cache'}
-            </Button>
-            {cacheStats.lastUpdated > 0 && (
-              <span className='sellers-cache-updated'>
-                Last updated: {formatRelativeTime(cacheStats.lastUpdated)}
-              </span>
-            )}
-            {cacheMessage && (
-              <span className='sellers-cache-updated'>{cacheMessage}</span>
-            )}
-          </div>
+          {pressingsSummary && (
+            <PressingsSummary summary={pressingsSummary}>
+              <Button
+                size='small'
+                onClick={handleRefreshCache}
+                disabled={
+                  refreshingCache ||
+                  scanStatus?.status === 'scanning' ||
+                  scanStatus?.status === 'matching'
+                }
+                title='Fetch every page of pressings for tracked records not fetched in full in the last 30 days'
+              >
+                {refreshingCache
+                  ? 'Refreshing Pressings...'
+                  : 'Refresh Pressings'}
+              </Button>
+              {cacheMessage && (
+                <span className='sellers-cache-updated'>{cacheMessage}</span>
+              )}
+            </PressingsSummary>
+          )}
           {refreshingCache && cacheRefreshStatus && (
             <div className='sellers-scan-progress'>
               <div className='sellers-scan-progress-text'>
                 {cacheRefreshStatus.mastersTotal > 0
-                  ? `Building release cache... ${cacheRefreshStatus.mastersProcessed} of ${cacheRefreshStatus.mastersTotal} masters`
-                  : 'Building release cache...'}
+                  ? `Fetching every page of pressings... ${cacheRefreshStatus.mastersProcessed} of ${cacheRefreshStatus.mastersTotal} records`
+                  : 'Fetching every page of pressings...'}
                 {cacheRefreshStatus.mastersFailed > 0 &&
                   ` (${cacheRefreshStatus.mastersFailed} failed)`}
                 {hasPendingScan && ' Scan will start when the cache is ready.'}

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 
 import {
+  DiscogsPressingsSummary,
   NewReleaseSyncStatus,
   WishlistNewRelease,
 } from '../../../shared/types';
@@ -10,6 +11,7 @@ import { Button } from '../ui/Button';
 import { ProgressBar } from '../ui/ProgressBar';
 
 import { NewReleaseCard } from './NewReleaseCard';
+import { PressingsSummary } from './PressingsSummary';
 
 interface Props {
   onCountChange: (count: number) => void;
@@ -33,6 +35,8 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
   );
   const [error, setError] = useState<string | null>(null);
   const [checkStarting, setCheckStarting] = useState(false);
+  const [pressingsSummary, setPressingsSummary] =
+    useState<DiscogsPressingsSummary | null>(null);
 
   // Auto-continue mode state
   const [autoContinue, setAutoContinue] = useState(false);
@@ -93,11 +97,23 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
     }
   }, [api]);
 
+  const fetchPressingsSummary = useCallback(async () => {
+    try {
+      setPressingsSummary(await api.getPressingsSummary());
+    } catch {
+      // The summary is informational; the tab works without it
+    }
+  }, [api]);
+
   // Initial load
   useEffect(() => {
     fetchNewReleases();
     fetchSyncStatus();
   }, [fetchNewReleases, fetchSyncStatus]);
+
+  useEffect(() => {
+    fetchPressingsSummary();
+  }, [fetchPressingsSummary]);
 
   // Poll sync status while syncing or auto-continuing
   useEffect(() => {
@@ -116,6 +132,7 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
       if (status?.status === 'completed' || status?.status === 'error') {
         // Refresh releases after sync completes
         await fetchNewReleases();
+        await fetchPressingsSummary();
 
         // Auto-continue: if there are more masters to check and auto-continue is enabled
         if (
@@ -124,8 +141,9 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
           status.lastCheckedIndex > 0 &&
           status.lastCheckedIndex < status.totalMasters
         ) {
-          // Trigger next batch after a short delay
+          // Trigger next batch after a short delay, unless stopped by then
           setTimeout(async () => {
+            if (!autoContinueRef.current) return;
             try {
               await api.checkForNewReleases();
               await fetchSyncStatus();
@@ -159,10 +177,14 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
     autoContinue,
     fetchSyncStatus,
     fetchNewReleases,
+    fetchPressingsSummary,
     api,
   ]);
 
-  const handleCheckNow = async (withAutoContinue = false) => {
+  const handleCheckNow = async (
+    withAutoContinue = false,
+    everyRecord = false
+  ) => {
     try {
       setCheckStarting(true);
       setError(null);
@@ -170,8 +192,12 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
         setAutoContinue(true);
         // Update ref immediately so polling loop sees it
         autoContinueRef.current = true;
+      } else if (everyRecord) {
+        // One pass over every record replaces any batches still queued
+        setAutoContinue(false);
+        autoContinueRef.current = false;
       }
-      await api.checkForNewReleases();
+      await api.checkForNewReleases(everyRecord ? { everyRecord } : undefined);
 
       // Poll until status becomes 'syncing' (backend may take a moment to start)
       // This ensures the UI shows the progress bar immediately
@@ -325,6 +351,25 @@ export const NewReleasesTab: React.FC<Props> = ({ onCountChange }) => {
           </Button>
         )}
       </div>
+
+      {pressingsSummary && (
+        <PressingsSummary summary={pressingsSummary}>
+          <Button
+            variant='secondary'
+            size='small'
+            onClick={() => handleCheckNow(false, true)}
+            disabled={isSyncing}
+            title='Fetch the newest pressings of every wishlist and want-list record now, even ones checked this week (about one Discogs request per record; more for records due a full fetch)'
+          >
+            Check All Now
+          </Button>
+          <span className='pressings-summary-hint'>
+            Check Now skips records checked in the last 7 days. Check All Now
+            asks Discogs about every record, about{' '}
+            {Math.max(1, Math.ceil(pressingsSummary.tracked.records / 60))} min.
+          </span>
+        </PressingsSummary>
+      )}
 
       {/* Error state */}
       {(error || syncStatus?.status === 'error') && (

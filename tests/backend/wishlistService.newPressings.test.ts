@@ -563,4 +563,99 @@ describe('WishlistService new pressings', () => {
       expect(store.masters[200].baselineSince).toEqual(expect.any(Number));
     });
   });
+
+  describe('checking every record now', () => {
+    it('runs one check at a time when two start together', async () => {
+      await fetchWith(100, [row(1)]);
+      await fetchWith(200, [row(21)]);
+      mockAxios.get.mockReset();
+      mockAxios.get.mockImplementation(async (url: string) =>
+        page([row(url === '/masters/100/versions' ? 1 : 21)])
+      );
+
+      const [first, second] = await Promise.all([
+        service.checkForNewReleases(true, { everyRecord: true }),
+        service.checkForNewReleases(true, { everyRecord: true }),
+      ]);
+
+      // Two tracked records, fetched once each
+      expect(mockAxios.get).toHaveBeenCalledTimes(2);
+      expect(second).toEqual([]);
+      expect(first).toEqual([]);
+    });
+
+    it('covers want-list records too, without alerts when their tracking is off', async () => {
+      files['wishlist/settings.json'] = settings({ trackLocalWantList: false });
+      await fetchWith(100, [row(1)]);
+      await fetchWith(200, [row(21)]);
+      mockAxios.get.mockReset();
+      mockAxios.get.mockImplementation(async (url: string) =>
+        url === '/masters/100/versions'
+          ? page([row(1)])
+          : page([row(21), row(3)])
+      );
+
+      await service.checkForNewReleases(true, { everyRecord: true });
+
+      expect(mockAxios.get).toHaveBeenCalledWith(
+        '/masters/200/versions',
+        expect.anything()
+      );
+      expect(alerts()).toEqual([]);
+    });
+
+    it('fetches records checked this week too, in one pass', async () => {
+      await fetchWith(100, [row(1)]);
+      await fetchWith(200, [row(21)]);
+      files['wishlist/new-release-sync-status.json'] = {
+        status: 'completed',
+        lastCheckedIndex: 1,
+        totalMasters: 2,
+        mastersProcessed: 0,
+        newReleasesFound: 0,
+        progress: 100,
+      };
+      mockAxios.get.mockReset();
+      mockAxios.get.mockImplementation(async (url: string) =>
+        url === '/masters/100/versions'
+          ? page([row(1), row(2)])
+          : page([row(21)])
+      );
+
+      const found = await service.checkForNewReleases(true, {
+        everyRecord: true,
+      });
+
+      expect(mockAxios.get).toHaveBeenCalledTimes(2);
+      expect(found.map(r => r.id)).toEqual(['100-2']);
+      expect((await service.getNewReleaseSyncStatus()).lastCheckedIndex).toBe(
+        0
+      );
+    });
+  });
+
+  describe('getPressingsSummary', () => {
+    it('separates tracked records from seller lookups', async () => {
+      await fetchWith(100, [row(1), row(2, '2006', 'CD')]);
+      await service.pressings.noteReleaseMaster(5, 999);
+      await service.pressings.noteReleaseMaster(6, 999);
+      await service.pressings.noteReleaseMaster(7, 998);
+
+      const summary = await service.getPressingsSummary();
+
+      expect(summary.tracked).toEqual({
+        records: 2,
+        fetchedInFull: 1,
+        fullFetchDue: 1,
+        nextFullFetchAt: expect.any(Number),
+        newestCheckedThisWeek: 1,
+        releases: 2,
+        releasesWithDetails: 2,
+      });
+      expect(summary.tracked.nextFullFetchAt).toBeGreaterThan(
+        Date.now() + 29 * DAY
+      );
+      expect(summary.sellerLookups).toEqual({ albums: 2, releases: 3 });
+    });
+  });
 });

@@ -438,18 +438,19 @@ describe('Releases Routes - Hidden/Excluded', () => {
 
   describe('POST /api/v1/releases/sync', () => {
     beforeEach(() => {
-      mockReleaseTrackingService.syncReleases = jest
+      mockReleaseTrackingService.startSync = jest
         .fn()
-        .mockResolvedValue({ status: 'completed' });
+        .mockResolvedValue({ status: 'syncing' });
     });
 
-    it('should trigger release sync', async () => {
+    it('starts the sync and returns while it runs', async () => {
       const response = await request(app).post('/api/v1/releases/sync');
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.message).toBe('Release sync completed');
-      expect(mockReleaseTrackingService.syncReleases).toHaveBeenCalledWith(
+      expect(response.body.message).toBe('Release sync started');
+      expect(response.body.data).toEqual({ status: 'syncing' });
+      expect(mockReleaseTrackingService.startSync).toHaveBeenCalledWith(
         'testuser'
       );
     });
@@ -472,7 +473,7 @@ describe('Releases Routes - Hidden/Excluded', () => {
     });
 
     it('should handle errors', async () => {
-      mockReleaseTrackingService.syncReleases = jest
+      mockReleaseTrackingService.startSync = jest
         .fn()
         .mockRejectedValue(new Error('Sync failed'));
 

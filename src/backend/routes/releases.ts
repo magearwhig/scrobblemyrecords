@@ -148,12 +148,12 @@ export default function createReleasesRouter(
         });
       }
 
-      // Start sync (this can take a while)
-      const status = await releaseTrackingService.syncReleases(username);
+      // Runs in the background; poll GET /sync for progress
+      const status = await releaseTrackingService.startSync(username);
 
       res.json({
         success: true,
-        message: 'Release sync completed',
+        message: 'Release sync started',
         data: status,
       });
     } catch (error) {

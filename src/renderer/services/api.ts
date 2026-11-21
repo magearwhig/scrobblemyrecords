@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 
 import {
+  DiscogsPressingsSummary,
   AlbumLabelInfo,
   AlbumLabelStatus,
   AddDiscardPileItemRequest,
@@ -1717,8 +1718,18 @@ class ApiService {
   /**
    * Trigger check for new releases
    */
-  async checkForNewReleases(): Promise<void> {
-    await this.api.post('/wishlist/new-releases/check');
+  async checkForNewReleases(options?: {
+    everyRecord?: boolean;
+  }): Promise<void> {
+    await this.api.post('/wishlist/new-releases/check', options ?? {});
+  }
+
+  /**
+   * What the Discogs pressings catalogue holds (tracked records, seller lookups)
+   */
+  async getPressingsSummary(): Promise<DiscogsPressingsSummary> {
+    const response = await this.api.get('/wishlist/pressings/summary');
+    return response.data.data;
   }
 
   /**
@@ -2205,14 +2216,8 @@ class ApiService {
     message: string;
     status: ReleaseTrackingSyncStatus;
   }> {
-    // This can take a long time - increase timeout
-    const response = await this.api.post(
-      '/releases/sync',
-      {},
-      {
-        timeout: 900000, // 15 minutes // 10 minutes
-      }
-    );
+    // Returns once the sync is running; poll getReleaseTrackingSyncStatus
+    const response = await this.api.post('/releases/sync', {});
     return { message: response.data.message, status: response.data.data };
   }
 
