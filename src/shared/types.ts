@@ -1445,6 +1445,30 @@ export type StoredWishlistItem = Omit<EnrichedWishlistItem, 'vinylVersions'> & {
   vinylVersions?: ReleaseVersion[];
 };
 
+/**
+ * What the Discogs pressings catalogue holds, for the status shown on Local
+ * Sellers and New Releases. Tracked records are the wishlist and local want
+ * list; seller lookups are releases seen in seller listings whose album is
+ * not tracked (kept so scans don't look them up again).
+ */
+export interface DiscogsPressingsSummary {
+  tracked: {
+    records: number;
+    /** Every page of pressings fetched within the last 30 days */
+    fetchedInFull: number;
+    /** Never fetched in full, or over 30 days ago */
+    fullFetchDue: number;
+    /** When the next record falls due for a full fetch (null if none fetched) */
+    nextFullFetchAt: number | null;
+    /** Newest pressings fetched within the last 7 days */
+    newestCheckedThisWeek: number;
+    releases: number;
+    releasesWithDetails: number;
+  };
+  /** Every other album in the catalogue: seller-listing lookups, albums no longer tracked */
+  sellerLookups: { albums: number; releases: number };
+}
+
 export interface WishlistStore {
   schemaVersion: 1;
   lastUpdated: number;

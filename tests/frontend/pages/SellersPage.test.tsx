@@ -27,6 +27,7 @@ const mockTriggerSingleSellerScan = jest.fn();
 const mockGetSellerSettings = jest.fn();
 const mockGetSellerMatches = jest.fn();
 const mockMarkMatchAsNotified = jest.fn();
+const mockGetPressingsSummary = jest.fn();
 
 // Stable instance, like the real singleton - a new object per call would
 // change `api` identity on every render and re-trigger the page's load effect
@@ -47,6 +48,7 @@ jest.mock('../../../src/renderer/services/api', () => {
     getSellerSettings: mockGetSellerSettings,
     getSellerMatches: mockGetSellerMatches,
     markMatchAsNotified: mockMarkMatchAsNotified,
+    getPressingsSummary: mockGetPressingsSummary,
   });
   return {
     getApiService: () => {
@@ -243,6 +245,18 @@ describe('SellersPage', () => {
     mockGetSellers.mockResolvedValue(mockSellers);
     mockGetSellerScanStatus.mockResolvedValue(idleScanStatus);
     mockGetReleaseCacheStats.mockResolvedValue(mockCacheStats);
+    mockGetPressingsSummary.mockResolvedValue({
+      tracked: {
+        records: 184,
+        fetchedInFull: 174,
+        fullFetchDue: 10,
+        nextFullFetchAt: Date.now() + 5 * 24 * 60 * 60 * 1000,
+        newestCheckedThisWeek: 184,
+        releases: 1500,
+        releasesWithDetails: 1500,
+      },
+      sellerLookups: { albums: 13901, releases: 15421 },
+    });
     mockGetReleaseCacheRefreshStatus.mockResolvedValue(idleCacheRefreshStatus);
     mockGetWishlist.mockResolvedValue([{ id: 1 }]); // Non-empty wishlist
     mockGetLocalWantList.mockResolvedValue([]);
@@ -364,25 +378,27 @@ describe('SellersPage', () => {
     expect(screen.getByText('Full Inventory Refresh')).toBeInTheDocument();
   });
 
-  it('shows cache stats card', async () => {
+  it('shows the pressings catalogue, tracked records apart from seller lookups', async () => {
     renderSellersPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Release Matching Cache')).toBeInTheDocument();
+      expect(screen.getByText('Discogs pressings')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('200')).toBeInTheDocument(); // Masters
-    expect(screen.getByText('1,500')).toBeInTheDocument(); // Releases
+    expect(
+      screen.queryByText('Release Matching Cache')
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('184')).toBeInTheDocument(); // Tracked records
+    expect(screen.getByText('1,500')).toBeInTheDocument(); // Their pressings
+    expect(
+      screen.getByText(/15,421 releases from 13,901 other albums/)
+    ).toBeInTheDocument();
   });
 
-  it('shows stale masters count when available', async () => {
+  it('shows how many records are due a full fetch', async () => {
     renderSellersPage();
 
-    await waitFor(() => {
-      expect(screen.getByText('10')).toBeInTheDocument();
-    });
-
-    expect(screen.getByText('Stale (30+ days)')).toBeInTheDocument();
+    expect(await screen.findByText(/10 due a full fetch/)).toBeInTheDocument();
   });
 
   it('shows cache empty warning when cache has no masters', async () => {
@@ -399,11 +415,11 @@ describe('SellersPage', () => {
     });
   });
 
-  it('shows Build/Refresh Cache button', async () => {
+  it('shows Refresh Pressings button', async () => {
     renderSellersPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Build/Refresh Cache')).toBeInTheDocument();
+      expect(screen.getByText('Refresh Pressings')).toBeInTheDocument();
     });
   });
 
@@ -498,10 +514,10 @@ describe('SellersPage', () => {
       renderSellersPage();
 
       await waitFor(() => {
-        expect(screen.getByText('Build/Refresh Cache')).toBeInTheDocument();
+        expect(screen.getByText('Refresh Pressings')).toBeInTheDocument();
       });
-      await user.click(screen.getByText('Build/Refresh Cache'));
-      expect(await screen.findByText(/68 of 193 masters/)).toBeInTheDocument();
+      await user.click(screen.getByText('Refresh Pressings'));
+      expect(await screen.findByText(/68 of 193 records/)).toBeInTheDocument();
 
       // Adding a seller reloads the page data; that reload's refresh status
       // is from an older, finished run
@@ -520,7 +536,7 @@ describe('SellersPage', () => {
         expect(mockGetSellers).toHaveBeenCalledTimes(2);
         expect(screen.queryByTestId('skeleton-loader')).not.toBeInTheDocument();
       });
-      expect(screen.getByText(/68 of 193 masters/)).toBeInTheDocument();
+      expect(screen.getByText(/68 of 193 records/)).toBeInTheDocument();
     });
 
     it('stops showing progress if the server restarted mid-refresh', async () => {
@@ -533,15 +549,17 @@ describe('SellersPage', () => {
 
       renderSellersPage();
 
-      expect(await screen.findByText(/68 of 193 masters/)).toBeInTheDocument();
+      expect(await screen.findByText(/68 of 193 records/)).toBeInTheDocument();
       await waitFor(
         () =>
           expect(
-            screen.getByText('Cache refresh was interrupted (server restarted)')
+            screen.getByText(
+              'Pressings refresh was interrupted (server restarted)'
+            )
           ).toBeInTheDocument(),
         POLL_WAIT
       );
-      expect(screen.getByText('Build/Refresh Cache')).toBeInTheDocument();
+      expect(screen.getByText('Refresh Pressings')).toBeInTheDocument();
     });
 
     it('shows progress of a refresh already running when the page loads', async () => {
@@ -553,7 +571,9 @@ describe('SellersPage', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/Building release cache\.\.\. 68 of 193 masters/)
+          screen.getByText(
+            /Fetching every page of pressings\.\.\. 68 of 193 records/
+          )
         ).toBeInTheDocument();
       });
       expect(screen.getByRole('progressbar')).toHaveAttribute(
@@ -561,10 +581,10 @@ describe('SellersPage', () => {
         '35'
       );
       expect(
-        screen.getByRole('button', { name: 'Building Cache...' })
+        screen.getByRole('button', { name: 'Refreshing Pressings...' })
       ).toBeDisabled();
       expect(
-        screen.getByRole('button', { name: 'Preparing Cache...' })
+        screen.getByRole('button', { name: 'Fetching Pressings...' })
       ).toBeDisabled();
     });
 
@@ -573,29 +593,29 @@ describe('SellersPage', () => {
       renderSellersPage();
 
       await waitFor(() => {
-        expect(screen.getByText('Build/Refresh Cache')).toBeInTheDocument();
+        expect(screen.getByText('Refresh Pressings')).toBeInTheDocument();
       });
 
       mockGetReleaseCacheRefreshStatus.mockResolvedValue(
         completedCacheRefreshStatus
       );
       mockGetReleaseCacheStats.mockClear();
-      await user.click(screen.getByText('Build/Refresh Cache'));
+      await user.click(screen.getByText('Refresh Pressings'));
 
       expect(mockRefreshReleaseCache).toHaveBeenCalled();
-      expect(await screen.findByText(/68 of 193 masters/)).toBeInTheDocument();
+      expect(await screen.findByText(/68 of 193 records/)).toBeInTheDocument();
 
       await waitFor(
         () =>
           expect(
             screen.getByText(
-              'Processed 193 masters, added 450 releases, 2 failed (7 already cached)'
+              'Fetched every page of 193 records, 450 new pressings, 2 failed (7 not due yet)'
             )
           ).toBeInTheDocument(),
         POLL_WAIT
       );
       expect(mockGetReleaseCacheStats).toHaveBeenCalled();
-      expect(screen.getByText('Build/Refresh Cache')).toBeInTheDocument();
+      expect(screen.getByText('Refresh Pressings')).toBeInTheDocument();
     });
 
     it('shows the server error when a refresh cannot start', async () => {
@@ -611,9 +631,9 @@ describe('SellersPage', () => {
       renderSellersPage();
 
       await waitFor(() => {
-        expect(screen.getByText('Build/Refresh Cache')).toBeInTheDocument();
+        expect(screen.getByText('Refresh Pressings')).toBeInTheDocument();
       });
-      await user.click(screen.getByText('Build/Refresh Cache'));
+      await user.click(screen.getByText('Refresh Pressings'));
 
       await waitFor(() => {
         expect(
@@ -678,7 +698,7 @@ describe('SellersPage', () => {
       await waitFor(
         () =>
           expect(
-            screen.getByText('Cache refresh failed: Discogs unavailable')
+            screen.getByText('Pressings refresh failed: Discogs unavailable')
           ).toBeInTheDocument(),
         POLL_WAIT
       );

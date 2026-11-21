@@ -153,6 +153,21 @@ newest/complete fetch, which flags nothing.
   days, otherwise the newest page (7 days), so undated pressings are learned
   monthly without seller monitoring.
 
+## Follow-up (2026-11-21) -- show the catalogue
+
+- `GET /api/v1/wishlist/pressings/summary` (`getPressingsSummary`): tracked
+  records (wishlist + want list), fetched in full / due, next full fetch,
+  newest checked this week, known pressings; other albums (seller lookups,
+  past wishlist) counted separately.
+- `PressingsSummary` card replaces the Release Matching Cache card on Local
+  Sellers ("Refresh Pressings") and sits on the wishlist New Releases tab.
+- Check All Now: `checkForNewReleases(force, { everyRecord: true })` fetches
+  the newest pressings of every tracked record in one pass, ignoring the
+  7-day window; one check runs at a time (in-process guard); it stops a
+  queued auto-continue batch.
+- Release tracking: `POST /releases/sync` returns once the sync is running
+  (`startSync`), so the New Releases page shows progress without a reload.
+
 ## Open limitations
 
 - A newest-first check sees at most the 100 newest pressings.

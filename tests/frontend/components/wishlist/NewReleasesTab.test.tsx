@@ -11,16 +11,26 @@ const mockGetNewReleaseSyncStatus = jest.fn();
 const mockCheckForNewReleases = jest.fn();
 const mockDismissNewRelease = jest.fn();
 const mockDismissAllNewReleases = jest.fn();
+const mockGetPressingsSummary = jest.fn();
 
-jest.mock('../../../../src/renderer/services/api', () => ({
-  getApiService: () => ({
-    getWishlistNewReleases: mockGetWishlistNewReleases,
-    getNewReleaseSyncStatus: mockGetNewReleaseSyncStatus,
-    checkForNewReleases: mockCheckForNewReleases,
-    dismissNewRelease: mockDismissNewRelease,
-    dismissAllNewReleases: mockDismissAllNewReleases,
-  }),
-}));
+// Stable instance, like the real singleton - a new object per call would
+// change `api` identity on every render and restart the polling effect
+jest.mock('../../../../src/renderer/services/api', () => {
+  let instance: Record<string, jest.Mock> | undefined;
+  return {
+    getApiService: () => {
+      instance ??= {
+        getWishlistNewReleases: mockGetWishlistNewReleases,
+        getNewReleaseSyncStatus: mockGetNewReleaseSyncStatus,
+        checkForNewReleases: mockCheckForNewReleases,
+        dismissNewRelease: mockDismissNewRelease,
+        dismissAllNewReleases: mockDismissAllNewReleases,
+        getPressingsSummary: mockGetPressingsSummary,
+      };
+      return instance;
+    },
+  };
+});
 
 jest.mock('../../../../src/renderer/context/AppContext', () => ({
   useApp: () => ({
@@ -86,6 +96,70 @@ describe('NewReleasesTab', () => {
       totalMasters: 0,
       lastCheckedIndex: 0,
       mastersProcessed: 0,
+    });
+    mockGetPressingsSummary.mockResolvedValue({
+      tracked: {
+        records: 196,
+        fetchedInFull: 196,
+        fullFetchDue: 0,
+        nextFullFetchAt: Date.now() + 10 * 24 * 60 * 60 * 1000,
+        newestCheckedThisWeek: 196,
+        releases: 3808,
+        releasesWithDetails: 3798,
+      },
+      sellerLookups: { albums: 13901, releases: 15421 },
+    });
+  });
+
+  it('shows what the pressings catalogue holds', async () => {
+    render(<NewReleasesTab onCountChange={mockOnCountChange} />);
+
+    expect(
+      await screen.findByText(/196 of 196 checked this week/i)
+    ).toBeInTheDocument();
+  });
+
+  it('Check All Now stops auto-continue from starting another batch', async () => {
+    mockCheckForNewReleases.mockResolvedValue(undefined);
+    // Between batches: half the records checked
+    mockGetNewReleaseSyncStatus.mockResolvedValue({
+      status: 'completed',
+      totalMasters: 10,
+      lastCheckedIndex: 5,
+      mastersProcessed: 5,
+    });
+    render(<NewReleasesTab onCountChange={mockOnCountChange} />);
+
+    await user.click(
+      await screen.findByRole('button', { name: /Check All Remaining/i })
+    );
+    await waitFor(
+      () =>
+        expect(
+          screen.getByRole('button', { name: /Check All Now/i })
+        ).toBeEnabled(),
+      { timeout: 3000 }
+    );
+    await user.click(screen.getByRole('button', { name: /Check All Now/i }));
+    // Past the next status poll and the auto-continue delay
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    expect(mockCheckForNewReleases.mock.calls).toEqual([
+      [undefined],
+      [{ everyRecord: true }],
+    ]);
+  }, 15000);
+
+  it('checks every record now, even ones checked this week', async () => {
+    mockCheckForNewReleases.mockResolvedValue(undefined);
+    render(<NewReleasesTab onCountChange={mockOnCountChange} />);
+
+    await user.click(
+      await screen.findByRole('button', { name: /Check All Now/i })
+    );
+
+    expect(mockCheckForNewReleases).toHaveBeenCalledWith({
+      everyRecord: true,
     });
   });
 

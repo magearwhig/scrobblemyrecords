@@ -3163,6 +3163,47 @@ describe('ReleaseTrackingService', () => {
       mockMusicBrainzService.batchGetCoverArtUrls.mockResolvedValue(new Map());
     };
 
+    it('a sync started directly saves its syncing status first', async () => {
+      setupSyncFixture({ includeReissues: false });
+      jest
+        .spyOn(
+          service as unknown as { getCollectionArtists: () => Promise<never> },
+          'getCollectionArtists'
+        )
+        .mockReturnValue(new Promise<never>(() => undefined));
+
+      void service.syncReleases('tester');
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(mockFileStorage.writeJSON).toHaveBeenCalledWith(
+        expect.stringContaining('sync'),
+        expect.objectContaining({
+          status: expect.objectContaining({ status: 'syncing' }),
+        })
+      );
+    });
+
+    it('startSync returns once the sync is running, before it finishes', async () => {
+      setupSyncFixture({ includeReissues: false });
+      // The sync never gets past reading the collection
+      jest
+        .spyOn(
+          service as unknown as { getCollectionArtists: () => Promise<never> },
+          'getCollectionArtists'
+        )
+        .mockReturnValue(new Promise<never>(() => undefined));
+
+      const status = await service.startSync('tester');
+
+      expect(status.status).toBe('syncing');
+      // A second start while it runs doesn't start another
+      await service.startSync('tester');
+      expect(
+        (service as unknown as { getCollectionArtists: jest.Mock })
+          .getCollectionArtists
+      ).toHaveBeenCalledTimes(1);
+    });
+
     it('does NOT call getRecentReleases when includeReissues=false', async () => {
       setupSyncFixture({ includeReissues: false });
 

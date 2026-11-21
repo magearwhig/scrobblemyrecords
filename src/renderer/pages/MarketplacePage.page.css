@@ -128,61 +128,11 @@
 
 /* Master/Release Cache Card */
 .sellers-cache-card {
-  background: var(--bg-secondary);
-  border-radius: var(--radius-md);
-  padding: 1rem;
-  margin-bottom: 1rem;
-  border: 1px solid var(--border-color);
+  margin-bottom: var(--space-4);
 }
 
-.sellers-cache-header {
-  margin-bottom: 0.75rem;
-}
-
-.sellers-cache-header h3 {
-  margin: 0 0 0.25rem 0;
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.sellers-cache-hint {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-}
-
-.sellers-cache-stats {
-  display: flex;
-  gap: 1.5rem;
-  margin-bottom: 0.75rem;
-}
-
-.sellers-cache-stat {
-  display: flex;
-  flex-direction: column;
-}
-
-.sellers-cache-stat-value {
-  font-size: var(--text-xl);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.sellers-cache-stat-label {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.sellers-cache-stat-warning .sellers-cache-stat-value {
-  color: var(--accent-warning);
-}
-
-.sellers-cache-actions {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+.sellers-cache-card .pressings-summary {
+  margin-bottom: 0;
 }
 
 .sellers-cache-updated {

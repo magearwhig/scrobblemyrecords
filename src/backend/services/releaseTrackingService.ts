@@ -263,7 +263,7 @@ export class ReleaseTrackingService {
    */
   private async updateSyncStatus(
     update: Partial<ReleaseTrackingSyncStatus>
-  ): Promise<void> {
+  ): Promise<ReleaseTrackingSyncStatus> {
     const current = await this.getSyncStatus();
     const updated = { ...current, ...update };
 
@@ -273,6 +273,7 @@ export class ReleaseTrackingService {
     };
 
     await this.fileStorage.writeJSON(SYNC_STATUS_FILE, store);
+    return updated;
   }
 
   // ============================================
@@ -855,7 +856,37 @@ export class ReleaseTrackingService {
   /**
    * Sync releases for all artists in collection
    */
-  async syncReleases(username: string): Promise<ReleaseTrackingSyncStatus> {
+  /**
+   * Start a sync in the background. Resolves once it is running (its
+   * 'syncing' status saved), so a page can poll progress straight away; a
+   * sync already running is left alone and its status returned.
+   */
+  async startSync(username: string): Promise<ReleaseTrackingSyncStatus> {
+    if (this.syncInProgress) return this.getSyncStatus();
+    return new Promise<ReleaseTrackingSyncStatus>((resolve, reject) => {
+      let started = false;
+      this.syncReleases(username, {
+        onStarted: status => {
+          started = true;
+          resolve(status);
+        },
+      })
+        .then(status => {
+          if (!started) resolve(status);
+        })
+        .catch(error => {
+          this.logger.error('Background release sync failed', error);
+          if (!started) reject(error);
+        });
+    });
+  }
+
+  async syncReleases(
+    username: string,
+    {
+      onStarted,
+    }: { onStarted?: (status: ReleaseTrackingSyncStatus) => void } = {}
+  ): Promise<ReleaseTrackingSyncStatus> {
     if (this.syncInProgress) {
       this.logger.warn('Sync already in progress');
       return this.getSyncStatus();
@@ -870,7 +901,7 @@ export class ReleaseTrackingService {
 
     try {
       // Initialize sync status
-      await this.updateSyncStatus({
+      const started = await this.updateSyncStatus({
         status: 'syncing',
         artistsProcessed: 0,
         totalArtists: 0,
@@ -881,6 +912,7 @@ export class ReleaseTrackingService {
         estimatedTimeRemaining: undefined,
         error: undefined,
       });
+      onStarted?.(started);
 
       // Get settings
       const settings = await this.getSettings();

@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-7405%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-7421%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -524,6 +524,7 @@ Sync and manage your Discogs wantlist with vinyl availability tracking:
 - Every Discogs pressing the app sees is kept in one catalogue (`data/discogs/pressings.json`), shared by the wishlist, new-release checks and seller matching. The first look at a record only learns its pressings; later, any vinyl pressing not in the catalogue, released last year or this year, is flagged (undated ones once every pressing of the record has been seen). Check Next Batch fetches every page of each record once a month so undated pressings are learned, and a record whose newest pressings show no vinyl is checked in full before it is called CD-only
 - Any Discogs fetch of a record's pressings counts: wishlist syncs and seller cache refreshes flag new pressings too, and Check Next Batch skips records fetched in the last week
 - Batch processing respects Discogs API rate limits
+- **Check All Now** fetches the newest pressings of every wishlist and want-list record in one pass, even ones checked this week; the same Discogs pressings card shows what is stored
 - Filter by source: Discogs Wishlist, Local Want List, or Vinyl Watch List
 - Filter by detection timeframe: 7 days, 30 days, or 90 days
 - Dismiss individual releases or bulk dismiss all
@@ -543,7 +544,8 @@ Track Discogs inventories of your favorite local record shops to find wishlist i
 - **Quick Check**: Daily check for newest listings
 - Progressive pagination handles large inventories (10,000+ items)
 - Intelligent caching reduces API calls
-- **Build/Refresh Cache** runs in the background with a real progress bar (masters processed, failures), survives a page reload, and can't run at the same time as a scan
+- A **Discogs pressings** card shows what the shared catalogue holds: your wishlist and want-list records, their known pressings, when every page was last fetched (next full fetch due), newest-pressing checks this week, and the other albums kept from seller listings
+- **Refresh Pressings** fetches every page for records not fetched in full in 30 days; it runs in the background with a progress bar, survives a page reload, and can't run at the same time as a scan
 
 **Match Detection:**
 - Automatically matches seller inventory against your Discogs wishlist

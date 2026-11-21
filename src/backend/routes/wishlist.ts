@@ -748,6 +748,23 @@ export default function createWishlistRouter(
   });
 
   /**
+   * GET /api/v1/wishlist/pressings/summary
+   * What the Discogs pressings catalogue holds (tracked records, seller lookups)
+   */
+  router.get('/pressings/summary', async (_req: Request, res: Response) => {
+    try {
+      const summary = await wishlistService.getPressingsSummary();
+      res.json({ success: true, data: summary });
+    } catch (error) {
+      logger.error('Error getting pressings summary', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  /**
    * GET /api/v1/wishlist/new-releases/status
    * Get new release check sync status
    */
@@ -769,7 +786,7 @@ export default function createWishlistRouter(
    * Trigger check for new releases
    * Returns immediately, check runs in background
    */
-  router.post('/new-releases/check', async (_req: Request, res: Response) => {
+  router.post('/new-releases/check', async (req: Request, res: Response) => {
     try {
       // Return immediately
       res.json({ success: true, data: { message: 'Check started' } });
@@ -779,8 +796,11 @@ export default function createWishlistRouter(
         'new-release-check',
         'Checking for new releases...'
       );
+      // everyRecord: fetch every tracked record now, even ones checked this
+      // week; otherwise the next batch of records due a check
+      const everyRecord = req.body?.everyRecord === true;
       wishlistService
-        .checkForNewReleases(true)
+        .checkForNewReleases(true, everyRecord ? { everyRecord } : undefined)
         .then(() =>
           jobStatusService.completeJob(jobId, 'New release check complete')
         )
