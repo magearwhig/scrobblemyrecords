@@ -17,6 +17,7 @@ import { useNotifications } from '../hooks/useNotifications';
 import { ROUTES, navigate } from '../routes';
 import { getApiService } from '../services/api';
 import { statsApi } from '../services/statsApi';
+import { lookUpMissingCovers } from '../utils/albumCovers';
 import { formatLocalDateOnly, formatRelativeTime } from '../utils/dateUtils';
 import { createLogger } from '../utils/logger';
 import { playAlbumOnSpotify } from '../utils/spotifyUtils';
@@ -115,7 +116,20 @@ const AlbumDetailPage: React.FC = () => {
         if (signal.aborted) return;
 
         if (result.success && result.data) {
-          setData(result.data);
+          const detail = result.data;
+          setData(detail);
+          // An album not in the collection has no cover yet: look one up
+          // after the page shows, so it never waits on Last.fm
+          if (!detail.coverUrl) {
+            void lookUpMissingCovers(detail.artist, [detail]).then(found => {
+              const coverUrl = found.get(detail.album);
+              if (coverUrl && !signal.aborted) {
+                setData(current =>
+                  current === detail ? { ...detail, coverUrl } : current
+                );
+              }
+            });
+          }
         } else {
           const message = result.error || 'Failed to load album details.';
           setError(message);

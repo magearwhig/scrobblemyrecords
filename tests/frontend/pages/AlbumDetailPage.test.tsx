@@ -4,7 +4,7 @@ import React from 'react';
 
 import '@testing-library/jest-dom';
 import AlbumDetailPage from '../../../src/renderer/pages/AlbumDetailPage';
-import { statsApi } from '../../../src/renderer/services/statsApi';
+import { imagesApi, statsApi } from '../../../src/renderer/services/statsApi';
 import { AlbumDetailResponse } from '../../../src/shared/types';
 
 // Mock recharts to avoid rendering issues in jsdom (used by AlbumListeningArc)
@@ -28,7 +28,9 @@ jest.mock('../../../src/renderer/services/statsApi', () => ({
     getAlbumDetail: jest.fn(),
     getAlbumListeningArc: jest.fn(),
   },
-  imagesApi: {},
+  imagesApi: {
+    batchGetAlbumCovers: jest.fn(),
+  },
 }));
 
 // Mock spotifyUtils so the Play button doesn't try to open URIs in jsdom
@@ -38,6 +40,7 @@ jest.mock('../../../src/renderer/utils/spotifyUtils', () => ({
 }));
 
 const mockStatsApi = statsApi as jest.Mocked<typeof statsApi>;
+const mockImagesApi = imagesApi as jest.Mocked<typeof imagesApi>;
 
 const baseAlbumData: AlbumDetailResponse = {
   artist: 'Radiohead',
@@ -121,6 +124,10 @@ describe('AlbumDetailPage', () => {
       success: true,
       data: baseAlbumData.arc,
     });
+    mockImagesApi.batchGetAlbumCovers.mockResolvedValue({
+      success: true,
+      data: {},
+    });
     // Reset hash so each test starts clean.
     window.location.hash = '';
   });
@@ -140,6 +147,36 @@ describe('AlbumDetailPage', () => {
     ).toBeInTheDocument();
     // Album title not yet rendered
     expect(screen.queryByText('Kid A')).not.toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------- cover
+
+  it("looks up a cover for an album you don't own", async () => {
+    mockImagesApi.batchGetAlbumCovers.mockResolvedValue({
+      success: true,
+      data: { 'radiohead|kid a': 'https://example.com/kid-a.jpg' },
+    });
+
+    render(<AlbumDetailPage />);
+
+    const cover = await screen.findByAltText('Kid A cover');
+    expect(cover).toHaveAttribute('src', 'https://example.com/kid-a.jpg');
+    expect(mockImagesApi.batchGetAlbumCovers).toHaveBeenCalledWith([
+      { artist: 'Radiohead', album: 'Kid A' },
+    ]);
+  });
+
+  it('keeps the collection cover without looking one up', async () => {
+    mockStatsApi.getAlbumDetail.mockResolvedValue({
+      success: true,
+      data: { ...baseAlbumData, coverUrl: 'https://example.com/owned.jpg' },
+    });
+
+    render(<AlbumDetailPage />);
+
+    const cover = await screen.findByAltText('Kid A cover');
+    expect(cover).toHaveAttribute('src', 'https://example.com/owned.jpg');
+    expect(mockImagesApi.batchGetAlbumCovers).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------- happy path

@@ -1,6 +1,6 @@
 /* global navigator */
 import { Play } from 'lucide-react';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 
 import './discovery.css';
 
@@ -9,7 +9,6 @@ import {
   ForgottenTrack,
   TrackMapping,
 } from '../../../shared/types';
-import { normalizeForMatching } from '../../../shared/utils/trackNormalization';
 import { lookupInCollection } from '../../hooks/useCollectionLookup';
 import { navigate } from '../../routes';
 import ApiService from '../../services/api';
@@ -41,8 +40,11 @@ interface ForgottenFavoritesTabProps {
   formatDate: (timestamp: number) => string;
   openLink: (url: string) => void;
   api: ApiService;
-  collection?: CollectionItem[];
+  /** Owned albums by artist|album, album mappings included (useCollectionLookup) */
+  collectionMap?: Map<string, CollectionItem>;
 }
+
+const EMPTY_COLLECTION_MAP = new Map<string, CollectionItem>();
 
 const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
   forgottenTracks,
@@ -59,7 +61,7 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
   formatDate,
   openLink,
   api,
-  collection,
+  collectionMap = EMPTY_COLLECTION_MAP,
 }) => {
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [mappingModalOpen, setMappingModalOpen] = useState(false);
@@ -79,17 +81,6 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
   const [mappingSuccess, setMappingSuccess] = useState<string | null>(null);
   const [mappingError, setMappingError] = useState<string | null>(null);
   const [existingMappings, setExistingMappings] = useState<TrackMapping[]>([]);
-
-  // Build collection lookup map for "In Collection" matching
-  const collectionMap = useMemo(() => {
-    const map = new Map<string, CollectionItem>();
-    if (!collection) return map;
-    for (const item of collection) {
-      const key = `${normalizeForMatching(item.release.artist)}|${normalizeForMatching(item.release.title)}`;
-      map.set(key, item);
-    }
-    return map;
-  }, [collection]);
 
   // Navigate to a collection item's release details page
   const navigateToAlbum = (item: CollectionItem) => {

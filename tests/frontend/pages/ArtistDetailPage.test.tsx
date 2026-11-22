@@ -36,6 +36,7 @@ jest.mock('../../../src/renderer/services/statsApi', () => ({
   },
   imagesApi: {
     getArtistImage: jest.fn(),
+    batchGetAlbumCovers: jest.fn(),
   },
 }));
 
@@ -104,6 +105,7 @@ describe('ArtistDetailPage', () => {
         lastPlayed: 1706745600,
         inCollection: true,
         collectionReleaseId: 456,
+        coverUrl: 'https://example.com/kid-a.jpg',
       },
       {
         album: 'OK Computer',
@@ -134,6 +136,11 @@ describe('ArtistDetailPage', () => {
     mockImagesApi.getArtistImage.mockResolvedValue({
       success: true,
       data: { url: 'https://example.com/radiohead.jpg', source: 'lastfm' },
+    });
+
+    mockImagesApi.batchGetAlbumCovers.mockResolvedValue({
+      success: true,
+      data: {},
     });
   });
 
@@ -184,6 +191,25 @@ describe('ArtistDetailPage', () => {
       expect(img).toBeInTheDocument();
       expect(img).toHaveAttribute('src', 'https://example.com/radiohead.jpg');
     });
+  });
+
+  it("looks up covers only for albums you don't own", async () => {
+    mockImagesApi.batchGetAlbumCovers.mockResolvedValue({
+      success: true,
+      data: { 'radiohead|ok computer': 'https://example.com/ok-computer.jpg' },
+    });
+
+    render(<ArtistDetailPage />);
+
+    const cover = await screen.findByAltText('OK Computer');
+    expect(cover).toHaveAttribute('src', 'https://example.com/ok-computer.jpg');
+    expect(screen.getByAltText('Kid A')).toHaveAttribute(
+      'src',
+      'https://example.com/kid-a.jpg'
+    );
+    expect(mockImagesApi.batchGetAlbumCovers).toHaveBeenCalledWith([
+      { artist: 'Radiohead', album: 'OK Computer' },
+    ]);
   });
 
   it('should render image placeholder when no image is available', async () => {

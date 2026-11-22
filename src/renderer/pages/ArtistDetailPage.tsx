@@ -18,6 +18,7 @@ import { useNotifications } from '../hooks/useNotifications';
 import { ROUTES, navigate } from '../routes';
 import { getApiService } from '../services/api';
 import { statsApi, imagesApi } from '../services/statsApi';
+import { lookUpMissingCovers } from '../utils/albumCovers';
 import { formatLocalDateOnly, formatRelativeTime } from '../utils/dateUtils';
 import { createLogger } from '../utils/logger';
 import { playAlbumOnSpotify, playTrackOnSpotify } from '../utils/spotifyUtils';
@@ -127,7 +128,24 @@ const ArtistDetailPage: React.FC = () => {
         if (signal.aborted) return;
 
         if (result.success && result.data) {
-          setData(result.data);
+          const detail = result.data;
+          setData(detail);
+          // Albums not in the collection have no cover yet: look them up
+          // after the page shows, so it never waits on Last.fm
+          void lookUpMissingCovers(detail.artist, detail.albums).then(found => {
+            if (found.size === 0 || signal.aborted) return;
+            setData(current =>
+              current === detail
+                ? {
+                    ...detail,
+                    albums: detail.albums.map(a => {
+                      const coverUrl = found.get(a.album);
+                      return coverUrl ? { ...a, coverUrl } : a;
+                    }),
+                  }
+                : current
+            );
+          });
         } else {
           setError('Failed to load artist data.');
           logger.warn('Artist detail fetch failed', { artist: name });
