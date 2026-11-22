@@ -40,10 +40,12 @@ jest.mock('../../../src/renderer/context/AuthContext', () => ({
 
 // Mock API
 const mockGetEntireCollection = jest.fn();
+const mockGetDiscoveryAlbumMappings = jest.fn();
 
 jest.mock('../../../src/renderer/services/api', () => ({
   getApiService: () => ({
     getEntireCollection: mockGetEntireCollection,
+    getDiscoveryAlbumMappings: mockGetDiscoveryAlbumMappings,
   }),
 }));
 
@@ -77,6 +79,7 @@ describe('useCollectionLookup', () => {
         createCollectionItem(3, 'The Beatles', 'Abbey Road'),
       ],
     });
+    mockGetDiscoveryAlbumMappings.mockResolvedValue([]);
   });
 
   describe('hook behavior', () => {
@@ -141,6 +144,82 @@ describe('useCollectionLookup', () => {
       });
 
       expect(result.current.collection).toHaveLength(0);
+    });
+  });
+
+  describe('album mappings', () => {
+    const lice = createCollectionItem(
+      10,
+      'Aesop Rock, Homeboy Sandman',
+      'Triple Fat Lice'
+    );
+
+    const mapping = (collectionId: number) => ({
+      historyArtist: 'lice',
+      historyAlbum: 'triple fat lice',
+      collectionId,
+      collectionArtist: 'Aesop Rock, Homeboy Sandman',
+      collectionAlbum: 'Triple Fat Lice',
+      createdAt: 1,
+    });
+
+    beforeEach(() => {
+      mockGetEntireCollection.mockResolvedValue({
+        success: true,
+        data: [lice],
+      });
+    });
+
+    it('finds an owned album under the history name mapped to it', async () => {
+      mockGetDiscoveryAlbumMappings.mockResolvedValue([mapping(10)]);
+
+      const { result } = renderHook(() => useCollectionLookup());
+
+      await waitFor(() => {
+        expect(
+          lookupInCollection(
+            result.current.collectionMap,
+            'Lice',
+            'Triple Fat Lice'
+          )
+        ).toBe(lice);
+      });
+      // Still found under its own name
+      expect(
+        lookupInCollection(
+          result.current.collectionMap,
+          'Aesop Rock, Homeboy Sandman',
+          'Triple Fat Lice'
+        )
+      ).toBe(lice);
+    });
+
+    it('ignores mappings not linked to a collection item', async () => {
+      mockGetDiscoveryAlbumMappings.mockResolvedValue([mapping(0)]);
+
+      const { result } = renderHook(() => useCollectionLookup());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+      expect(
+        lookupInCollection(
+          result.current.collectionMap,
+          'Lice',
+          'Triple Fat Lice'
+        )
+      ).toBeUndefined();
+    });
+
+    it('still matches by name when the mappings fail to load', async () => {
+      mockGetDiscoveryAlbumMappings.mockRejectedValue(new Error('down'));
+
+      const { result } = renderHook(() => useCollectionLookup());
+
+      await waitFor(() => {
+        expect(result.current.collectionMap.size).toBe(1);
+      });
+      expect(result.current.loading).toBe(false);
     });
   });
 });

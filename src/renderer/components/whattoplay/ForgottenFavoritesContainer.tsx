@@ -10,7 +10,7 @@ type ForgottenSortOption = 'plays' | 'artist' | 'track' | 'dormant';
 
 const ForgottenFavoritesContainer: React.FC = () => {
   const { state } = useApp();
-  const { collection } = useCollectionLookup();
+  const { collectionMap } = useCollectionLookup();
   const api = getApiService(state.serverUrl);
 
   const [forgottenTracks, setForgottenTracks] = useState<ForgottenTrack[]>([]);
@@ -73,7 +73,7 @@ const ForgottenFavoritesContainer: React.FC = () => {
       formatDate={formatDate}
       openLink={openLink}
       api={api}
-      collection={collection}
+      collectionMap={collectionMap}
     />
   );
 };

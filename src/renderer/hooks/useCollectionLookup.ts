@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 
-import { CollectionItem } from '../../shared/types';
+import { AlbumMapping, CollectionItem } from '../../shared/types';
+import { createCollectionNameResolver } from '../../shared/utils/albumMapping';
 import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -50,6 +51,7 @@ export function useCollectionLookup(): CollectionLookupResult {
   const { state } = useApp();
   const { authStatus } = useAuth();
   const [collection, setCollection] = useState<CollectionItem[]>([]);
+  const [albumMappings, setAlbumMappings] = useState<AlbumMapping[]>([]);
   const [loading, setLoading] = useState(false);
 
   const username = authStatus.discogs.username;
@@ -59,6 +61,20 @@ export function useCollectionLookup(): CollectionLookupResult {
 
     const controller = new AbortController();
     const api = getApiService(state.serverUrl);
+
+    // Album mappings let an owned album be found under the name Last.fm
+    // records it by (e.g. "Lice" for "Aesop Rock, Homeboy Sandman"). Without
+    // them, albums still match by name.
+    api
+      .getDiscoveryAlbumMappings()
+      .then(mappings => {
+        if (!controller.signal.aborted) setAlbumMappings(mappings ?? []);
+      })
+      .catch(err => {
+        if (!controller.signal.aborted) {
+          logger.warn('Failed to load album mappings for lookup', err);
+        }
+      });
 
     const loadCollection = async () => {
       try {
@@ -91,8 +107,21 @@ export function useCollectionLookup(): CollectionLookupResult {
       const key = buildCollectionKey(item.release.artist, item.release.title);
       map.set(key, item);
     }
+    // Then every history name mapped to an owned album, the way the server's
+    // stats match them; a record's own name is never displaced
+    const namesFor = createCollectionNameResolver(albumMappings);
+    for (const item of collection) {
+      const [, ...mappedNames] = namesFor(
+        item.release.artist,
+        item.release.title
+      );
+      for (const name of mappedNames) {
+        const key = buildCollectionKey(name.artist, name.album);
+        if (!map.has(key)) map.set(key, item);
+      }
+    }
     return map;
-  }, [collection]);
+  }, [collection, albumMappings]);
 
   const collectionArtistCounts = useMemo(() => {
     const counts = new Map<string, number>();

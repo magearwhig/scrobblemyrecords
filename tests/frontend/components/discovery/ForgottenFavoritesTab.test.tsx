@@ -4,8 +4,9 @@ import React from 'react';
 
 import '@testing-library/jest-dom';
 import ForgottenFavoritesTab from '../../../../src/renderer/components/discovery/ForgottenFavoritesTab';
+import { lookupInCollection } from '../../../../src/renderer/hooks/useCollectionLookup';
 import ApiService from '../../../../src/renderer/services/api';
-import { ForgottenTrack } from '../../../../src/shared/types';
+import { CollectionItem, ForgottenTrack } from '../../../../src/shared/types';
 
 jest.mock('../../../../src/renderer/services/api');
 
@@ -91,7 +92,26 @@ describe('ForgottenFavoritesTab', () => {
     formatDate: mockFormatDate,
     openLink: mockOpenLink,
     api: mockApi,
-    collection: undefined,
+    collectionMap: undefined as Map<string, CollectionItem> | undefined,
+  });
+
+  it("checks ownership with the page's collection lookup (album mappings included)", () => {
+    const collectionMap = new Map<string, CollectionItem>();
+
+    render(
+      <ForgottenFavoritesTab
+        {...getDefaultProps()}
+        forgottenTracks={[makeTrack({ artist: 'Lice', album: 'Lice' })]}
+        forgottenTotalMatching={1}
+        collectionMap={collectionMap}
+      />
+    );
+
+    expect(lookupInCollection).toHaveBeenCalledWith(
+      collectionMap,
+      'Lice',
+      'Lice'
+    );
   });
 
   it('renders the section header', () => {
