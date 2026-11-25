@@ -4,6 +4,7 @@ import { CachedCollectionData, CollectionItem } from '../../shared/types';
 import { AuthService } from '../services/authService';
 import { DiscogsService } from '../services/discogsService';
 import { jobStatusService } from '../services/jobStatusService';
+import { pagesWritten } from '../utils/collectionCache';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 import { validateUsername } from '../utils/validation';
@@ -81,8 +82,11 @@ export default function createCollectionRouter(
       let pageNumber = 1;
       let hasExpiredCache = false;
       let hasValidCache = false;
+      // Only the pages the last sync wrote (page 1 says how many); later
+      // ones are left over from an older sync
+      let lastPage = Infinity;
 
-      while (true) {
+      while (pageNumber <= lastPage) {
         const cacheKey = `collections/${username}-page-${pageNumber}.json`;
         const cached =
           await fileStorage.readJSON<CachedCollectionData>(cacheKey);
@@ -91,6 +95,7 @@ export default function createCollectionRouter(
           // No cache file found
           break;
         }
+        if (pageNumber === 1) lastPage = pagesWritten(cached);
 
         // Check if cache is expired (24 hours = 86400000 ms)
         const isExpired =

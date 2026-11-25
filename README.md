@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-7461%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-7500%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -873,7 +873,7 @@ Protect your user-generated data with manual and automatic backups:
 - Album mappings (Last.fm → Discogs collection, and merged album versions)
 - Dismissed album merge suggestions
 - Track mappings (track names counted as another track, including album page merges)
-- Every list of plays (Top Tracks, Albums and Artists, Forgotten Favorites, History's lists, the artist and track pages, rankings over time, the dashboard) counts a play the same way, through one shared resolver: track mappings first (including ones that move a play to another album or artist), then album mappings on the album it lands on, then artist aliases, then which record you own. A contract test checks these pages agree, and a lint rule stops new code from applying mappings itself (see `AGENTS.md`)
+- Every page counts a play the same way, through one shared play identity service: lists of plays (Top Tracks, Albums and Artists, Forgotten Favorites, History, the artist and track pages, rankings over time, the dashboard) and a record's plays (the album page, Release Details, label pages, play counts on Collection, Wishlist and Seller Matches, coverage, Dusty Corners, Heavy Rotation, play suggestions, crates, Wrapped, Missing Albums). Rules apply in one order: track mappings (one saved on any version of an album applies to all of them, and can move a play to another album or artist), album mappings, artist aliases, then which record you own. Editions of a record ("(10th Anniversary Edition)", "(2011 - Remaster)", "- Disc 1") count as the record, and so does a collaboration's album scrobbled under one of its artists. A contract test checks the pages agree, and a lint rule stops new code from applying mappings itself (see `AGENTS.md`)
 - Compound-artist mappings
 - Labels you set for albums you don't own (label pages)
 - Unresolved history: album assignments for albumless plays, hidden tracks, and excluded artists

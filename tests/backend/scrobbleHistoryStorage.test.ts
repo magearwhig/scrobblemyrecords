@@ -174,6 +174,54 @@ describe('ScrobbleHistoryStorage', () => {
   });
 
   describe('fuzzyNormalizeKey', () => {
+    it.each([
+      ['Whales And Leeches (Deluxe Version)', 'Whales And Leeches'],
+      ['Black Sheep Boy (10th Anniversary Edition)', 'Black Sheep Boy'],
+      ["The Boatman's Call (2011 - Remaster)", "The Boatman's Call"],
+      ['Sharpen Your Teeth (Bonus Track Version)', 'Sharpen Your Teeth'],
+      ['Check Your Head (Deluxe Edition/Remastered/2009)', 'Check Your Head'],
+      [
+        "Paul's Boutique (20th Anniversary Edition / Remastered)",
+        "Paul's Boutique",
+      ],
+      ['Graceland (25th Anniversary Deluxe Edition)', 'Graceland'],
+      ['Bloomed (Reissue)', 'Bloomed'],
+      [
+        'Father, Son, Holy Ghost (Amazon MP3 Exclusive)',
+        'Father, Son, Holy Ghost',
+      ],
+      ['Being There - Disc 1', 'Being There'],
+      ['Diamonds And Pearls (2023 Remaster)', 'Diamonds And Pearls'],
+      [
+        'Set Yourself On Fire - 20th Anniversary Edition',
+        'Set Yourself On Fire',
+      ],
+      [
+        'No Cities Left - Definitive 20th Anniversary Edition',
+        'No Cities Left',
+      ],
+    ])(
+      'treats the edition note in "%s" as the same album',
+      (edition, album) => {
+        expect(storage.fuzzyNormalizeKey('Artist', edition)).toBe(
+          storage.fuzzyNormalizeKey('Artist', album)
+        );
+      }
+    );
+
+    it.each([
+      ['Hasta El Cielo (Con Todo El Mundo In Dub)', 'Hasta El Cielo'],
+      ['Beast Rest Forth Mouth: Remixed', 'Beast Rest Forth Mouth'],
+      ['Repeater + 3 Songs', 'Repeater'],
+      ["(What's the Story) Morning Glory?", 'Morning Glory?'],
+      ['The Universe Smiles Upon You II', 'The Universe Smiles Upon You'],
+      ['Live - Disco Edition Mix', 'Live'],
+    ])('keeps "%s" apart: not an edition note', (other, album) => {
+      expect(storage.fuzzyNormalizeKey('Artist', other)).not.toBe(
+        storage.fuzzyNormalizeKey('Artist', album)
+      );
+    });
+
     it('should read an ampersand as "and"', () => {
       expect(storage.fuzzyNormalizeKey('Catherine Wheel', 'Adam And Eve')).toBe(
         storage.fuzzyNormalizeKey('Catherine Wheel', 'Adam & Eve')

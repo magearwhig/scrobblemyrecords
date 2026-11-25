@@ -10,6 +10,7 @@ import { DiscogsService } from '../../../src/backend/services/discogsService';
 import { HiddenItemService } from '../../../src/backend/services/hiddenItemService';
 import { MappingService } from '../../../src/backend/services/mappingService';
 import { OllamaService } from '../../../src/backend/services/ollamaService';
+import { PlayIdentityService } from '../../../src/backend/services/playIdentity/service';
 import { ScrobbleHistoryStorage } from '../../../src/backend/services/scrobbleHistoryStorage';
 import { ScrobbleHistorySyncService } from '../../../src/backend/services/scrobbleHistorySyncService';
 import { StatsService } from '../../../src/backend/services/statsService';
@@ -19,6 +20,8 @@ import {
 } from '../../../src/backend/services/suggestionService';
 import { TrackMappingService } from '../../../src/backend/services/trackMappingService';
 import { FileStorage } from '../../../src/backend/utils/fileStorage';
+import { TrackMapping } from '../../../src/shared/types';
+import { trackMatchKey } from '../../../src/shared/utils/trackNormalization';
 
 // Mock dependencies
 jest.mock('../../../src/backend/services/authService');
@@ -28,7 +31,19 @@ jest.mock('../../../src/backend/services/scrobbleHistorySyncService');
 jest.mock('../../../src/backend/services/analyticsService');
 jest.mock('../../../src/backend/services/suggestionService');
 jest.mock('../../../src/backend/services/mappingService');
-jest.mock('../../../src/backend/services/trackMappingService');
+// The class is mocked; its pure helpers stay real (play identity uses them)
+jest.mock('../../../src/backend/services/trackMappingService', () => {
+  const actual = jest.requireActual(
+    '../../../src/backend/services/trackMappingService'
+  );
+  return {
+    ...jest.createMockFromModule<typeof actual>(
+      '../../../src/backend/services/trackMappingService'
+    ),
+    createTrackMapper: actual.createTrackMapper,
+    trackMappingAlbumKey: actual.trackMappingAlbumKey,
+  };
+});
 jest.mock('../../../src/backend/services/hiddenItemService');
 jest.mock('../../../src/backend/services/statsService');
 jest.mock('../../../src/backend/utils/fileStorage');
@@ -68,6 +83,47 @@ const MockedOllamaService = OllamaService as jest.MockedClass<
 >;
 
 describe('Suggestions Routes', () => {
+  /** History index with these albums' plays */
+  const useHistory = (
+    albums: Record<string, Array<{ timestamp: number; track?: string }>>
+  ) => {
+    mockHistoryStorage.getIndex = jest.fn().mockResolvedValue({
+      albums: Object.fromEntries(
+        Object.entries(albums).map(([key, plays]) => [
+          key,
+          {
+            lastPlayed: Math.max(...plays.map(p => p.timestamp)),
+            playCount: plays.length,
+            plays,
+          },
+        ])
+      ),
+      totalScrobbles: 0,
+      lastSyncTimestamp: 1,
+      oldestScrobbleDate: 0,
+    });
+  };
+  /** Track mappings, as the track mapping service would load them */
+  const useTrackMappings = (mappings: TrackMapping[]) => {
+    const key = (artist: string, album: string, track: string) =>
+      [artist, album, track].map(trackMatchKey).join('|');
+    const byKey = new Map(
+      mappings.map(m => [
+        key(m.historyArtist, m.historyAlbum, m.historyTrack),
+        m,
+      ])
+    );
+    mockTrackMappingService.getAllTrackMappings = jest
+      .fn()
+      .mockResolvedValue(mappings);
+    mockTrackMappingService.createLookup = jest
+      .fn()
+      .mockResolvedValue(
+        (artist: string, album: string, track: string) =>
+          byKey.get(key(artist, album, track)) ?? null
+      );
+  };
+
   let app: express.Application;
   let mockFileStorage: jest.Mocked<FileStorage>;
   let mockAuthService: jest.Mocked<AuthService>;
@@ -214,6 +270,25 @@ describe('Suggestions Routes', () => {
     mockMappingService.getAllAlbumMappingsForCollection = jest
       .fn()
       .mockResolvedValue([]);
+    mockMappingService.getAllAlbumMappings = jest.fn().mockResolvedValue([]);
+
+    // Plays are resolved by a real play identity service over the history
+    // and mapping fakes; tests set the history with useHistory()
+    mockHistoryStorage.getIndex = jest.fn().mockResolvedValue(null);
+    mockHistoryStorage.fuzzyNormalizeKey = jest.fn(
+      (artist: string, album: string) =>
+        `${artist.toLowerCase().trim()}|${album
+          .toLowerCase()
+          .replace(/\s*\(deluxe edition\)$/, '')
+          .trim()}`
+    );
+    useTrackMappings([]);
+    const playIdentity = new PlayIdentityService(mockHistoryStorage);
+    playIdentity.setMappingService(mockMappingService);
+    playIdentity.setTrackMappingService(mockTrackMappingService);
+    mockStatsService.getPlayIdentityService = jest
+      .fn()
+      .mockReturnValue(playIdentity);
 
     // Create Express app
     app = express();
@@ -858,19 +933,12 @@ describe('Suggestions Routes', () => {
 
   describe('GET /api/v1/suggestions/album-history/:artist/:album', () => {
     beforeEach(() => {
-      mockHistoryStorage.getAlbumHistoryFuzzy = jest.fn().mockResolvedValue({
-        entry: null,
-        matchType: 'none',
-      });
       mockHistoryStorage.invalidateCache = jest.fn();
     });
 
     it('should return not found when no history exists', async () => {
       // Arrange
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: null,
-        matchType: 'none',
-      });
+      useHistory({});
 
       // Act
       const response = await request(app).get(
@@ -887,17 +955,11 @@ describe('Suggestions Routes', () => {
 
     it('should return history when exists', async () => {
       // Arrange
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: {
-          lastPlayed: 1640000000000,
-          playCount: 5,
-          plays: [
-            { timestamp: 1640000000, track: 'Track 1' },
-            { timestamp: 1639000000, track: 'Track 2' },
-          ],
-        },
-        matchType: 'exact',
-        matchedKeys: ['test artist|test album'],
+      useHistory({
+        'test artist|test album': [
+          { timestamp: 1640000000, track: 'Track 1' },
+          { timestamp: 1639000000, track: 'Track 2' },
+        ],
       });
 
       // Act
@@ -909,7 +971,6 @@ describe('Suggestions Routes', () => {
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data.found).toBe(true);
-      // playCount is now the deduplicated plays count, not entry.playCount
       expect(response.body.data.playCount).toBe(2);
       expect(response.body.data.plays).toHaveLength(2);
       expect(response.body.data.matchType).toBe('exact');
@@ -917,17 +978,11 @@ describe('Suggestions Routes', () => {
 
     it('should count different tracks that share a timestamp', async () => {
       // Arrange
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: {
-          lastPlayed: 1640000000,
-          playCount: 2,
-          plays: [
-            { timestamp: 1640000000, track: 'Track 1' },
-            { timestamp: 1640000000, track: 'Track 2' },
-          ],
-        },
-        matchType: 'exact',
-        matchedKeys: ['test artist|test album'],
+      useHistory({
+        'test artist|test album': [
+          { timestamp: 1640000000, track: 'Track 1' },
+          { timestamp: 1640000000, track: 'Track 2' },
+        ],
       });
 
       // Act
@@ -942,9 +997,9 @@ describe('Suggestions Routes', () => {
 
     it('should handle errors gracefully', async () => {
       // Arrange
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockRejectedValue(
-        new Error('History error')
-      );
+      mockHistoryStorage.getIndex = jest
+        .fn()
+        .mockRejectedValue(new Error('History error'));
 
       // Act
       const response = await request(app).get(
@@ -958,14 +1013,8 @@ describe('Suggestions Routes', () => {
 
     it('should return fuzzy match results', async () => {
       // Arrange - simulates matching "Album (Deluxe Edition)" when looking for "Album"
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: {
-          lastPlayed: 1640000000,
-          playCount: 10,
-          plays: [{ timestamp: 1640000000 }],
-        },
-        matchType: 'fuzzy',
-        matchedKeys: ['test artist|album (deluxe edition)'],
+      useHistory({
+        'test artist|album (deluxe edition)': [{ timestamp: 1640000000 }],
       });
 
       // Act
@@ -1340,27 +1389,18 @@ describe('Suggestions Routes', () => {
         })),
         { timestamp: 1620000000, track: 'Dirty Work' },
       ];
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: { lastPlayed: 1640000000, playCount: plays.length, plays },
-        matchType: 'exact',
-        matchedKeys: ['prof|good time boy'],
-      });
-      mockTrackMappingService.getMappingsForAlbum.mockImplementation(
-        async (_artist, album) =>
-          album === 'good time boy'
-            ? [
-                {
-                  historyArtist: 'prof',
-                  historyAlbum: 'good time boy',
-                  historyTrack: 'Dirt Work',
-                  cacheArtist: 'prof',
-                  cacheAlbum: 'good time boy',
-                  cacheTrack: 'Dirty Work',
-                  createdAt: 1,
-                },
-              ]
-            : []
-      );
+      useHistory({ 'prof|good time boy': plays });
+      useTrackMappings([
+        {
+          historyArtist: 'prof',
+          historyAlbum: 'good time boy',
+          historyTrack: 'Dirt Work',
+          cacheArtist: 'prof',
+          cacheAlbum: 'good time boy',
+          cacheTrack: 'Dirty Work',
+          createdAt: 1,
+        },
+      ]);
 
       const response = await request(app).get(
         '/api/v1/suggestions/album-history/Prof/Good%20Time%20Boy'
@@ -1390,17 +1430,11 @@ describe('Suggestions Routes', () => {
     };
 
     it('applies merges saved on the album a history album is merged into', async () => {
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: {
-          lastPlayed: 1640000000,
-          playCount: 2,
-          plays: [
-            { timestamp: 1640000000, track: 'Dirty Work' },
-            { timestamp: 1639000000, track: 'Dirt Work' },
-          ],
-        },
-        matchType: 'exact',
-        matchedKeys: ['prof|old album'],
+      useHistory({
+        'prof|old album': [
+          { timestamp: 1640000000, track: 'Dirty Work' },
+          { timestamp: 1639000000, track: 'Dirt Work' },
+        ],
       });
       mockMappingService.getAllAlbumMappings = jest.fn().mockResolvedValue([
         {
@@ -1412,9 +1446,7 @@ describe('Suggestions Routes', () => {
           createdAt: 1,
         },
       ]);
-      mockTrackMappingService.getMappingsForAlbum.mockImplementation(
-        async (_artist, album) => (album === 'new album' ? [dirtWork] : [])
-      );
+      useTrackMappings([dirtWork]);
 
       const response = await request(app).get(
         '/api/v1/suggestions/album-history/Prof/Old%20Album'
@@ -1429,15 +1461,7 @@ describe('Suggestions Routes', () => {
     });
 
     it('counts a track called "Constructor"', async () => {
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: {
-          lastPlayed: 1640000000,
-          playCount: 1,
-          plays: [{ timestamp: 1640000000, track: 'Constructor' }],
-        },
-        matchType: 'exact',
-        matchedKeys: ['a|b'],
-      });
+      useHistory({ 'a|b': [{ timestamp: 1640000000, track: 'Constructor' }] });
 
       const response = await request(app).get(
         '/api/v1/suggestions/album-history/A/B'

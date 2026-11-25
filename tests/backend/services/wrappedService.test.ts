@@ -712,7 +712,7 @@ describe('WrappedService', () => {
   });
 
   describe('collection stats - most played new addition', () => {
-    it('should find most-played new addition with fuzzy matching', async () => {
+    it('should find the most-played new addition from its plays', async () => {
       // Arrange: collection item added in range
       mockFileStorage.readJSON = jest
         .fn()
@@ -766,36 +766,27 @@ describe('WrappedService', () => {
       const feb1Sec = new Date('2024-02-01T00:00:00Z').getTime() / 1000;
       const mar1Sec = new Date('2024-03-01T00:00:00Z').getTime() / 1000;
 
-      // Mock fuzzy lookup: Radiohead has 3 plays after add, Pink Floyd has 1
-      mockHistoryStorage.getAlbumHistoryFuzzy = jest
-        .fn()
-        .mockImplementation((artist: string) => {
-          if (artist.toLowerCase().includes('radiohead')) {
-            return Promise.resolve({
-              entry: {
-                lastPlayed: new Date('2024-06-15').getTime() / 1000,
-                playCount: 50,
-                plays: [
-                  { timestamp: feb1Sec + 86400 }, // Day after add
-                  { timestamp: feb1Sec + 172800 },
-                  { timestamp: feb1Sec + 259200 },
-                ],
-              },
-              match: 'fuzzy',
-            });
-          }
-          if (artist.toLowerCase().includes('pink floyd')) {
-            return Promise.resolve({
-              entry: {
-                lastPlayed: new Date('2024-04-10').getTime() / 1000,
-                playCount: 30,
-                plays: [{ timestamp: mar1Sec + 86400 }],
-              },
-              match: 'fuzzy',
-            });
-          }
-          return Promise.resolve({ entry: null, match: 'none' });
-        });
+      // History: Radiohead has 3 plays after being added, Pink Floyd 1
+      mockHistoryStorage.getIndex = jest.fn().mockResolvedValue({
+        ...sampleIndex,
+        albums: {
+          ...sampleIndex.albums,
+          'radiohead|ok computer': {
+            lastPlayed: feb1Sec + 259200,
+            playCount: 3,
+            plays: [
+              { timestamp: feb1Sec + 86400 }, // Day after add
+              { timestamp: feb1Sec + 172800 },
+              { timestamp: feb1Sec + 259200 },
+            ],
+          },
+          'pink floyd|dark side of the moon': {
+            lastPlayed: mar1Sec + 86400,
+            playCount: 1,
+            plays: [{ timestamp: mar1Sec + 86400 }],
+          },
+        },
+      });
 
       // Act
       const result = await wrappedService.generateWrapped(

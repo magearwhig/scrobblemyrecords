@@ -129,7 +129,8 @@ describe('Stats Routes - Album Tracks Played', () => {
       expect(response.body.data.totalScrobbledTracks).toBe(3);
       expect(mockStatsService.getAlbumTracksPlayed).toHaveBeenCalledWith(
         'Radiohead',
-        'OK Computer'
+        'OK Computer',
+        expect.any(Array)
       );
     });
 

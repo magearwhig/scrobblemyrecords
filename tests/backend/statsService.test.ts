@@ -75,6 +75,13 @@ describe('StatsService', () => {
     oldestScrobbleDate: 0,
   });
 
+  /** A history entry with one play at each timestamp */
+  const entryAt = (...timestamps: number[]) => ({
+    lastPlayed: Math.max(...timestamps),
+    playCount: timestamps.length,
+    plays: timestamps.map(timestamp => ({ timestamp })),
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
 
@@ -708,27 +715,12 @@ describe('StatsService', () => {
         }),
       ];
 
-      mockHistoryStorage.getAlbumHistoryFuzzy
-        .mockResolvedValueOnce({
-          entry: {
-            lastPlayed: now,
-            playCount: 10,
-            plays: [{ timestamp: now }],
-          },
-          matchType: 'exact',
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'artist 1|album 1': entryAt(now),
+          'artist 2|album 2': entryAt(now - 40 * 24 * 60 * 60), // 40 days ago
         })
-        .mockResolvedValueOnce({
-          entry: {
-            lastPlayed: now - 40 * 24 * 60 * 60, // 40 days ago
-            playCount: 5,
-            plays: [{ timestamp: now - 40 * 24 * 60 * 60 }],
-          },
-          matchType: 'exact',
-        })
-        .mockResolvedValueOnce({
-          entry: null,
-          matchType: 'none',
-        });
+      );
 
       // Act
       const coverage = await statsService.getCollectionCoverage(collection);
@@ -772,27 +764,12 @@ describe('StatsService', () => {
         }),
       ];
 
-      mockHistoryStorage.getAlbumHistoryFuzzy
-        .mockResolvedValueOnce({
-          entry: {
-            lastPlayed: now - 10 * 24 * 60 * 60, // 10 days ago
-            playCount: 5,
-            plays: [{ timestamp: now - 10 * 24 * 60 * 60 }],
-          },
-          matchType: 'exact',
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'artist 1|recent album': entryAt(now - 10 * 24 * 60 * 60), // 10 days ago
+          'artist 2|dusty album': entryAt(sevenMonthsAgo),
         })
-        .mockResolvedValueOnce({
-          entry: {
-            lastPlayed: sevenMonthsAgo,
-            playCount: 3,
-            plays: [{ timestamp: sevenMonthsAgo }],
-          },
-          matchType: 'exact',
-        })
-        .mockResolvedValueOnce({
-          entry: null,
-          matchType: 'none',
-        });
+      );
 
       // Act
       const dusty = await statsService.getDustyCorners(collection, 10);
@@ -833,15 +810,12 @@ describe('StatsService', () => {
         }),
       ];
 
-      mockHistoryStorage.getAlbumHistoryFuzzy
-        .mockResolvedValueOnce({
-          entry: { lastPlayed: now, playCount: 100, plays: [] },
-          matchType: 'exact',
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'artist 1|album 1': entryAt(...Array(100).fill(now)),
+          'artist 2|album 2': entryAt(...Array(50).fill(now)),
         })
-        .mockResolvedValueOnce({
-          entry: { lastPlayed: now, playCount: 50, plays: [] },
-          matchType: 'exact',
-        });
+      );
 
       // Act
       const heavy = await statsService.getHeavyRotation(collection, 10);
@@ -1170,7 +1144,7 @@ describe('StatsService', () => {
       const warmBlock = {
         warmedAt: Math.floor(Date.now() / 1000),
         syncTimestamp,
-        version: 7,
+        version: 8,
         artistAliasFingerprint: '',
         historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
         streaks: { currentStreak: 5, longestStreak: 10 },
@@ -1244,7 +1218,7 @@ describe('StatsService', () => {
         warm: {
           warmedAt: 0,
           syncTimestamp,
-          version: 7,
+          version: 8,
           artistAliasFingerprint: '',
           historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
           topAlbums: { all: [{ artist: 'cached', album: 'cached' }] },
@@ -1277,7 +1251,7 @@ describe('StatsService', () => {
         warm: {
           warmedAt: 0,
           syncTimestamp,
-          version: 7,
+          version: 8,
           artistAliasFingerprint: '',
           // Built when a rule pointed somewhere else (same counts)
           historyFingerprint: computeHistoryFingerprint(
@@ -1303,7 +1277,7 @@ describe('StatsService', () => {
       const warmBlock = {
         warmedAt: 0,
         syncTimestamp,
-        version: 7,
+        version: 8,
         artistAliasFingerprint: '',
         historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
         // Built when there were no album mappings
@@ -1539,7 +1513,7 @@ describe('StatsService', () => {
       warm: {
         warmedAt: Math.floor(Date.now() / 1000),
         syncTimestamp,
-        version: 7,
+        version: 8,
         artistAliasFingerprint: '',
         historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
         streaks: { currentStreak: 7, longestStreak: 21 },
@@ -1909,14 +1883,9 @@ describe('StatsService', () => {
       ];
 
       if (isAfterJanuary) {
-        mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-          entry: {
-            lastPlayed: thisYearTimestamp,
-            playCount: 10,
-            plays: [{ timestamp: thisYearTimestamp }],
-          },
-          matchType: 'exact',
-        });
+        mockHistoryStorage.getIndex.mockResolvedValue(
+          createMockIndex({ 'artist|album': entryAt(thisYearTimestamp) })
+        );
 
         // Act
         const coverage = await statsService.getCollectionCoverage(collection);
@@ -1927,14 +1896,9 @@ describe('StatsService', () => {
       } else {
         // In January, just verify the method works with this month data
         const nowTimestamp = Math.floor(now.getTime() / 1000);
-        mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-          entry: {
-            lastPlayed: nowTimestamp,
-            playCount: 10,
-            plays: [{ timestamp: nowTimestamp }],
-          },
-          matchType: 'exact',
-        });
+        mockHistoryStorage.getIndex.mockResolvedValue(
+          createMockIndex({ 'artist|album': entryAt(nowTimestamp) })
+        );
 
         const coverage = await statsService.getCollectionCoverage(collection);
         expect(coverage.albumsPlayedThisMonth).toBe(1);
@@ -2529,51 +2493,54 @@ describe('StatsService', () => {
   });
 
   describe('getAlbumTracksPlayed', () => {
-    it('should return empty array when album has no plays', async () => {
-      // Arrange
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: null,
-        matchType: 'none',
-      });
+    const tracksIndex = (
+      albums: Record<string, Array<{ timestamp: number; track?: string }>>
+    ) =>
+      ({
+        albums: Object.fromEntries(
+          Object.entries(albums).map(([key, plays]) => [
+            key,
+            {
+              lastPlayed: Math.max(...plays.map(p => p.timestamp)),
+              playCount: plays.length,
+              plays,
+            },
+          ])
+        ),
+        totalScrobbles: 0,
+        lastSyncTimestamp: 1700000000,
+        oldestScrobbleDate: 0,
+      }) as ScrobbleHistoryIndex;
 
-      // Act
+    it('should return empty array when album has no plays', async () => {
+      mockHistoryStorage.getIndex.mockResolvedValue(tracksIndex({}));
+
       const result = await statsService.getAlbumTracksPlayed(
         'Unknown Artist',
         'Unknown Album'
       );
 
-      // Assert
       expect(result).toEqual([]);
-      expect(mockHistoryStorage.getAlbumHistoryFuzzy).toHaveBeenCalledWith(
-        'Unknown Artist',
-        'Unknown Album'
-      );
     });
 
     it('should return unique track names from album plays', async () => {
-      // Arrange
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: {
-          lastPlayed: 1700000000,
-          playCount: 5,
-          plays: [
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        tracksIndex({
+          'radiohead|ok computer': [
             { timestamp: 1700000000, track: 'Airbag' },
             { timestamp: 1699999000, track: 'Paranoid Android' },
             { timestamp: 1699998000, track: 'Airbag' },
             { timestamp: 1699997000, track: 'Subterranean Homesick Alien' },
             { timestamp: 1699996000, track: 'Paranoid Android' },
           ],
-        },
-        matchType: 'exact',
-      });
+        })
+      );
 
-      // Act
       const result = await statsService.getAlbumTracksPlayed(
         'Radiohead',
         'OK Computer'
       );
 
-      // Assert
       expect(result).toHaveLength(3);
       expect(result).toContain('Airbag');
       expect(result).toContain('Paranoid Android');
@@ -2581,77 +2548,70 @@ describe('StatsService', () => {
     });
 
     it('should skip plays without track names', async () => {
-      // Arrange
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: {
-          lastPlayed: 1700000000,
-          playCount: 4,
-          plays: [
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        tracksIndex({
+          'artist|album': [
             { timestamp: 1700000000, track: 'Track A' },
-            { timestamp: 1699999000 }, // No track name
+            { timestamp: 1699999000 },
             { timestamp: 1699998000, track: 'Track B' },
-            { timestamp: 1699997000 }, // No track name
+            { timestamp: 1699997000 },
           ],
-        },
-        matchType: 'fuzzy',
-      });
+        })
+      );
 
-      // Act
       const result = await statsService.getAlbumTracksPlayed('Artist', 'Album');
 
-      // Assert
       expect(result).toHaveLength(2);
       expect(result).toContain('Track A');
       expect(result).toContain('Track B');
     });
 
-    it('should use fuzzy matching via historyStorage', async () => {
-      // Arrange - Fuzzy match "Album" to "Album (Deluxe Edition)"
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: {
-          lastPlayed: 1700000000,
-          playCount: 2,
-          plays: [
+    it('for an owned record, includes versions that resolve to it by name', async () => {
+      // "Album" owned; plays scrobbled on "Album (Deluxe Edition)", which the
+      // spelling-tolerant match ties to the record
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        tracksIndex({
+          'artist|album (deluxe edition)': [
             { timestamp: 1700000000, track: 'Song 1' },
             { timestamp: 1699999000, track: 'Song 2' },
           ],
-        },
-        matchType: 'fuzzy',
-        matchedKeys: ['artist|album (deluxe edition)'],
+        })
+      );
+      const owned = createMockCollectionItem({
+        id: 1,
+        artist: 'Artist',
+        title: 'Album',
       });
+      // Like the real key: edition words don't count
+      mockHistoryStorage.fuzzyNormalizeKey.mockImplementation(
+        (artist: string, album: string) =>
+          `${artist.toLowerCase()}|${album.toLowerCase().replace(/\s*\(deluxe edition\)$/, '')}`
+      );
 
-      // Act
-      const result = await statsService.getAlbumTracksPlayed('Artist', 'Album');
+      const result = await statsService.getAlbumTracksPlayed(
+        'Artist',
+        'Album',
+        [owned]
+      );
 
-      // Assert
       expect(result).toHaveLength(2);
       expect(result).toContain('Song 1');
       expect(result).toContain('Song 2');
-      expect(mockHistoryStorage.getAlbumHistoryFuzzy).toHaveBeenCalledWith(
-        'Artist',
-        'Album'
-      );
     });
 
     it('should return empty array when album has plays but no track names', async () => {
-      // Arrange
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: {
-          lastPlayed: 1700000000,
-          playCount: 3,
-          plays: [
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        tracksIndex({
+          'artist|album': [
             { timestamp: 1700000000 },
             { timestamp: 1699999000 },
             { timestamp: 1699998000 },
           ],
-        },
-        matchType: 'exact',
-      });
+        })
+      );
 
-      // Act
       const result = await statsService.getAlbumTracksPlayed('Artist', 'Album');
 
-      // Assert
       expect(result).toEqual([]);
     });
   });
@@ -5104,10 +5064,6 @@ describe('StatsService', () => {
       );
 
       // Assert
-      expect(mockHistoryStorage.getAlbumHistoryFuzzy).toHaveBeenCalledWith(
-        'artist',
-        'studio'
-      );
       expect(result.album).toBe('Studio');
       expect(result.playCount).toBe(5);
       expect(result.mappings.albumMapping?.collectionLinked).toBe(false);
@@ -5517,21 +5473,11 @@ describe('StatsService', () => {
 
     it('getHeavyRotation sums the collection title and its linked versions', async () => {
       // Arrange
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockImplementation(
-        async (_artist: string, album: string) => {
-          const counts: Record<string, number> = {
-            tallulah: 3,
-            'tallulah (remastered)': 2,
-          };
-          const count = counts[album.toLowerCase()];
-          return count
-            ? {
-                entry: { playCount: count, lastPlayed: now, plays: [] },
-                matchType: 'exact' as const,
-                matchedKeys: [`the go-betweens|${album.toLowerCase()}`],
-              }
-            : { entry: null, matchType: 'none' as const };
-        }
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createMockIndex({
+          'the go-betweens|tallulah': entryAt(now, now, now),
+          'the go-betweens|tallulah (remastered)': entryAt(now, now),
+        })
       );
       useMappings([linked]);
       const collection = [
@@ -5646,6 +5592,11 @@ describe('StatsService', () => {
       );
       mockHistoryStorage.getIndex.mockResolvedValue({
         albums: {
+          'the go-betweens|tallulah': {
+            lastPlayed: now,
+            playCount: 1,
+            plays: plays(1, 'Bye Bye'),
+          },
           'the go-betweens|tallulah (live)': {
             lastPlayed: now,
             playCount: 1,
@@ -5680,6 +5631,11 @@ describe('StatsService', () => {
       });
       mockHistoryStorage.getIndex.mockResolvedValue({
         albums: {
+          'the go-betweens|tallulah': {
+            lastPlayed: now,
+            playCount: 1,
+            plays: plays(1, 'Bye Bye'),
+          },
           'the go-betweens|tallulah (remastered)': {
             lastPlayed: now,
             playCount: 1,
@@ -6040,7 +5996,7 @@ describe('StatsService', () => {
           expect.stringContaining('stats-cache'),
           expect.objectContaining({
             warm: expect.objectContaining({
-              version: 7,
+              version: 8,
               historyFingerprint: 'scrobbles:8;unresolved:5',
             }),
           })

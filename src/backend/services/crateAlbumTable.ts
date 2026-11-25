@@ -12,11 +12,7 @@ import {
   DiscogsRelease,
   ScrobbleHistoryIndex,
 } from '../../shared/types';
-import {
-  createAlbumCanonicalizer,
-  createAlbumGroupNameResolver,
-  stripDiscogsSuffix,
-} from '../../shared/utils/albumMapping';
+import { stripDiscogsSuffix } from '../../shared/utils/albumMapping';
 import { computeReleaseRuntime } from '../../shared/utils/releaseRuntime';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
@@ -27,25 +23,30 @@ import {
   CrateTableAlbum,
   CrateTableCopy,
 } from './crateTableTypes';
-import { loadAlbumMappings, lookupMergedHistory } from './mergedAlbumHistory';
+import { loadAlbumMappings } from './mergedAlbumHistory';
+import { PlayIdentityService, ResolvedPlay } from './playIdentity/service';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 
 /** Bump when the table derivation changes so memoised tables are rebuilt */
-export const CRATE_TABLE_VERSION = 1;
+// Bumped to 2: plays come from play identity (track mappings move plays)
+export const CRATE_TABLE_VERSION = 2;
 
 const HISTORY_INDEX_FILE = 'history/scrobble-history-index.json';
 const ALBUM_MAPPINGS_FILE = 'mappings/album-mappings.json';
+const TRACK_MAPPINGS_FILE = 'mappings/track-mappings.json';
 const DISCARD_PILE_FILE = 'collections/discard-pile.json';
 
 const FACTS_TTL_MS = 10 * 60 * 1000;
 const FACTS_CONCURRENCY = 16;
 const SNAPSHOT_RETRY_DELAY_MS = 500;
 
-type HistoryStorageLike = Pick<
-  ScrobbleHistoryStorage,
-  'batchLookup' | 'normalizeKey' | 'getIndex'
-> &
-  Partial<Pick<ScrobbleHistoryStorage, 'invalidateCache'>>;
+type HistoryStorageLike = Pick<ScrobbleHistoryStorage, 'getIndex'> &
+  Partial<
+    Pick<
+      ScrobbleHistoryStorage,
+      'invalidateCache' | 'fuzzyNormalizeKey' | 'batchLookup' | 'normalizeKey'
+    >
+  >;
 
 interface ArtistNameResolverLike {
   resolveArtist(name: string): string;
@@ -98,7 +99,13 @@ export async function readCollectionSnapshot(
       `collections/${username}-progress.json`
     ),
   ]);
-  const numbers = pageNumbers(files, username);
+  // Pages past the count page 1 gives are left over from an older, longer
+  // sync: not part of this snapshot
+  const firstPage = await fileStorage.readJSON<CollectionPageFile>(
+    `collections/${username}-page-1.json`
+  );
+  const lastPage = firstPage?.pagination?.pages ?? Infinity;
+  const numbers = pageNumbers(files, username).filter(n => n <= lastPage);
 
   const items: CollectionItem[] = [];
   const pagesSeen = new Set<string>();
@@ -107,9 +114,12 @@ export async function readCollectionSnapshot(
   let withPagination = 0;
   let missingPage = false;
   for (const n of numbers) {
-    const page = await fileStorage.readJSON<CollectionPageFile>(
-      `collections/${username}-page-${n}.json`
-    );
+    const page =
+      n === 1
+        ? firstPage
+        : await fileStorage.readJSON<CollectionPageFile>(
+            `collections/${username}-page-${n}.json`
+          );
     if (!page || !Array.isArray(page.data)) {
       // Listed but unreadable (deleted mid-rewrite or corrupt)
       missingPage = true;
@@ -180,15 +190,32 @@ export interface AlbumTableInputs {
 
 /**
  * Build the album table (plan section 5): dedupe entries by release ID,
- * group releases by the album canonicalizer key (not by master_id), and
- * attribute plays with one lookupMergedHistory call for the whole
- * collection. The history storage is the only I/O.
+ * group releases by merged album (play identity, not master_id), and give
+ * each album every play that resolves to one of its copies. Pass the shared
+ * play identity service so the plays match the rest of the app; without it,
+ * one is built from the inputs. The history storage is the only I/O.
  */
 export async function buildAlbumTable(
   inputs: AlbumTableInputs,
-  historyStorage: HistoryStorageLike
+  historyStorage: HistoryStorageLike,
+  playIdentity?: Pick<PlayIdentityService, 'readModel'>
 ): Promise<CrateAlbumTable> {
   const { items, mappings, resolveArtist, discardIds } = inputs;
+  const identityService =
+    playIdentity ??
+    (() => {
+      const own = new PlayIdentityService(
+        historyStorage as Pick<
+          ScrobbleHistoryStorage,
+          'getIndex' | 'fuzzyNormalizeKey'
+        >
+      );
+      own.setMappingService({ getAllAlbumMappings: async () => mappings });
+      own.setArtistNameResolver({ resolveArtist });
+      return own;
+    })();
+  const model = await identityService.readModel(items);
+  const itemByRelease = new Map<number, CollectionItem>();
 
   // Discogs-numbered names the resolver doesn't know fall back to the plain
   // name, as createAlbumCanonicalizer does
@@ -208,6 +235,7 @@ export async function buildAlbumTable(
     const release = item.release;
     if (!release) continue;
     const releaseId = release.id ?? item.id;
+    if (!itemByRelease.has(releaseId)) itemByRelease.set(releaseId, item);
     const addedMs = Date.parse(item.date_added);
     const rating = item.rating && item.rating > 0 ? item.rating : undefined;
     const inDiscard = discardIds.has(item.id);
@@ -247,11 +275,10 @@ export async function buildAlbumTable(
     });
   }
 
-  // 2. Group into albums
-  const canonicalize = createAlbumCanonicalizer(mappings, resolveArtist);
+  // 2. Group into albums (merged albums, as everywhere else)
   const groups = new Map<string, CrateTableCopy[]>();
   for (const copy of byRelease.values()) {
-    const { key } = canonicalize(copy.artist, copy.title);
+    const key = model.identity.album(copy.artist, copy.title).albumKey;
     const copies = groups.get(key) ?? [];
     copies.push(copy);
     groups.set(key, copies);
@@ -283,27 +310,36 @@ export async function buildAlbumTable(
     });
   }
 
-  // 3. Attribute plays: one lookup for the whole collection
+  // 3. Attribute plays: every play that resolves to one of the copies
   const index: ScrobbleHistoryIndex | null = await historyStorage.getIndex();
   if (index && albums.length > 0) {
-    const namesFor = createAlbumGroupNameResolver(mappings, resolveArtist);
-    const results = await lookupMergedHistory(
-      historyStorage,
-      albums.map(album => namesFor(album.copies, album.albumKey))
-    );
-    albums.forEach((album, i) => {
-      const result = results[i];
-      const timestamps = (result?.entry?.plays ?? [])
-        .map(play => play.timestamp)
-        .sort((a, b) => a - b);
+    for (const album of albums) {
+      const plays = new Set<ResolvedPlay>();
+      const matchedKeys = new Set<string>();
+      let matchType: 'exact' | 'fuzzy' | 'none' = 'none';
+      for (const copy of album.copies) {
+        const item = itemByRelease.get(copy.releaseId);
+        if (!item) continue;
+        for (const play of model.recordResolvedPlays(item)) plays.add(play);
+        const result = model.recordPlays(item);
+        result.matchedKeys.forEach(key => matchedKeys.add(key));
+        if (result.matchType === 'exact') matchType = 'exact';
+        else if (result.matchType === 'fuzzy' && matchType === 'none') {
+          matchType = 'fuzzy';
+        }
+      }
+      const timestamps = Array.from(plays, play => play.timestamp).sort(
+        (a, b) => a - b
+      );
       album.listening = {
-        scrobbleCount: result?.entry?.playCount ?? 0,
-        lastPlayed: result?.entry?.lastPlayed || null,
+        scrobbleCount: timestamps.length,
+        lastPlayed:
+          timestamps.length > 0 ? timestamps[timestamps.length - 1] : null,
         playTimestamps: timestamps,
-        matchType: result?.matchType ?? 'none',
-        matchedKeys: result?.matchedKeys ?? [],
+        matchType,
+        matchedKeys: Array.from(matchedKeys),
       };
-    });
+    }
   }
 
   // 4. Competition ranking ("1, 2, 2, 4"): ties share a rank, albums with no
@@ -361,6 +397,7 @@ export interface CrateAlbumTableBuilderOptions {
 export class CrateAlbumTableBuilder {
   private logger = createLogger('CrateAlbumTableBuilder');
   private artistResolver: ArtistNameResolverLike | null = null;
+  private playIdentity: Pick<PlayIdentityService, 'readModel'> | undefined;
 
   private table: { username: string; value: CrateAlbumTable } | null = null;
   private inflight = new Map<string, Promise<CrateAlbumTable>>();
@@ -397,6 +434,13 @@ export class CrateAlbumTableBuilder {
     this.artistResolver = resolver;
   }
 
+  /** The shared play identity service, so crate plays match the rest of the app */
+  setPlayIdentityService(
+    service: Pick<PlayIdentityService, 'readModel'>
+  ): void {
+    this.playIdentity = service;
+  }
+
   /** Identity until a resolver is set */
   getResolveArtist(): (name: string) => string {
     const resolver = this.artistResolver;
@@ -424,15 +468,18 @@ export class CrateAlbumTableBuilder {
 
     const files = await this.fileStorage.listFiles('collections');
     const pages = pageNumbers(files, username);
-    const [pageMtimes, progress, mappings, discard, index] = await Promise.all([
-      Promise.all(
-        pages.map(n => mtime(`collections/${username}-page-${n}.json`))
-      ),
-      mtime(`collections/${username}-progress.json`),
-      mtime(ALBUM_MAPPINGS_FILE),
-      mtime(DISCARD_PILE_FILE),
-      this.historyStorage.getIndex(),
-    ]);
+    const [pageMtimes, progress, mappings, trackMappings, discard, index] =
+      await Promise.all([
+        Promise.all(
+          pages.map(n => mtime(`collections/${username}-page-${n}.json`))
+        ),
+        mtime(`collections/${username}-progress.json`),
+        mtime(ALBUM_MAPPINGS_FILE),
+        // Track mappings can move plays between albums (play identity)
+        mtime(TRACK_MAPPINGS_FILE),
+        mtime(DISCARD_PILE_FILE),
+        this.historyStorage.getIndex(),
+      ]);
 
     return [
       `v${CRATE_TABLE_VERSION}`,
@@ -441,6 +488,7 @@ export class CrateAlbumTableBuilder {
       `progress:${progress}`,
       `history:${history}:${index?.lastSyncTimestamp ?? 0}`,
       `mappings:${mappings}`,
+      `tracks:${trackMappings}`,
       `artists:${this.artistResolver?.getFingerprint() ?? ''}`,
       `discard:${discard}`,
     ].join('|');
@@ -506,7 +554,8 @@ export class CrateAlbumTableBuilder {
         fingerprint,
         now: Date.now(),
       },
-      this.historyStorage
+      this.historyStorage,
+      this.playIdentity
     );
     this.logger.debug('Built crate album table', {
       albums: table.totalAlbums,

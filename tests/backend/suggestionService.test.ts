@@ -14,6 +14,20 @@ describe('SuggestionService', () => {
   let suggestionService: SuggestionService;
   let mockAnalyticsService: jest.Mocked<AnalyticsService>;
   let mockHistoryStorage: jest.Mocked<ScrobbleHistoryStorage>;
+  let historyAlbums: Record<
+    string,
+    {
+      lastPlayed: number;
+      playCount: number;
+      plays: Array<{ timestamp: number }>;
+    }
+  >;
+  /** A history entry with `count` plays at `timestamp` */
+  const playedAt = (timestamp: number, count = 1) => ({
+    lastPlayed: timestamp,
+    playCount: count,
+    plays: Array.from({ length: count }, () => ({ timestamp })),
+  });
 
   // Factory for creating mock collection items
   const createMockCollectionItem = (
@@ -52,7 +66,20 @@ describe('SuggestionService', () => {
       getTopArtistsMap: jest.fn().mockResolvedValue(new Map()),
     } as unknown as jest.Mocked<AnalyticsService>;
 
+    historyAlbums = {};
     mockHistoryStorage = {
+      // Each test lists the history albums it needs in historyAlbums
+      getIndex: jest.fn(async () => ({
+        albums: historyAlbums,
+        totalScrobbles: Object.values(historyAlbums).reduce(
+          (n, a) => n + a.playCount,
+          0
+        ),
+        lastSyncTimestamp: 1,
+        oldestScrobbleDate: 0,
+      })),
+      fuzzyNormalizeKey: (artist: string, album: string) =>
+        `${artist.toLowerCase()}|${album.toLowerCase()}`,
       getAlbumHistory: jest.fn().mockResolvedValue(null),
       getAlbumHistoryFuzzy: jest
         .fn()
@@ -124,28 +151,12 @@ describe('SuggestionService', () => {
         title: 'Tallulah',
       });
       const nowSeconds = Math.floor(Date.now() / 1000);
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockImplementation(
-        async (_artist: string, title: string) =>
-          title === 'Tallulah'
-            ? {
-                entry: {
-                  lastPlayed: nowSeconds - 400 * 86400,
-                  playCount: 3,
-                  plays: [],
-                },
-                matchType: 'exact' as const,
-                matchedKeys: ['the go-betweens|tallulah'],
-              }
-            : {
-                entry: {
-                  lastPlayed: nowSeconds - 2 * 86400,
-                  playCount: 1,
-                  plays: [],
-                },
-                matchType: 'exact' as const,
-                matchedKeys: ['the go-betweens|tallulah (remastered)'],
-              }
-      );
+      historyAlbums = {
+        'the go-betweens|tallulah': playedAt(nowSeconds - 400 * 86400, 3),
+        'the go-betweens|tallulah (remastered)': playedAt(
+          nowSeconds - 2 * 86400
+        ),
+      };
       suggestionService.setMappingService({
         getAllAlbumMappings: jest.fn().mockResolvedValue([
           {
@@ -169,10 +180,7 @@ describe('SuggestionService', () => {
     it('should mark album as never played when no history', async () => {
       // Arrange
       const album = createMockCollectionItem();
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: null,
-        matchType: 'none',
-      });
+      historyAlbums = {};
 
       // Act
       const factors = await suggestionService.calculateFactors(album);
@@ -187,14 +195,9 @@ describe('SuggestionService', () => {
       const album = createMockCollectionItem();
       const thirtyDaysAgoSeconds =
         Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: {
-          lastPlayed: thirtyDaysAgoSeconds,
-          playCount: 5,
-          plays: [],
-        },
-        matchType: 'exact',
-      });
+      historyAlbums = {
+        'test artist|test album': playedAt(thirtyDaysAgoSeconds, 5),
+      };
 
       // Act
       const factors = await suggestionService.calculateFactors(album);
@@ -597,17 +600,10 @@ describe('SuggestionService', () => {
       });
       const collection = [recentlyPlayed, notRecent];
 
-      // Mock recently played for first album using fuzzy matching
-      mockHistoryStorage.getAlbumHistoryFuzzy
-        .mockResolvedValueOnce({
-          entry: {
-            lastPlayed: Date.now(),
-            playCount: 1,
-            plays: [],
-          },
-          matchType: 'exact',
-        })
-        .mockResolvedValue({ entry: null, matchType: 'none' });
+      // The first album was played just now
+      historyAlbums = {
+        'test artist|recent': playedAt(Math.floor(Date.now() / 1000)),
+      };
       mockHistoryStorage.getDaysSinceLastPlayed
         .mockResolvedValueOnce(2) // First album played 2 days ago
         .mockResolvedValue(100); // Others not recently

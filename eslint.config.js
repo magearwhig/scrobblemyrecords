@@ -15,15 +15,7 @@ const PLAY_IDENTITY_MESSAGE =
 // named album), which the resolver doesn't answer yet: see "Not yet moved" in
 // .plan/play-identity-plan.md. Delete a line when its file is moved.
 const PLAY_IDENTITY_NOT_YET_MOVED = [
-  'src/backend/routes/suggestions.ts', // release details history, mapping suggestions
   'src/backend/services/albumMergeSuggestions.ts', // suggests merges from raw names
-  'src/backend/services/albumPlayCountService.ts', // play counts per owned record
-  'src/backend/services/analyticsService.ts', // missing albums/artists
-  'src/backend/services/crateAlbumTable.ts', // crate rows per owned record
-  'src/backend/services/imageService.ts', // covers by owned record
-  'src/backend/services/statsService.ts', // album page, label page, ROI, coverage, listening arc
-  'src/backend/services/suggestionService.ts', // play suggestions per owned record
-  'src/backend/services/wrappedService.ts', // collection part of Wrapped
 ];
 
 module.exports = [

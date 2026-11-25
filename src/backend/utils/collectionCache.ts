@@ -20,29 +20,53 @@ interface CollectionCachePage {
  *   collections/{username}-page-2.json
  *   ...
  *
- * Iteration stops at the first missing or empty page.
- * Returns an empty array if no cache exists.
+ * Reads as many pages as page 1's pagination says the sync wrote, so pages
+ * left over from an earlier, longer sync are never read (they repeat
+ * records, or hold ones since sold). Without pagination (old caches), stops
+ * at the first missing or empty page. Returns an empty array if no cache
+ * exists.
  */
 export async function getAllCachedCollectionItems(
   username: string,
   fileStorage: FileStorage
 ): Promise<CollectionItem[]> {
   const allItems: CollectionItem[] = [];
-  let pageNumber = 1;
-
-  while (true) {
-    const cacheKey = `collections/${username}-page-${pageNumber}.json`;
-    const cached = await fileStorage.readJSON<{
-      data: CollectionItem[];
-      timestamp: number;
-    }>(cacheKey);
-
+  let lastPage = Infinity;
+  for (let pageNumber = 1; pageNumber <= lastPage; pageNumber++) {
+    const cached = await readPage(username, pageNumber, fileStorage);
     if (!cached || !cached.data || cached.data.length === 0) break;
+    if (pageNumber === 1) lastPage = pagesWritten(cached);
     allItems.push(...cached.data);
-    pageNumber++;
   }
-
   return allItems;
+}
+
+/** How many pages the sync that wrote this page 1 wrote (Infinity if unknown) */
+export function pagesWritten(firstPage: CollectionCachePage): number {
+  const pages = firstPage.pagination?.pages;
+  return typeof pages === 'number' && pages > 0 ? pages : Infinity;
+}
+
+/**
+ * Delete cached collection pages past `lastPage`: left over from an earlier
+ * sync that had more pages. Returns how many were deleted.
+ */
+export async function removeStaleCollectionPages(
+  username: string,
+  lastPage: number,
+  fileStorage: Pick<FileStorage, 'listFiles' | 'delete'>
+): Promise<number> {
+  const pattern = new RegExp(
+    `^${username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-page-(\\d+)\\.json$`
+  );
+  let removed = 0;
+  for (const file of await fileStorage.listFiles('collections')) {
+    const match = file.match(pattern);
+    if (!match || Number(match[1]) <= lastPage) continue;
+    await fileStorage.delete(`collections/${file}`);
+    removed++;
+  }
+  return removed;
 }
 
 /**
@@ -92,11 +116,18 @@ export async function readCollectionCacheSnapshot(
   // An empty collection is cached as page 1 with no items, so page 1 always
   // counts; later pages stop the read when missing or empty
   readOne(firstPage);
+  // Pages past the count page 1 gives are left over from an earlier sync
+  const lastPage = pagesWritten(firstPage);
   let page =
-    firstPage.data.length > 0 ? await readPage(username, 2, fileStorage) : null;
+    firstPage.data.length > 0 && lastPage >= 2
+      ? await readPage(username, 2, fileStorage)
+      : null;
   while (page && page.data && page.data.length > 0) {
     readOne(page);
-    page = await readPage(username, pagesRead + 1, fileStorage);
+    page =
+      pagesRead < lastPage
+        ? await readPage(username, pagesRead + 1, fileStorage)
+        : null;
   }
 
   const complete =

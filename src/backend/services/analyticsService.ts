@@ -4,18 +4,13 @@ import {
   MissingAlbum,
   MissingArtist,
 } from '../../shared/types';
-import {
-  createAlbumCanonicalizer,
-  createCollectionNameResolver,
-  isCollectionLinked,
-  stripDiscogsSuffix,
-} from '../../shared/utils/albumMapping';
+import { stripDiscogsSuffix } from '../../shared/utils/albumMapping';
 import { createLogger } from '../utils/logger';
 
 import { ArtistNameResolver } from './artistNameResolver';
 import { LastFmService, LastFmTopArtist } from './lastfmService';
 import { MappingService } from './mappingService';
-import { loadAlbumMappings } from './mergedAlbumHistory';
+import { PlayIdentityService } from './playIdentity/service';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 
 type ArtistResolver = Pick<ArtistNameResolver, 'resolveArtist'> &
@@ -44,6 +39,15 @@ export class AnalyticsService {
   ) {
     this.historyStorage = historyStorage;
     this.lastFmService = lastFmService;
+    this.playIdentity = new PlayIdentityService(historyStorage);
+  }
+
+  /** Resolves plays and finds a record's plays; replaced by the shared one */
+  private playIdentity: PlayIdentityService;
+
+  /** The shared play identity service, so ownership matches the rest of the app */
+  setPlayIdentityService(service: PlayIdentityService): void {
+    this.playIdentity = service;
   }
 
   /**
@@ -51,11 +55,13 @@ export class AnalyticsService {
    */
   setMappingService(mappingService: MappingService): void {
     this.mappingService = mappingService;
+    this.playIdentity.setMappingService(mappingService);
   }
 
   /** Optional: group spellings of one artist (see ArtistNameResolver). */
   setArtistNameResolver(resolver: ArtistResolver): void {
     this.artistNameResolver = resolver;
+    this.playIdentity.setArtistNameResolver(resolver);
   }
 
   /**
@@ -195,31 +201,21 @@ export class AnalyticsService {
   async getAlbumCompleteness(
     artist: string,
     album: string,
-    totalTracks: number
+    totalTracks: number,
+    /** The album's plays, when the caller already has them */
+    knownHistory?: Pick<AlbumHistoryEntry, 'plays' | 'playCount'> | null
   ): Promise<number> {
     if (totalTracks === 0) {
       return 0.5; // Neutral if no track info
     }
 
-    // Plays across the collection item's own name and every history album
-    // mapped to it
-    const namesFor = createCollectionNameResolver(
-      await loadAlbumMappings(this.mappingService)
-    );
-    const history: Pick<AlbumHistoryEntry, 'plays' | 'playCount'> = {
-      plays: [],
-      playCount: 0,
-    };
-    for (const name of namesFor(artist, album)) {
-      const entry = await this.historyStorage.getAlbumHistory(
-        name.artist,
-        name.album
-      );
-      if (entry) {
-        history.plays.push(...entry.plays);
-        history.playCount += entry.playCount;
-      }
-    }
+    // The album's plays (play identity): every version merged into it
+    const history: Pick<AlbumHistoryEntry, 'plays' | 'playCount'> =
+      knownHistory ??
+        (await this.playIdentity.readModel()).albumPlays(artist, album) ?? {
+          plays: [],
+          playCount: 0,
+        };
     if (history.playCount === 0) {
       return 0.5; // Neutral if never played
     }
@@ -339,78 +335,21 @@ export class AnalyticsService {
     collection: CollectionItem[],
     limit: number = 20
   ): Promise<MissingAlbum[]> {
-    const historyAlbums = await this.historyStorage.getAllAlbums();
-    if (historyAlbums.length === 0) {
-      return [];
-    }
-
-    // Merge history albums by album mapping first, so thresholds and ranking
-    // apply to the whole album. A mapping linked to a collection item means the
-    // album is owned; an unlinked one merges it into another history album.
-    const resolver = this.artistNameResolver;
-    const canonicalize = createAlbumCanonicalizer(
-      await loadAlbumMappings(this.mappingService),
-      resolver ? name => resolver.resolveArtist(name) : undefined
-    );
-
-    const merged = new Map<string, MissingAlbum>();
-    // Every name merged into each album, so ownership can match any of them
-    const mergedNames = new Map<
-      string,
-      Array<{ artist: string; album: string }>
-    >();
-    for (const { artist, album, history } of historyAlbums) {
-      const canonical = canonicalize(artist, album);
-      if (canonical.mapping && isCollectionLinked(canonical.mapping)) {
-        // Manual mapping to a collection item, skip this album (it's in collection)
-        continue;
-      }
-
-      const names = mergedNames.get(canonical.key) ?? [];
-      names.push({ artist, album });
-      if (canonical.mapping) {
-        names.push({ artist: canonical.artist, album: canonical.album });
-      }
-      mergedNames.set(canonical.key, names);
-
-      const existing = merged.get(canonical.key);
-      if (existing) {
-        existing.playCount += history.playCount;
-        existing.lastPlayed = Math.max(existing.lastPlayed, history.lastPlayed);
-      } else {
-        merged.set(canonical.key, {
-          artist: canonical.artist,
-          album: canonical.album,
-          playCount: history.playCount,
-          lastPlayed: history.lastPlayed,
-        });
-      }
-    }
-
-    // Find albums in history but not in collection
+    // Albums by play identity (versions merged by album mappings are one),
+    // missing when no record owns them: the same answer as the Owned badges
+    const model = await this.playIdentity.readModel(collection);
     const missing: MissingAlbum[] = [];
-    for (const [key, candidate] of merged) {
-      // Skip albums with too few plays
-      if (candidate.playCount < 3) {
-        continue;
-      }
-
-      // Owned if any name merged into this album matches a collection item
-      const names = mergedNames.get(key) ?? [candidate];
-      const foundMatch = collection.some(item =>
-        names.some(
-          name =>
-            this.artistsMatch(item.release.artist, name.artist) &&
-            this.albumsMatch(item.release.title, name.album)
-        )
-      );
-
-      if (!foundMatch) {
-        missing.push(candidate);
-      }
+    for (const album of model.albums()) {
+      // Skip albums with too few plays, and ones you own
+      if (album.playCount < 3 || album.collectionItem) continue;
+      missing.push({
+        artist: album.artist,
+        album: album.album,
+        playCount: album.playCount,
+        lastPlayed: album.lastPlayed,
+      });
     }
 
-    // Sort by play count and return top N
     return missing.sort((a, b) => b.playCount - a.playCount).slice(0, limit);
   }
 

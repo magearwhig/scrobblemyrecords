@@ -17,7 +17,23 @@ const p = identity.play(artist, album, track); // album null = unresolved play
 // ownership is p.collectionItem
 ```
 
-In `StatsService` use `this.createPlayIdentity(collection)`.
+**Both directions go through one shared `PlayIdentityService`**
+(`playIdentity/service.ts`; `server.ts` hands the same instance to every
+service, and `StatsService.getPlayIdentityService()` returns it):
+
+- *What does this play count as?* `await service.resolver(collection)`, then
+  `identity.play(...)` / `identity.album(...)`.
+- *Which plays does this record or album have?*
+  `const model = await service.readModel(collection)`, then
+  `model.recordPlays(item)` (an owned record: every play that resolves to it
+  or another copy), `model.albumPlays(artist, album)` (a merged album, or the
+  record's plays when it's owned), `model.discogsAlbumPlayList(artist, title)`
+  (an album named the Discogs way, e.g. a wishlist record: also tries
+  spelling-tolerant names and the artist's Last.fm name) or `model.albums()`.
+
+Both are cached until the history, a mapping, an alias or the collection
+changes. In `StatsService` use `this.createPlayIdentity(collection)` or
+`this.playIdentity.readModel(collection)`.
 
 Why: every page used to apply its own subset of track mappings, album
 mappings, artist aliases and collection matching, so the same play counted
@@ -49,13 +65,12 @@ Rules:
 - **Lint enforces it.** `eslint.config.js` rejects importing
   `createAlbumCanonicalizer`, `createCollectionNameResolver`,
   `createAlbumGroupNameResolver` or `createTrackMapper`, or calling
-  `fuzzyNormalizeKey`, outside the resolver. Files not moved yet are listed in
-  `PLAY_IDENTITY_NOT_YET_MOVED`; that list only shrinks. Never add a file to
-  it: extend the resolver instead.
+  `fuzzyNormalizeKey`, outside the resolver. The only exception
+  (`PLAY_IDENTITY_NOT_YET_MOVED`) is Suggested Album Merges, which has to see
+  names before they're merged. Never add a file to it: extend the resolver
+  instead.
 - **Collection items can repeat** in the cached collection; the resolver
   counts each record (by id) once. Don't count `collection.length` as records.
 
-Not every consumer has moved yet: the files in `PLAY_IDENTITY_NOT_YET_MOVED`
-start from an owned record or a named album and look up its plays, which the
-resolver doesn't answer yet. `.plan/play-identity-plan.md` lists them. When
-you touch one, move it onto the resolver rather than patching its own rules.
+Showing raw scrobbled names (mapping editors, the Unresolved tools, Memory
+Scrobble's typeahead) is fine: those don't count plays or decide ownership.

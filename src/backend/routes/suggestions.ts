@@ -7,10 +7,6 @@ import {
   SuggestionSettings,
   SyncSettings,
 } from '../../shared/types';
-import {
-  createAlbumCanonicalizer,
-  createCollectionNameResolver,
-} from '../../shared/utils/albumMapping';
 import { trackMatchKey } from '../../shared/utils/trackNormalization';
 import { AIPromptBuilder, AIPromptContext } from '../services/aiPromptBuilder';
 import { findAlbumMergeSuggestions } from '../services/albumMergeSuggestions';
@@ -799,137 +795,18 @@ export default function createSuggestionsRouter(
         const decodedArtist = decodeURIComponent(artist);
         const decodedAlbum = decodeURIComponent(album);
 
-        // Get ALL album mappings for this collection album
-        // For Various Artists albums, this returns mappings for each track artist
-        const albumMappings =
-          await mappingService.getAllAlbumMappingsForCollection(
-            decodedArtist,
-            decodedAlbum
-          );
+        // The record's plays by play identity: every play that resolves to
+        // it (album mappings, including one per track artist on a Various
+        // Artists record, track mappings, artist mappings, edition
+        // spellings), the same plays as its album page
+        const model = await statsService
+          .getPlayIdentityService()
+          .readModel(await loadOwnedCollection());
+        // Named the Discogs way: an owned record's plays, else the album's
+        // plays by name, spelling-tolerant and by the artist's Last.fm name
+        const found = model.discogsAlbumPlayList(decodedArtist, decodedAlbum);
 
-        // Collect all plays from all mappings
-        const allPlays: Array<{ timestamp: number; track?: string }> = [];
-        const allMatchedKeys: string[] = [];
-        let latestPlayed: number | null = null;
-        let bestMatchType: 'exact' | 'fuzzy' | 'none' = 'none';
-
-        // If we have mappings, query scrobble history for each one
-        if (albumMappings.length > 0) {
-          logger.debug(
-            `Album history: found ${albumMappings.length} mappings for "${decodedArtist}|${decodedAlbum}"`
-          );
-
-          for (const mapping of albumMappings) {
-            const searchArtist = mapping.historyArtist;
-            const searchAlbum = mapping.historyAlbum;
-
-            logger.debug(
-              `Album history: querying mapping "${searchArtist}|${searchAlbum}"`
-            );
-
-            // Try with fuzzy matching on the mapped names
-            let result = await historyStorage.getAlbumHistoryFuzzy(
-              searchArtist,
-              searchAlbum
-            );
-
-            // If not found, check if artist has a scrobble mapping and try that
-            if (result.matchType === 'none') {
-              const mappedArtist =
-                artistMappingService.getLastfmName(searchArtist);
-              if (mappedArtist !== searchArtist) {
-                logger.debug(
-                  `Album history: trying mapped artist "${mappedArtist}" for "${searchArtist}"`
-                );
-                result = await historyStorage.getAlbumHistoryFuzzy(
-                  mappedArtist,
-                  searchAlbum
-                );
-              }
-            }
-
-            if (result.matchType !== 'none' && result.entry) {
-              allPlays.push(...result.entry.plays);
-              if (result.matchedKeys) {
-                allMatchedKeys.push(...result.matchedKeys);
-              }
-              if (
-                result.entry.lastPlayed &&
-                (!latestPlayed || result.entry.lastPlayed > latestPlayed)
-              ) {
-                latestPlayed = result.entry.lastPlayed;
-              }
-              // Track best match type (exact > fuzzy)
-              if (result.matchType === 'exact') {
-                bestMatchType = 'exact';
-              } else if (
-                result.matchType === 'fuzzy' &&
-                bestMatchType !== 'exact'
-              ) {
-                bestMatchType = 'fuzzy';
-              }
-            }
-          }
-        }
-
-        // Also try direct search with the collection artist/album name
-        let directResult = await historyStorage.getAlbumHistoryFuzzy(
-          decodedArtist,
-          decodedAlbum
-        );
-
-        // If not found, check if artist has a scrobble mapping and try that
-        if (directResult.matchType === 'none') {
-          const mappedArtist =
-            artistMappingService.getLastfmName(decodedArtist);
-          if (mappedArtist !== decodedArtist) {
-            logger.debug(
-              `Album history: trying mapped artist "${mappedArtist}" for "${decodedArtist}"`
-            );
-            directResult = await historyStorage.getAlbumHistoryFuzzy(
-              mappedArtist,
-              decodedAlbum
-            );
-          }
-        }
-
-        if (directResult.matchType !== 'none' && directResult.entry) {
-          allPlays.push(...directResult.entry.plays);
-          if (directResult.matchedKeys) {
-            allMatchedKeys.push(...directResult.matchedKeys);
-          }
-          if (
-            directResult.entry.lastPlayed &&
-            (!latestPlayed || directResult.entry.lastPlayed > latestPlayed)
-          ) {
-            latestPlayed = directResult.entry.lastPlayed;
-          }
-          // Track best match type (exact > fuzzy)
-          if (directResult.matchType === 'exact') {
-            bestMatchType = 'exact';
-          } else if (
-            directResult.matchType === 'fuzzy' &&
-            bestMatchType !== 'exact'
-          ) {
-            bestMatchType = 'fuzzy';
-          }
-        }
-
-        // Deduplicate plays found by more than one search. Key on track as well
-        // as timestamp: consecutive tracks can share a scrobble timestamp.
-        const uniquePlays = new Map<
-          string,
-          { timestamp: number; track?: string }
-        >();
-        for (const play of allPlays) {
-          const key = `${play.timestamp}|${play.track ?? ''}`;
-          if (!uniquePlays.has(key)) {
-            uniquePlays.set(key, play);
-          }
-        }
-        const deduplicatedPlays = Array.from(uniquePlays.values());
-
-        if (deduplicatedPlays.length === 0) {
+        if (found.plays.length === 0) {
           return res.json({
             success: true,
             data: {
@@ -943,75 +820,28 @@ export default function createSuggestionsRouter(
           });
         }
 
-        // Create a combined result for track mapping
-        // Use deduplicated plays count to avoid double-counting when same plays
-        // are found through both mapping search and direct search
-        const combinedResult = {
-          entry: {
-            plays: deduplicatedPlays,
-            lastPlayed: latestPlayed,
-            playCount: deduplicatedPlays.length,
-          },
-          matchType: bestMatchType,
-          matchedKeys: [...new Set(allMatchedKeys)],
-        };
-
-        // Albums whose track mappings apply: the Discogs album asked for,
-        // every matched Last.fm history album, and the albums those are
-        // merged into by album mappings (where album page merges are saved)
-        const canonicalize = createAlbumCanonicalizer(
-          await loadAlbumMappings(mappingService)
-        );
-        const albumNames: Array<{ artist: string; album: string }> = [];
-        for (const name of [
-          { artist: decodedArtist, album: decodedAlbum },
-          ...combinedResult.matchedKeys.map(key => {
-            // Album names may contain "|"
-            const [historyArtist, ...rest] = key.split('|');
-            return { artist: historyArtist, album: rest.join('|') };
-          }),
-        ]) {
-          albumNames.push(name);
-          const canonical = canonicalize(name.artist, name.album);
-          if (canonical.mapping) {
-            albumNames.push({
-              artist: canonical.artist,
-              album: canonical.album,
-            });
-          }
-        }
-        const albumTrackMappings = (
-          await Promise.all(
-            albumNames.map(name =>
-              trackMappingService.getMappingsForAlbum(name.artist, name.album)
-            )
+        // Tracks as they count (after track mappings)
+        const mappedPlays = found.plays.map(play => ({
+          timestamp: play.timestamp,
+          ...(play.track && { track: play.track }),
+        }));
+        const matchedKeys = Array.from(
+          new Set(
+            found.plays
+              .map(play => play.sourceKey)
+              .filter((key): key is string => key !== null)
           )
-        ).flat();
-        // First mapping found per scrobbled track key, in albumNames order
-        const mappedTrackByKey = new Map<string, string>();
-        for (const mapping of albumTrackMappings) {
-          const key = trackMatchKey(mapping.historyTrack);
-          if (!mappedTrackByKey.has(key)) {
-            mappedTrackByKey.set(key, mapping.cacheTrack);
-          }
-        }
-
-        // Apply track mappings so tracks show and count under the track
-        // they are mapped to
-        const mappedPlays = combinedResult.entry.plays.map(play => {
-          if (!play.track) return play;
-          const mappedTrack = mappedTrackByKey.get(trackMatchKey(play.track));
-          return mappedTrack ? { ...play, track: mappedTrack } : play;
-        });
+        );
+        const { matchType } = found;
+        const lastPlayed = Math.max(...found.plays.map(p => p.timestamp));
 
         // Per-track counts over every play (the plays list is cut to 50),
-        // keyed by trackMatchKey. trackAliases leads a tracklist title that
-        // a track mapping counts as another track (e.g. a typo) to its key.
+        // keyed by trackMatchKey
         const trackStats = new Map<
           string,
           { count: number; lastPlayed: number }
         >();
-        for (const play of mappedPlays) {
+        for (const play of found.plays) {
           if (!play.track) continue;
           const key = trackMatchKey(play.track);
           const stat = trackStats.get(key) ?? { count: 0, lastPlayed: 0 };
@@ -1019,10 +849,39 @@ export default function createSuggestionsRouter(
           stat.lastPlayed = Math.max(stat.lastPlayed, play.timestamp);
           trackStats.set(key, stat);
         }
+
+        // trackAliases leads a tracklist title that a track mapping counts
+        // as another track (e.g. a typo) to its key: the mappings saved
+        // under the album asked for and every album its plays are on
+        const albumNames = [
+          { artist: decodedArtist, album: decodedAlbum },
+          ...found.plays.flatMap(play =>
+            play.album === null
+              ? []
+              : [{ artist: play.artist, album: play.album }]
+          ),
+        ];
         const trackAliases = new Map<string, string>();
-        for (const [key, mappedTrack] of mappedTrackByKey) {
-          trackAliases.set(key, trackMatchKey(mappedTrack));
+        const seenAlbums = new Set<string>();
+        for (const name of albumNames) {
+          const nameKey = `${name.artist}\u0000${name.album}`;
+          if (seenAlbums.has(nameKey)) continue;
+          seenAlbums.add(nameKey);
+          for (const mapping of model.identity.trackMappingsFor(
+            name.artist,
+            name.album
+          )) {
+            const key = trackMatchKey(mapping.historyTrack);
+            if (!trackAliases.has(key)) {
+              trackAliases.set(key, trackMatchKey(mapping.cacheTrack));
+            }
+          }
         }
+        const combinedResult = {
+          entry: { lastPlayed, playCount: found.plays.length },
+          matchType,
+          matchedKeys,
+        };
 
         res.json({
           success: true,
@@ -1486,36 +1345,17 @@ export default function createSuggestionsRouter(
       const candidates = AIPromptBuilder.buildCandidates(context);
       const candidateIds = new Set(candidates.map(c => c.id));
 
-      // Build avoid ID set (recently played + recent AI suggestions)
-      // Use mapping service + fuzzy matching to handle Discogs↔Last.fm name differences
-      const collectionByFuzzyKey = new Map<string, CollectionItem>();
-      const namesFor = createCollectionNameResolver(
-        await loadAlbumMappings(mappingService)
-      );
-      for (const item of allItems) {
-        for (const name of namesFor(item.release.artist, item.release.title)) {
-          collectionByFuzzyKey.set(
-            historyStorage.fuzzyNormalizeKey(name.artist, name.album),
-            item
-          );
-        }
-      }
-
+      // Build avoid ID set (recently played + recent AI suggestions): the
+      // owned record each album is, by play identity
+      const identity = await statsService
+        .getPlayIdentityService()
+        .resolver(allItems);
       const avoidIds = new Set<number>();
-      for (const recent of recentlyPlayed) {
-        const fuzzyKey = historyStorage.fuzzyNormalizeKey(
-          recent.artist,
-          recent.album
-        );
-        const match = collectionByFuzzyKey.get(fuzzyKey);
-        if (match) avoidIds.add(match.id);
-      }
-      for (const aiSugg of recentAISuggestionsList) {
-        const fuzzyKey = historyStorage.fuzzyNormalizeKey(
-          aiSugg.artist,
-          aiSugg.album
-        );
-        const match = collectionByFuzzyKey.get(fuzzyKey);
+      for (const { artist, album } of [
+        ...recentlyPlayed,
+        ...recentAISuggestionsList,
+      ]) {
+        const match = identity.album(artist, album).collectionItem;
         if (match) avoidIds.add(match.id);
       }
 

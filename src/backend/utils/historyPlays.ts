@@ -407,3 +407,34 @@ export function findExclusionCandidates(
   }
   return candidates.sort((a, b) => b.plays - a.plays);
 }
+
+/** One stored history entry: an album entry, or an artist's unresolved plays. */
+export interface ListeningEntry {
+  /** Normalized scrobbled artist */
+  artist: string;
+  /** Normalized album, or null for unresolved plays */
+  album: string | null;
+  entry: AlbumHistoryEntry;
+}
+
+/**
+ * Every history entry that holds listening events: album entries plus
+ * unresolved (albumless) entries. For per-entry loops in listening-level
+ * stats; album-level stats keep iterating `index.albums`.
+ */
+export function listeningEntries(
+  index: Pick<ScrobbleHistoryIndex, 'albums' | 'unresolved'>
+): ListeningEntry[] {
+  const entries: ListeningEntry[] = [];
+  for (const [key, entry] of Object.entries(index.albums)) {
+    entries.push({
+      artist: artistFromAlbumKey(key),
+      album: albumFromAlbumKey(key),
+      entry,
+    });
+  }
+  for (const [artist, entry] of Object.entries(index.unresolved ?? {})) {
+    entries.push({ artist, album: null, entry });
+  }
+  return entries;
+}

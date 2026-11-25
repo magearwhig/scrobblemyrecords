@@ -6,12 +6,11 @@ import {
   SuggestionResult,
   SuggestionSettings,
 } from '../../shared/types';
-import { createCollectionNameResolver } from '../../shared/utils/albumMapping';
 import { createLogger } from '../utils/logger';
 
 import { AnalyticsService } from './analyticsService';
 import { MappingService } from './mappingService';
-import { loadAlbumMappings, lookupMergedHistory } from './mergedAlbumHistory';
+import { PlayIdentityService } from './playIdentity/service';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 
 /**
@@ -38,6 +37,8 @@ export class SuggestionService {
   private analyticsService: AnalyticsService;
   private historyStorage: ScrobbleHistoryStorage;
   private mappingService: MappingService | null = null;
+  /** Finds a record's plays (play identity); replaced by the shared one */
+  private playIdentity: PlayIdentityService;
   private logger = createLogger('SuggestionService');
 
   // Track recently suggested albums to avoid repetition
@@ -55,6 +56,7 @@ export class SuggestionService {
   ) {
     this.analyticsService = analyticsService;
     this.historyStorage = historyStorage;
+    this.playIdentity = new PlayIdentityService(historyStorage);
   }
 
   /**
@@ -63,6 +65,15 @@ export class SuggestionService {
    */
   setMappingService(service: MappingService): void {
     this.mappingService = service;
+    this.playIdentity.setMappingService(service);
+  }
+
+  /**
+   * The shared play identity service, so a record's plays here match the
+   * rest of the app (track mappings, aliases); see AGENTS.md
+   */
+  setPlayIdentityService(service: PlayIdentityService): void {
+    this.playIdentity = service;
   }
 
   /**
@@ -89,15 +100,10 @@ export class SuggestionService {
     if (prefetchedHistory !== undefined) {
       historyResult = prefetchedHistory;
     } else {
-      // Every name this collection item's plays may be recorded under
-      // (its own title plus mapped history albums). Fuzzy matching lets
-      // "Shame Shame" match "Shame Shame (Deluxe Edition)".
-      const namesFor = createCollectionNameResolver(
-        await loadAlbumMappings(this.mappingService)
-      );
-      [historyResult] = await lookupMergedHistory(this.historyStorage, [
-        namesFor(artist, title),
-      ]);
+      // Every play that resolves to this record (play identity), including
+      // other versions such as "Shame Shame (Deluxe Edition)"
+      const model = await this.playIdentity.readModel([album]);
+      historyResult = model.recordPlays(album);
     }
 
     // Calculate recency gap (days since last played)
@@ -145,7 +151,8 @@ export class SuggestionService {
     const albumCompleteness = await this.analyticsService.getAlbumCompleteness(
       artist,
       title,
-      trackCount
+      trackCount,
+      historyResult.entry
     );
 
     return {
@@ -302,17 +309,9 @@ export class SuggestionService {
 
     const precomputed = { timeOfDayScore };
 
-    // Pre-fetch history for all collection items in a single batch lookup,
-    // across every name mapped to each item
-    const namesFor = createCollectionNameResolver(
-      await loadAlbumMappings(this.mappingService)
-    );
-    const prefetched = await lookupMergedHistory(
-      this.historyStorage,
-      collection.map(album =>
-        namesFor(album.release.artist, album.release.title)
-      )
-    );
+    // Every record's plays (play identity), resolved once for all of them
+    const model = await this.playIdentity.readModel(collection);
+    const prefetched = collection.map(album => model.recordPlays(album));
 
     // Score all albums
     const scoredAlbums: SuggestionResult[] = [];

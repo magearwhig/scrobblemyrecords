@@ -6,7 +6,7 @@ import {
 } from '../../../src/backend/services/crateAlbumTable';
 import { evaluateCrate } from '../../../src/backend/services/crateEvaluator';
 import { DiscogsService } from '../../../src/backend/services/discogsService';
-import * as mergedAlbumHistory from '../../../src/backend/services/mergedAlbumHistory';
+import { PlayIdentityService } from '../../../src/backend/services/playIdentity/service';
 import { ScrobbleHistoryStorage } from '../../../src/backend/services/scrobbleHistoryStorage';
 import { FileStorage } from '../../../src/backend/utils/fileStorage';
 import {
@@ -211,7 +211,8 @@ describe('crateAlbumTable', () => {
   let lookupSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    lookupSpy = jest.spyOn(mergedAlbumHistory, 'lookupMergedHistory');
+    // One read model (all plays resolved once) per table build
+    lookupSpy = jest.spyOn(PlayIdentityService.prototype, 'readModel');
   });
 
   afterEach(() => {
@@ -418,11 +419,10 @@ describe('crateAlbumTable', () => {
         matchedKeys: [],
       });
       expect(table.albums[0].scrobbleRank).toBeUndefined();
-      expect(lookupSpy).not.toHaveBeenCalled();
     });
 
-    it('makes one lookupMergedHistory and one batchLookup call per build', async () => {
-      const { builder, history } = setup({
+    it('resolves the plays once per build, for the whole collection', async () => {
+      const { builder } = setup({
         items: [
           item(1, 'A', 'One'),
           item(2, 'B', 'Two'),
@@ -430,12 +430,16 @@ describe('crateAlbumTable', () => {
         ],
         index: historyIndex({ 'a|one': [1] }),
       });
-      const batchSpy = jest.spyOn(history, 'batchLookup');
-      await builder.getTable(USER);
+      const table = await builder.getTable(USER);
       expect(lookupSpy).toHaveBeenCalledTimes(1);
-      expect(batchSpy).toHaveBeenCalledTimes(1);
-      // Full plays, not counts only
-      expect(lookupSpy.mock.calls[0][2]).toBeUndefined();
+      expect(lookupSpy.mock.calls[0][0]).toHaveLength(3);
+      expect(
+        table.albums.map(a => [a.album, a.listening.scrobbleCount])
+      ).toEqual([
+        ['One', 1],
+        ['Two', 0],
+        ['Three', 0],
+      ]);
     });
 
     it('three concurrent getTable calls share one build', async () => {
@@ -583,6 +587,27 @@ describe('crateAlbumTable', () => {
       });
       expect(result.items).toHaveLength(3);
       expect(result.mixed).toBe(true);
+    });
+
+    it('ignores pages left over past the count page 1 gives', async () => {
+      const fs = new MemoryFileStorage();
+      writePages(fs, items, { perPage: 2 });
+      // From an older, longer sync
+      fs.put(`collections/${USER}-page-4.json`, {
+        data: [items[0], items[1]],
+        pagination: { page: 4, pages: 5, items: 9 },
+      });
+      fs.put(`collections/${USER}-page-5.json`, {
+        data: [items[2]],
+        pagination: { page: 5, pages: 5, items: 9 },
+      });
+      const result = await snapshot(fs);
+      expect(result.items).toHaveLength(5);
+      expect(result.collection).toEqual({
+        complete: true,
+        pagesRead: 3,
+        pagesExpected: 3,
+      });
     });
 
     it('is incomplete when pages disagree on pagination', async () => {

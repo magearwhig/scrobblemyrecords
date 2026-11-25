@@ -399,3 +399,120 @@ describe('linked ownership', () => {
     );
   });
 });
+
+describe('record keys and collaboration suffixes', () => {
+  const base = {
+    mapTrack: trackMapperFrom([]),
+    resolveArtist: (name: string) => name.toLowerCase(),
+    fuzzyKey: (artist: string, album: string) =>
+      `${artist.toLowerCase()}|${album.toLowerCase()}`,
+  };
+
+  it("keeps two records apart when one's name is mapped to the other", () => {
+    const record = item(1, 'Band', 'Record');
+    const box = item(2, 'Band', 'Record Deluxe Box');
+    const resolve = createPlayIdentityResolver({
+      ...base,
+      albumMappings: [
+        albumMapping('band', 'record', 'Band', 'Record Deluxe Box', 2),
+      ],
+      collection: [record, box],
+    });
+
+    expect(resolve.recordKey(record)).not.toBe(resolve.recordKey(box));
+    expect(resolve.play('band', 'record', 'Song').collectionItem).toBe(box);
+  });
+
+  it('matches a collaboration whose Discogs names all carry number suffixes', () => {
+    const split = item(1, 'A (2), B (3)', 'Split');
+    const resolve = createPlayIdentityResolver({
+      ...base,
+      albumMappings: [],
+      collection: [split],
+    });
+
+    expect(resolve.play('a, b', 'split', 'Song').collectionItem).toBe(split);
+  });
+});
+
+describe('track mappings across album versions', () => {
+  it('a merge saved under one version applies to plays on every version', () => {
+    const merge = {
+      historyArtist: 'the format',
+      historyAlbum: 'dog problems',
+      historyTrack: 'time bomb (live)',
+      cacheArtist: 'the format',
+      cacheAlbum: 'dog problems',
+      cacheTrack: 'Time Bomb',
+      createdAt: 1,
+    };
+    const resolve = resolverWith({
+      mapTrack: trackMapperFrom([merge]),
+      trackMappings: [merge],
+    });
+
+    // Scrobbled on the bonus-track version; the merge was saved on the plain one
+    const played = resolve.play(
+      'The Format',
+      'Dog Problems (Bonus Track Version)',
+      'Time Bomb (Live)'
+    );
+
+    expect(played.track).toBe('Time Bomb');
+    expect(played.trackKey).toBe(
+      resolve.play('The Format', 'Dog Problems', 'Time Bomb').trackKey
+    );
+  });
+});
+
+describe('collaboration credits', () => {
+  it('a record credited to several artists owns the same album under one of them', () => {
+    const garbology = item(1, 'Aesop Rock, Blockhead', 'Garbology');
+    const resolve = createPlayIdentityResolver({
+      albumMappings: [],
+      mapTrack: trackMapperFrom([]),
+      resolveArtist: name => name.toLowerCase(),
+      collection: [garbology],
+      fuzzyKey: (artist, album) =>
+        `${artist.toLowerCase()}|${album.toLowerCase()}`,
+    });
+
+    expect(resolve.play('Aesop Rock', 'Garbology', 'X').collectionItem).toBe(
+      garbology
+    );
+    expect(resolve.play('Blockhead', 'Garbology', 'X').collectionItem).toBe(
+      garbology
+    );
+    // Another title by one of them is not this record
+    expect(
+      resolve.play('Aesop Rock', 'Skelethon', 'X').collectionItem
+    ).toBeUndefined();
+  });
+});
+
+describe('movesPlaysTo with merges saved on another version', () => {
+  it('sees a play another version of the album sends to the target', () => {
+    // A/Version merged into B/Base; a track mapping saved on A/Version moves
+    // the song to C. B/Base's play of the song therefore counts as C.
+    const move = {
+      historyArtist: 'a',
+      historyAlbum: 'version',
+      historyTrack: 'song',
+      cacheArtist: 'c',
+      cacheAlbum: 'elsewhere',
+      cacheTrack: 'Song',
+      createdAt: 1,
+    };
+    const resolve = createPlayIdentityResolver({
+      albumMappings: [albumMapping('a', 'version', 'b', 'base', 0)],
+      mapTrack: trackMapperFrom([move]),
+      trackMappings: [move],
+      resolveArtist: name => name.toLowerCase(),
+      collection: [],
+      fuzzyKey: (artist, album) => `${artist}|${album}`,
+    });
+
+    expect(resolve.play('b', 'base', 'song').artist).toBe('c');
+    expect(resolve.movesPlaysTo(name => name === 'c')('b', 'base')).toBe(true);
+  });
+});

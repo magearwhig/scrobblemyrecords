@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 
 import { artistMappingService } from '../services/artistMappingService';
 import { ArtistNameResolver } from '../services/artistNameResolver';
+import { getAllCachedCollectionItems } from '../utils/collectionCache';
 import { FileStorage } from '../utils/fileStorage';
 import { logger } from '../utils/logger';
 
@@ -320,28 +321,13 @@ export function createArtistMappingRouter(
       const artistSet = new Set<string>();
 
       try {
-        const collectionFiles = await fileStorage.listFiles('collections');
-        // Filter for paginated collection files: {username}-page-{n}.json
-        const pageFiles = collectionFiles.filter(
-          file => file.startsWith(`${username}-page-`) && file.endsWith('.json')
-        );
-
-        for (const pageFile of pageFiles) {
-          try {
-            const page = await fileStorage.readJSON<{
-              success: boolean;
-              data: Array<{ release: { artist: string } }>;
-            }>(`collections/${pageFile}`);
-
-            if (page?.data) {
-              page.data.forEach(item => {
-                if (item.release?.artist) {
-                  artistSet.add(item.release.artist);
-                }
-              });
-            }
-          } catch {
-            // Skip invalid page files
+        // The pages the last sync wrote (not ones left over from an older one)
+        for (const item of await getAllCachedCollectionItems(
+          username,
+          fileStorage
+        )) {
+          if (item.release?.artist) {
+            artistSet.add(item.release.artist);
           }
         }
       } catch {

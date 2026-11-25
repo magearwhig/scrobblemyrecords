@@ -227,8 +227,8 @@ describe('StatsService.getAlbumListeningArc', () => {
     });
   });
 
-  describe('with multiple fuzzy-matching keys', () => {
-    it('should aggregate plays from all matching keys', async () => {
+  describe('with an edition variant', () => {
+    it('counts it with the record when owned, apart when not (as Top Albums)', async () => {
       // Arrange — both exact and edition variant should match
       const index: ScrobbleHistoryIndex = {
         lastSyncTimestamp: JAN_2023,
@@ -249,15 +249,36 @@ describe('StatsService.getAlbumListeningArc', () => {
       };
       mockHistoryStorage.getIndex = jest.fn().mockResolvedValue(index);
 
+      const owned = {
+        id: 1,
+        date_added: '',
+        release: {
+          id: 1,
+          title: 'OK Computer',
+          artist: 'Radiohead',
+          format: [],
+          label: [],
+          resource_url: '',
+        },
+      };
+
       // Act
-      const result = await service.getAlbumListeningArc(
+      const ownedArc = await service.getAlbumListeningArc(
+        'Radiohead',
+        'OK Computer',
+        [owned]
+      );
+      const unownedArc = await service.getAlbumListeningArc(
         'Radiohead',
         'OK Computer'
       );
 
-      // Assert — 3 total plays
-      const totalPlays = result.reduce((s, b) => s + b.playCount, 0);
-      expect(totalPlays).toBe(3);
+      // Assert — owned: the edition's plays resolve to the record, 3 plays.
+      // Not owned and not mapped: two albums, as in Top Albums, 2 plays.
+      const total = (arc: typeof ownedArc) =>
+        arc.reduce((sum, b) => sum + b.playCount, 0);
+      expect(total(ownedArc)).toBe(3);
+      expect(total(unownedArc)).toBe(2);
     });
   });
 });

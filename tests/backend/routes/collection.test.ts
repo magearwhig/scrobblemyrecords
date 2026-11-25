@@ -166,6 +166,37 @@ describe('Collection Routes', () => {
   });
 
   describe('GET /:username/all', () => {
+    it('reads only the pages the last sync wrote, not ones left over from an older sync', async () => {
+      const page = (id: number, pages: number) => ({
+        timestamp: Date.now(),
+        pagination: { page: 1, pages, per_page: 50, items: pages },
+        data: [
+          {
+            id,
+            release: { id, title: `Album ${id}`, artist: 'Artist' },
+            date_added: '2023-01-01',
+          },
+        ],
+      });
+      const files: Record<string, unknown> = {
+        'collections/testuser-page-1.json': page(1, 2),
+        'collections/testuser-page-2.json': page(2, 2),
+        // Left over from an older, longer sync: a record since sold
+        'collections/testuser-page-3.json': page(3, 3),
+      };
+      mockFileStorage.readJSON.mockImplementation(
+        async (path: string) => (files[path] ?? null) as never
+      );
+
+      const response = await request(app)
+        .get('/api/v1/collection/testuser/all')
+        .expect(200);
+
+      expect(response.body.data.map((i: { id: number }) => i.id)).toEqual([
+        1, 2,
+      ]);
+    });
+
     it('should get entire collection from cached pages', async () => {
       const mockCachedPage1 = {
         timestamp: Date.now(),

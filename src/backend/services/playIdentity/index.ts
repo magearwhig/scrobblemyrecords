@@ -9,6 +9,7 @@ import {
   createCollectionNameResolver,
   isCollectionLinked,
   stripDiscogsSuffix,
+  stripDiscogsSuffixes,
 } from '../../../shared/utils/albumMapping';
 import { trackMatchKey } from '../../../shared/utils/trackNormalization';
 import { loadAlbumMappings } from '../mergedAlbumHistory';
@@ -65,6 +66,11 @@ export interface PlayIdentityInputs {
   collection: CollectionItem[];
   /** Spelling-tolerant artist|album key (ScrobbleHistoryStorage.fuzzyNormalizeKey) */
   fuzzyKey: (artist: string, album: string) => string;
+  /**
+   * The Last.fm name for a Discogs artist (artist mappings), so a record is
+   * also found under the name its plays are scrobbled with
+   */
+  lastfmArtistOf?: (discogsArtist: string) => string;
 }
 
 export interface PlayIdentityResolver {
@@ -86,6 +92,26 @@ export interface PlayIdentityResolver {
    * (e.g. "Aesop Rock, Blockhead" for Aesop Rock's Garbology)
    */
   ownedByArtist(artist: string): CollectionItem[];
+  /**
+   * Groups copies of one album (same merged album), so a play owned by one
+   * copy counts for all; see PlayIdentityService.readModel
+   */
+  recordKey(item: CollectionItem): string;
+  /**
+   * The track mappings saved under any version of an album (merged album),
+   * e.g. to line a tracklist's titles up with the tracks they count as
+   */
+  trackMappingsFor(artist: string, album: string): TrackMapping[];
+  /**
+   * Whether a scrobbled album name is the record's own name or one an album
+   * mapping links to it (an exact match, not a spelling-tolerant one)
+   */
+  isOwnName(
+    item: CollectionItem,
+    artist: string,
+    album: string,
+    ownKey?: string
+  ): boolean;
 }
 
 /** Prefix for keys of unresolved plays, so none equals a real album's */
@@ -116,6 +142,20 @@ export function createPlayIdentityResolver(
   });
   const canonicalize = createAlbumCanonicalizer(albumMappings, resolveArtist);
 
+  // A record's artist as credited, without Discogs suffixes on every artist
+  // of a collaboration ("A (2), B (3)"), and as its plays are scrobbled
+  // (artist mappings)
+  const recordArtists = (item: CollectionItem): Set<string> => {
+    const credited = item.release.artist;
+    const plain = stripDiscogsSuffixes(credited);
+    const names = new Set([credited, plain]);
+    if (inputs.lastfmArtistOf) {
+      names.add(inputs.lastfmArtistOf(credited));
+      names.add(inputs.lastfmArtistOf(plain));
+    }
+    return names;
+  };
+
   const itemsById = new Map<number, CollectionItem>();
   for (const item of collection) itemsById.set(item.id, item);
 
@@ -132,8 +172,24 @@ export function createPlayIdentityResolver(
     if (!byFuzzyKey.has(fuzzy)) byFuzzyKey.set(fuzzy, item);
   };
   for (const item of collection) {
-    index(item.release.artist, item.release.title, item);
+    for (const artist of recordArtists(item)) {
+      index(artist, item.release.title, item);
+    }
   }
+  // Lowest tier: a record credited to several artists ("Aesop Rock,
+  // Blockhead") under each of them, for the same title spelled the same way
+  const byCreditKey = new Map<string, CollectionItem>();
+  for (const item of collection) {
+    const parts = stripDiscogsSuffixes(item.release.artist)
+      .split(/\s*(?:,|&|\/)\s*/)
+      .filter(Boolean);
+    if (parts.length < 2) continue;
+    for (const part of parts) {
+      const key = fuzzyKey(part, item.release.title);
+      if (!byCreditKey.has(key)) byCreditKey.set(key, item);
+    }
+  }
+
   const namesFor = createCollectionNameResolver(albumMappings);
   for (const item of collection) {
     const [, ...linked] = namesFor(item.release.artist, item.release.title);
@@ -159,8 +215,10 @@ export function createPlayIdentityResolver(
   // spelling, including Discogs "(2)" suffixes) shares one owner
   const byAlbumKey = new Map<string, CollectionItem>();
   for (const item of collection) {
-    const { key } = canonicalize(item.release.artist, item.release.title);
-    if (!byAlbumKey.has(key)) byAlbumKey.set(key, item);
+    for (const artist of recordArtists(item)) {
+      const { key } = canonicalize(artist, item.release.title);
+      if (!byAlbumKey.has(key)) byAlbumKey.set(key, item);
+    }
   }
 
   const ownedRecord = (
@@ -177,7 +235,8 @@ export function createPlayIdentityResolver(
       byExactKey.get(albumNameKey(mergedArtist, mergedAlbum)) ??
       byAlbumKey.get(albumKey) ??
       byFuzzyKey.get(fuzzyKey(artist, album)) ??
-      byFuzzyKey.get(fuzzyKey(mergedArtist, mergedAlbum))
+      byFuzzyKey.get(fuzzyKey(mergedArtist, mergedAlbum)) ??
+      byCreditKey.get(fuzzyKey(artist, album))
     );
   };
 
@@ -212,6 +271,37 @@ export function createPlayIdentityResolver(
     return identity;
   };
 
+  // Track mappings by merged album: one saved under any version of an album
+  // (e.g. an album page merge) applies to plays on every version
+  const byAlbumGroup = new Map<string, TrackMapping>();
+  for (const m of inputs.trackMappings ?? []) {
+    const key = `${canonicalize(m.historyArtist, m.historyAlbum).key}|${trackMatchKey(m.historyTrack)}`;
+    if (!byAlbumGroup.has(key)) byAlbumGroup.set(key, m);
+  }
+  const mapByAlbumGroup = (
+    target: ReturnType<TrackMapper>,
+    artist: string,
+    albumName: string | null,
+    track: string
+  ): ReturnType<TrackMapper> => {
+    if (target.mapping || albumName === null || byAlbumGroup.size === 0) {
+      return target;
+    }
+    const groupKey = canonicalize(artist, albumName).key;
+    const m = byAlbumGroup.get(`${groupKey}|${trackMatchKey(track)}`);
+    if (!m) return target;
+    const sameAlbum =
+      canonicalize(m.cacheArtist, m.cacheAlbum).key === groupKey;
+    return sameAlbum
+      ? { artist, album: albumName, track: m.cacheTrack, mapping: m }
+      : {
+          artist: m.cacheArtist,
+          album: m.cacheAlbum,
+          track: m.cacheTrack,
+          mapping: m,
+        };
+  };
+
   const playCache = new Map<string, PlayIdentity>();
   const play = (
     artist: string,
@@ -222,7 +312,12 @@ export function createPlayIdentityResolver(
     const cached = playCache.get(cacheKey);
     if (cached) return cached;
 
-    const target = mapTrack(artist, albumName, track);
+    const target = mapByAlbumGroup(
+      mapTrack(artist, albumName, track),
+      artist,
+      albumName,
+      track
+    );
     const artistKey = resolveArtist(target.artist).toLowerCase();
     let identity: PlayIdentity;
     if (target.album === null) {
@@ -279,10 +374,13 @@ export function createPlayIdentityResolver(
   // scrobbled album and then the album an album mapping merges it into
   const plainCanonicalize = createAlbumCanonicalizer(albumMappings);
   const movesPlaysTo = (isTarget: (artist: string) => boolean) => {
-    const sources = new Set(
-      (inputs.trackMappings ?? [])
-        .filter(m => isTarget(m.cacheArtist) && !isTarget(m.historyArtist))
-        .map(m => trackMatchKey(m.historyArtist))
+    const moving = (inputs.trackMappings ?? []).filter(
+      m => isTarget(m.cacheArtist) && !isTarget(m.historyArtist)
+    );
+    const sources = new Set(moving.map(m => trackMatchKey(m.historyArtist)));
+    // A mapping saved on one version applies to every version of the album
+    const sourceAlbums = new Set(
+      moving.map(m => canonicalize(m.historyArtist, m.historyAlbum).key)
     );
     return (artist: string, albumName: string | null) =>
       albumName !== null &&
@@ -290,10 +388,47 @@ export function createPlayIdentityResolver(
       (sources.has(trackMatchKey(artist)) ||
         sources.has(
           trackMatchKey(plainCanonicalize(artist, albumName).artist)
-        ));
+        ) ||
+        sourceAlbums.has(canonicalize(artist, albumName).key));
   };
 
-  return { play, album, movesPlaysTo, ownedByArtist };
+  // A record's own name only: a mapping from that name to another record
+  // must not make the two one record
+  const ownCanonicalize = createAlbumCanonicalizer([], resolveArtist);
+  const recordKey = (item: CollectionItem) =>
+    ownCanonicalize(
+      stripDiscogsSuffixes(item.release.artist),
+      item.release.title
+    ).key;
+  const isOwnName = (
+    item: CollectionItem,
+    artist: string,
+    albumName: string,
+    ownKey = albumNameKey(item.release.artist, item.release.title)
+  ) => {
+    const key = albumNameKey(artist, albumName);
+    return key === ownKey || linkedBySource.get(key)?.id === item.id;
+  };
+
+  const mappingsByAlbumGroup = new Map<string, TrackMapping[]>();
+  for (const m of inputs.trackMappings ?? []) {
+    const { key } = canonicalize(m.historyArtist, m.historyAlbum);
+    const list = mappingsByAlbumGroup.get(key) ?? [];
+    list.push(m);
+    mappingsByAlbumGroup.set(key, list);
+  }
+  const trackMappingsFor = (artist: string, albumName: string) =>
+    mappingsByAlbumGroup.get(canonicalize(artist, albumName).key) ?? [];
+
+  return {
+    play,
+    album,
+    movesPlaysTo,
+    ownedByArtist,
+    recordKey,
+    isOwnName,
+    trackMappingsFor,
+  };
 }
 
 /**
@@ -310,6 +445,7 @@ export async function buildPlayIdentityResolver(deps: {
   resolveArtist: (artist: string) => string;
   historyStorage: Pick<ScrobbleHistoryStorage, 'fuzzyNormalizeKey'>;
   collection?: CollectionItem[];
+  lastfmArtistOf?: (discogsArtist: string) => string;
 }): Promise<PlayIdentityResolver> {
   const albumMappings = await loadAlbumMappings(deps.mappingService);
   return createPlayIdentityResolver({
@@ -319,6 +455,7 @@ export async function buildPlayIdentityResolver(deps: {
       (await deps.trackMappingService?.getAllTrackMappings?.()) ?? [],
     resolveArtist: deps.resolveArtist,
     collection: deps.collection ?? [],
+    lastfmArtistOf: deps.lastfmArtistOf,
     fuzzyKey: (artist, album) => {
       const key = deps.historyStorage.fuzzyNormalizeKey?.(artist, album);
       return typeof key === 'string' ? key : albumNameKey(artist, album);

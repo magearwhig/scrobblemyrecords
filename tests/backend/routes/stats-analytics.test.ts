@@ -227,7 +227,8 @@ describe('Stats Analytics Routes', () => {
       expect(response.body.data).toEqual(mockArcData);
       expect(mockStatsService.getAlbumListeningArc).toHaveBeenCalledWith(
         'Radiohead',
-        'OK Computer'
+        'OK Computer',
+        expect.any(Array)
       );
     });
 

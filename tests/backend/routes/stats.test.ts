@@ -1139,156 +1139,42 @@ describe('Stats Routes', () => {
       expect(response.body.error).toContain('Scrobble history not available');
     });
 
-    it('should return play counts for albums with exact matches', async () => {
-      // Arrange
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: {
+    it('returns counts from the shared play identity service', async () => {
+      const discogsAlbumPlays = jest
+        .fn()
+        .mockReturnValue({ playCount: 7, lastPlayed: 1, matchType: 'exact' });
+      mockStatsService.getPlayIdentityService = jest.fn().mockReturnValue({
+        readModel: jest.fn().mockResolvedValue({ discogsAlbumPlays }),
+      });
+
+      const response = await request(appWithHistory)
+        .post('/api/v1/stats/album-play-counts')
+        .send({ albums: [{ artist: 'Radiohead', title: 'Kid A' }] });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.results).toEqual([
+        {
           artist: 'Radiohead',
-          album: 'Kid A',
-          playCount: 42,
-          lastPlayed: 1704067200,
-        },
-        matchType: 'exact',
-      });
-
-      // Act
-      const response = await request(appWithHistory)
-        .post('/api/v1/stats/album-play-counts')
-        .send({
-          albums: [{ artist: 'Radiohead', title: 'Kid A' }],
-        });
-
-      // Assert
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.results).toHaveLength(1);
-      expect(response.body.data.results[0]).toEqual({
-        artist: 'Radiohead',
-        title: 'Kid A',
-        playCount: 42,
-        lastPlayed: 1704067200,
-        matchType: 'exact',
-      });
-    });
-
-    it('should return play counts for albums with fuzzy matches', async () => {
-      // Arrange
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: {
-          artist: 'Pink Floyd',
-          album: 'The Dark Side of the Moon',
-          playCount: 100,
-          lastPlayed: 1706745600,
-        },
-        matchType: 'fuzzy',
-      });
-
-      // Act
-      const response = await request(appWithHistory)
-        .post('/api/v1/stats/album-play-counts')
-        .send({
-          albums: [{ artist: 'Pink Floyd', title: 'Dark Side Of The Moon' }],
-        });
-
-      // Assert
-      expect(response.status).toBe(200);
-      expect(response.body.data.results[0]).toMatchObject({
-        artist: 'Pink Floyd',
-        title: 'Dark Side Of The Moon',
-        playCount: 100,
-        matchType: 'fuzzy',
-      });
-    });
-
-    it('should return zero play count for albums with no match', async () => {
-      // Arrange
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockResolvedValue({
-        entry: null,
-        matchType: 'none',
-      });
-
-      // Act
-      const response = await request(appWithHistory)
-        .post('/api/v1/stats/album-play-counts')
-        .send({
-          albums: [{ artist: 'Unknown Artist', title: 'Unknown Album' }],
-        });
-
-      // Assert
-      expect(response.status).toBe(200);
-      expect(response.body.data.results[0]).toEqual({
-        artist: 'Unknown Artist',
-        title: 'Unknown Album',
-        playCount: 0,
-        lastPlayed: null,
-        matchType: 'none',
-      });
-    });
-
-    it('should handle multiple albums in a single request', async () => {
-      // Arrange
-      mockHistoryStorage.getAlbumHistoryFuzzy
-        .mockResolvedValueOnce({
-          entry: { playCount: 50, lastPlayed: 1704067200 },
+          title: 'Kid A',
+          playCount: 7,
+          lastPlayed: 1,
           matchType: 'exact',
-        })
-        .mockResolvedValueOnce({
-          entry: { playCount: 30, lastPlayed: 1705276800 },
-          matchType: 'fuzzy',
-        })
-        .mockResolvedValueOnce({
-          entry: null,
-          matchType: 'none',
-        });
-
-      // Act
-      const response = await request(appWithHistory)
-        .post('/api/v1/stats/album-play-counts')
-        .send({
-          albums: [
-            { artist: 'Artist 1', title: 'Album 1' },
-            { artist: 'Artist 2', title: 'Album 2' },
-            { artist: 'Artist 3', title: 'Album 3' },
-          ],
-        });
-
-      // Assert
-      expect(response.status).toBe(200);
-      expect(response.body.data.results).toHaveLength(3);
-      expect(response.body.data.results[0].playCount).toBe(50);
-      expect(response.body.data.results[1].playCount).toBe(30);
-      expect(response.body.data.results[2].playCount).toBe(0);
-    });
-
-    it('should handle empty albums array', async () => {
-      // Act
-      const response = await request(appWithHistory)
-        .post('/api/v1/stats/album-play-counts')
-        .send({ albums: [] });
-
-      // Assert
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.results).toEqual([]);
+        },
+      ]);
+      expect(discogsAlbumPlays).toHaveBeenCalledWith('Radiohead', 'Kid A');
     });
 
     it('should handle errors gracefully', async () => {
-      // Arrange
-      mockHistoryStorage.getAlbumHistoryFuzzy.mockRejectedValue(
-        new Error('Database error')
-      );
+      mockStatsService.getPlayIdentityService = jest.fn().mockReturnValue({
+        readModel: jest.fn().mockRejectedValue(new Error('Storage error')),
+      });
 
-      // Act
       const response = await request(appWithHistory)
         .post('/api/v1/stats/album-play-counts')
-        .send({
-          albums: [{ artist: 'Radiohead', title: 'Kid A' }],
-        });
+        .send({ albums: [{ artist: 'Radiohead', title: 'Kid A' }] });
 
-      // Assert
       expect(response.status).toBe(500);
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('Database error');
     });
   });
 
