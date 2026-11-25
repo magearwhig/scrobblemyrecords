@@ -34,7 +34,9 @@ copy was played, so copy-level play counts are never added up.
    record by `recordKey`) after the played albums, with `playCount: 0` and
    `lastPlayed: null`; works without a history index. The page shows "Not
    played yet", hides the listening arc for them, and has an All / In
-   collection filter. Done 2026-11-25.
+   collection filter. The album page opens for an owned record with no plays
+   (it used to answer "not found", which the new rows exposed). Done
+   2026-11-25.
 2. **Album page lists your records.** "In Your Collection" becomes "Your
    records": every owned copy (from the server, via play identity), each with
    a "Scrobble this record" action that opens Release Details for that

@@ -4078,7 +4078,19 @@ export class StatsService {
         collection
       );
 
-    if (totalPlayCount === 0) {
+    // The owned record, by play identity: a link on any merged version, then
+    // the album's names (the same answer Top Albums and History give)
+    let collectionItem: CollectionItem | undefined;
+    if (collection && collection.length > 0) {
+      const identity = await this.createPlayIdentity(collection);
+      collectionItem = identity.album(
+        resolvedArtist,
+        resolvedAlbum
+      ).collectionItem;
+    }
+
+    // A record you own opens even before its first play
+    if (totalPlayCount === 0 && !collectionItem) {
       throw new Error('ALBUM_NOT_FOUND');
     }
 
@@ -4156,17 +4168,6 @@ export class StatsService {
       resolvedAlbum,
       collection
     );
-
-    // The owned record, by play identity: a link on any merged version, then
-    // the album's names (the same answer Top Albums and History give)
-    let collectionItem: CollectionItem | undefined;
-    if (collection && collection.length > 0) {
-      const identity = await this.createPlayIdentity(collection);
-      collectionItem = identity.album(
-        resolvedArtist,
-        resolvedAlbum
-      ).collectionItem;
-    }
 
     // Artist mapping (Discogs ↔ Last.fm). Search both directions since the
     // queried artistName could match either side of the recorded mapping.

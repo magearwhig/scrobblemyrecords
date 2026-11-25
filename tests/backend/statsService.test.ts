@@ -5232,6 +5232,49 @@ describe('StatsService', () => {
     });
   });
 
+  describe('getAlbumDetail for a record never played', () => {
+    const now = Math.floor(Date.now() / 1000);
+    const history = () =>
+      createMockIndex({
+        'luna|penthouse': {
+          lastPlayed: now,
+          playCount: 1,
+          plays: [{ timestamp: now }],
+        },
+      });
+    const days = createMockCollectionItem({
+      id: 77,
+      artist: 'Luna (5)',
+      title: 'The Days Of Our Nights',
+      coverImage: 'https://example.com/days.jpg',
+    });
+
+    it('opens an owned record with no plays', async () => {
+      mockHistoryStorage.getIndex.mockResolvedValue(history());
+
+      const result = await statsService.getAlbumDetail(
+        'Luna',
+        'The Days Of Our Nights',
+        [days]
+      );
+
+      expect(result.playCount).toBe(0);
+      expect(result.firstPlayed).toBeNull();
+      expect(result.lastPlayed).toBeNull();
+      expect(result.tracks).toEqual([]);
+      expect(result.inCollection).toBe(true);
+      expect(result.collectionReleaseId).toBe(77);
+    });
+
+    it('is still not found when neither played nor owned', async () => {
+      mockHistoryStorage.getIndex.mockResolvedValue(history());
+
+      await expect(
+        statsService.getAlbumDetail('Luna', 'Bewitched', [days])
+      ).rejects.toThrow('ALBUM_NOT_FOUND');
+    });
+  });
+
   describe('getTrackDetail mapping service integration', () => {
     // Helper to create a mock index with track info
     const createMockIndexWithTracks = (
