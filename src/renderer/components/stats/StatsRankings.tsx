@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlbumPlayCount,
   ArtistPlayCount,
-  CollectionItem,
   DateRange,
   LabelPlayCount,
   TrackPlayCount,
@@ -31,12 +30,6 @@ const SUBJECTS: Array<{ value: Subject; label: string }> = [
   { value: 'artists', label: 'Artists' },
   { value: 'tracks', label: 'Tracks' },
 ];
-
-interface StatsRankingsProps {
-  collectionMap?: Map<string, CollectionItem>;
-  collectionArtistCounts?: Map<string, number>;
-  collectionArtistCovers?: Map<string, string>;
-}
 
 /** Album covers from the batch image endpoint, keyed lowercase */
 async function withAlbumCovers(
@@ -87,11 +80,7 @@ async function withArtistImages(
  * time. Rankings over time sit behind a button, so their data only loads
  * when asked for.
  */
-export const StatsRankings: React.FC<StatsRankingsProps> = ({
-  collectionMap,
-  collectionArtistCounts,
-  collectionArtistCovers,
-}) => {
+export const StatsRankings: React.FC = () => {
   const [period, setPeriod] = useState<Period>('month');
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [subject, setSubject] = useState<Subject>('albums');
@@ -227,7 +216,6 @@ export const StatsRankings: React.FC<StatsRankingsProps> = ({
             type='albums'
             data={albums}
             loading={loading.albums}
-            collectionMap={collectionMap}
           />
         </div>
         <div className={listClass('labels')}>
@@ -244,8 +232,6 @@ export const StatsRankings: React.FC<StatsRankingsProps> = ({
             type='artists'
             data={artists}
             loading={loading.artists}
-            collectionArtistCounts={collectionArtistCounts}
-            collectionArtistCovers={collectionArtistCovers}
           />
         </div>
         <div className={listClass('tracks')}>

@@ -9,7 +9,6 @@ import {
   ForgottenTrack,
   TrackMapping,
 } from '../../../shared/types';
-import { lookupInCollection } from '../../hooks/useCollectionLookup';
 import { navigate } from '../../routes';
 import ApiService from '../../services/api';
 import { createLogger } from '../../utils/logger';
@@ -40,11 +39,7 @@ interface ForgottenFavoritesTabProps {
   formatDate: (timestamp: number) => string;
   openLink: (url: string) => void;
   api: ApiService;
-  /** Owned albums by artist|album, album mappings included (useCollectionLookup) */
-  collectionMap?: Map<string, CollectionItem>;
 }
-
-const EMPTY_COLLECTION_MAP = new Map<string, CollectionItem>();
 
 const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
   forgottenTracks,
@@ -61,7 +56,6 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
   formatDate,
   openLink,
   api,
-  collectionMap = EMPTY_COLLECTION_MAP,
 }) => {
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [mappingModalOpen, setMappingModalOpen] = useState(false);
@@ -390,9 +384,8 @@ const ForgottenFavoritesTab: React.FC<ForgottenFavoritesTabProps> = ({
 
           <div className='missing-list'>
             {sortedForgottenTracks.map((track, index) => {
-              const collectionItem = track.album
-                ? lookupInCollection(collectionMap, track.artist, track.album)
-                : undefined;
+              // Decided on the server (play identity)
+              const { collectionItem } = track;
 
               return (
                 <div

@@ -91,17 +91,22 @@ describe('TopList', () => {
       expect(screen.getByText('The Go-Betweens')).toBeInTheDocument();
     });
 
-    it('uses a collection cover when the artist has no photo', () => {
+    it("uses the server's owned cover and count when the artist has no photo", () => {
       render(
         <TopList
           title='Top Artists'
           type='artists'
-          data={mockArtists}
+          data={mockArtists.map(a =>
+            a.artist.toLowerCase() === 'the beatles'
+              ? { ...a, ownedCount: 3, ownedCoverUrl: 'abbey.jpg' }
+              : a
+          )}
           onPeriodChange={mockOnPeriodChange}
           currentPeriod='month'
-          collectionArtistCovers={new Map([['the beatles', 'abbey.jpg']])}
         />
       );
+
+      expect(screen.getByText('3 owned')).toBeInTheDocument();
 
       expect(screen.getByRole('img', { name: 'The Beatles' })).toHaveAttribute(
         'src',
@@ -515,7 +520,7 @@ describe('TopList', () => {
       expect(screen.queryByText('Owned')).not.toBeInTheDocument();
     });
 
-    it('should not show Owned badge when inCollection is undefined and no collectionMap', () => {
+    it('should not show Owned badge when the server says nothing about ownership', () => {
       const albums: AlbumPlayCount[] = [
         {
           artist: 'Nirvana',
@@ -536,45 +541,6 @@ describe('TopList', () => {
       );
 
       expect(screen.queryByText('Owned')).not.toBeInTheDocument();
-    });
-
-    it('should show Owned badge from collectionMap fallback when inCollection not set', () => {
-      const albums: AlbumPlayCount[] = [
-        {
-          artist: 'Radiohead',
-          album: 'OK Computer',
-          playCount: 50,
-          lastPlayed: Date.now() / 1000,
-        },
-      ];
-
-      const collectionMap = new Map();
-      collectionMap.set('radiohead|ok computer', {
-        id: 123,
-        date_added: '2024-01-15T00:00:00Z',
-        release: {
-          id: 123,
-          title: 'OK Computer',
-          artist: 'Radiohead',
-          year: 1997,
-          format: ['CD'],
-          label: ['Parlophone'],
-          resource_url: 'https://api.discogs.com/releases/123',
-        },
-      });
-
-      render(
-        <TopList
-          title='Top Albums'
-          type='albums'
-          data={albums}
-          currentPeriod='month'
-          onPeriodChange={mockOnPeriodChange}
-          collectionMap={collectionMap}
-        />
-      );
-
-      expect(screen.getByText('Owned')).toBeInTheDocument();
     });
   });
 

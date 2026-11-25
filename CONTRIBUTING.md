@@ -50,6 +50,7 @@ src/
 - **Frontend routing**: Hash-based (`window.location.hash`), no React Router
 - **State management**: React Context API (no Redux)
 - **Service injection**: Services instantiated in `server.ts` and passed into route factories
+- **Play identity**: one resolver (`services/playIdentity`) decides which artist, album and track a play counts as and whether it's owned; every list of plays uses it (see [`AGENTS.md`](AGENTS.md))
 
 ## Development Workflow
 
@@ -196,7 +197,7 @@ The app has several mapping layers between Discogs and Last.fm data:
 - **Scrobble artist mappings**: User-corrected artist names for scrobbling
 - **Hidden items**: User-excluded items from collection and releases
 
-When implementing features that display or process tracks/artists, check if any of these mappings should be applied.
+Don't apply these mappings yourself in a feature. Anything that groups scrobbles, counts plays or decides whether an album is owned goes through the play identity resolver in `src/backend/services/playIdentity/`, which applies track mappings, album mappings and artist aliases once, in a fixed order, so every page counts a play the same way. If it can't answer what you need, extend the resolver and its tests. See [`AGENTS.md`](AGENTS.md) for the rules.
 
 ## Questions?
 

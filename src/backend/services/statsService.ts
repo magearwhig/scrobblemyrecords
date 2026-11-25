@@ -20,6 +20,11 @@ import {
   DayOfWeekDistributionResult,
   DustyCornerAlbum,
   ForgottenTrack,
+  HistoryAlbumRow,
+  HistoryArtistRow,
+  HistoryListPage,
+  HistoryListQuery,
+  HistoryTrackRow,
   HourlyDistributionResult,
   ListeningHours,
   MilestoneInfo,
@@ -101,7 +106,7 @@ const AVG_TRACK_DURATION_SECONDS = 210;
  * Bump when a change alters what warm-cached stats contain (e.g. how albums
  * are grouped), so caches built by older code are recomputed.
  */
-const WARM_CACHE_VERSION = 6;
+const WARM_CACHE_VERSION = 7;
 
 // Album shown for unresolved plays; re-exported for existing importers
 export { UNKNOWN_ALBUM_LABEL };
@@ -180,6 +185,13 @@ export class StatsService {
   private trackMappingService: TrackMappingService | null = null;
   private mappingService: MappingService | null = null;
   private artistNameResolver: ArtistNameResolver | null = null;
+  /** Play identity resolvers by rules fingerprint; see createPlayIdentity */
+  private playIdentityCache = new Map<string, Promise<PlayIdentityResolver>>();
+  /** History list rows by index and rules; see cachedHistoryRows */
+  private historyRowsCache = new WeakMap<
+    object,
+    Map<string, Promise<unknown[]>>
+  >();
   private albumLabelService: Pick<AlbumLabelService, 'getAll'> | null = null;
   private compoundArtistMappingService: CompoundArtistMappingServiceLike | null =
     null;
@@ -649,7 +661,7 @@ export class StatsService {
   }
 
   private artistAliasFingerprint(): string {
-    return this.artistNameResolver?.getFingerprint() ?? '';
+    return this.artistNameResolver?.getFingerprint?.() ?? '';
   }
 
   /** Identifies the current track mappings; '' when there are none. */
@@ -665,6 +677,61 @@ export class StatsService {
     );
   }
 
+  /** Identifies the rules a play identity resolver is built from */
+  private async playIdentityKey(collection: CollectionItem[]): Promise<string> {
+    return [
+      await this.albumMappingFingerprint(),
+      await this.trackMappingFingerprint(),
+      this.artistAliasFingerprint(),
+      // The records' names and covers, not just IDs: a refresh can change them
+      createHash('sha1')
+        .update(
+          JSON.stringify(
+            collection.map(item => [
+              item.id,
+              item.release.artist,
+              item.release.title,
+              item.release.cover_image ?? '',
+            ])
+          )
+        )
+        .digest('hex'),
+    ].join('\u0001');
+  }
+
+  /**
+   * A History list's rows, built once per history index and set of rules,
+   * so paging, sorting and searching only slice them
+   */
+  private async cachedHistoryRows<Row>(
+    index: ScrobbleHistoryIndex,
+    list: string,
+    collection: CollectionItem[],
+    build: () => Promise<Row[]>
+  ): Promise<Row[]> {
+    const key = [
+      list,
+      index.lastSyncTimestamp,
+      index.totalScrobbles,
+      await this.playIdentityKey(collection),
+    ].join('\u0002');
+    let byKey = this.historyRowsCache.get(index);
+    if (!byKey) {
+      byKey = new Map();
+      this.historyRowsCache.set(index, byKey);
+    }
+    const cached = byKey.get(key) as Promise<Row[]> | undefined;
+    if (cached) return cached;
+    // Only the latest rows of each list are worth keeping
+    for (const old of byKey.keys()) {
+      if (old.startsWith(`${list}\u0002`)) byKey.delete(old);
+    }
+    const rows = build();
+    byKey.set(key, rows);
+    rows.catch(() => byKey!.delete(key));
+    return rows;
+  }
+
   /**
    * What each play counts as (artist, album, track, owned record): the one
    * resolver every list of plays groups by, so pages agree. See
@@ -673,13 +740,23 @@ export class StatsService {
   private async createPlayIdentity(
     collection: CollectionItem[] = []
   ): Promise<PlayIdentityResolver> {
-    return buildPlayIdentityResolver({
+    // Reused until a mapping, an alias or the collection changes, so its
+    // memo of resolved plays carries over between requests
+    const key = await this.playIdentityKey(collection);
+    const cached = this.playIdentityCache.get(key);
+    if (cached) return cached;
+    const resolver = buildPlayIdentityResolver({
       mappingService: this.mappingService,
       trackMappingService: this.trackMappingService,
       resolveArtist: name => this.resolveArtistName(name),
       historyStorage: this.historyStorage,
       collection,
     });
+    // One with and one without the collection are both in common use
+    if (this.playIdentityCache.size >= 4) this.playIdentityCache.clear();
+    this.playIdentityCache.set(key, resolver);
+    resolver.catch(() => this.playIdentityCache.delete(key));
+    return resolver;
   }
 
   /** Identifies the current album mappings; '' when there are none. */
@@ -997,28 +1074,30 @@ export class StatsService {
       cutoffTimestamp = this.getPeriodCutoff(period);
     }
 
-    // Count plays per artist in the period.
-    // Uses resolveArtistNames for multi-attribution: compound artists
-    // (e.g., "Danny Brown, Jane Remover") add a play to each component.
-    // Unresolved plays count: the artist is known.
+    // Count plays per artist in the period, by the artist each play counts
+    // as (play identity: a track mapping can move a play to another artist).
+    // Compound artists (e.g., "Danny Brown, Jane Remover") add a play to each
+    // component. Unresolved plays count: the artist is known.
+    const identity = await this.createPlayIdentity();
     const artistCounts = new Map<string, number>();
+    const keysFor = new Map<string, string[]>();
 
-    for (const { artist, entry } of listeningEntries(index)) {
-      let periodPlays = 0;
+    for (const { artist, album, entry } of listeningEntries(index)) {
       for (const play of entry.plays) {
-        if (
-          play.timestamp >= cutoffTimestamp &&
-          play.timestamp <= endTimestamp
-        ) {
-          periodPlays++;
+        if (play.timestamp < cutoffTimestamp || play.timestamp > endTimestamp) {
+          continue;
         }
-      }
-      if (periodPlays === 0) continue;
-      for (const canonical of this.resolveArtistNames(artist)) {
-        artistCounts.set(
-          canonical,
-          (artistCounts.get(canonical) || 0) + periodPlays
-        );
+        const playArtist = play.track
+          ? identity.play(artist, album, play.track).artist
+          : artist;
+        let keys = keysFor.get(playArtist);
+        if (!keys) {
+          keys = this.resolveArtistNames(playArtist);
+          keysFor.set(playArtist, keys);
+        }
+        for (const key of keys) {
+          artistCounts.set(key, (artistCounts.get(key) || 0) + 1);
+        }
       }
     }
 
@@ -1087,12 +1166,10 @@ export class StatsService {
       cutoffTimestamp = this.getPeriodCutoff(period);
     }
 
-    // Count plays per album in the period. Versions merged by album mappings
-    // count as one album, shown under the artist with the most plays.
-    const canonicalize = createAlbumCanonicalizer(
-      await loadAlbumMappings(this.mappingService),
-      name => this.resolveArtistName(name)
-    );
+    // Count plays per album in the period by play identity: versions merged
+    // by album mappings are one album, a play a track mapping moves counts on
+    // the album it moved to, and the album shows under its most-played artist
+    const identity = await this.createPlayIdentity(collection ?? []);
     const albumCounts = new Map<
       string,
       {
@@ -1100,51 +1177,38 @@ export class StatsService {
         playCount: number;
         lastPlayed: number;
         artistPlays: Map<string, number>;
-        collectionId?: number;
+        collectionItem?: CollectionItem;
       }
     >();
 
-    for (const [key, albumHistory] of Object.entries(index.albums)) {
-      const [artist, album] = key.split('|');
-      let periodPlays = 0;
-      let periodLastPlayed = 0;
-
-      for (const play of albumHistory.plays) {
-        if (
-          play.timestamp >= cutoffTimestamp &&
-          play.timestamp <= endTimestamp
-        ) {
-          periodPlays++;
-          if (play.timestamp > periodLastPlayed) {
-            periodLastPlayed = play.timestamp;
-          }
+    for (const { artist, album, entry } of listeningEntries(index)) {
+      if (album === null) continue;
+      for (const play of entry.plays) {
+        if (play.timestamp < cutoffTimestamp || play.timestamp > endTimestamp) {
+          continue;
         }
-      }
-
-      if (periodPlays === 0) continue;
-
-      const canonical = canonicalize(artist, album);
-      const linkedId =
-        canonical.mapping && isCollectionLinked(canonical.mapping)
-          ? canonical.mapping.collectionId
-          : undefined;
-      const existing = albumCounts.get(canonical.key);
-      if (existing) {
-        existing.playCount += periodPlays;
-        existing.lastPlayed = Math.max(existing.lastPlayed, periodLastPlayed);
-        existing.artistPlays.set(
-          artist,
-          (existing.artistPlays.get(artist) ?? 0) + periodPlays
-        );
-        existing.collectionId ??= linkedId;
-      } else {
-        albumCounts.set(canonical.key, {
-          album: canonical.album,
-          playCount: periodPlays,
-          lastPlayed: periodLastPlayed,
-          artistPlays: new Map([[artist, periodPlays]]),
-          collectionId: linkedId,
-        });
+        const target = play.track
+          ? identity.play(artist, album, play.track)
+          : identity.album(artist, album);
+        if (target.album === null || target.albumKey === null) continue;
+        const existing = albumCounts.get(target.albumKey);
+        if (existing) {
+          existing.playCount++;
+          existing.lastPlayed = Math.max(existing.lastPlayed, play.timestamp);
+          existing.artistPlays.set(
+            target.artist,
+            (existing.artistPlays.get(target.artist) ?? 0) + 1
+          );
+          existing.collectionItem ??= target.collectionItem;
+        } else {
+          albumCounts.set(target.albumKey, {
+            album: target.album,
+            playCount: 1,
+            lastPlayed: play.timestamp,
+            artistPlays: new Map([[target.artist, 1]]),
+            collectionItem: target.collectionItem,
+          });
+        }
       }
     }
 
@@ -1156,41 +1220,56 @@ export class StatsService {
       const [topArtist] = Array.from(entry.artistPlays.entries()).sort(
         (a, b) => b[1] - a[1]
       )[0];
+      const owned = entry.collectionItem;
       return {
         artist: this.capitalizeArtist(topArtist),
         album: this.capitalizeTitle(entry.album),
         playCount: entry.playCount,
         lastPlayed: entry.lastPlayed,
+        ...(owned && {
+          inCollection: true,
+          collectionReleaseId: owned.release.id,
+          ...(owned.release.cover_image && {
+            coverUrl: owned.release.cover_image,
+          }),
+        }),
       };
     });
 
-    // Enrich with collection info if collection is provided
-    if (collection && collection.length > 0) {
-      const collectionByFuzzyKey =
-        await this.buildFuzzyCollectionMap(collection);
-
-      for (const [i, album] of result.entries()) {
-        const linkedId = topEntries[i].collectionId;
-        const collectionItem =
-          (linkedId !== undefined
-            ? collection.find(item => item.id === linkedId)
-            : undefined) ??
-          this.lookupCollectionItem(
-            collectionByFuzzyKey,
-            album.artist,
-            album.album
-          );
-        if (collectionItem) {
-          album.inCollection = true;
-          album.collectionReleaseId = collectionItem.release.id;
-          if (collectionItem.release.cover_image) {
-            album.coverUrl = collectionItem.release.cover_image;
-          }
-        }
-      }
-    }
-
     return result;
+  }
+
+  /** The owned record of each album (play identity), or undefined */
+  async ownedRecordsOf(
+    albums: Array<{ artist: string; album: string }>,
+    collection: CollectionItem[]
+  ): Promise<Array<CollectionItem | undefined>> {
+    if (collection.length === 0) return albums.map(() => undefined);
+    const identity = await this.createPlayIdentity(collection);
+    return albums.map(
+      ({ artist, album }) => identity.album(artist, album).collectionItem
+    );
+  }
+
+  /**
+   * Records each artist owns and a cover from one (play identity), for rows
+   * of artists that don't carry ownership themselves (e.g. cached top artists)
+   */
+  async withArtistOwnership<Row extends { artist: string }>(
+    rows: Row[],
+    collection: CollectionItem[]
+  ): Promise<Array<Row & { ownedCount: number; ownedCoverUrl?: string }>> {
+    const identity = await this.createPlayIdentity(collection);
+    return rows.map(row => {
+      const owned = identity.ownedByArtist(row.artist);
+      const cover = owned.find(item => item.release.cover_image)?.release
+        .cover_image;
+      return {
+        ...row,
+        ownedCount: owned.length,
+        ...(cover && { ownedCoverUrl: cover }),
+      };
+    });
   }
 
   /**
@@ -1975,6 +2054,343 @@ export class StatsService {
       .sort((a, b) => a.date.localeCompare(b.date));
   }
 
+  /** Artist name with display casing from the alias mappings, if any */
+  private artistDisplayName(artist: string): string {
+    return this.artistNameResolver
+      ? this.artistNameResolver.getDisplayName(artist)
+      : artist;
+  }
+
+  /** Search, sort and page one History list */
+  private pageHistoryRows<Row extends { playCount: number }>(
+    rows: Row[],
+    query: HistoryListQuery<string>,
+    searchText: (row: Row) => string[],
+    sortValue: (row: Row, sortBy: string) => number | string
+  ): HistoryListPage<Row> {
+    // A copy: rows may be cached, and sorting is in place
+    let filtered = [...rows];
+    const search = query.search?.toLowerCase().trim();
+    if (search) {
+      filtered = rows.filter(row =>
+        searchText(row).some(text => text.toLowerCase().includes(search))
+      );
+    }
+    filtered.sort((a, b) => {
+      const x = sortValue(a, query.sortBy);
+      const y = sortValue(b, query.sortBy);
+      const comparison =
+        typeof x === 'number' && typeof y === 'number'
+          ? x - y
+          : String(x).localeCompare(String(y));
+      return query.sortOrder === 'desc' ? -comparison : comparison;
+    });
+    const start = (query.page - 1) * query.perPage;
+    return {
+      items: filtered.slice(start, start + query.perPage),
+      total: filtered.length,
+      totalPages: Math.ceil(filtered.length / query.perPage),
+      page: query.page,
+      maxPlayCount: filtered.reduce(
+        (max, row) => Math.max(max, row.playCount),
+        0
+      ),
+    };
+  }
+
+  /**
+   * History's Tracks list: one row per track by play identity, the same rows
+   * as Top Tracks, with the owned record attached
+   */
+  async getHistoryTracks(
+    query: HistoryListQuery<
+      'playCount' | 'lastPlayed' | 'artist' | 'album' | 'track'
+    >,
+    collection: CollectionItem[] = []
+  ): Promise<HistoryListPage<HistoryTrackRow>> {
+    const index = await this.historyStorage.getIndex();
+    if (!index) {
+      return {
+        items: [],
+        total: 0,
+        totalPages: 0,
+        page: query.page,
+        maxPlayCount: 0,
+      };
+    }
+    const items = await this.cachedHistoryRows<HistoryTrackRow>(
+      index,
+      'tracks',
+      collection,
+      async () => {
+        const identity = await this.createPlayIdentity(collection);
+        const rows = new Map<
+          string,
+          {
+            artists: TrackSpellings;
+            spellings: TrackSpellings;
+            album: string | null;
+            playCount: number;
+            firstPlayed: number;
+            lastPlayed: number;
+            collectionItem?: CollectionItem;
+          }
+        >();
+        for (const { artist, album, entry } of listeningEntries(index)) {
+          for (const play of entry.plays) {
+            if (!play.track) continue;
+            const target = identity.play(artist, album, play.track);
+            const row = rows.get(target.trackKey);
+            if (row) {
+              row.playCount++;
+              row.artists.add(target.artist);
+              row.spellings.add(target.track);
+              row.firstPlayed = Math.min(row.firstPlayed, play.timestamp);
+              row.lastPlayed = Math.max(row.lastPlayed, play.timestamp);
+              row.collectionItem ??= target.collectionItem;
+            } else {
+              const artists = new TrackSpellings();
+              artists.add(target.artist);
+              const spellings = new TrackSpellings();
+              spellings.add(target.track);
+              rows.set(target.trackKey, {
+                artists,
+                spellings,
+                album: target.album,
+                playCount: 1,
+                firstPlayed: play.timestamp,
+                lastPlayed: play.timestamp,
+                collectionItem: target.collectionItem,
+              });
+            }
+          }
+        }
+        const items: HistoryTrackRow[] = Array.from(rows.values(), row => {
+          const artist = row.artists.best;
+          return {
+            artist,
+            artistName: this.artistDisplayName(artist),
+            album: row.album ?? UNKNOWN_ALBUM_LABEL,
+            ...(row.album === null && { albumUnknown: true }),
+            track: row.spellings.best,
+            playCount: row.playCount,
+            firstPlayed: row.firstPlayed,
+            lastPlayed: row.lastPlayed,
+            ...(row.collectionItem && { collectionItem: row.collectionItem }),
+          };
+        });
+        return items;
+      }
+    );
+    return this.pageHistoryRows(
+      items,
+      query,
+      row => [row.artist, row.album, row.track],
+      (row, sortBy) =>
+        sortBy === 'artist' || sortBy === 'album' || sortBy === 'track'
+          ? row[sortBy]
+          : sortBy === 'lastPlayed'
+            ? row.lastPlayed
+            : row.playCount
+    );
+  }
+
+  /**
+   * History's Albums list: one row per album by play identity (versions
+   * joined by album mappings are one album), with the owned record attached.
+   * Plays with no album aren't albums, so they aren't listed.
+   */
+  async getHistoryAlbums(
+    query: HistoryListQuery<'playCount' | 'lastPlayed' | 'artist' | 'album'>,
+    collection: CollectionItem[] = []
+  ): Promise<HistoryListPage<HistoryAlbumRow>> {
+    const index = await this.historyStorage.getIndex();
+    if (!index) {
+      return {
+        items: [],
+        total: 0,
+        totalPages: 0,
+        page: query.page,
+        maxPlayCount: 0,
+      };
+    }
+    const items = await this.cachedHistoryRows<HistoryAlbumRow>(
+      index,
+      'albums',
+      collection,
+      async () => {
+        const identity = await this.createPlayIdentity(collection);
+        const rows = new Map<
+          string,
+          {
+            artists: TrackSpellings;
+            album: string;
+            playCount: number;
+            firstPlayed: number;
+            lastPlayed: number;
+            collectionItem?: CollectionItem;
+          }
+        >();
+        for (const { artist, album, entry } of listeningEntries(index)) {
+          if (album === null) continue;
+          for (const play of entry.plays) {
+            // A track mapping can move a play to another album
+            const target = play.track
+              ? identity.play(artist, album, play.track)
+              : identity.album(artist, album);
+            if (target.album === null || target.albumKey === null) continue;
+            const row = rows.get(target.albumKey);
+            if (row) {
+              row.playCount++;
+              row.artists.add(target.artist);
+              row.firstPlayed = Math.min(row.firstPlayed, play.timestamp);
+              row.lastPlayed = Math.max(row.lastPlayed, play.timestamp);
+              row.collectionItem ??= target.collectionItem;
+            } else {
+              const artists = new TrackSpellings();
+              artists.add(target.artist);
+              rows.set(target.albumKey, {
+                artists,
+                album: target.album,
+                playCount: 1,
+                firstPlayed: play.timestamp,
+                lastPlayed: play.timestamp,
+                collectionItem: target.collectionItem,
+              });
+            }
+          }
+        }
+        const items: HistoryAlbumRow[] = Array.from(rows.values(), row => {
+          const artist = row.artists.best;
+          return {
+            artist,
+            artistName: this.artistDisplayName(artist),
+            album: row.album,
+            playCount: row.playCount,
+            firstPlayed: row.firstPlayed,
+            lastPlayed: row.lastPlayed,
+            ...(row.collectionItem && { collectionItem: row.collectionItem }),
+          };
+        });
+        return items;
+      }
+    );
+    return this.pageHistoryRows(
+      items,
+      query,
+      row => [row.artist, row.album],
+      (row, sortBy) =>
+        sortBy === 'artist' || sortBy === 'album'
+          ? row[sortBy]
+          : sortBy === 'lastPlayed'
+            ? row.lastPlayed
+            : row.playCount
+    );
+  }
+
+  /**
+   * History's Artists list: plays per artist (a compound credit counts for
+   * each artist it splits into), albums counted once per merged album, and
+   * the records each artist owns
+   */
+  async getHistoryArtists(
+    query: HistoryListQuery<
+      'playCount' | 'lastPlayed' | 'artist' | 'albumCount'
+    >,
+    collection: CollectionItem[] = []
+  ): Promise<HistoryListPage<HistoryArtistRow>> {
+    const index = await this.historyStorage.getIndex();
+    if (!index) {
+      return {
+        items: [],
+        total: 0,
+        totalPages: 0,
+        page: query.page,
+        maxPlayCount: 0,
+      };
+    }
+    const items = await this.cachedHistoryRows<HistoryArtistRow>(
+      index,
+      'artists',
+      collection,
+      async () => {
+        const identity = await this.createPlayIdentity(collection);
+        const keysFor = new Map<string, string[]>();
+        const artistKeys = (artist: string) => {
+          let keys = keysFor.get(artist);
+          if (!keys) {
+            keys = this.resolveArtistNames(artist);
+            keysFor.set(artist, keys);
+          }
+          return keys;
+        };
+        const rows = new Map<
+          string,
+          {
+            playCount: number;
+            albums: Set<string>;
+            firstPlayed: number;
+            lastPlayed: number;
+          }
+        >();
+        for (const { artist, album, entry } of listeningEntries(index)) {
+          for (const play of entry.plays) {
+            const target = play.track
+              ? identity.play(artist, album, play.track)
+              : album === null
+                ? { artist, albumKey: null }
+                : identity.album(artist, album);
+            for (const key of artistKeys(target.artist)) {
+              const row = rows.get(key) ?? {
+                playCount: 0,
+                albums: new Set<string>(),
+                firstPlayed: play.timestamp,
+                lastPlayed: play.timestamp,
+              };
+              row.playCount++;
+              if (target.albumKey !== null) row.albums.add(target.albumKey);
+              row.firstPlayed = Math.min(row.firstPlayed, play.timestamp);
+              row.lastPlayed = Math.max(row.lastPlayed, play.timestamp);
+              rows.set(key, row);
+            }
+          }
+        }
+        const items: HistoryArtistRow[] = Array.from(
+          rows.entries(),
+          ([key, row]) => {
+            const artist = this.artistDisplayName(key);
+            const owned = identity.ownedByArtist(artist);
+            const cover = owned.find(item => item.release.cover_image)?.release
+              .cover_image;
+            return {
+              artist,
+              playCount: row.playCount,
+              albumCount: row.albums.size,
+              firstPlayed: row.firstPlayed,
+              lastPlayed: row.lastPlayed,
+              ownedCount: owned.length,
+              ...(cover && { ownedCoverUrl: cover }),
+            };
+          }
+        );
+        return items;
+      }
+    );
+    return this.pageHistoryRows(
+      items,
+      query,
+      row => [row.artist],
+      (row, sortBy) =>
+        sortBy === 'artist'
+          ? row.artist
+          : sortBy === 'lastPlayed'
+            ? row.lastPlayed
+            : sortBy === 'albumCount'
+              ? row.albumCount
+              : row.playCount
+    );
+  }
+
   /**
    * Get tracks with high play counts that haven't been played recently.
    * Surfaces forgotten favorites from the scrobble history.
@@ -1990,18 +2406,20 @@ export class StatsService {
   async getForgottenFavorites(
     dormantPeriodDays: number = 90,
     minPlayCount: number = 10,
-    limit: number = 100
+    limit: number = 100,
+    collection: CollectionItem[] = []
   ): Promise<{ tracks: ForgottenTrack[]; totalMatching: number }> {
     // Cap limit at 100
     const cappedLimit = Math.min(limit, 100);
 
     // Check cache (keyed by params excluding limit - we store all results).
     // Artist aliases decide which plays share a row.
+    // The rules (mappings, aliases) and the collection decide the rows and
+    // their owned records
     const cacheKey = JSON.stringify({
       dormantPeriodDays,
       minPlayCount,
-      aliases: this.artistAliasFingerprint(),
-      albumMappings: await this.albumMappingFingerprint(),
+      rules: await this.playIdentityKey(collection),
     });
     if (
       this.forgottenFavoritesCache &&
@@ -2035,6 +2453,7 @@ export class StatsService {
         count: number;
         lastPlayed: number;
         firstPlayed: number;
+        collectionItem?: CollectionItem;
       }
     >();
 
@@ -2042,7 +2461,7 @@ export class StatsService {
     // plays (album null), which form their own "Unknown album" track rows.
     // Album versions merged by a mapping count as one album, so a play on any
     // version keeps the track from looking forgotten.
-    const identity = await this.createPlayIdentity();
+    const identity = await this.createPlayIdentity(collection);
     for (const { artist, album, entry: albumHistory } of listeningEntries(
       index
     )) {
@@ -2055,6 +2474,7 @@ export class StatsService {
           album: targetAlbum,
           track: targetTrack,
           trackKey,
+          collectionItem,
         } = identity.play(artist, album, play.track);
 
         const existing = trackStats.get(trackKey);
@@ -2069,6 +2489,7 @@ export class StatsService {
           if (play.timestamp < existing.firstPlayed) {
             existing.firstPlayed = play.timestamp;
           }
+          existing.collectionItem ??= collectionItem;
         } else {
           const spellings = new TrackSpellings();
           spellings.add(targetTrack);
@@ -2081,6 +2502,7 @@ export class StatsService {
             count: 1,
             lastPlayed: play.timestamp,
             firstPlayed: play.timestamp,
+            collectionItem,
           });
         }
       }
@@ -2105,6 +2527,7 @@ export class StatsService {
           lastPlayed: stats.lastPlayed,
           daysSincePlay: Math.floor((now - stats.lastPlayed) / (24 * 60 * 60)),
           firstPlayed: stats.firstPlayed,
+          ...(stats.collectionItem && { collectionItem: stats.collectionItem }),
         });
       }
     }
@@ -2198,7 +2621,7 @@ export class StatsService {
 
     // Track play counts by play identity (track mappings, merged album
     // versions), value = { spellings, album, count, lastPlayed }
-    const identity = await this.createPlayIdentity();
+    const identity = await this.createPlayIdentity(collection);
     const trackCounts = new Map<
       string,
       {
@@ -2220,130 +2643,102 @@ export class StatsService {
         playCount: number;
         lastPlayed: number;
         historyEntries: Array<{ artist: string; album: string }>;
-        collectionId?: number;
+        collectionItem?: CollectionItem;
       }
     >();
-
-    // Manual album mappings (history name -> canonical album). Versions of the same
-    // album that the user mapped together (e.g. "Tallulah (Remastered)" -> "Tallulah")
-    // are merged into a single entry.
-    const canonicalize = createAlbumCanonicalizer(
-      await loadAlbumMappings(this.mappingService)
-    );
 
     // Play trend data: key = period string (YYYY-MM or YYYY-Www), value = count
     const trendCounts = new Map<string, number>();
 
-    // Unresolved plays (historyAlbum null) count in totals, periods, trend and
-    // top tracks (as "Unknown album"), but never in the albums list
-    const addTrackPlay = (
-      artist: string,
-      historyAlbum: string | null,
-      play: { timestamp: number; track?: string }
-    ) => {
-      if (!play.track) return;
-      const target = identity.play(artist, historyAlbum, play.track);
-      if (!this.isArtistMatch(target.artist, artistName)) return;
-      const { track, trackKey } = target;
-      const existing = trackCounts.get(trackKey);
-      if (existing) {
-        existing.count++;
-        existing.spellings.add(track);
-        if (play.timestamp > existing.lastPlayed) {
-          existing.lastPlayed = play.timestamp;
-        }
-      } else {
-        const spellings = new TrackSpellings();
-        spellings.add(track);
-        trackCounts.set(trackKey, {
-          spellings,
-          album: target.album,
-          count: 1,
-          lastPlayed: play.timestamp,
-        });
-      }
-    };
+    // Every play is resolved first (play identity), and counts here when it
+    // counts as this artist: a track mapping can move plays to or away from
+    // them. Unresolved plays (no album) count in totals, periods, trend and
+    // top tracks (as "Unknown album"), but never in the albums list.
     const movesPlaysHere = identity.movesPlaysTo(name =>
       this.isArtistMatch(name, artistName)
     );
-
     for (const {
       artist,
       album: historyAlbum,
       entry: albumHistory,
     } of listeningEntries(index)) {
-      if (!this.isArtistMatch(artist, artistName)) {
-        // Another artist's plays count here only when a track mapping moves
-        // them to this artist, and then only in the top tracks
-        if (movesPlaysHere(artist, historyAlbum)) {
-          for (const play of albumHistory.plays) {
-            addTrackPlay(artist, historyAlbum, play);
-          }
-        }
+      if (
+        !this.isArtistMatch(artist, artistName) &&
+        !movesPlaysHere(artist, historyAlbum)
+      ) {
         continue;
       }
-
-      // Mappings are one hop deep, so the target is the canonical album.
-      // Unresolved plays have no album: album stays null.
-      let album: string | null = null;
-      if (historyAlbum !== null) {
-        const canonical = canonicalize(artist, historyAlbum);
-        album = canonical.album;
-        const albumMapping = canonical.mapping;
-
-        const normalizedAlbum = album.toLowerCase().trim();
-        const existingAlbum = albumCounts.get(normalizedAlbum);
-        if (existingAlbum) {
-          existingAlbum.playCount += albumHistory.playCount;
-          if (albumHistory.lastPlayed > existingAlbum.lastPlayed) {
-            existingAlbum.lastPlayed = albumHistory.lastPlayed;
-          }
-          existingAlbum.historyEntries.push({ artist, album: historyAlbum });
-          if (!existingAlbum.collectionId && albumMapping?.collectionId) {
-            existingAlbum.collectionId = albumMapping.collectionId;
-          }
-        } else {
-          albumCounts.set(normalizedAlbum, {
-            artist,
-            album,
-            playCount: albumHistory.playCount,
-            lastPlayed: albumHistory.lastPlayed,
-            historyEntries: [{ artist, album: historyAlbum }],
-            collectionId: albumMapping?.collectionId || undefined,
-          });
-        }
-      }
-
       for (const play of albumHistory.plays) {
-        totalPlayCount++;
+        const target = play.track
+          ? identity.play(artist, historyAlbum, play.track)
+          : historyAlbum === null
+            ? null
+            : identity.album(artist, historyAlbum);
+        if (!this.isArtistMatch(target?.artist ?? artist, artistName)) {
+          continue;
+        }
 
-        // Track first/last played
+        totalPlayCount++;
         if (firstPlayed === null || play.timestamp < firstPlayed) {
           firstPlayed = play.timestamp;
         }
         if (lastPlayed === null || play.timestamp > lastPlayed) {
           lastPlayed = play.timestamp;
         }
-
-        // Period counts
         if (play.timestamp >= weekStart) thisWeek++;
         if (play.timestamp >= monthStart) thisMonth++;
         if (play.timestamp >= yearStart) thisYear++;
-
-        // Track aggregation by play identity: a track mapping that moves the
-        // play to another album counts it there, and one that moves it to
-        // another artist counts it on that artist's page, as Top Tracks does
-        if (play.track) addTrackPlay(artist, historyAlbum, play);
-
-        // Play trend aggregation
         const periodKey = this.trendPeriodKey(play.timestamp, trendPeriod);
         trendCounts.set(periodKey, (trendCounts.get(periodKey) || 0) + 1);
+
+        // Albums, by merged album (versions joined by mappings are one)
+        if (target?.album && target.albumKey) {
+          const existing = albumCounts.get(target.albumKey);
+          if (existing) {
+            existing.playCount++;
+            existing.lastPlayed = Math.max(existing.lastPlayed, play.timestamp);
+            existing.collectionItem ??= target.collectionItem;
+            if (
+              historyAlbum !== null &&
+              !existing.historyEntries.some(
+                e => e.artist === artist && e.album === historyAlbum
+              )
+            ) {
+              existing.historyEntries.push({ artist, album: historyAlbum });
+            }
+          } else {
+            albumCounts.set(target.albumKey, {
+              artist: target.artist,
+              album: target.album,
+              playCount: 1,
+              lastPlayed: play.timestamp,
+              historyEntries:
+                historyAlbum === null ? [] : [{ artist, album: historyAlbum }],
+              collectionItem: target.collectionItem,
+            });
+          }
+        }
+
+        // Top tracks, by track identity
+        if (play.track && target && 'trackKey' in target) {
+          const existing = trackCounts.get(target.trackKey);
+          if (existing) {
+            existing.count++;
+            existing.spellings.add(target.track);
+            existing.lastPlayed = Math.max(existing.lastPlayed, play.timestamp);
+          } else {
+            const spellings = new TrackSpellings();
+            spellings.add(target.track);
+            trackCounts.set(target.trackKey, {
+              spellings,
+              album: target.album,
+              count: 1,
+              lastPlayed: play.timestamp,
+            });
+          }
+        }
       }
     }
-
-    // Build fuzzy collection lookup for cross-referencing albums
-    // Uses mapping service + fuzzy normalization to handle Discogs↔Last.fm name differences
-    const collectionByFuzzyKey = await this.buildFuzzyCollectionMap(collection);
 
     // Build top tracks (sorted by play count descending)
     const topTracks = Array.from(trackCounts.values())
@@ -2360,19 +2755,8 @@ export class StatsService {
     const albums = Array.from(albumCounts.values())
       .sort((a, b) => b.playCount - a.playCount)
       .map(a => {
-        const collectionItem =
-          (a.collectionId
-            ? collection.find(item => item.id === a.collectionId)
-            : undefined) ??
-          [{ artist: a.artist, album: a.album }, ...a.historyEntries]
-            .map(entry =>
-              this.lookupCollectionItem(
-                collectionByFuzzyKey,
-                entry.artist,
-                entry.album
-              )
-            )
-            .find(item => item !== undefined);
+        // Decided by play identity
+        const { collectionItem } = a;
         return {
           album: this.capitalizeTitle(a.album),
           playCount: a.playCount,
@@ -3117,7 +3501,7 @@ export class StatsService {
       };
     }
 
-    const identity = await this.createPlayIdentity();
+    const identity = await this.createPlayIdentity(collection);
 
     let totalPlayCount = 0;
     let firstPlayed: number | null = null;
@@ -3135,6 +3519,7 @@ export class StatsService {
         artist: string;
         playCount: number;
         lastPlayed: number;
+        collectionItem?: CollectionItem;
       }
     >();
 
@@ -3222,12 +3607,14 @@ export class StatsService {
           if (play.timestamp > existing.lastPlayed) {
             existing.lastPlayed = play.timestamp;
           }
+          existing.collectionItem ??= target.collectionItem;
         } else {
           albumAppearances.set(appearanceKey, {
             album: target.album,
             artist: target.artist,
             playCount: 1,
             lastPlayed: play.timestamp,
+            collectionItem: target.collectionItem,
           });
         }
 
@@ -3250,22 +3637,12 @@ export class StatsService {
       }
     }
 
-    // Build fuzzy collection lookup for cross-referencing albums
-    // Uses mapping service + fuzzy normalization to handle Discogs↔Last.fm name differences
-    const collectionByFuzzyKey = await this.buildFuzzyCollectionMap(collection);
-
     // Build appearsOn list with collection cross-reference
     const appearsOn = Array.from(albumAppearances.values())
       .sort((a, b) => b.playCount - a.playCount)
       .map(a => {
-        const collectionItem =
-          a.album === null
-            ? undefined
-            : this.lookupCollectionItem(
-                collectionByFuzzyKey,
-                a.artist,
-                a.album
-              );
+        // Decided by play identity
+        const { collectionItem } = a;
         return {
           album: this.displayAlbum(a.album),
           artist: this.capitalizeArtist(a.artist),
@@ -4054,25 +4431,15 @@ export class StatsService {
     // Listening arc (monthly buckets)
     const arc = await this.getAlbumListeningArc(resolvedArtist, resolvedAlbum);
 
-    // Collection lookup. Prefer the explicit albumMapping (yields collectionId
-    // directly) and reconcile against any provided collection items for cover URL.
-    // A link on any merged version counts for the whole album.
+    // The owned record, by play identity: a link on any merged version, then
+    // the album's names (the same answer Top Albums and History give)
     let collectionItem: CollectionItem | undefined;
     if (collection && collection.length > 0) {
-      const linkedId = [albumMapping, ...mergedMappings].find(
-        m => m && isCollectionLinked(m)
-      )?.collectionId;
-      if (linkedId !== undefined) {
-        collectionItem = collection.find(item => item.id === linkedId);
-      }
-      if (!collectionItem) {
-        const fuzzyMap = await this.buildFuzzyCollectionMap(collection);
-        collectionItem = this.lookupCollectionItem(
-          fuzzyMap,
-          resolvedArtist,
-          resolvedAlbum
-        );
-      }
+      const identity = await this.createPlayIdentity(collection);
+      collectionItem = identity.album(
+        resolvedArtist,
+        resolvedAlbum
+      ).collectionItem;
     }
 
     // Artist mapping (Discogs ↔ Last.fm). Search both directions since the

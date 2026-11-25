@@ -888,7 +888,8 @@ describe('Stats Routes', () => {
       expect(mockStatsService.getForgottenFavorites).toHaveBeenCalledWith(
         90,
         10,
-        100
+        100,
+        expect.any(Array)
       );
     });
 
@@ -904,7 +905,8 @@ describe('Stats Routes', () => {
       expect(mockStatsService.getForgottenFavorites).toHaveBeenCalledWith(
         180,
         10,
-        100
+        100,
+        expect.any(Array)
       );
     });
 
@@ -920,7 +922,8 @@ describe('Stats Routes', () => {
       expect(mockStatsService.getForgottenFavorites).toHaveBeenCalledWith(
         90,
         20,
-        100
+        100,
+        expect.any(Array)
       );
     });
 
@@ -936,7 +939,8 @@ describe('Stats Routes', () => {
       expect(mockStatsService.getForgottenFavorites).toHaveBeenCalledWith(
         90,
         10,
-        50
+        50,
+        expect.any(Array)
       );
     });
 
@@ -954,7 +958,8 @@ describe('Stats Routes', () => {
       expect(mockStatsService.getForgottenFavorites).toHaveBeenCalledWith(
         365,
         5,
-        25
+        25,
+        expect.any(Array)
       );
     });
 
@@ -970,7 +975,8 @@ describe('Stats Routes', () => {
       expect(mockStatsService.getForgottenFavorites).toHaveBeenCalledWith(
         90,
         10,
-        100
+        100,
+        expect.any(Array)
       );
     });
 
@@ -2225,6 +2231,21 @@ describe('Stats Routes', () => {
       dashboardStatsService.getDustyCorners = jest.fn().mockResolvedValue([]);
       dashboardStatsService.getTopArtists = jest.fn().mockResolvedValue([]);
       dashboardStatsService.getTopAlbums = jest.fn().mockResolvedValue([]);
+      // Ownership is decided by StatsService (play identity); stand in with
+      // an exact-title match on the collection it's given
+      dashboardStatsService.ownedRecordsOf = jest
+        .fn()
+        .mockImplementation(
+          async (
+            albums: Array<{ artist: string; album: string }>,
+            collection: Array<{ release: { title: string } }>
+          ) =>
+            albums.map(a =>
+              collection.find(
+                item => item.release.title.toLowerCase() === a.album
+              )
+            )
+        );
 
       // History storage mocks
       dashboardHistoryStorage.getRecentlyPlayedAlbums = jest
@@ -2275,7 +2296,7 @@ describe('Stats Routes', () => {
       return testApp;
     };
 
-    it('should use mapping service for recent albums collection matching', async () => {
+    it('shows a recent album as owned when StatsService finds its record (e.g. through a mapping)', async () => {
       // Arrange
       dashboardHistoryStorage.getRecentlyPlayedAlbums.mockResolvedValue([
         {
@@ -2330,6 +2351,10 @@ describe('Stats Routes', () => {
           },
         ]);
 
+      // Play identity follows the mapping to the record
+      dashboardStatsService.ownedRecordsOf.mockResolvedValue([
+        collectionPage.data[0] as never,
+      ]);
       dashboardApp = createDashboardApp(true);
 
       // Act
@@ -2339,7 +2364,11 @@ describe('Stats Routes', () => {
 
       // Assert
       expect(response.status).toBe(200);
-      expect(dashboardMappingService.getAllAlbumMappings).toHaveBeenCalled();
+      // The route asks StatsService, with the recent albums and the collection
+      expect(dashboardStatsService.ownedRecordsOf).toHaveBeenCalledWith(
+        [expect.objectContaining({ album: 'bestiary (bonus track version)' })],
+        [expect.objectContaining({ id: 1 })]
+      );
 
       const recentAlbums = response.body.data.recentAlbums;
       expect(recentAlbums).toHaveLength(1);
@@ -2348,7 +2377,7 @@ describe('Stats Routes', () => {
       expect(recentAlbums[0].coverUrl).toBe('https://example.com/bestiary.jpg');
     });
 
-    it('should work without mapping service (fallback to fuzzy only)', async () => {
+    it('shows a recent album as owned by its own name without a mapping service', async () => {
       // Arrange
       dashboardHistoryStorage.getRecentlyPlayedAlbums.mockResolvedValue([
         {

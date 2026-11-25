@@ -63,6 +63,12 @@ export default function createSuggestionsRouter(
 ) {
   const router = express.Router();
 
+  /** The cached collection, for ownership on History rows; empty when not connected */
+  const loadOwnedCollection = async (): Promise<CollectionItem[]> => {
+    const username = (await authService.getUserSettings()).discogs.username;
+    return username ? getAllCachedCollectionItems(username, fileStorage) : [];
+  };
+
   /**
    * Album and track mappings change how albums and tracks are merged in
    * cached stats (e.g. top albums, top tracks), so rebuild the warm cache in
@@ -612,12 +618,16 @@ export default function createSuggestionsRouter(
         });
       }
 
-      const result = await historyStorage.getAlbumsPaginated(
-        page,
-        perPage,
-        sortBy as 'playCount' | 'lastPlayed' | 'artist' | 'album',
-        sortOrder as 'asc' | 'desc',
-        search
+      // Grouped by play identity, with the owned record on each row
+      const result = await statsService.getHistoryAlbums(
+        {
+          page,
+          perPage,
+          sortBy: sortBy as 'playCount' | 'lastPlayed' | 'artist' | 'album',
+          sortOrder,
+          search,
+        },
+        await loadOwnedCollection()
       );
 
       res.json({
@@ -665,12 +675,20 @@ export default function createSuggestionsRouter(
         });
       }
 
-      const result = await historyStorage.getArtistsPaginated(
-        page,
-        perPage,
-        sortBy as 'playCount' | 'lastPlayed' | 'artist' | 'albumCount',
-        sortOrder as 'asc' | 'desc',
-        search
+      // Grouped by play identity, with owned record counts
+      const result = await statsService.getHistoryArtists(
+        {
+          page,
+          perPage,
+          sortBy: sortBy as
+            | 'playCount'
+            | 'lastPlayed'
+            | 'artist'
+            | 'albumCount',
+          sortOrder,
+          search,
+        },
+        await loadOwnedCollection()
       );
 
       res.json({
@@ -724,12 +742,22 @@ export default function createSuggestionsRouter(
         });
       }
 
-      const result = await historyStorage.getTracksPaginated(
-        page,
-        perPage,
-        sortBy as 'playCount' | 'lastPlayed' | 'artist' | 'album' | 'track',
-        sortOrder as 'asc' | 'desc',
-        search
+      // Grouped by play identity, the same rows as Top Tracks, with the
+      // owned record on each row
+      const result = await statsService.getHistoryTracks(
+        {
+          page,
+          perPage,
+          sortBy: sortBy as
+            | 'playCount'
+            | 'lastPlayed'
+            | 'artist'
+            | 'album'
+            | 'track',
+          sortOrder,
+          search,
+        },
+        await loadOwnedCollection()
       );
 
       res.json({

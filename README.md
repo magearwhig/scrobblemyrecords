@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-7457%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-7461%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -427,7 +427,8 @@ Three-tab view of your listening activity:
 - **Spotify Integration**: Play button for each track to instantly search and play on Spotify
 - Sync controls to update the history index
 - Full all-time artists, albums and tracks lists (opened from the Stats page **View all-time** links), styled like the Stats top lists: rank when sorted by most played, cover art, "Owned" badges, last played and play count
-- "Owned" badges here, on the Stats rankings and on Forgotten Favorites follow your album mappings, so an album Last.fm files under another name (e.g. "Lice" for Discogs' "Aesop Rock, Homeboy Sandman") still shows as owned
+- The Albums, Tracks and Artists lists count plays the same way as the Stats page: album versions joined by a mapping are one album, and a play a track mapping moves counts where it moved to
+- "Owned" badges here, on the Stats rankings, Forgotten Favorites and the dashboard are decided on the server from your album mappings and collection, so an album Last.fm files under another name (e.g. "Lice" for Discogs' "Aesop Rock, Homeboy Sandman") still shows as owned, and every page agrees. "N owned" on an artist counts each record once, including ones linked to the artist by a mapping
 - Artists without a photo show the cover of one of their records in your collection (Last.fm no longer provides artist photos)
 
 **Unresolved Tab** (plays Last.fm recorded without an album):
@@ -872,7 +873,7 @@ Protect your user-generated data with manual and automatic backups:
 - Album mappings (Last.fm → Discogs collection, and merged album versions)
 - Dismissed album merge suggestions
 - Track mappings (track names counted as another track, including album page merges)
-- Every list of tracks (Top Tracks, Forgotten Favorites, the artist and track pages, rankings over time) counts a play the same way, through one shared resolver: track mappings first (including ones that move a play to another album or artist), then album mappings on the album it lands on, then artist aliases. A contract test checks these pages agree
+- Every list of plays (Top Tracks, Albums and Artists, Forgotten Favorites, History's lists, the artist and track pages, rankings over time, the dashboard) counts a play the same way, through one shared resolver: track mappings first (including ones that move a play to another album or artist), then album mappings on the album it lands on, then artist aliases, then which record you own. A contract test checks these pages agree, and a lint rule stops new code from applying mappings itself (see `AGENTS.md`)
 - Compound-artist mappings
 - Labels you set for albums you don't own (label pages)
 - Unresolved history: album assignments for albumless plays, hidden tracks, and excluded artists

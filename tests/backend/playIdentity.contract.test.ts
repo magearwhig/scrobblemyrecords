@@ -121,6 +121,28 @@ const fileStorage = {
   writeJSONWithBackup: jest.fn().mockResolvedValue(undefined),
 } as unknown as FileStorage;
 
+// Owned: the collection's own spelling, linked by the album mapping
+const dogProblems = {
+  id: 5403896,
+  date_added: '2024-01-01T00:00:00Z',
+  release: {
+    id: 5403896,
+    title: 'Dog Problems',
+    artist: 'The Format (2)',
+    format: ['Vinyl'],
+    label: [],
+    resource_url: '',
+  },
+};
+const collection = [dogProblems];
+
+const query = {
+  page: 1,
+  perPage: 50,
+  sortBy: 'playCount',
+  sortOrder: 'desc',
+} as const;
+
 const isDogProblems = (album: string | undefined) =>
   album?.toLowerCase() === 'dog problems';
 
@@ -203,5 +225,105 @@ describe('play identity contract', () => {
       .sort((a, b) => b - a);
 
     expect(counts).toEqual([6, 1, 1]);
+  });
+
+  it("History's Tracks list agrees, and says it's owned", async () => {
+    const { items } = await stats.getHistoryTracks(query, collection);
+    const rows = items.filter(t => t.track === 'Time Bomb');
+
+    const onDogProblems = rows.filter(t => isDogProblems(t.album));
+    expect(onDogProblems.map(t => t.playCount)).toEqual([6]);
+    expect(onDogProblems[0].collectionItem?.id).toBe(5403896);
+    expect(rows).toHaveLength(3);
+  });
+
+  it("History's Albums list and Top Albums agree on Dog Problems", async () => {
+    const history = await stats.getHistoryAlbums(query, collection);
+    const top = await stats.getTopAlbums(
+      'all',
+      50,
+      undefined,
+      undefined,
+      collection
+    );
+
+    const historyRow = history.items.find(a => isDogProblems(a.album));
+    const topRow = top.find(a => isDogProblems(a.album));
+    expect(historyRow?.playCount).toBe(6);
+    expect(topRow?.playCount).toBe(6);
+    expect(historyRow?.collectionItem?.id).toBe(5403896);
+    expect(topRow?.inCollection).toBe(true);
+    // The b-sides album lost its only play to Dog Problems
+    expect(history.items.some(a => a.album.toLowerCase() === 'b-sides')).toBe(
+      false
+    );
+    expect(top.some(a => a.album.toLowerCase() === 'b-sides')).toBe(false);
+  });
+
+  it('Forgotten Favorites and History agree on what is owned', async () => {
+    const { tracks } = await stats.getForgottenFavorites(0, 1, 100, collection);
+
+    expect(
+      tracks.find(t => t.track === 'Time Bomb' && isDogProblems(t.album))
+        ?.collectionItem?.id
+    ).toBe(5403896);
+  });
+
+  it("History's Artists list and Top Artists agree on what The Format owns", async () => {
+    const history = await stats.getHistoryArtists(query, collection);
+    const top = await stats.withArtistOwnership(
+      await stats.getTopArtists('all', 10),
+      collection
+    );
+
+    expect(history.items[0].ownedCount).toBe(1);
+    expect(
+      top.find(a => a.artist.toLowerCase() === 'the format')?.ownedCount
+    ).toBe(1);
+  });
+
+  it("the artist page's totals and albums agree with History", async () => {
+    const detail = await stats.getArtistDetail(
+      'The Format',
+      'month',
+      collection
+    );
+    const history = await stats.getHistoryArtists(query, collection);
+
+    // Every play that counts as The Format, including the one a track
+    // mapping moved from a misspelled artist
+    expect(detail.totalPlayCount).toBe(8);
+    expect(history.items[0].playCount).toBe(8);
+
+    const albums = detail.albums.map(a => [a.album.toLowerCase(), a.playCount]);
+    expect(albums).toEqual([
+      ['dog problems', 6],
+      ['live', 1],
+    ]);
+    expect(detail.albums[0].inCollection).toBe(true);
+  });
+
+  it('Top Artists, artist rankings and History count The Format the same', async () => {
+    const top = await stats.getTopArtists('all', 10);
+    const ranked = await rankings.getRankingsOverTime('artists', 10);
+    const latest = ranked.snapshots[ranked.snapshots.length - 1].rankings;
+
+    const isTheFormat = (name: string | undefined) =>
+      name?.toLowerCase() === 'the format';
+    expect(top.find(a => isTheFormat(a.artist))?.playCount).toBe(8);
+    expect(latest.find(r => isTheFormat(r.name))?.count).toBe(8);
+    // The misspelled artist's only play moved to The Format
+    expect(top.some(a => a.artist.toLowerCase() === 'teh format')).toBe(false);
+    expect(latest.some(r => r.name.toLowerCase() === 'teh format')).toBe(false);
+  });
+
+  it('album rankings agree with Top Albums', async () => {
+    const ranked = await rankings.getRankingsOverTime('albums', 10);
+    const latest = ranked.snapshots[ranked.snapshots.length - 1].rankings;
+
+    expect(
+      latest.find(r => r.name.toLowerCase() === 'dog problems')?.count
+    ).toBe(6);
+    expect(latest.some(r => r.name.toLowerCase() === 'b-sides')).toBe(false);
   });
 });

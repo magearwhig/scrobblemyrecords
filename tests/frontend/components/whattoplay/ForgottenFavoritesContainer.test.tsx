@@ -19,15 +19,6 @@ jest.mock('../../../../src/renderer/context/AppContext', () => ({
   }),
 }));
 
-jest.mock('../../../../src/renderer/hooks/useCollectionLookup', () => ({
-  useCollectionLookup: () => ({
-    collectionMap: new Map(),
-    collectionArtistCounts: new Map(),
-    loading: false,
-    collection: [],
-  }),
-}));
-
 // Mock the ForgottenFavoritesTab child component
 jest.mock(
   '../../../../src/renderer/components/discovery/ForgottenFavoritesTab',

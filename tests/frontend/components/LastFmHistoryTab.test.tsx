@@ -20,20 +20,6 @@ jest.mock('../../../src/renderer/context/AppContext', () => ({
   useApp: () => mockUseApp,
 }));
 
-// Mock useCollectionLookup hook (used by Phase 6 cross-feature enrichment)
-const mockLookupInCollection = jest.fn();
-const mockCollectionLookup = {
-  collectionMap: new Map(),
-  collectionArtistCounts: new Map(),
-  collectionArtistCovers: new Map<string, string>(),
-  loading: false,
-  collection: [],
-};
-jest.mock('../../../src/renderer/hooks/useCollectionLookup', () => ({
-  useCollectionLookup: () => mockCollectionLookup,
-  lookupInCollection: (...args: unknown[]) => mockLookupInCollection(...args),
-}));
-
 // Cover art for albums not in the collection
 const mockBatchGetAlbumCovers = jest.fn();
 jest.mock('../../../src/renderer/services/statsApi', () => ({
@@ -87,6 +73,8 @@ const createMockArtistHistory = (count: number) => ({
     playCount: 500 - i * 50,
     albumCount: 10 - i,
     lastPlayed: Math.floor(Date.now() / 1000) - i * 86400,
+    ownedCount: 0,
+    ownedCoverUrl: undefined as string | undefined,
   })),
   total: count,
   totalPages: Math.ceil(count / 50),
@@ -94,7 +82,6 @@ const createMockArtistHistory = (count: number) => ({
 });
 
 beforeEach(() => {
-  mockLookupInCollection.mockReturnValue(undefined);
   mockBatchGetAlbumCovers.mockResolvedValue({ success: true, data: {} });
 });
 
@@ -136,7 +123,6 @@ describe('LastFmHistoryTab list rows', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockLookupInCollection.mockReturnValue(undefined);
     mockBatchGetAlbumCovers.mockResolvedValue({ success: true, data: {} });
     api = createMockApiInstance();
     mockApiService.getApiService.mockReturnValue(api as any);
@@ -209,17 +195,17 @@ describe('LastFmHistoryTab list rows', () => {
           album: 'sound of silver',
           playCount: 9,
           lastPlayed: 1,
+          collectionItem: owned(
+            'LCD Soundsystem',
+            'Sound Of Silver',
+            'lcd.jpg'
+          ),
         },
       ],
       total: 2,
       totalPages: 1,
       page: 1,
     });
-    mockLookupInCollection.mockImplementation((_map, artist: string) =>
-      artist === 'lcd soundsystem'
-        ? owned('LCD Soundsystem', 'Sound Of Silver', 'lcd.jpg')
-        : undefined
-    );
 
     render(<LastFmHistoryTab />);
 
@@ -356,10 +342,15 @@ describe('LastFmHistoryTab list rows', () => {
     expect(screen.getByText('First played')).toBeInTheDocument();
   });
 
-  it('uses a collection cover for an artist', async () => {
+  it("uses the server's owned cover and count for an artist", async () => {
     api.getAlbumHistoryPaginated.mockResolvedValue(createMockAlbumHistory(1));
-    api.getArtistHistoryPaginated.mockResolvedValue(createMockArtistHistory(1));
-    mockCollectionLookup.collectionArtistCovers.set('artist 1', 'a1.jpg');
+    const artists = createMockArtistHistory(1);
+    artists.items[0] = {
+      ...artists.items[0],
+      ownedCount: 2,
+      ownedCoverUrl: 'a1.jpg',
+    };
+    api.getArtistHistoryPaginated.mockResolvedValue(artists);
 
     render(<LastFmHistoryTab />);
     await screen.findByText('Album 1');
@@ -368,7 +359,45 @@ describe('LastFmHistoryTab list rows', () => {
     expect(
       await screen.findByRole('img', { name: 'Artist 1' })
     ).toHaveAttribute('src', 'a1.jpg');
-    mockCollectionLookup.collectionArtistCovers.clear();
+    expect(screen.getByText('2 owned')).toBeInTheDocument();
+  });
+
+  it("shows Owned on a track from the server's row and links to the record", async () => {
+    api.getAlbumHistoryPaginated.mockResolvedValue(createMockAlbumHistory(1));
+    api.getTrackHistoryPaginated.mockResolvedValue({
+      items: [
+        {
+          artist: 'lice',
+          artistName: 'lice',
+          album: 'triple fat lice',
+          track: 'pins and needles',
+          playCount: 5,
+          firstPlayed: 1,
+          lastPlayed: 1,
+          collectionItem: owned(
+            'Aesop Rock, Homeboy Sandman',
+            'Triple Fat Lice',
+            'tfl.jpg'
+          ),
+        },
+      ],
+      total: 1,
+      totalPages: 1,
+      page: 1,
+    });
+
+    render(<LastFmHistoryTab />);
+    await screen.findByText('Album 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Tracks' }));
+
+    expect(
+      await screen.findByRole('button', {
+        name: 'View Triple Fat Lice in your collection',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: 'Triple Fat Lice cover' })
+    ).toHaveAttribute('src', 'tfl.jpg');
   });
 });
 
@@ -380,7 +409,6 @@ describe('LastFmHistoryTab', () => {
     mockApi = createMockApiInstance();
     mockApiService.getApiService.mockReturnValue(mockApi as any);
     jest.clearAllMocks();
-    mockLookupInCollection.mockReturnValue(undefined);
     mockBatchGetAlbumCovers.mockResolvedValue({ success: true, data: {} });
     jest.useFakeTimers();
     user = userEvent.setup({ delay: null });
