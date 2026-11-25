@@ -684,8 +684,15 @@ export interface DustyCornerAlbum {
 }
 
 export interface RankingItem {
+  /**
+   * Stable identity of the row across snapshots (two tracks can share a
+   * name). Always sent by the server; optional for responses cached before it.
+   */
+  key?: string;
   name: string;
   artist?: string;
+  /** Tracks: the album the track counts on; null when it has none */
+  album?: string | null;
   count: number;
   rank: number;
 }

@@ -566,23 +566,71 @@ describe('RankingsService', () => {
       expect(result.snapshots.map(s => s.period)).toContain('2024-03');
     });
 
-    it('merges unresolved plays into the same artist|track ranking', async () => {
+    it('ranks unresolved plays apart from album plays, like Top Tracks', async () => {
       mockHistoryStorage.getIndex = jest
         .fn()
         .mockResolvedValue({ albums, unresolved });
 
       const result = await service.getRankingsOverTime('tracks', 10);
 
-      const rankings = result.snapshots[0].rankings;
-      expect(rankings).toHaveLength(3); // January only
-      expect(rankings.find(r => r.name === 'Track 1')).toMatchObject({
-        artist: 'artist 1',
-        count: 3,
+      const rankings = result.snapshots[0].rankings; // January only
+      expect(rankings.map(r => [r.name, r.artist, r.count])).toEqual([
+        ['Single', 'artist 3', 3],
+        ['Track 1', 'artist 1', 2],
+        ['Track 2', 'artist 2', 2],
+        ['Track 1', 'artist 1', 1],
+      ]);
+    });
+
+    it('ranks a track on album versions joined by a mapping as one', async () => {
+      mockHistoryStorage.getIndex = jest.fn().mockResolvedValue({
+        albums: {
+          'the format|dog problems': {
+            playCount: 2,
+            plays: [
+              { timestamp: 1705320000, track: 'Time Bomb' },
+              { timestamp: 1705320001, track: 'Time Bomb' },
+            ],
+          },
+          'the format|dog problems (bonus track version)': {
+            playCount: 1,
+            plays: [{ timestamp: 1705320002, track: 'Time Bomb' }],
+          },
+          'the format|live': {
+            playCount: 1,
+            plays: [{ timestamp: 1705320003, track: 'Time Bomb' }],
+          },
+        },
       });
-      expect(rankings.find(r => r.name === 'Single')).toMatchObject({
-        artist: 'artist 3',
-        count: 3,
+      service.setMappingService({
+        getAllAlbumMappings: async () => [
+          {
+            historyArtist: 'the format',
+            historyAlbum: 'dog problems (bonus track version)',
+            collectionArtist: 'The Format (2)',
+            collectionAlbum: 'Dog Problems',
+            collectionId: 5403896,
+            createdAt: 1,
+          },
+        ],
       });
+
+      const result = await service.getRankingsOverTime('tracks', 10);
+
+      const rankings = result.snapshots[result.snapshots.length - 1].rankings;
+      // The live album is another album, so its play is its own row
+      expect(rankings.map(r => [r.name, r.count])).toEqual([
+        ['Time Bomb', 3],
+        ['Time Bomb', 1],
+      ]);
+      // Each row says which album it is and has its own key, so the chart
+      // can show both
+      // History album names are stored lowercase; the chart capitalises them
+      expect(rankings.map(r => r.album?.toLowerCase())).toEqual([
+        'dog problems',
+        'live',
+      ]);
+      expect(new Set(rankings.map(r => r.key)).size).toBe(2);
     });
 
     it('album rankings are identical with and without unresolved plays', async () => {

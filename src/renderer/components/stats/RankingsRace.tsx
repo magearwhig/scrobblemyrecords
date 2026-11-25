@@ -4,11 +4,18 @@ import { toDisplayName } from '../../../shared/utils/displayName';
 import './RankingsRace.css';
 
 interface RankingItem {
+  /** Stable row identity; two tracks on different albums can share a name */
+  key?: string;
   name: string;
   artist?: string;
+  album?: string | null;
   count: number;
   rank: number;
 }
+
+/** A bar's identity across snapshots */
+const itemKey = (item: RankingItem): string =>
+  item.key ?? `${item.name}|${item.artist ?? ''}`;
 
 interface RankingSnapshot {
   period: string;
@@ -34,6 +41,14 @@ export const RankingsRace: React.FC<RankingsRaceProps> = ({
 
   // Get current snapshot data
   const currentSnapshot = snapshots[currentIndex] || null;
+  // Track name|artist pairs shared by more than one bar in this snapshot
+  const sameLabel = new Set<string>();
+  const seenLabels = new Set<string>();
+  for (const r of currentSnapshot?.rankings ?? []) {
+    const label = `${r.name}|${r.artist ?? ''}`;
+    if (seenLabels.has(label)) sameLabel.add(label);
+    seenLabels.add(label);
+  }
   const maxCount = currentSnapshot
     ? Math.max(...currentSnapshot.rankings.map(r => r.count))
     : 1;
@@ -44,7 +59,7 @@ export const RankingsRace: React.FC<RankingsRaceProps> = ({
     const items = new Set<string>();
     for (const snapshot of snapshots) {
       for (const ranking of snapshot.rankings) {
-        items.add(ranking.name);
+        items.add(itemKey(ranking));
       }
     }
     setAllItems(items);
@@ -158,17 +173,17 @@ export const RankingsRace: React.FC<RankingsRaceProps> = ({
       {/* Rankings visualization */}
       <div className='rankings-race-chart'>
         {currentSnapshot &&
-          Array.from(allItems).map(itemName => {
+          Array.from(allItems).map(itemId => {
             // Find this item in the current snapshot
             const item = currentSnapshot.rankings.find(
-              r => r.name === itemName
+              r => itemKey(r) === itemId
             );
 
             if (!item) {
               // Item not in current ranking - move it off screen
               return (
                 <div
-                  key={itemName}
+                  key={itemId}
                   className='rankings-race-bar rankings-race-bar-hidden'
                   style={{
                     transform: `translateY(${topN * 60 + 100}px)`,
@@ -180,16 +195,23 @@ export const RankingsRace: React.FC<RankingsRaceProps> = ({
 
             const widthPercent = (item.count / maxCount) * 100;
             // History names are stored lowercase
-            const label =
+            const baseLabel =
               type === 'artists'
                 ? toDisplayName(item.name)
                 : `${toDisplayName(item.name)}${item.artist ? ` - ${toDisplayName(item.artist)}` : ''}`;
+            // Name the album only when another bar would read the same
+            const label =
+              type === 'tracks' &&
+              item.album &&
+              sameLabel.has(`${item.name}|${item.artist ?? ''}`)
+                ? `${baseLabel} (${toDisplayName(item.album)})`
+                : baseLabel;
             // Use rank-1 (0-indexed) for positioning
             const position = (item.rank - 1) * 60;
 
             return (
               <div
-                key={item.name}
+                key={itemId}
                 className='rankings-race-bar rankings-race-bar-positioned'
                 style={{
                   transform: `translateY(${position}px)`,

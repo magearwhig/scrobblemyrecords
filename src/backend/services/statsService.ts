@@ -73,6 +73,10 @@ import { ArtistNameResolver } from './artistNameResolver';
 import { CompoundArtistMappingServiceLike } from './compoundArtistMappingService';
 import { MappingService } from './mappingService';
 import { loadAlbumMappings, lookupMergedHistory } from './mergedAlbumHistory';
+import {
+  buildPlayIdentityResolver,
+  PlayIdentityResolver,
+} from './playIdentity';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 import {
   createTrackMapper,
@@ -97,7 +101,7 @@ const AVG_TRACK_DURATION_SECONDS = 210;
  * Bump when a change alters what warm-cached stats contain (e.g. how albums
  * are grouped), so caches built by older code are recomputed.
  */
-const WARM_CACHE_VERSION = 5;
+const WARM_CACHE_VERSION = 6;
 
 // Album shown for unresolved plays; re-exported for existing importers
 export { UNKNOWN_ALBUM_LABEL };
@@ -659,6 +663,23 @@ export class StatsService {
       this.trackMappingService,
       await loadAlbumMappings(this.mappingService)
     );
+  }
+
+  /**
+   * What each play counts as (artist, album, track, owned record): the one
+   * resolver every list of plays groups by, so pages agree. See
+   * services/playIdentity.
+   */
+  private async createPlayIdentity(
+    collection: CollectionItem[] = []
+  ): Promise<PlayIdentityResolver> {
+    return buildPlayIdentityResolver({
+      mappingService: this.mappingService,
+      trackMappingService: this.trackMappingService,
+      resolveArtist: name => this.resolveArtistName(name),
+      historyStorage: this.historyStorage,
+      collection,
+    });
   }
 
   /** Identifies the current album mappings; '' when there are none. */
@@ -1223,9 +1244,9 @@ export class StatsService {
       cutoffTimestamp = this.getPeriodCutoff(period);
     }
 
-    // Count plays per track in the period, after track mappings
-    // Key: normalized "artist|album|track"
-    const mapTrack = await this.createTrackMapper();
+    // Count plays per track in the period, after track mappings and merged
+    // album versions. Key: normalized "artist|album|track"
+    const identity = await this.createPlayIdentity();
     const trackCounts = new Map<
       string,
       {
@@ -1246,12 +1267,8 @@ export class StatsService {
           play.timestamp <= endTimestamp &&
           play.track
         ) {
-          const target = mapTrack(artist, album, play.track);
-          const trackKey = this.trackGroupKey(
-            target.artist,
-            target.album,
-            target.track
-          );
+          const target = identity.play(artist, album, play.track);
+          const trackKey = target.trackKey;
           const existing = trackCounts.get(trackKey);
           if (existing) {
             existing.count++;
@@ -1984,6 +2001,7 @@ export class StatsService {
       dormantPeriodDays,
       minPlayCount,
       aliases: this.artistAliasFingerprint(),
+      albumMappings: await this.albumMappingFingerprint(),
     });
     if (
       this.forgottenFavoritesCache &&
@@ -2021,8 +2039,10 @@ export class StatsService {
     >();
 
     // Track mappings are keyed by album, so they never apply to unresolved
-    // plays (album null), which form their own "Unknown album" track rows
-    const mapTrack = await this.createTrackMapper();
+    // plays (album null), which form their own "Unknown album" track rows.
+    // Album versions merged by a mapping count as one album, so a play on any
+    // version keeps the track from looking forgotten.
+    const identity = await this.createPlayIdentity();
     for (const { artist, album, entry: albumHistory } of listeningEntries(
       index
     )) {
@@ -2034,13 +2054,9 @@ export class StatsService {
           artist: targetArtist,
           album: targetAlbum,
           track: targetTrack,
-        } = mapTrack(artist, album, play.track);
+          trackKey,
+        } = identity.play(artist, album, play.track);
 
-        const trackKey = this.trackGroupKey(
-          targetArtist,
-          targetAlbum,
-          targetTrack
-        );
         const existing = trackStats.get(trackKey);
 
         if (existing) {
@@ -2180,9 +2196,9 @@ export class StatsService {
     let thisMonth = 0;
     let thisYear = 0;
 
-    // Track play counts after track mappings: key = normalized
-    // artist|album|track, value = { spellings, album, count, lastPlayed }
-    const mapTrack = await this.createTrackMapper();
+    // Track play counts by play identity (track mappings, merged album
+    // versions), value = { spellings, album, count, lastPlayed }
+    const identity = await this.createPlayIdentity();
     const trackCounts = new Map<
       string,
       {
@@ -2220,12 +2236,50 @@ export class StatsService {
 
     // Unresolved plays (historyAlbum null) count in totals, periods, trend and
     // top tracks (as "Unknown album"), but never in the albums list
+    const addTrackPlay = (
+      artist: string,
+      historyAlbum: string | null,
+      play: { timestamp: number; track?: string }
+    ) => {
+      if (!play.track) return;
+      const target = identity.play(artist, historyAlbum, play.track);
+      if (!this.isArtistMatch(target.artist, artistName)) return;
+      const { track, trackKey } = target;
+      const existing = trackCounts.get(trackKey);
+      if (existing) {
+        existing.count++;
+        existing.spellings.add(track);
+        if (play.timestamp > existing.lastPlayed) {
+          existing.lastPlayed = play.timestamp;
+        }
+      } else {
+        const spellings = new TrackSpellings();
+        spellings.add(track);
+        trackCounts.set(trackKey, {
+          spellings,
+          album: target.album,
+          count: 1,
+          lastPlayed: play.timestamp,
+        });
+      }
+    };
+    const movesPlaysHere = identity.movesPlaysTo(name =>
+      this.isArtistMatch(name, artistName)
+    );
+
     for (const {
       artist,
       album: historyAlbum,
       entry: albumHistory,
     } of listeningEntries(index)) {
       if (!this.isArtistMatch(artist, artistName)) {
+        // Another artist's plays count here only when a track mapping moves
+        // them to this artist, and then only in the top tracks
+        if (movesPlaysHere(artist, historyAlbum)) {
+          for (const play of albumHistory.plays) {
+            addTrackPlay(artist, historyAlbum, play);
+          }
+        }
         continue;
       }
 
@@ -2276,29 +2330,10 @@ export class StatsService {
         if (play.timestamp >= monthStart) thisMonth++;
         if (play.timestamp >= yearStart) thisYear++;
 
-        // Track aggregation. The mapper looks up the scrobble's own album;
-        // a mapping keeps the row on this canonical album.
-        if (play.track) {
-          const track = mapTrack(artist, historyAlbum, play.track).track;
-          const trackKey = this.trackGroupKey(artist, album, track);
-          const existing = trackCounts.get(trackKey);
-          if (existing) {
-            existing.count++;
-            existing.spellings.add(track);
-            if (play.timestamp > existing.lastPlayed) {
-              existing.lastPlayed = play.timestamp;
-            }
-          } else {
-            const spellings = new TrackSpellings();
-            spellings.add(track);
-            trackCounts.set(trackKey, {
-              spellings,
-              album,
-              count: 1,
-              lastPlayed: play.timestamp,
-            });
-          }
-        }
+        // Track aggregation by play identity: a track mapping that moves the
+        // play to another album counts it there, and one that moves it to
+        // another artist counts it on that artist's page, as Top Tracks does
+        if (play.track) addTrackPlay(artist, historyAlbum, play);
 
         // Play trend aggregation
         const periodKey = this.trendPeriodKey(play.timestamp, trendPeriod);
@@ -3082,8 +3117,7 @@ export class StatsService {
       };
     }
 
-    const normalizedAlbumFilter = album?.toLowerCase();
-    const mapTrack = await this.createTrackMapper();
+    const identity = await this.createPlayIdentity();
 
     let totalPlayCount = 0;
     let firstPlayed: number | null = null;
@@ -3092,8 +3126,8 @@ export class StatsService {
     // Play trend data
     const trendCounts = new Map<string, number>();
 
-    // Albums this track appears on: key = normalized album, value = { album, artist, playCount, lastPlayed }.
-    // Versions merged by album mappings count as one album.
+    // Albums this track appears on, by play identity: versions merged by
+    // album mappings count as one album
     const albumAppearances = new Map<
       string,
       {
@@ -3103,53 +3137,70 @@ export class StatsService {
         lastPlayed: number;
       }
     >();
-    const canonicalize = createAlbumCanonicalizer(
-      await loadAlbumMappings(this.mappingService)
-    );
-    const canonicalAlbumFilter = album
-      ? canonicalize(artist, album).album.toLowerCase()
-      : undefined;
 
-    // Unresolved plays (entryAlbum null) appear as one "Unknown album"
-    // bucket; an album filter of "Unknown album" selects only them
+    // An album filter of "Unknown album" selects plays with no album
     const unknownAlbumFilter =
-      normalizedAlbumFilter === UNKNOWN_ALBUM_LABEL.toLowerCase();
+      album?.toLowerCase() === UNKNOWN_ALBUM_LABEL.toLowerCase();
+    const albumFilterKey =
+      album && !unknownAlbumFilter
+        ? identity.album(artist, album).albumKey
+        : undefined;
+    // Opened from an album row, the track is named as that album counts it
+    const requestedKey = trackMatchKey(
+      album && !unknownAlbumFilter
+        ? identity.play(artist, album, track).track
+        : track
+    );
+
+    // Each play is resolved before filtering, so a play a track mapping moved
+    // to another album or artist counts there, and only there
+    const artistMatches = new Map<string, boolean>();
+    const matchesArtist = (name: string) => {
+      let match = artistMatches.get(name);
+      if (match === undefined) {
+        match = this.isArtistMatch(name, artist);
+        artistMatches.set(name, match);
+      }
+      return match;
+    };
+
+    // Other artists' plays only matter when a track mapping moves some to
+    // this artist; skip the rest without resolving each play
+    const movesPlaysHere = identity.movesPlaysTo(matchesArtist);
+
     for (const {
       artist: entryArtist,
       album: entryAlbum,
       entry: albumHistory,
     } of listeningEntries(index)) {
-      // Filter by artist (includes compound decomposition)
-      if (!this.isArtistMatch(entryArtist, artist)) {
-        continue;
-      }
-
-      // If album filter is provided, only look at that album (any of its versions)
-      const canonicalAlbum =
-        entryAlbum === null
-          ? null
-          : canonicalize(entryArtist, entryAlbum).album;
-      if (entryAlbum === null || canonicalAlbum === null) {
-        if (normalizedAlbumFilter && !unknownAlbumFilter) continue;
-      } else if (
-        normalizedAlbumFilter &&
-        entryAlbum.toLowerCase() !== normalizedAlbumFilter &&
-        canonicalAlbum.toLowerCase() !== canonicalAlbumFilter
+      if (
+        !matchesArtist(entryArtist) &&
+        !movesPlaysHere(entryArtist, entryAlbum)
       ) {
         continue;
       }
-
-      // Match by trackMatchKey after track mappings, so spellings counted
-      // as this track on this album match
-      const targetKey = trackMatchKey(
-        mapTrack(entryArtist, entryAlbum, track).track
-      );
+      // The requested name as this album counts it, when a track mapping
+      // renames it on this same album. A mapping that moves it to another
+      // album makes it another album's track, so it doesn't count here.
+      const requestedHere = identity.play(entryArtist, entryAlbum, track);
+      const entryRequestedKey =
+        requestedHere.albumKey ===
+        (entryAlbum === null
+          ? null
+          : identity.album(entryArtist, entryAlbum).albumKey)
+          ? trackMatchKey(requestedHere.track)
+          : requestedKey;
       for (const play of albumHistory.plays) {
-        if (
-          !play.track ||
-          trackMatchKey(mapTrack(entryArtist, entryAlbum, play.track).track) !==
-            targetKey
-        ) {
+        if (!play.track) continue;
+        const target = identity.play(entryArtist, entryAlbum, play.track);
+        if (!matchesArtist(target.artist)) continue;
+        if (unknownAlbumFilter) {
+          if (target.album !== null) continue;
+        } else if (albumFilterKey && target.albumKey !== albumFilterKey) {
+          continue;
+        }
+        const playKey = trackMatchKey(target.track);
+        if (playKey !== requestedKey && playKey !== entryRequestedKey) {
           continue;
         }
 
@@ -3164,20 +3215,17 @@ export class StatsService {
         }
 
         // Album appearances
-        const normalizedEntryAlbum =
-          canonicalAlbum === null
-            ? UNRESOLVED_GROUP_PREFIX
-            : canonicalAlbum.toLowerCase();
-        const existing = albumAppearances.get(normalizedEntryAlbum);
+        const appearanceKey = target.albumKey ?? UNRESOLVED_GROUP_PREFIX;
+        const existing = albumAppearances.get(appearanceKey);
         if (existing) {
           existing.playCount++;
           if (play.timestamp > existing.lastPlayed) {
             existing.lastPlayed = play.timestamp;
           }
         } else {
-          albumAppearances.set(normalizedEntryAlbum, {
-            album: canonicalAlbum,
-            artist: entryArtist,
+          albumAppearances.set(appearanceKey, {
+            album: target.album,
+            artist: target.artist,
             playCount: 1,
             lastPlayed: play.timestamp,
           });

@@ -1170,7 +1170,7 @@ describe('StatsService', () => {
       const warmBlock = {
         warmedAt: Math.floor(Date.now() / 1000),
         syncTimestamp,
-        version: 5,
+        version: 6,
         artistAliasFingerprint: '',
         historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
         streaks: { currentStreak: 5, longestStreak: 10 },
@@ -1244,7 +1244,7 @@ describe('StatsService', () => {
         warm: {
           warmedAt: 0,
           syncTimestamp,
-          version: 5,
+          version: 6,
           artistAliasFingerprint: '',
           historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
           topAlbums: { all: [{ artist: 'cached', album: 'cached' }] },
@@ -1277,7 +1277,7 @@ describe('StatsService', () => {
         warm: {
           warmedAt: 0,
           syncTimestamp,
-          version: 5,
+          version: 6,
           artistAliasFingerprint: '',
           // Built when a rule pointed somewhere else (same counts)
           historyFingerprint: computeHistoryFingerprint(
@@ -1303,7 +1303,7 @@ describe('StatsService', () => {
       const warmBlock = {
         warmedAt: 0,
         syncTimestamp,
-        version: 5,
+        version: 6,
         artistAliasFingerprint: '',
         historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
         // Built when there were no album mappings
@@ -1539,7 +1539,7 @@ describe('StatsService', () => {
       warm: {
         warmedAt: Math.floor(Date.now() / 1000),
         syncTimestamp,
-        version: 5,
+        version: 6,
         artistAliasFingerprint: '',
         historyFingerprint: computeHistoryFingerprint(createMockIndex({})),
         streaks: { currentStreak: 7, longestStreak: 21 },
@@ -1995,6 +1995,83 @@ describe('StatsService', () => {
       ),
       lastSyncTimestamp: Math.floor(Date.now() / 1000),
       oldestScrobbleDate: 0,
+    });
+
+    describe('album versions merged by an album mapping', () => {
+      const dogProblemsMapping = {
+        historyArtist: 'the format',
+        historyAlbum: 'dog problems (bonus track version)',
+        collectionId: 5403896,
+        collectionArtist: 'The Format (2)',
+        collectionAlbum: 'Dog Problems',
+        createdAt: 1,
+      };
+      const day = 24 * 60 * 60;
+      const plays = (count: number, timestamp: number) =>
+        Array.from({ length: count }, () => ({
+          timestamp,
+          track: 'Time Bomb',
+        }));
+
+      beforeEach(() => {
+        statsService.setMappingService({
+          getAllAlbumMappings: jest
+            .fn()
+            .mockResolvedValue([dogProblemsMapping]),
+        } as unknown as MappingService);
+      });
+
+      it('is not forgotten when played recently on another version', async () => {
+        const now = Math.floor(Date.now() / 1000);
+        const longAgo = now - 3 * 365 * day;
+        mockHistoryStorage.getIndex.mockResolvedValue(
+          createMockIndexWithTracks({
+            'the format|dog problems': {
+              lastPlayed: longAgo,
+              playCount: 15,
+              plays: plays(15, longAgo),
+            },
+            'the format|dog problems (bonus track version)': {
+              lastPlayed: now - day,
+              playCount: 2,
+              plays: plays(2, now - day),
+            },
+          })
+        );
+
+        const result = await statsService.getForgottenFavorites(1095, 10, 100);
+
+        expect(result.tracks).toEqual([]);
+      });
+
+      it('counts the versions as one track', async () => {
+        const now = Math.floor(Date.now() / 1000);
+        const longAgo = now - 3 * 365 * day;
+        mockHistoryStorage.getIndex.mockResolvedValue(
+          createMockIndexWithTracks({
+            'the format|dog problems': {
+              lastPlayed: longAgo,
+              playCount: 6,
+              plays: plays(6, longAgo),
+            },
+            'the format|dog problems (bonus track version)': {
+              lastPlayed: longAgo,
+              playCount: 6,
+              plays: plays(6, longAgo),
+            },
+          })
+        );
+
+        const result = await statsService.getForgottenFavorites(90, 10, 100);
+
+        expect(result.tracks).toHaveLength(1);
+        expect(result.tracks[0]).toMatchObject({
+          artist: 'The Format',
+          album: 'Dog Problems',
+          track: 'Time Bomb',
+          allTimePlayCount: 12,
+        });
+      });
     });
 
     it('should return empty array when no history', async () => {
@@ -2598,6 +2675,51 @@ describe('StatsService', () => {
       ),
       lastSyncTimestamp: Math.floor(Date.now() / 1000),
       oldestScrobbleDate: 0,
+    });
+
+    it('counts a track on album versions merged by a mapping as one row', async () => {
+      const now = Math.floor(Date.now() / 1000);
+      statsService.setMappingService({
+        getAllAlbumMappings: jest.fn().mockResolvedValue([
+          {
+            historyArtist: 'the format',
+            historyAlbum: 'dog problems (bonus track version)',
+            collectionId: 5403896,
+            collectionArtist: 'The Format (2)',
+            collectionAlbum: 'Dog Problems',
+            createdAt: 1,
+          },
+        ]),
+      } as unknown as MappingService);
+      const plays = (count: number) =>
+        Array.from({ length: count }, () => ({
+          timestamp: now,
+          track: 'Time Bomb',
+        }));
+      mockHistoryStorage.getIndex.mockResolvedValue(
+        createIndexWithTracks({
+          'the format|dog problems': {
+            lastPlayed: now,
+            playCount: 7,
+            plays: plays(7),
+          },
+          'the format|dog problems (bonus track version)': {
+            lastPlayed: now,
+            playCount: 2,
+            plays: plays(2),
+          },
+        })
+      );
+
+      const topTracks = await statsService.getTopTracks('all', 10);
+
+      expect(topTracks).toHaveLength(1);
+      expect(topTracks[0]).toMatchObject({
+        artist: 'The Format',
+        album: 'Dog Problems',
+        track: 'Time Bomb',
+        playCount: 9,
+      });
     });
 
     it('should return empty array when no history', async () => {
@@ -4254,6 +4376,114 @@ describe('StatsService', () => {
     });
   });
 
+  describe('a track mapping that moves plays to another album', () => {
+    const now = Math.floor(Date.now() / 1000);
+    // Two plays of a demo on a b-sides album, mapped to the album track
+    const moved: TrackMapping = {
+      historyArtist: 'the format',
+      historyAlbum: 'b-sides',
+      historyTrack: 'Time Bomb (Demo)',
+      cacheArtist: 'the format',
+      cacheAlbum: 'dog problems',
+      cacheTrack: 'Time Bomb',
+      createdAt: 1,
+    };
+
+    beforeEach(() => {
+      const { TrackMappingService: RealTrackMappingService } =
+        jest.requireActual<
+          typeof import('../../src/backend/services/trackMappingService')
+        >('../../src/backend/services/trackMappingService');
+      statsService.setTrackMappingService(
+        new RealTrackMappingService({
+          readJSON: jest
+            .fn()
+            .mockResolvedValue({ schemaVersion: 1, mappings: [moved] }),
+          writeJSONWithBackup: jest.fn().mockResolvedValue(undefined),
+        } as unknown as FileStorage)
+      );
+      mockHistoryStorage.getIndex.mockResolvedValue({
+        albums: {
+          'the format|b-sides': {
+            lastPlayed: now,
+            playCount: 2,
+            plays: [
+              { timestamp: now, track: 'Time Bomb (Demo)' },
+              { timestamp: now - 1, track: 'Time Bomb (Demo)' },
+            ],
+          },
+          'the format|dog problems': {
+            lastPlayed: now - 10,
+            playCount: 3,
+            plays: [
+              { timestamp: now - 10, track: 'Time Bomb' },
+              { timestamp: now - 11, track: 'Time Bomb' },
+              { timestamp: now - 12, track: 'Time Bomb' },
+            ],
+          },
+        },
+        totalScrobbles: 5,
+        lastSyncTimestamp: now,
+        oldestScrobbleDate: 0,
+      });
+    });
+
+    it('artist page counts them on the album they moved to', async () => {
+      const result = await statsService.getArtistDetail(
+        'The Format',
+        'month',
+        []
+      );
+
+      expect(
+        result.topTracks.map(t => [t.track, t.album, t.playCount])
+      ).toEqual([['Time Bomb', 'Dog Problems', 5]]);
+    });
+
+    it('track page counts them when opened from the album they moved to', async () => {
+      const result = await statsService.getTrackDetail(
+        'The Format',
+        'Time Bomb',
+        'Dog Problems'
+      );
+
+      expect(result.totalPlayCount).toBe(5);
+      expect(result.appearsOn.map(a => [a.album, a.playCount])).toEqual([
+        ['Dog Problems', 5],
+      ]);
+    });
+
+    it('track page no longer counts them on the album they left', async () => {
+      const result = await statsService.getTrackDetail(
+        'The Format',
+        'Time Bomb (Demo)',
+        'B-Sides'
+      );
+
+      expect(result.totalPlayCount).toBe(0);
+    });
+
+    it("track page doesn't count a moved song as another song on that album", async () => {
+      // The demo plays moved to Dog Problems count as Time Bomb there, so
+      // asking for "Time Bomb (Demo)" on Dog Problems finds none
+      const result = await statsService.getTrackDetail(
+        'The Format',
+        'Time Bomb (Demo)',
+        'Dog Problems'
+      );
+
+      expect(result.totalPlayCount).toBe(0);
+    });
+
+    it('top tracks agree with the artist page', async () => {
+      const top = await statsService.getTopTracks('all', 10);
+
+      expect(top.map(t => [t.track, t.album, t.playCount])).toEqual([
+        ['Time Bomb', 'Dog Problems', 5],
+      ]);
+    });
+  });
+
   describe('track spellings and track mappings', () => {
     const now = Math.floor(Date.now() / 1000);
     const plays = (track: string, count: number, offset = 0) =>
@@ -4484,7 +4714,7 @@ describe('StatsService', () => {
         } as unknown as MappingService);
       });
 
-      it('top tracks keep a merge saved on the new album with the other plays of the old one', async () => {
+      it('top tracks keep a merge saved on the new album with the other plays of the old one, under the album they merge into', async () => {
         useTrackMappings([
           { ...dirtWork, historyAlbum: 'new album', cacheAlbum: 'new album' },
         ]);
@@ -4492,7 +4722,7 @@ describe('StatsService', () => {
         const top = await statsService.getTopTracks('all', 10);
 
         expect(top.map(t => [t.track, t.album, t.playCount])).toEqual([
-          ['Dirty Work', 'Old Album', 2],
+          ['Dirty Work', 'New Album', 2],
           ['Kia Boy', 'New Album', 1],
         ]);
       });
@@ -5604,7 +5834,7 @@ describe('StatsService', () => {
           expect.stringContaining('stats-cache'),
           expect.objectContaining({
             warm: expect.objectContaining({
-              version: 5,
+              version: 6,
               historyFingerprint: 'scrobbles:8;unresolved:5',
             }),
           })

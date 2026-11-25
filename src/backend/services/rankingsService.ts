@@ -16,14 +16,19 @@ import { createLogger } from '../utils/logger';
 
 import { ArtistNameResolver } from './artistNameResolver';
 import { loadAlbumMappings } from './mergedAlbumHistory';
+import { buildPlayIdentityResolver } from './playIdentity';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
-import { createTrackMapper, TrackMappingService } from './trackMappingService';
+import { TrackMappingService } from './trackMappingService';
 
 export type RankingType = 'tracks' | 'artists' | 'albums';
 
 export interface RankingItem {
-  name: string; // track, artist, or album name
-  artist?: string; // for tracks and albums
+  /** Stable identity of the row across snapshots (two tracks can share a name); always set here */
+  key?: string;
+  name: string;
+  artist?: string;
+  /** Tracks: the album the track counts on; null when it has none */
+  album?: string | null;
   count: number;
   rank: number;
 }
@@ -113,6 +118,10 @@ export class RankingsService {
       /** null for unresolved (albumless) plays: never ranked as an album */
       albumKey: string | null;
       track?: string;
+      /** Tracks: the play's identity (see services/playIdentity) */
+      trackKey?: string;
+      trackArtist?: string;
+      trackAlbum?: string | null;
     }> = [];
 
     const resolver = this.artistNameResolver;
@@ -121,11 +130,32 @@ export class RankingsService {
       albumMappings,
       resolver ? name => resolver.resolveArtist(name) : undefined
     );
-    // Track rankings count a track mapping's tracks as the track it names
-    const mapTrack =
+    // Track rankings group by play identity, the same way Top Tracks does:
+    // one row per track on an album, after track mappings and merged versions
+    const identity =
       type === 'tracks'
-        ? await createTrackMapper(this.trackMappingService, albumMappings)
+        ? await buildPlayIdentityResolver({
+            mappingService: this.mappingService,
+            trackMappingService: this.trackMappingService,
+            resolveArtist: name =>
+              resolver ? resolver.resolveArtist(name) : name.toLowerCase(),
+            historyStorage: this.historyStorage,
+          })
         : null;
+    const trackFields = (
+      artist: string,
+      album: string | null,
+      track: string | undefined
+    ) => {
+      if (!identity || !track) return { track };
+      const target = identity.play(artist, album, track);
+      return {
+        track: target.track,
+        trackKey: target.trackKey,
+        trackArtist: target.artist,
+        trackAlbum: target.album,
+      };
+    };
 
     for (const [albumKey, albumEntry] of Object.entries(index.albums)) {
       const artist = artistFromAlbumKey(albumKey);
@@ -151,17 +181,14 @@ export class RankingsService {
             album,
             albumArtist,
             albumKey: canonical.key,
-            track:
-              mapTrack && play.track
-                ? mapTrack(artist, historyAlbum, play.track).track
-                : play.track,
+            ...trackFields(artist, historyAlbum, play.track),
           });
         }
       }
     }
 
-    // Unresolved plays count for artist and track rankings. Track rankings
-    // key on artist|track, so they merge with album plays of the same track.
+    // Unresolved plays count for artist and track rankings; in track
+    // rankings they are their own rows, as in Top Tracks.
     // Album rankings leave them out entirely, so they cannot even add a
     // snapshot month (calculateRankings also skips a null albumKey).
     const unresolvedEntries =
@@ -176,7 +203,7 @@ export class RankingsService {
             album: UNKNOWN_ALBUM_LABEL,
             albumArtist: artist,
             albumKey: null,
-            track: play.track,
+            ...trackFields(artist, null, play.track),
           });
         }
       }
@@ -255,6 +282,9 @@ export class RankingsService {
       albumArtist: string;
       albumKey: string | null;
       track?: string;
+      trackKey?: string;
+      trackArtist?: string;
+      trackAlbum?: string | null;
     }>,
     type: RankingType,
     topN: number
@@ -265,6 +295,7 @@ export class RankingsService {
         count: number;
         name: string;
         artist?: string;
+        album?: string | null;
         /** Tracks: named by the most-played spelling */
         spellings?: TrackSpellings;
       }
@@ -274,14 +305,19 @@ export class RankingsService {
       let key: string;
       let name: string;
       let artist: string | undefined;
+      let album: string | null | undefined;
 
       switch (type) {
         case 'tracks':
           if (!scrobble.track) continue;
-          // Spellings of one track ("feat." vs "(with …)") rank as one
-          key = `${scrobble.artist}|${trackMatchKey(scrobble.track)}`;
+          // Play identity: spellings of one track ("feat." vs "(with …)") on
+          // one album rank as one
+          key =
+            scrobble.trackKey ??
+            `${scrobble.artist}|${trackMatchKey(scrobble.track)}`;
           name = scrobble.track;
-          artist = scrobble.artist;
+          artist = scrobble.trackArtist ?? scrobble.artist;
+          album = scrobble.trackAlbum;
           break;
         case 'artists':
           key = scrobble.artist;
@@ -304,7 +340,7 @@ export class RankingsService {
       } else {
         const spellings = type === 'tracks' ? new TrackSpellings() : undefined;
         spellings?.add(name);
-        counts.set(key, { count: 1, name, artist, spellings });
+        counts.set(key, { count: 1, name, artist, album, spellings });
       }
     }
 
@@ -313,9 +349,11 @@ export class RankingsService {
       .sort((a, b) => b[1].count - a[1].count)
       .slice(0, topN);
 
-    return sorted.map(([, data], index) => ({
+    return sorted.map(([key, data], index) => ({
+      key,
       name: data.spellings?.best ?? data.name,
       artist: data.artist,
+      ...(data.album !== undefined && { album: data.album }),
       count: data.count,
       rank: index + 1,
     }));
