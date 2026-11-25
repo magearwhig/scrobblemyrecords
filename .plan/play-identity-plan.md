@@ -1,7 +1,7 @@
 # One play identity: consistent grouping and ownership everywhere
 
 Status: complete 2026-11-25. PRs 1-2 merged (#33), PRs 3-4 merged (#34),
-PR 5 (record-to-plays) on branch `feat/play-identity-records`. The lint
+PR 5 (record-to-plays) merged (#35). The lint
 allowlist holds only Suggested Album Merges, which reads names before they
 merge on purpose.
 

@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-7502%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-7511%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -306,7 +306,7 @@ Click any artist, track or label name throughout the app to navigate to a dedica
 - Play trend chart with period selector (weekly/monthly/yearly)
 - Period stats: this week, this month, this year, all-time
 - Top tracks by play count
-- Albums list with "In Collection" badges and cover art (albums you don't own get their cover from Last.fm, as does the album page)
+- Albums list with "In Collection" badges and cover art (albums you don't own get their cover from Last.fm, as does the album page). Records you own but never played are listed too ("Not played yet"), after the played ones; **In collection** narrows the list to what you own, and an artist you own but never played still gets a page
 - Merge action on each album row to fold one version of an album into another (e.g. a live or deluxe edition)
 - First/last played dates
 - External links to Last.fm and Spotify

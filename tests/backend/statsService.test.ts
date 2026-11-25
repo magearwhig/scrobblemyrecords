@@ -3617,6 +3617,122 @@ describe('StatsService', () => {
       expect(result.totalPlayCount).toBe(0);
       expect(result.albums).toEqual([]);
     });
+
+    describe('records you own', () => {
+      const now = Math.floor(Date.now() / 1000);
+      const played = createMockCollectionItem({
+        id: 1,
+        artist: 'Radiohead',
+        title: 'OK Computer',
+      });
+      const unplayed = createMockCollectionItem({
+        id: 2,
+        artist: 'Radiohead',
+        title: 'Amnesiac',
+        coverImage: 'https://example.com/amnesiac.jpg',
+      });
+      const history = () =>
+        createMockIndex({
+          'radiohead|ok computer': {
+            lastPlayed: now,
+            playCount: 3,
+            plays: Array.from({ length: 3 }, () => ({ timestamp: now })),
+          },
+        });
+
+      it('lists an owned record never played, after the played ones', async () => {
+        mockHistoryStorage.getIndex.mockResolvedValue(history());
+
+        const result = await statsService.getArtistDetail(
+          'Radiohead',
+          'month',
+          [played, unplayed]
+        );
+
+        expect(
+          result.albums.map(a => [a.album, a.playCount, a.inCollection])
+        ).toEqual([
+          ['Ok Computer', 3, true],
+          ['Amnesiac', 0, true],
+        ]);
+        const amnesiac = result.albums[1];
+        expect(amnesiac.lastPlayed).toBeNull();
+        expect(amnesiac.coverUrl).toBe('https://example.com/amnesiac.jpg');
+        expect(amnesiac.collectionItemId).toBe(2);
+        expect(amnesiac.historyEntries).toEqual([]);
+        // Owning a record adds no plays
+        expect(result.totalPlayCount).toBe(3);
+      });
+
+      it('lists a played record once, even with a second copy', async () => {
+        mockHistoryStorage.getIndex.mockResolvedValue(history());
+
+        const result = await statsService.getArtistDetail(
+          'Radiohead',
+          'month',
+          [
+            played,
+            createMockCollectionItem({
+              id: 3,
+              artist: 'Radiohead',
+              title: 'OK Computer',
+            }),
+            // The cached collection can repeat an item
+            unplayed,
+            unplayed,
+          ]
+        );
+
+        expect(result.albums.map(a => a.album)).toEqual([
+          'Ok Computer',
+          'Amnesiac',
+        ]);
+      });
+
+      it("counts a record's plays scrobbled under another artist", async () => {
+        // Scrobbled as Aesop Rock; the record is credited to the duo
+        mockHistoryStorage.getIndex.mockResolvedValue(
+          createMockIndex({
+            'aesop rock|garbology': {
+              lastPlayed: now,
+              playCount: 2,
+              plays: Array.from({ length: 2 }, () => ({ timestamp: now })),
+            },
+          })
+        );
+        const garbology = createMockCollectionItem({
+          id: 9,
+          artist: 'Aesop Rock, Blockhead',
+          title: 'Garbology',
+        });
+
+        const result = await statsService.getArtistDetail(
+          'Aesop Rock, Blockhead',
+          'month',
+          [garbology]
+        );
+
+        expect(result.albums.map(a => [a.album, a.playCount])).toEqual([
+          ['Garbology', 2],
+        ]);
+        expect(result.albums[0].lastPlayed).toBe(now);
+      });
+
+      it("lists an artist's records when there's no listening history", async () => {
+        mockHistoryStorage.getIndex.mockResolvedValue(null);
+
+        const result = await statsService.getArtistDetail(
+          'Radiohead (2)',
+          'month',
+          [unplayed]
+        );
+
+        expect(result.albums.map(a => [a.album, a.playCount])).toEqual([
+          ['Amnesiac', 0],
+        ]);
+        expect(result.totalPlayCount).toBe(0);
+      });
+    });
   });
 
   describe('getTrackDetail', () => {
@@ -5113,6 +5229,49 @@ describe('StatsService', () => {
       // Assert
       expect(result.playCount).toBe(5);
       expect(result.mappings.mergedVersions).toHaveLength(1);
+    });
+  });
+
+  describe('getAlbumDetail for a record never played', () => {
+    const now = Math.floor(Date.now() / 1000);
+    const history = () =>
+      createMockIndex({
+        'luna|penthouse': {
+          lastPlayed: now,
+          playCount: 1,
+          plays: [{ timestamp: now }],
+        },
+      });
+    const days = createMockCollectionItem({
+      id: 77,
+      artist: 'Luna (5)',
+      title: 'The Days Of Our Nights',
+      coverImage: 'https://example.com/days.jpg',
+    });
+
+    it('opens an owned record with no plays', async () => {
+      mockHistoryStorage.getIndex.mockResolvedValue(history());
+
+      const result = await statsService.getAlbumDetail(
+        'Luna',
+        'The Days Of Our Nights',
+        [days]
+      );
+
+      expect(result.playCount).toBe(0);
+      expect(result.firstPlayed).toBeNull();
+      expect(result.lastPlayed).toBeNull();
+      expect(result.tracks).toEqual([]);
+      expect(result.inCollection).toBe(true);
+      expect(result.collectionReleaseId).toBe(77);
+    });
+
+    it('is still not found when neither played nor owned', async () => {
+      mockHistoryStorage.getIndex.mockResolvedValue(history());
+
+      await expect(
+        statsService.getAlbumDetail('Luna', 'Bewitched', [days])
+      ).rejects.toThrow('ALBUM_NOT_FOUND');
     });
   });
 

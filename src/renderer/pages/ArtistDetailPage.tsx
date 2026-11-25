@@ -48,6 +48,10 @@ const stripDisambiguation = (name: string): string =>
 
 type ArtistAlbum = ArtistDetailResponse['albums'][number];
 
+/** A row's identity: the title, plus the owned record when titles repeat */
+const rowKey = (album: ArtistAlbum) =>
+  `${album.album}|${album.collectionItemId ?? ''}`;
+
 /**
  * Album mappings that merge `source` into `target`. When either side is owned,
  * every version of both is linked to the owned collection item (the owned copy's
@@ -106,9 +110,12 @@ const ArtistDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [trendPeriod, setTrendPeriod] = useState<'month' | 'week'>('month');
+  // Row whose listening arc is open (rowKey: titles can repeat)
   const [expandedArcAlbum, setExpandedArcAlbum] = useState<string | null>(null);
   /** Album being merged into another album version (merge modal open when set) */
   const [mergeSource, setMergeSource] = useState<ArtistAlbum | null>(null);
+  // Albums list: everything, or only the records in your collection
+  const [ownedOnly, setOwnedOnly] = useState(false);
   const [merging, setMerging] = useState(false);
   /** The page to navigate back to — derived from `?from=` URL param. */
   const previousPage = useMemo<string>(() => {
@@ -369,6 +376,11 @@ const ArtistDetailPage: React.FC = () => {
     );
   }
 
+  const ownedCount = data.albums.filter(a => a.inCollection).length;
+  const shownAlbums = ownedOnly
+    ? data.albums.filter(a => a.inCollection)
+    : data.albums;
+
   const encodedArtist = encodeURIComponent(data.artist);
   const encodedCleanArtist = encodeURIComponent(cleanArtistName);
 
@@ -482,13 +494,41 @@ const ArtistDetailPage: React.FC = () => {
 
         {/* Albums */}
         <div className='detail-page-section'>
-          <h3>Albums</h3>
+          <div className='artist-albums-header'>
+            <h3>Albums</h3>
+            {ownedCount > 0 && ownedCount < data.albums.length && (
+              <div
+                className='artist-albums-filter'
+                role='group'
+                aria-label='Which albums to show'
+              >
+                <Button
+                  size='small'
+                  variant={ownedOnly ? 'outline' : 'primary'}
+                  className='button--filter'
+                  aria-pressed={!ownedOnly}
+                  onClick={() => setOwnedOnly(false)}
+                >
+                  All ({data.albums.length})
+                </Button>
+                <Button
+                  size='small'
+                  variant={ownedOnly ? 'primary' : 'outline'}
+                  className='button--filter'
+                  aria-pressed={ownedOnly}
+                  onClick={() => setOwnedOnly(true)}
+                >
+                  In collection ({ownedCount})
+                </Button>
+              </div>
+            )}
+          </div>
           {data.albums.length === 0 ? (
             <p className='detail-page-meta'>No album data available.</p>
           ) : (
             <div className='detail-page-albums'>
-              {data.albums.map(album => (
-                <div key={album.album} className='detail-page-album-entry'>
+              {shownAlbums.map(album => (
+                <div key={rowKey(album)} className='detail-page-album-entry'>
                   <div className='detail-page-album-item'>
                     {album.coverUrl ? (
                       <img
@@ -509,7 +549,9 @@ const ArtistDetailPage: React.FC = () => {
                         <AlbumLink artist={data.artist} album={album.album} />
                       </div>
                       <div className='detail-page-album-meta'>
-                        {album.playCount.toLocaleString()} plays
+                        {album.playCount > 0
+                          ? `${album.playCount.toLocaleString()} plays`
+                          : 'Not played yet'}
                         {album.inCollection && (
                           <>
                             {' '}
@@ -520,28 +562,30 @@ const ArtistDetailPage: React.FC = () => {
                         )}
                       </div>
                     </div>
-                    <IconButton
-                      icon={
-                        expandedArcAlbum === album.album ? (
-                          <ChevronUp size={16} aria-hidden='true' />
-                        ) : (
-                          <ChevronDown size={16} aria-hidden='true' />
-                        )
-                      }
-                      size='small'
-                      variant='ghost'
-                      onClick={() =>
-                        setExpandedArcAlbum(prev =>
-                          prev === album.album ? null : album.album
-                        )
-                      }
-                      aria-label={
-                        expandedArcAlbum === album.album
-                          ? `Hide listening arc for ${album.album}`
-                          : `Show listening arc for ${album.album}`
-                      }
-                      title='Toggle listening arc'
-                    />
+                    {album.playCount > 0 && (
+                      <IconButton
+                        icon={
+                          expandedArcAlbum === rowKey(album) ? (
+                            <ChevronUp size={16} aria-hidden='true' />
+                          ) : (
+                            <ChevronDown size={16} aria-hidden='true' />
+                          )
+                        }
+                        size='small'
+                        variant='ghost'
+                        onClick={() =>
+                          setExpandedArcAlbum(prev =>
+                            prev === rowKey(album) ? null : rowKey(album)
+                          )
+                        }
+                        aria-label={
+                          expandedArcAlbum === rowKey(album)
+                            ? `Hide listening arc for ${album.album}`
+                            : `Show listening arc for ${album.album}`
+                        }
+                        title='Toggle listening arc'
+                      />
+                    )}
                     {data.albums.length > 1 &&
                       (album.historyEntries?.length ?? 0) > 0 && (
                         <IconButton
@@ -563,7 +607,7 @@ const ArtistDetailPage: React.FC = () => {
                       title={`Play ${album.album} on Spotify`}
                     />
                   </div>
-                  {expandedArcAlbum === album.album && (
+                  {expandedArcAlbum === rowKey(album) && (
                     <div className='detail-page-album-arc'>
                       <AlbumListeningArc
                         artist={data.artist}
@@ -624,9 +668,9 @@ const ArtistDetailPage: React.FC = () => {
             </p>
             <ul className='artist-merge-target-list'>
               {data.albums
-                .filter(a => a.album !== mergeSource.album)
+                .filter(a => rowKey(a) !== rowKey(mergeSource))
                 .map(target => (
-                  <li key={target.album}>
+                  <li key={rowKey(target)}>
                     <button
                       type='button'
                       className='artist-merge-target'

@@ -440,3 +440,22 @@
   color: var(--text-secondary);
   font-size: var(--text-xs);
 }
+
+/* Albums heading with the All / In collection filter beside it */
+.artist-albums-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.artist-albums-header h3 {
+  margin: 0;
+}
+
+.artist-albums-filter {
+  display: flex;
+  gap: var(--space-2);
+}

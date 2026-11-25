@@ -30,6 +30,12 @@ jest.mock('recharts', () => ({
 }));
 
 // Mock statsApi and imagesApi
+jest.mock('../../../src/renderer/components/stats/AlbumListeningArc', () => ({
+  AlbumListeningArc: ({ album }: { album: string }) => (
+    <div data-testid='listening-arc'>{album}</div>
+  ),
+}));
+
 jest.mock('../../../src/renderer/services/statsApi', () => ({
   statsApi: {
     getArtistDetail: jest.fn(),
@@ -444,6 +450,95 @@ describe('ArtistDetailPage', () => {
     await waitFor(() => {
       const badges = screen.getAllByText('In Collection');
       expect(badges.length).toBe(1); // Only Kid A is in collection
+    });
+  });
+
+  describe('records you own but never played', () => {
+    const withUnplayed = () =>
+      mockStatsApi.getArtistDetail.mockResolvedValue({
+        success: true,
+        data: {
+          ...mockArtistData,
+          albums: [
+            ...mockArtistData.albums,
+            {
+              album: 'Amnesiac',
+              playCount: 0,
+              lastPlayed: null,
+              inCollection: true,
+              collectionReleaseId: 789,
+              collectionItemId: 789,
+              coverUrl: 'https://example.com/amnesiac.jpg',
+              historyEntries: [],
+            },
+          ],
+        },
+      });
+
+    it('are listed as not played yet, without a listening arc', async () => {
+      withUnplayed();
+      render(<ArtistDetailPage />);
+
+      expect(await screen.findByText('Amnesiac')).toBeInTheDocument();
+      expect(screen.getByText('Not played yet')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', {
+          name: 'Show listening arc for Amnesiac',
+        })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Show listening arc for Kid A' })
+      ).toBeInTheDocument();
+    });
+
+    it('opens the arc only under the row you expanded when titles repeat', async () => {
+      const user = userEvent.setup();
+      mockStatsApi.getArtistDetail.mockResolvedValue({
+        success: true,
+        data: {
+          ...mockArtistData,
+          albums: [
+            { album: 'Live', playCount: 5, lastPlayed: 1, inCollection: false },
+            {
+              album: 'Live',
+              playCount: 0,
+              lastPlayed: null,
+              inCollection: true,
+              collectionItemId: 42,
+            },
+          ],
+        },
+      });
+      render(<ArtistDetailPage />);
+
+      await user.click(
+        await screen.findByRole('button', {
+          name: 'Show listening arc for Live',
+        })
+      );
+
+      expect(screen.getAllByTestId('listening-arc')).toHaveLength(1);
+    });
+
+    it('can show only the records in your collection', async () => {
+      const user = userEvent.setup();
+      withUnplayed();
+      render(<ArtistDetailPage />);
+      await screen.findByText('Amnesiac');
+
+      await user.click(
+        screen.getByRole('button', { name: 'In collection (2)' })
+      );
+
+      expect(screen.getByText('Kid A')).toBeInTheDocument();
+      expect(screen.getByText('Amnesiac')).toBeInTheDocument();
+      expect(screen.queryByText('OK Computer')).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'In collection (2)' })
+      ).toHaveAttribute('aria-pressed', 'true');
+
+      await user.click(screen.getByRole('button', { name: 'All (3)' }));
+      expect(screen.getByText('OK Computer')).toBeInTheDocument();
     });
   });
 

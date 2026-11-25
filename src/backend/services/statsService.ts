@@ -2501,19 +2501,8 @@ export class StatsService {
     trendPeriod: 'month' | 'week' = 'month',
     collection: CollectionItem[]
   ): Promise<ArtistDetailResponse> {
+    // No history yet: the records you own are still listed
     const index = await this.historyStorage.getIndex();
-    if (!index) {
-      return {
-        artist: artistName,
-        totalPlayCount: 0,
-        firstPlayed: null,
-        lastPlayed: null,
-        periodCounts: { thisWeek: 0, thisMonth: 0, thisYear: 0, allTime: 0 },
-        playTrend: [],
-        topTracks: [],
-        albums: [],
-      };
-    }
 
     // Period cutoffs (timestamps in seconds)
     const now = new Date();
@@ -2567,11 +2556,9 @@ export class StatsService {
     const movesPlaysHere = identity.movesPlaysTo(name =>
       this.isArtistMatch(name, artistName)
     );
-    for (const {
-      artist,
-      album: historyAlbum,
-      entry: albumHistory,
-    } of listeningEntries(index)) {
+    for (const { artist, album: historyAlbum, entry: albumHistory } of index
+      ? listeningEntries(index)
+      : []) {
       if (
         !this.isArtistMatch(artist, artistName) &&
         !movesPlaysHere(artist, historyAlbum)
@@ -2661,10 +2648,50 @@ export class StatsService {
         lastPlayed: t.lastPlayed,
       }));
 
-    // Build albums list with collection cross-reference
-    const albums = Array.from(albumCounts.values())
-      .sort((a, b) => b.playCount - a.playCount)
-      .map(a => {
+    // Records you own that no row above covers, once per record (copies of
+    // one album are one record). Their plays can be credited to another
+    // artist (a collaboration scrobbled under one of its artists), so the
+    // record's own plays decide; plays belong to the album, never a copy.
+    const listedRecords = new Set(
+      Array.from(albumCounts.values()).flatMap(a =>
+        a.collectionItem ? [identity.recordKey(a.collectionItem)] : []
+      )
+    );
+    const otherRecords: Array<{
+      album: string;
+      playCount: number;
+      lastPlayed: number | null;
+      historyEntries: Array<{ artist: string; album: string }>;
+      collectionItem?: CollectionItem;
+    }> = [];
+    const unlisted = identity
+      .ownedByArtist(artistName)
+      .filter(item => !listedRecords.has(identity.recordKey(item)));
+    if (unlisted.length > 0) {
+      const model = await this.playIdentity.readModel(collection);
+      for (const item of unlisted) {
+        const key = identity.recordKey(item);
+        if (listedRecords.has(key)) continue;
+        listedRecords.add(key);
+        const { entry } = model.recordPlays(item);
+        otherRecords.push({
+          album: item.release.title,
+          playCount: entry?.playCount ?? 0,
+          lastPlayed: entry?.lastPlayed ?? null,
+          historyEntries: [],
+          collectionItem: item,
+        });
+      }
+    }
+
+    // Played albums by plays, then records never played by title
+    const albums = [...Array.from(albumCounts.values()), ...otherRecords]
+      .sort(
+        (a, b) =>
+          b.playCount - a.playCount ||
+          (b.playCount === 0 ? a.album.localeCompare(b.album) : 0)
+      )
+      .map((a): ArtistDetailResponse['albums'][number] => {
         // Decided by play identity
         const { collectionItem } = a;
         return {
@@ -4051,7 +4078,19 @@ export class StatsService {
         collection
       );
 
-    if (totalPlayCount === 0) {
+    // The owned record, by play identity: a link on any merged version, then
+    // the album's names (the same answer Top Albums and History give)
+    let collectionItem: CollectionItem | undefined;
+    if (collection && collection.length > 0) {
+      const identity = await this.createPlayIdentity(collection);
+      collectionItem = identity.album(
+        resolvedArtist,
+        resolvedAlbum
+      ).collectionItem;
+    }
+
+    // A record you own opens even before its first play
+    if (totalPlayCount === 0 && !collectionItem) {
       throw new Error('ALBUM_NOT_FOUND');
     }
 
@@ -4129,17 +4168,6 @@ export class StatsService {
       resolvedAlbum,
       collection
     );
-
-    // The owned record, by play identity: a link on any merged version, then
-    // the album's names (the same answer Top Albums and History give)
-    let collectionItem: CollectionItem | undefined;
-    if (collection && collection.length > 0) {
-      const identity = await this.createPlayIdentity(collection);
-      collectionItem = identity.album(
-        resolvedArtist,
-        resolvedAlbum
-      ).collectionItem;
-    }
 
     // Artist mapping (Discogs ↔ Last.fm). Search both directions since the
     // queried artistName could match either side of the recorded mapping.
