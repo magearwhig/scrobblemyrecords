@@ -36,6 +36,7 @@ const PAGE_NAMES: Record<string, string> = {
   [ROUTES.WRAPPED]: 'Wrapped',
   [ROUTES.ARTIST_DETAIL]: 'Artist',
   [ROUTES.TRACK_DETAIL]: 'Track',
+  [ROUTES.RELEASE_DETAILS]: 'Release Details',
 };
 
 /**

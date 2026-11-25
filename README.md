@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-7500%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-7502%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -212,7 +212,7 @@ without a `duration` field.
 ### Core Features
 - **Home Dashboard**: Engaging dashboard with quick stats, quick actions, recent albums, and monthly highlights
 - **Collection Browser**: Search and filter your Discogs collection; your search, filters and scroll position come back when you return from an album
-- **Release Details**: Side/disc track selection and per-album scrobble history
+- **Release Details**: Laid out like the album page (cover, actions, then tracks beside scrobble history and marketplace prices); side/disc track selection, and the selected count and Scrobble button stay in view at the bottom while you scroll the tracklist. "Listening stats" opens the album page, which leads back here
 - **Tracks with parts**: a track Discogs lists in parts ("Intro / Sweet Jane", "The Czar") is one track, with its parts shown underneath; **Split** scrobbles it as its parts instead, remembered per release
 - **Track Selection**: Choose individual tracks or entire albums
 - **Batch Scrobbling**: Scrobble multiple items with progress tracking

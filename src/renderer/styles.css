@@ -2636,6 +2636,101 @@ button.mapping-result-item:disabled {
   color: var(--text-primary);
 }
 
+/* ==========================================================================
+   Album-style detail pages (album page, Release Details): square cover,
+   header action row, two-column content grid. Global because both pages use
+   them and either can be opened first.
+   ========================================================================== */
+
+.album-detail-header {
+  align-items: flex-start;
+}
+
+.album-detail-cover,
+.album-detail-cover-placeholder {
+  width: 120px;
+  height: 120px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+  object-fit: cover;
+}
+
+.album-detail-cover-placeholder {
+  background-color: var(--bg-tertiary);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.album-detail-artist-line {
+  font-size: var(--text-md);
+}
+
+.album-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  align-items: center;
+}
+
+/* External-link <a> styled to match Button's outline appearance, since
+ * the design system has no Link button variant. */
+.album-detail-external-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+}
+
+.album-detail-external-link:hover {
+  background: var(--bg-hover);
+}
+
+.album-detail-external-link:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.album-detail-content-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.album-detail-content-grid > * {
+  min-width: 0;
+}
+
+.album-detail-mappings-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+@media (max-width: 768px) {
+  .album-detail-cover,
+  .album-detail-cover-placeholder {
+    width: 96px;
+    height: 96px;
+  }
+
+  .album-detail-content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Top Tracks List */
 .detail-page-top-tracks {
   list-style: none;
