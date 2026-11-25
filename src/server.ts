@@ -427,6 +427,11 @@ suggestionService.setMappingService(mappingService);
 const statsService = new StatsService(fileStorage, historyStorage);
 statsService.setTrackMappingService(trackMappingService);
 statsService.setMappingService(mappingService);
+// One play identity service for the whole app: every service counts plays
+// and finds a record's plays the same way (see AGENTS.md)
+const playIdentityService = statsService.getPlayIdentityService();
+analyticsService.setPlayIdentityService(playIdentityService);
+suggestionService.setPlayIdentityService(playIdentityService);
 
 // Wire up stats cache warming: after each sync StatsService precomputes
 // expensive stats and persists them so dashboard reads are instant.
@@ -436,6 +441,7 @@ rankingsService.setMappingService(mappingService);
 rankingsService.setTrackMappingService(trackMappingService);
 const imageService = new ImageService(fileStorage, lastfmService);
 imageService.setMappingService(mappingService);
+imageService.setPlayIdentityService(playIdentityService);
 const wishlistService = new WishlistService(fileStorage, authService);
 // Cached vinyl prices and price alerts for wishlist records (rolling
 // background refresh; started in startServer outside tests)
@@ -494,6 +500,7 @@ const crateTableBuilder = new CrateAlbumTableBuilder(
   mappingService,
   discardPileService
 );
+crateTableBuilder.setPlayIdentityService(playIdentityService);
 const crateService = new CrateService(
   fileStorage,
   crateTableBuilder,
@@ -518,7 +525,9 @@ const buyingShortlistService = new BuyingShortlistService({
   getPriorities: () => wishlistPriorityService.getSnapshot(),
   getWishlistRows: () => exportDataService.getWishlistRows(),
   getPlayCounts: albums =>
-    getAlbumPlayCounts(albums, { historyStorage, mappingService }),
+    getAlbumPlayCounts(albums, {
+      playIdentity: statsService.getPlayIdentityService(),
+    }),
 });
 // Check a Record: one lookup across collection, wants and discard pile
 const recordLookupService = new RecordLookupService({
@@ -558,6 +567,7 @@ const wrappedService = new WrappedService(
   fileStorage
 );
 wrappedService.setMappingService(mappingService);
+wrappedService.setPlayIdentityService(playIdentityService);
 
 // API routes
 app.use(

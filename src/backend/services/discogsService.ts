@@ -22,6 +22,11 @@ import {
   needsTracklistRefetch,
   TRACKLIST_VERSION,
 } from '../../shared/utils/tracklist';
+import {
+  getAllCachedCollectionItems,
+  pagesWritten,
+  removeStaleCollectionPages,
+} from '../utils/collectionCache';
 import { getDiscogsAxios } from '../utils/discogsAxios';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
@@ -526,7 +531,14 @@ export class DiscogsService {
       }
 
       // Get first page to determine total pages
-      const firstPage = await this.getUserCollection(username, 1, 50);
+      // A forced refresh fetches every page, so no page from the previous
+      // sync (with other page boundaries) is mixed in
+      const firstPage = await this.getUserCollection(
+        username,
+        1,
+        50,
+        forceReload
+      );
       if (!firstPage.success || !firstPage.pagination) {
         this.logger.warn('Failed to get first page for preloading');
         // Mark as failed
@@ -559,7 +571,12 @@ export class DiscogsService {
           // Add delay to respect rate limits (1 request per second)
           await new Promise(resolve => setTimeout(resolve, 1000));
 
-          const result = await this.getUserCollection(username, page, 50);
+          const result = await this.getUserCollection(
+            username,
+            page,
+            50,
+            forceReload
+          );
           if (result.success) {
             this.logger.debug(`Cached page ${page}/${totalPages}`);
 
@@ -580,6 +597,9 @@ export class DiscogsService {
           // Continue with next page even if one fails
         }
       }
+
+      // Pages past the last one are left over from an older, longer sync
+      await this.removeStalePages(username, totalPages);
 
       // Mark as completed
       await this.fileStorage.writeJSON(progressKey, {
@@ -612,6 +632,26 @@ export class DiscogsService {
     }
   }
 
+  /**
+   * Delete cached collection pages past the last page a sync wrote. Page 1
+   * always stays: an empty collection is cached as an empty page 1.
+   */
+  private async removeStalePages(
+    username: string,
+    lastPage: number
+  ): Promise<void> {
+    const removed = await removeStaleCollectionPages(
+      username,
+      Math.max(lastPage, 1),
+      this.fileStorage
+    );
+    if (removed > 0) {
+      this.logger.info(
+        `Removed ${removed} collection cache pages left over from an older sync`
+      );
+    }
+  }
+
   async searchCollectionFromCache(
     username: string,
     query: string,
@@ -628,7 +668,9 @@ export class DiscogsService {
       let pageNumber = 1;
       let hasExpiredCache = false;
 
-      while (true) {
+      // Only the pages the last sync wrote (page 1 says how many)
+      let lastPage = Infinity;
+      while (pageNumber <= lastPage) {
         const cacheKey = `collections/${username}-page-${pageNumber}.json`;
         const cached =
           await this.fileStorage.readJSON<ApiResponse<CollectionItem[]>>(
@@ -639,6 +681,7 @@ export class DiscogsService {
           // No cache file found, stop reading
           break;
         }
+        if (pageNumber === 1) lastPage = pagesWritten(cached);
 
         // Check if cache is expired but still use the data
         const isExpired = !this.isCacheValid(cached);
@@ -1058,6 +1101,26 @@ export class DiscogsService {
   async updateCacheWithNewItems(
     username: string
   ): Promise<{ success: boolean; newItemsAdded: number; error?: string }> {
+    // One writer at a time: an update during a full refresh would read its
+    // half-written pages and save the mixture
+    if (this.preloadingInProgress.get(username)) {
+      return {
+        success: false,
+        newItemsAdded: 0,
+        error: 'A collection refresh is already in progress',
+      };
+    }
+    this.preloadingInProgress.set(username, true);
+    try {
+      return await this.addNewItemsToCache(username);
+    } finally {
+      this.preloadingInProgress.delete(username);
+    }
+  }
+
+  private async addNewItemsToCache(
+    username: string
+  ): Promise<{ success: boolean; newItemsAdded: number; error?: string }> {
     try {
       this.logger.info(`Starting incremental cache update for ${username}`);
 
@@ -1188,31 +1251,34 @@ export class DiscogsService {
 
       this.logger.info(`Adding ${newItems.length} new items to cache`);
 
-      // Read all existing cache pages and merge with new items
-      const allExistingItems: CollectionItem[] = [];
-      let pageNumber = 1;
-
-      while (true) {
-        const pageKey = `collections/${username}-page-${pageNumber}.json`;
-        const pageCache =
-          await this.fileStorage.readJSON<ApiResponse<CollectionItem[]>>(
-            pageKey
-          );
-
-        if (!pageCache || !pageCache.data) {
-          break;
-        }
-
-        allExistingItems.push(...pageCache.data);
-        pageNumber++;
-      }
+      // The cached pages, only as many as the last sync wrote: pages past
+      // that are left over from an older sync and repeat records
+      const allExistingItems = await getAllCachedCollectionItems(
+        username,
+        this.fileStorage
+      );
 
       this.logger.debug(
         `Loaded ${allExistingItems.length} existing items from cache`
       );
 
-      // Merge new items with existing items (new items first since they're newest)
-      const mergedItems = [...newItems, ...allExistingItems];
+      // Merge new items with existing items (new items first since they're
+      // newest). A new item already in the cache (same release, same date
+      // added) is that entry fetched again; counted per copy, so two copies
+      // added at the same moment both stay.
+      const cachedCopies = new Map<string, number>();
+      for (const item of allExistingItems) {
+        const key = `${item.id}|${item.date_added}`;
+        cachedCopies.set(key, (cachedCopies.get(key) ?? 0) + 1);
+      }
+      const reallyNew = newItems.filter(item => {
+        const key = `${item.id}|${item.date_added}`;
+        const cached = cachedCopies.get(key) ?? 0;
+        if (cached === 0) return true;
+        cachedCopies.set(key, cached - 1);
+        return false;
+      });
+      const mergedItems = [...reallyNew, ...allExistingItems];
       this.logger.debug(`Merged to ${mergedItems.length} total items`);
 
       // Re-paginate and save updated cache
@@ -1242,25 +1308,13 @@ export class DiscogsService {
         await this.fileStorage.writeJSON(pageKey, pageData);
       }
 
-      // Remove any old pages that are no longer needed
-      let checkOldPages = totalPages + 1;
-      while (checkOldPages <= totalPages + 5) {
-        // Check a few extra pages
-        const oldPageKey = `collections/${username}-page-${checkOldPages}.json`;
-        try {
-          await this.fileStorage.delete(oldPageKey);
-          this.logger.debug(`Removed old cache page ${checkOldPages}`);
-        } catch {
-          // Page doesn't exist, which is fine
-          break;
-        }
-        checkOldPages++;
-      }
+      // Remove pages past the new last page
+      await this.removeStalePages(username, totalPages);
 
       this.logger.info(
-        `Incremental cache update completed: added ${newItems.length} new items`
+        `Incremental cache update completed: added ${reallyNew.length} new items`
       );
-      return { success: true, newItemsAdded: newItems.length };
+      return { success: true, newItemsAdded: reallyNew.length };
     } catch (error) {
       this.logger.error('Error during incremental cache update', error);
       return {

@@ -810,4 +810,52 @@ describe('StatsService.getLabelDetail', () => {
       expect(result.map(l => l.label)).toEqual(['L1', 'L2']);
     });
   });
+
+  it('splits an album by play: a play a track mapping moves to an owned record counts on its label', async () => {
+    // Three plays on Single (not owned, looked up as Merge); a track mapping
+    // moves the one play of Song to Record, owned on Sub Pop
+    historyStorage.getIndex.mockResolvedValue(
+      indexOf({
+        'band|single': [...plays(1, 'Song'), ...plays(2, 'Other', NOW - DAY)],
+      })
+    );
+    const { TrackMappingService } = jest.requireActual<
+      typeof import('../../src/backend/services/trackMappingService')
+    >('../../src/backend/services/trackMappingService');
+    service.setTrackMappingService(
+      new TrackMappingService({
+        readJSON: jest.fn().mockResolvedValue({
+          schemaVersion: 1,
+          mappings: [
+            {
+              historyArtist: 'band',
+              historyAlbum: 'single',
+              historyTrack: 'Song',
+              cacheArtist: 'band',
+              cacheAlbum: 'record',
+              cacheTrack: 'Song',
+              createdAt: 1,
+            },
+          ],
+        }),
+        writeJSONWithBackup: jest.fn(),
+      } as unknown as FileStorage)
+    );
+    const lookups = new Map<string, AlbumLabelInfo>();
+    lookups.set(albumGroupKey('band', 'single'), {
+      labels: ['Merge'],
+      source: 'musicbrainz',
+      status: 'found',
+    } as AlbumLabelInfo);
+    service.setAlbumLabelService({ getAll: async () => lookups });
+    const collection = [item(1, 'Band', 'Record', ['Sub Pop'])];
+
+    const top = await service.getTopLabels('all', 10, collection);
+
+    // Song's play counts on Sub Pop; the two other plays stay on Merge
+    expect(top.map(l => [l.label, l.playCount])).toEqual([
+      ['Merge', 2],
+      ['Sub Pop', 1],
+    ]);
+  });
 });

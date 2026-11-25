@@ -1112,9 +1112,14 @@ export default function createStatsRouter(
         });
       }
 
+      // With the collection, an owned record's plays include every version
+      // that resolves to it (play identity)
+      const settings = await authService.getUserSettings();
+      const username = settings.discogs.username;
       const tracksPlayed = await statsService.getAlbumTracksPlayed(
         artist,
-        album
+        album,
+        username ? await loadCollection(username) : []
       );
 
       res.json({
@@ -1185,8 +1190,7 @@ export default function createStatsRouter(
       }
 
       const results = await getAlbumPlayCounts(body.albums, {
-        historyStorage,
-        mappingService,
+        playIdentity: statsService.getPlayIdentityService(),
       });
 
       const response: AlbumPlayCountResponse = { results };
@@ -1667,7 +1671,14 @@ export default function createStatsRouter(
         });
       }
 
-      const data = await statsService.getAlbumListeningArc(artist, album);
+      // With the collection, the same plays as the album page
+      const settings = await authService.getUserSettings();
+      const username = settings.discogs.username;
+      const data = await statsService.getAlbumListeningArc(
+        artist,
+        album,
+        username ? await loadCollection(username) : []
+      );
       res.json({ success: true, data });
     } catch (error) {
       logger.error('Error getting album arc', error);

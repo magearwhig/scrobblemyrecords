@@ -11,10 +11,6 @@ import {
   WrappedNewArtist,
   WrappedTopItem,
 } from '../../shared/types';
-import {
-  createAlbumCanonicalizer,
-  createCollectionNameResolver,
-} from '../../shared/utils/albumMapping';
 import { getAllCachedCollectionItems } from '../utils/collectionCache';
 import { FileStorage } from '../utils/fileStorage';
 import {
@@ -27,7 +23,7 @@ import { createLogger } from '../utils/logger';
 import { ArtistNameResolver } from './artistNameResolver';
 import { DiscogsService } from './discogsService';
 import { ImageService } from './imageService';
-import { loadAlbumMappings, lookupMergedHistory } from './mergedAlbumHistory';
+import { PlayIdentityService } from './playIdentity/service';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 import { StatsService } from './statsService';
 
@@ -43,16 +39,27 @@ export class WrappedService {
   private logger = createLogger('WrappedService');
   private artistNameResolver: ArtistNameResolver | null = null;
 
+  /** Resolves plays and finds a record's plays; replaced by the shared one */
+  private playIdentity: PlayIdentityService;
+
   constructor(
     private statsService: StatsService,
     private historyStorage: ScrobbleHistoryStorage,
     private discogsService: DiscogsService,
     private imageService: ImageService,
     private fileStorage: FileStorage
-  ) {}
+  ) {
+    this.playIdentity = new PlayIdentityService(historyStorage);
+  }
+
+  /** The shared play identity service, so Wrapped counts like the rest of the app */
+  setPlayIdentityService(service: PlayIdentityService): void {
+    this.playIdentity = service;
+  }
 
   setArtistNameResolver(resolver: ArtistNameResolver): void {
     this.artistNameResolver = resolver;
+    this.playIdentity.setArtistNameResolver(resolver);
   }
 
   private mappingService: {
@@ -64,17 +71,13 @@ export class WrappedService {
     getAllAlbumMappings(): Promise<AlbumMapping[]>;
   }): void {
     this.mappingService = service;
+    this.playIdentity.setMappingService(service);
   }
 
-  /** History for each collection item, across every name mapped to it. */
+  /** Every play that resolves to each collection item (play identity) */
   private async lookupCollectionHistory(collection: CollectionItem[]) {
-    const namesFor = createCollectionNameResolver(
-      await loadAlbumMappings(this.mappingService)
-    );
-    return lookupMergedHistory(
-      this.historyStorage,
-      collection.map(item => namesFor(item.release.artist, item.release.title))
-    );
+    const model = await this.playIdentity.readModel(collection);
+    return collection.map(item => model.recordPlays(item));
   }
 
   /**
@@ -159,11 +162,9 @@ export class WrappedService {
     // Track plays in range per artist
     const artistRangePlays = new Map<string, number>();
 
-    const resolver = this.artistNameResolver;
-    const canonicalize = createAlbumCanonicalizer(
-      await loadAlbumMappings(this.mappingService),
-      resolver ? name => resolver.resolveArtist(name) : undefined
-    );
+    // Each play counts as its play identity: the artist and merged album
+    // it resolves to (track mappings, album mappings, aliases)
+    const identity = await this.playIdentity.resolver();
 
     /**
      * Count one listening event toward totals, artists, days and hours.
@@ -211,14 +212,13 @@ export class WrappedService {
     for (const [key, albumHistory] of Object.entries(index.albums)) {
       const artist = artistFromAlbumKey(key);
       const album = albumFromAlbumKey(key);
-      const normalizedArtist = this.resolveArtistName(artist);
-      // Merged versions count as one unique album
-      const albumKey = canonicalize(artist, album).key;
-
       for (const play of albumHistory.plays) {
-        if (countPlay(normalizedArtist, play)) {
+        const target = play.track
+          ? identity.play(artist, album, play.track)
+          : identity.album(artist, album);
+        if (countPlay(this.resolveArtistName(target.artist), play)) {
           // Unique albums: only plays that have an album
-          albumSet.add(albumKey);
+          if (target.albumKey !== null) albumSet.add(target.albumKey);
         }
       }
     }

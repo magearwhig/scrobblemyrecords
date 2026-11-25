@@ -136,6 +136,22 @@ export class ScrobbleHistoryStorage {
       // Remove "at XX" anniversary suffixes (e.g., "Gentlemen at 21")
       normalized = normalized.replace(/\s+at\s+\d+\s*$/gi, '');
 
+      // Remove a trailing edition note: a bracketed note made only of
+      // edition words, numbers and separators ("(10th Anniversary Edition)",
+      // "(2011 - Remaster)", "(Deluxe Edition/Remastered/2009)", "(Amazon
+      // MP3 Exclusive)"), and a trailing "- Disc 1"
+      normalized = normalized.replace(
+        /\s*[([](?=[^)\]]*\b(?:deluxe|edition|version|remaster(?:ed)?|anniversary|reissue|bonus|expanded|exclusive|mp3|disc|cd)\b)(?:\s|\d+(?:st|nd|rd|th)?|definitive|deluxe|edition|version|remaster(?:ed)?|anniversary|reissue|bonus|tracks?|expanded|exclusive|special|limited|collector'?s|amazon|itunes|spotify|mp3|disc|cd|digital|[-/&,.+])+[)\]]\s*$/gi,
+        ''
+      );
+      normalized = normalized.replace(/\s+-\s+(?:disc|cd)\s*\d+\s*$/gi, '');
+      // ... or after a dash ("Set Yourself On Fire - 20th Anniversary
+      // Edition"), when it names the edition and has nothing else
+      normalized = normalized.replace(
+        /\s+-\s+(?=[^-]*\b(?:edition|remaster(?:ed)?|anniversary|reissue)\b)(?:\s|\d+(?:st|nd|rd|th)?|definitive|deluxe|edition|version|remaster(?:ed)?|anniversary|reissue|expanded|special|limited|[/&,.+])+$/gi,
+        ''
+      );
+
       // Remove trailing " - EP", " - Single", " EP", " Single"
       normalized = normalized.replace(/\s*-?\s*(ep|single)\s*$/gi, '');
 

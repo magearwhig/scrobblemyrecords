@@ -1,6 +1,7 @@
 import {
   getAllCachedCollectionItems,
   readCollectionCacheSnapshot,
+  removeStaleCollectionPages,
 } from '../../../src/backend/utils/collectionCache';
 import { FileStorage } from '../../../src/backend/utils/fileStorage';
 import { CollectionItem } from '../../../src/shared/types';
@@ -417,5 +418,76 @@ describe('readCollectionCacheSnapshot', () => {
 
     expect(info.status).toBe('partial');
     expect(info.pagesRead).toBe(1);
+  });
+});
+
+describe('pages left over from an earlier, longer sync', () => {
+  let mockFileStorage: jest.Mocked<FileStorage>;
+  let files: Record<string, unknown>;
+  // The latest sync wrote 2 pages; pages 3 and 4 are from an older one
+  const latest = { pages: 2, items: 3 };
+  const older = { pages: 4, items: 7 };
+  const page = (
+    ids: number[],
+    pagination: { pages: number; items: number }
+  ) => ({
+    success: true,
+    data: ids.map(createCollectionItem),
+    pagination,
+    timestamp: 1,
+  });
+
+  beforeEach(() => {
+    files = {
+      'collections/u-page-1.json': page([1, 2], latest),
+      'collections/u-page-2.json': page([3], latest),
+      'collections/u-page-3.json': page([2, 3], older),
+      'collections/u-page-4.json': page([9], older),
+    };
+    mockFileStorage = new MockedFileStorage('test') as jest.Mocked<FileStorage>;
+    mockFileStorage.readJSON = jest.fn(
+      async (path: string) => (files[path] ?? null) as never
+    );
+    mockFileStorage.listFiles = jest.fn(async (_directory: string) =>
+      Object.keys(files).map(path => path.replace('collections/', ''))
+    );
+    mockFileStorage.delete = jest.fn(async (path: string) => {
+      delete files[path];
+    });
+  });
+
+  it('getAllCachedCollectionItems stops at the page count page 1 gives', async () => {
+    const items = await getAllCachedCollectionItems('u', mockFileStorage);
+
+    expect(items.map(i => i.id)).toEqual([1, 2, 3]);
+  });
+
+  it('readCollectionCacheSnapshot ignores them and reports complete', async () => {
+    const { items, info } = await readCollectionCacheSnapshot(
+      'u',
+      mockFileStorage
+    );
+
+    expect(items.map(i => i.id)).toEqual([1, 2, 3]);
+    expect(info.status).toBe('complete');
+    expect(info.pagesRead).toBe(2);
+  });
+
+  it('removeStaleCollectionPages deletes the pages past the last one', async () => {
+    const removed = await removeStaleCollectionPages('u', 2, mockFileStorage);
+
+    expect(removed).toBe(2);
+    expect(Object.keys(files).sort()).toEqual([
+      'collections/u-page-1.json',
+      'collections/u-page-2.json',
+    ]);
+  });
+
+  it("removeStaleCollectionPages leaves other users' pages alone", async () => {
+    files['collections/other-page-9.json'] = page([5], older);
+
+    await removeStaleCollectionPages('u', 2, mockFileStorage);
+
+    expect(files['collections/other-page-9.json']).toBeDefined();
   });
 });

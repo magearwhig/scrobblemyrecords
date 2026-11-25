@@ -32,7 +32,7 @@ describe('DiscogsService', () => {
     mockFileStorage = new MockedFileStorage('test') as jest.Mocked<FileStorage>;
     mockFileStorage.readJSON = jest.fn();
     mockFileStorage.writeJSON = jest.fn();
-    mockFileStorage.listFiles = jest.fn();
+    mockFileStorage.listFiles = jest.fn().mockResolvedValue([]);
     mockFileStorage.delete = jest.fn();
     mockFileStorage.ensureDataDir = jest.fn();
 
@@ -1796,5 +1796,158 @@ describe('DiscogsService', () => {
       // First should make API calls, second should not
       expect(mockAxiosInstance.get).toHaveBeenCalled();
     }, 10000);
+  });
+
+  describe('pages left over from an earlier, longer sync', () => {
+    let files: Record<string, any>;
+    const item = (id: number, dateAdded: string) => ({
+      id,
+      date_added: dateAdded,
+      rating: 0,
+      release: { id, title: `Album ${id}`, artist: 'Artist' },
+    });
+    const raw = (id: number, dateAdded: string) => ({
+      id,
+      date_added: dateAdded,
+      basic_information: {
+        id,
+        title: `Album ${id}`,
+        artists: [{ name: 'Artist' }],
+      },
+    });
+
+    beforeEach(() => {
+      files = {};
+      mockFileStorage.readJSON.mockImplementation(
+        async (path: string) => files[path] ?? null
+      );
+      mockFileStorage.writeJSON.mockImplementation(
+        async (path: string, data: unknown) => {
+          files[path] = data;
+        }
+      );
+      mockFileStorage.listFiles.mockImplementation(async () =>
+        Object.keys(files)
+          .filter(path => path.startsWith('collections/'))
+          .map(path => path.replace('collections/', ''))
+      );
+      mockFileStorage.delete.mockImplementation(async (path: string) => {
+        delete files[path];
+      });
+      jest.spyOn(discogsService as any, 'getAuthHeaders').mockResolvedValue({
+        Authorization: 'Discogs token=test-token',
+      });
+    });
+
+    it('a full refresh deletes pages past its last page', async () => {
+      files['collections/testuser-page-2.json'] = {
+        data: [item(9, '2020-01-01')],
+        pagination: { pages: 3, items: 101 },
+        timestamp: 1,
+      };
+      files['collections/testuser-page-3.json'] = {
+        data: [item(9, '2020-01-01')],
+        pagination: { pages: 3, items: 101 },
+        timestamp: 1,
+      };
+      mockAxiosInstance.get.mockResolvedValue({
+        data: {
+          pagination: { page: 1, pages: 1, per_page: 50, items: 1 },
+          releases: [raw(1, '2024-01-01')],
+        },
+      });
+
+      await discogsService.preloadAllCollectionPages('testuser', true);
+
+      expect(
+        Object.keys(files).filter(path => path.includes('-page-'))
+      ).toEqual(['collections/testuser-page-1.json']);
+    });
+
+    it('an incremental update waits out a full refresh instead of mixing pages', async () => {
+      (discogsService as any).preloadingInProgress.set('testuser', true);
+
+      const result = await discogsService.updateCacheWithNewItems('testuser');
+
+      expect(result).toMatchObject({
+        success: false,
+        error: 'A collection refresh is already in progress',
+      });
+      expect(mockFileStorage.writeJSON).not.toHaveBeenCalled();
+    });
+
+    it('a refresh of an empty collection keeps page 1', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        data: {
+          pagination: { page: 1, pages: 0, per_page: 50, items: 0 },
+          releases: [],
+        },
+      });
+
+      await discogsService.preloadAllCollectionPages('testuser', true);
+
+      expect(files['collections/testuser-page-1.json']).toBeDefined();
+    });
+
+    it('an incremental update keeps two copies added at the same moment', async () => {
+      const cachedAt = Date.parse('2024-06-01T00:00:00Z');
+      files['collections/testuser-page-1.json'] = {
+        data: [item(1, '2024-01-01T00:00:00Z')],
+        pagination: { page: 1, pages: 1, per_page: 50, items: 1 },
+        timestamp: cachedAt,
+      };
+      // Two new copies of record 2, added in the same second
+      mockAxiosInstance.get.mockResolvedValue({
+        data: {
+          pagination: { page: 1, pages: 1, per_page: 50, items: 3 },
+          releases: [
+            raw(2, '2024-07-01T00:00:00Z'),
+            raw(2, '2024-07-01T00:00:00Z'),
+            raw(1, '2024-01-01T00:00:00Z'),
+          ],
+        },
+      });
+
+      await discogsService.updateCacheWithNewItems('testuser');
+
+      expect(
+        files['collections/testuser-page-1.json'].data.map(
+          (i: { id: number }) => i.id
+        )
+      ).toEqual([2, 2, 1]);
+    });
+
+    it('an incremental update neither reads them back nor repeats records', async () => {
+      const cachedAt = Date.parse('2024-06-01T00:00:00Z');
+      files['collections/testuser-page-1.json'] = {
+        data: [item(1, '2024-01-01T00:00:00Z')],
+        pagination: { page: 1, pages: 1, per_page: 50, items: 1 },
+        timestamp: cachedAt,
+      };
+      // Left over from an older sync: repeats record 1
+      files['collections/testuser-page-2.json'] = {
+        data: [item(1, '2024-01-01T00:00:00Z')],
+        pagination: { page: 2, pages: 2, per_page: 50, items: 2 },
+        timestamp: 1,
+      };
+      // Discogs, newest first: a record added after the cache, then record 1
+      mockAxiosInstance.get.mockResolvedValue({
+        data: {
+          pagination: { page: 1, pages: 1, per_page: 50, items: 2 },
+          releases: [
+            raw(2, '2024-07-01T00:00:00Z'),
+            raw(1, '2024-01-01T00:00:00Z'),
+          ],
+        },
+      });
+
+      const result = await discogsService.updateCacheWithNewItems('testuser');
+
+      expect(result).toMatchObject({ success: true, newItemsAdded: 1 });
+      const page1 = files['collections/testuser-page-1.json'];
+      expect(page1.data.map((i: { id: number }) => i.id)).toEqual([2, 1]);
+      expect(page1.pagination).toMatchObject({ pages: 1, items: 2 });
+      expect(files['collections/testuser-page-2.json']).toBeUndefined();
+    });
   });
 });

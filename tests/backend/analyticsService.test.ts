@@ -361,6 +361,35 @@ describe('AnalyticsService', () => {
   });
 
   describe('getMissingAlbums', () => {
+    // Missing albums read the history index (play identity); build it from
+    // the albums each test lists, one play per counted play
+    beforeEach(() => {
+      mockHistoryStorage.getIndex.mockImplementation(async () => {
+        const albums = (await mockHistoryStorage.getAllAlbums()) as Array<{
+          artist: string;
+          album: string;
+          history: { lastPlayed: number; playCount: number };
+        }>;
+        if (albums.length === 0) return null;
+        return {
+          albums: Object.fromEntries(
+            albums.map(a => [
+              `${a.artist}|${a.album}`,
+              {
+                ...a.history,
+                plays: Array.from({ length: a.history.playCount }, () => ({
+                  timestamp: a.history.lastPlayed,
+                })),
+              },
+            ])
+          ),
+          totalScrobbles: albums.reduce((n, a) => n + a.history.playCount, 0),
+          lastSyncTimestamp: 1,
+          oldestScrobbleDate: 0,
+        } as never;
+      });
+    });
+
     it('should return empty array when no history', async () => {
       // Arrange
       mockHistoryStorage.getAllAlbums.mockResolvedValue([]);
@@ -555,10 +584,19 @@ describe('AnalyticsService', () => {
         },
       ]);
 
-      // Act
-      const missing = await analyticsService.getMissingAlbums([]);
+      // The linked record, as the route passes the collection
+      const collection = [
+        createMockCollectionItem({
+          id: 123,
+          artist: 'Radiohead',
+          title: 'Kid A',
+        }),
+      ];
 
-      // Assert - should be skipped due to mapping
+      // Act
+      const missing = await analyticsService.getMissingAlbums(collection);
+
+      // Assert - owned through the linked mapping
       expect(missing).toEqual([]);
     });
 

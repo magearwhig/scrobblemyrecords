@@ -1,8 +1,9 @@
 # One play identity: consistent grouping and ownership everywhere
 
-Status: PRs 1-2 merged 2026-11-24 (#33). PRs 3-4 implemented 2026-11-24 on
-branch `feat/play-identity-ownership` as one PR. What's left is the
-record-to-plays direction ("PR 5" below).
+Status: complete 2026-11-25. PRs 1-2 merged (#33), PRs 3-4 merged (#34),
+PR 5 (record-to-plays) on branch `feat/play-identity-records`. The lint
+allowlist holds only Suggested Album Merges, which reads names before they
+merge on purpose.
 
 ## Problem
 
@@ -150,24 +151,67 @@ unresolved vs a real "Unknown album", deleted collection link.
   content, a name match could beat an explicit link, Forgotten Favorites lost
   ownership after a cross-artist merge.
 
-## Not yet moved ("PR 5": record to plays)
+### PR 5: record to plays (2026-11-25)
 
-These start from an owned record or a named album and look up its plays,
-the reverse of what the resolver answers. They need a resolved-play read
-model indexed by album key (as the original design proposed):
+- `PlayIdentityService` (`playIdentity/service.ts`), shared by every service
+  from `server.ts`: the resolver cache, plus a read model (every play
+  resolved once, by album and by owned record) cached per history index and
+  rules. `recordPlays`, `recordResolvedPlays`, `albumPlays`, `albums`,
+  `discogsAlbumPlays` / `discogsAlbumPlayList`.
+- Moved: album page (and its arc and tracks-played), Release Details history
+  (track aliases from `trackMappingsFor`), label pages, Top Labels and label
+  candidates (resolved plays, so a moved play counts on the right label),
+  collection ROI, coverage, Dusty Corners, Heavy Rotation, album play counts
+  (Collection, Wishlist, Seller Matches), play suggestions, Wrapped, crates
+  (track mappings added to their fingerprint, table version 2), Missing
+  Albums and album completeness, collection covers, AI suggestion matching.
+  `lookupMergedHistory` and `buildFuzzyCollectionMap` are gone.
+- Resolver: a track mapping saved under any version of an album applies to
+  plays on every version (album page merges); a record's grouping key is its
+  own name; collaboration credits ("A, B") own the same title under each
+  artist; Discogs suffixes stripped on every collaborator; the artist's
+  Last.fm name (artist mappings) is another spelling of a record.
+- `fuzzyNormalizeKey` drops trailing edition notes, bracketed or after a dash
+  ("(10th Anniversary Edition)", "(2011 - Remaster)", "- 20th Anniversary
+  Edition", "- Disc 1"), so editions of an owned record count as it.
+- Real data: play counts for all 1,193 records: 43 changed, 41 up (aliases,
+  editions, collaborations), 2 down (double counts fixed); records with plays
+  901 -> 909. Missing Albums 1,669 -> 1,677: 15 now owned, 23 newly listed,
+  all different releases (remix albums, "Appendix", bonus discs, "Plus"
+  editions) that the old prefix rule hid. First read model build ~0.5 s, then
+  lookups 20-45 ms.
+- Behaviour changes: an album you don't own and haven't mapped is no longer
+  merged with its edition variants on the album page (consistent with Top
+  Albums); an owned record still gets every version that resolves to it.
+  Linked mappings only count as owned while the record is in the collection.
+- Peer review found 4 more issues, all fixed with tests: the spelling-tolerant
+  index could return plays moved away; labels split albums by history album,
+  not by play; `movesPlaysTo` missed version-wide track mappings; warm cache
+  version (now 8).
 
-- `statsService`: album page history (`getAlbumDetail` via
-  `lookupCollectionHistory`), label page, collection ROI, collection coverage
-  (`matchCollectionToHistory`), album listening arc
-- `routes/suggestions.ts`: Release Details history, mapping suggestions
-- `crateAlbumTable`, `albumPlayCountService`, `suggestionService`,
-  `analyticsService` (missing albums/artists), `wrappedService` (collection
-  part), `imageService`, `albumMergeSuggestions` (works on raw names on
-  purpose; may stay)
+## Found along the way: collection cache repeats (fixed 2026-11-25)
 
-## Found along the way
+The cache held 1,711 entries for 1,194 releases. Cause: a full collection
+refresh never deleted pages past its new last page, and every reader read
+"until a page is missing", so pages 26-35 from an older 35-page sync were read
+after the current 25. The incremental update made it worse: it read those
+stale pages back in and re-wrote them without de-duplicating, so repeats
+compounded (likely how a sync reported 1,711). A forced refresh could also
+reuse still-fresh cached pages from the previous sync.
 
-- The cached collection pages hold 1,711 items for 1,193 distinct records
-  (page 1 reports 35 pages / 1,711 items). The resolver de-duplicates, but
-  other users of `getAllCachedCollectionItems` may count repeats. Not
-  investigated.
+Fixed: `getAllCachedCollectionItems`, `readCollectionCacheSnapshot`, the
+`/collection/:user/all` route, collection search, the artist-mapping route and
+the crate snapshot read only as many pages as page 1's pagination says; a full
+refresh (now fetching every page when forced) and the incremental update
+delete pages past their last one (`removeStaleCollectionPages`); the
+incremental update de-duplicates by release id + date added (a second copy
+has its own date, so it stays). Real cache: 1,206 entries, 1,194 releases, 12
+genuine second copies. The stale files on disk go at the next full refresh.
+
+Peer review: de-duplication now only drops a new item already in the cache,
+counted per copy (two copies added in the same second both stay); page 1 is
+never deleted (an empty collection is an empty page 1); a full refresh and an
+incremental update share one lock, so an update can't save a half-refreshed
+mix. Still open: a reader during a refresh (~30 s) can see new and old pages
+together; a fix is to write a new generation of pages and switch over in one
+step.

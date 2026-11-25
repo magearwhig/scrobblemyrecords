@@ -1,12 +1,11 @@
 import { CollectionItem } from '../../shared/types';
-import { createCollectionNameResolver } from '../../shared/utils/albumMapping';
 import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import { FileStorage } from '../utils/fileStorage';
 import { createLogger } from '../utils/logger';
 
 import { LastFmService } from './lastfmService';
 import { MappingService } from './mappingService';
-import { loadAlbumMappings } from './mergedAlbumHistory';
+import { PlayIdentityService } from './playIdentity/service';
 
 const ALBUM_COVERS_CACHE = 'images/album-covers.json';
 const ARTIST_IMAGES_CACHE = 'images/artist-images.json';
@@ -46,6 +45,15 @@ export class ImageService {
   private fileStorage: FileStorage;
   private lastfmService: LastFmService;
   private mappingService: MappingService | null = null;
+  /** Until the shared one is set: names only, no history needed */
+  private ownPlayIdentity = new PlayIdentityService({
+    getIndex: async () => null,
+    // Spelling-tolerant: case, punctuation, edition tags like [Explicit]
+    fuzzyNormalizeKey: (artist: string, album: string) =>
+      `${normalizeForMatching(artist)}|${normalizeForMatching(album)}`,
+  });
+  private playIdentity: Pick<PlayIdentityService, 'resolver'> =
+    this.ownPlayIdentity;
   private logger = createLogger('ImageService');
 
   // In-memory caches for performance
@@ -60,6 +68,7 @@ export class ImageService {
 
   setMappingService(mappingService: MappingService): void {
     this.mappingService = mappingService;
+    this.ownPlayIdentity.setMappingService(mappingService);
   }
 
   /**
@@ -124,35 +133,23 @@ export class ImageService {
   }
 
   /**
-   * Get album cover from collection (if available)
-   * Uses mapping service to translate Discogs names to Last.fm names,
-   * then fuzzy-matches via normalizeForMatching to handle edition suffixes,
-   * disambiguation numbers, etc.
+   * Get album cover from collection (if available): the cover of the record
+   * the album is, by play identity (the same record its Owned badge links to)
    */
   async getAlbumCoverFromCollection(
     collection: CollectionItem[],
     artist: string,
     album: string
   ): Promise<string | null> {
-    const normalizedSearchArtist = normalizeForMatching(artist);
-    const normalizedSearchAlbum = normalizeForMatching(album);
-
-    // Match the collection item's own name or any history album mapped to it
-    const namesFor = createCollectionNameResolver(
-      await loadAlbumMappings(this.mappingService)
+    const identity = await this.playIdentity.resolver(collection);
+    return (
+      identity.album(artist, album).collectionItem?.release.cover_image || null
     );
-    for (const item of collection) {
-      const matches = namesFor(item.release.artist, item.release.title).some(
-        name =>
-          normalizeForMatching(name.artist) === normalizedSearchArtist &&
-          normalizeForMatching(name.album) === normalizedSearchAlbum
-      );
-      if (matches) {
-        return item.release.cover_image || null;
-      }
-    }
+  }
 
-    return null;
+  /** The shared play identity service, so covers follow the Owned badges */
+  setPlayIdentityService(service: Pick<PlayIdentityService, 'resolver'>): void {
+    this.playIdentity = service;
   }
 
   /**
