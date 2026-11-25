@@ -3,13 +3,11 @@ import React from 'react';
 import {
   AlbumPlayCount,
   ArtistPlayCount,
-  CollectionItem,
   DateRange,
   LabelPlayCount,
   TrackPlayCount,
 } from '../../../shared/types';
 import { toDisplayName } from '../../../shared/utils/displayName';
-import { normalizeForMatching } from '../../../shared/utils/trackNormalization';
 import { Badge } from '../../components/ui/Badge';
 import {
   playTrackOnSpotify,
@@ -52,10 +50,6 @@ interface TopListProps {
   currentPeriod?: Period;
   loading?: boolean;
   customDateRange?: DateRange;
-  collectionMap?: Map<string, CollectionItem>;
-  collectionArtistCounts?: Map<string, number>;
-  /** Cover of an owned record per artist, shown when there's no photo */
-  collectionArtistCovers?: Map<string, string>;
 }
 
 /**
@@ -69,9 +63,6 @@ export const TopList: React.FC<TopListProps> = ({
   currentPeriod,
   loading,
   customDateRange,
-  collectionMap,
-  collectionArtistCounts,
-  collectionArtistCovers,
 }) => {
   const isLabelData = (item: TopListItem): item is LabelPlayCount =>
     'labelKey' in item;
@@ -176,11 +167,8 @@ export const TopList: React.FC<TopListProps> = ({
                   );
                 }
                 if (isAlbumData(item)) {
-                  const owned =
-                    item.inCollection ||
-                    !!collectionMap?.has(
-                      `${normalizeForMatching(item.artist)}|${normalizeForMatching(item.album)}`
-                    );
+                  // Decided on the server (play identity)
+                  const owned = !!item.inCollection;
                   return (
                     <RankedRow
                       key={index}
@@ -204,19 +192,15 @@ export const TopList: React.FC<TopListProps> = ({
                     />
                   );
                 }
-                const ownedCount = collectionArtistCounts?.get(
-                  normalizeForMatching(item.artist)
-                );
+                // Decided on the server (play identity)
+                const { ownedCount, ownedCoverUrl } = item as ArtistPlayCount;
                 return (
                   <RankedRow
                     key={index}
                     rank={index + 1}
                     imageKind='artist'
                     imageUrl={
-                      (item as ArtistPlayCount).imageUrl ||
-                      collectionArtistCovers?.get(
-                        normalizeForMatching(item.artist)
-                      )
+                      (item as ArtistPlayCount).imageUrl || ownedCoverUrl
                     }
                     imageAlt={item.artist}
                     title={artistLink}

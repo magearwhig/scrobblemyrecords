@@ -1533,4 +1533,42 @@ describe('Suggestions Routes', () => {
       expect(mockStatsService.warmCache).toHaveBeenCalled();
     });
   });
+
+  describe('History lists come from play identity', () => {
+    const emptyPage = {
+      items: [],
+      total: 0,
+      totalPages: 0,
+      page: 2,
+      maxPlayCount: 0,
+    };
+
+    it.each([
+      ['tracks', 'getHistoryTracks', 'track'],
+      ['albums', 'getHistoryAlbums', 'album'],
+      ['artists', 'getHistoryArtists', 'artist'],
+    ] as const)(
+      'GET /history/%s asks StatsService.%s with the query and the collection',
+      async (list, method, sortBy) => {
+        mockStatsService[method] = jest.fn().mockResolvedValue(emptyPage);
+
+        const response = await request(app).get(
+          `/api/v1/suggestions/history/${list}?page=2&per_page=10&sort_by=${sortBy}&sort_order=asc&search=lice`
+        );
+
+        expect(response.status).toBe(200);
+        expect(response.body.data).toEqual(emptyPage);
+        expect(mockStatsService[method]).toHaveBeenCalledWith(
+          {
+            page: 2,
+            perPage: 10,
+            sortBy,
+            sortOrder: 'asc',
+            search: 'lice',
+          },
+          expect.any(Array)
+        );
+      }
+    );
+  });
 });

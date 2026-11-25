@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from 'react';
 
 import { ForgottenTrack } from '../../../shared/types';
 import { useApp } from '../../context/AppContext';
-import { useCollectionLookup } from '../../hooks/useCollectionLookup';
 import { getApiService } from '../../services/api';
 import ForgottenFavoritesTab from '../discovery/ForgottenFavoritesTab';
 
@@ -10,7 +9,6 @@ type ForgottenSortOption = 'plays' | 'artist' | 'track' | 'dormant';
 
 const ForgottenFavoritesContainer: React.FC = () => {
   const { state } = useApp();
-  const { collectionMap } = useCollectionLookup();
   const api = getApiService(state.serverUrl);
 
   const [forgottenTracks, setForgottenTracks] = useState<ForgottenTrack[]>([]);
@@ -73,7 +71,6 @@ const ForgottenFavoritesContainer: React.FC = () => {
       formatDate={formatDate}
       openLink={openLink}
       api={api}
-      collectionMap={collectionMap}
     />
   );
 };

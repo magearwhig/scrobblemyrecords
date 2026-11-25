@@ -107,6 +107,14 @@ describe('createPlayIdentityResolver', () => {
     expect(bonus.artist).toBe('The Format');
   });
 
+  it('names every version of a merged album by the name its mapping points to', () => {
+    const resolve = resolverWith();
+
+    expect(resolve.play('The Format', 'dog problems', 'Pick Me Up').album).toBe(
+      'Dog Problems'
+    );
+  });
+
   it('finds the owned record through a mapping and by name', () => {
     const resolve = resolverWith();
 
@@ -121,6 +129,16 @@ describe('createPlayIdentityResolver', () => {
         'The First Single'
       ).collectionItem
     ).toBeUndefined();
+  });
+
+  it('every version of a merged album shares its owner', () => {
+    // Exact-only name matching: only the merged album can tie the plain
+    // "dog problems" to the record "The Format (2) / Dog Problems"
+    const resolve = resolverWith({ fuzzyKey: (a, b) => `${a}|${b}` });
+
+    expect(
+      resolve.play('the format', 'dog problems', 'Time Bomb').collectionItem
+    ).toBe(dogProblems);
   });
 
   it('ignores an unlinked mapping for ownership but still merges versions', () => {
@@ -300,5 +318,84 @@ describe('movesPlaysTo', () => {
     const could = moving('Teh Format', 'odds and ends');
 
     expect(could('misc', 'odds')).toBe(true);
+  });
+});
+
+describe('ownedByArtist', () => {
+  const blockhead = item(20948779, 'Aesop Rock, Blockhead', 'Garbology');
+  const skelethon = item(4, 'Aesop Rock', 'Skelethon');
+  const afghan = item(5, 'The Afghan Whigs (2)', 'Gentlemen');
+  const resolve = createPlayIdentityResolver({
+    albumMappings: [
+      albumMapping(
+        'aesop rock',
+        'garbology',
+        'Aesop Rock, Blockhead',
+        'Garbology',
+        20948779
+      ),
+      // Unlinked mappings never make anything owned
+      albumMapping('aesop rock', 'none shall pass', 'x', 'y', 0),
+    ],
+    mapTrack: trackMapperFrom([]),
+    resolveArtist: name =>
+      name.toLowerCase() === 'the afghan whigs'
+        ? 'afghan whigs'
+        : name.toLowerCase(),
+    collection: [blockhead, skelethon, afghan],
+    fuzzyKey: (artist, album) =>
+      `${artist.toLowerCase()}|${album.toLowerCase()}`,
+  });
+
+  it("counts the artist's own records and ones linked to them by a mapping", () => {
+    expect(resolve.ownedByArtist('Aesop Rock')).toEqual([skelethon, blockhead]);
+  });
+
+  it('counts a record once even when the collection lists it twice', () => {
+    const twice = createPlayIdentityResolver({
+      albumMappings: [],
+      mapTrack: trackMapperFrom([]),
+      resolveArtist: name => name.toLowerCase(),
+      // The cached collection can repeat items (stale page files)
+      collection: [skelethon, { ...skelethon }],
+      fuzzyKey: (artist, album) => `${artist}|${album}`,
+    });
+
+    expect(twice.ownedByArtist('Aesop Rock')).toHaveLength(1);
+  });
+
+  it('follows artist aliases and ignores Discogs number suffixes', () => {
+    expect(resolve.ownedByArtist('Afghan Whigs')).toEqual([afghan]);
+  });
+
+  it('is empty for an artist with nothing owned', () => {
+    expect(resolve.ownedByArtist('Lice')).toEqual([]);
+  });
+});
+
+describe('linked ownership', () => {
+  it('a link on any version of a merged album beats a name match', () => {
+    const copy1 = item(1, 'The Format', 'Dog Problems');
+    const copy2 = item(2, 'The Format', 'Dog Problems');
+    const resolve = createPlayIdentityResolver({
+      albumMappings: [
+        albumMapping(
+          'the format',
+          'dog problems (bonus track version)',
+          'The Format',
+          'Dog Problems',
+          2
+        ),
+      ],
+      mapTrack: trackMapperFrom([]),
+      resolveArtist: name => name.toLowerCase(),
+      collection: [copy1, copy2],
+      fuzzyKey: (artist, album) =>
+        `${artist.toLowerCase()}|${album.toLowerCase()}`,
+    });
+
+    expect(resolve.album('The Format', 'Dog Problems').collectionItem).toBe(
+      copy2
+    );
   });
 });

@@ -1,5 +1,9 @@
 # Claude Code Instructions
 
+## Project rules (all agents)
+**Read and follow `AGENTS.md`, treat as if imported here.** It holds rules that apply to every agent, e.g. counting plays and ownership only through the play identity resolver.
+@./AGENTS.md
+
 ## Task Master AI Instructions
 **Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
 @./.taskmaster/CLAUDE.md

@@ -8,6 +8,7 @@ import {
   createAlbumCanonicalizer,
   createCollectionNameResolver,
   isCollectionLinked,
+  stripDiscogsSuffix,
 } from '../../../shared/utils/albumMapping';
 import { trackMatchKey } from '../../../shared/utils/trackNormalization';
 import { loadAlbumMappings } from '../mergedAlbumHistory';
@@ -79,6 +80,12 @@ export interface PlayIdentityResolver {
   movesPlaysTo(
     isTarget: (artist: string) => boolean
   ): (artist: string, album: string | null) => boolean;
+  /**
+   * Records owned by an artist: credited to them (through aliases, ignoring
+   * Discogs "(2)" suffixes), then ones an album mapping links to their plays
+   * (e.g. "Aesop Rock, Blockhead" for Aesop Rock's Garbology)
+   */
+  ownedByArtist(artist: string): CollectionItem[];
 }
 
 /** Prefix for keys of unresolved plays, so none equals a real album's */
@@ -99,8 +106,14 @@ const UNRESOLVED_PREFIX = '\u0000unresolved|';
 export function createPlayIdentityResolver(
   inputs: PlayIdentityInputs
 ): PlayIdentityResolver {
-  const { albumMappings, mapTrack, resolveArtist, collection, fuzzyKey } =
-    inputs;
+  const { albumMappings, mapTrack, resolveArtist, fuzzyKey } = inputs;
+  // Each record once: the cached collection can repeat items
+  const seenIds = new Set<number>();
+  const collection = inputs.collection.filter(item => {
+    if (seenIds.has(item.id)) return false;
+    seenIds.add(item.id);
+    return true;
+  });
   const canonicalize = createAlbumCanonicalizer(albumMappings, resolveArtist);
 
   const itemsById = new Map<number, CollectionItem>();
@@ -127,29 +140,54 @@ export function createPlayIdentityResolver(
     for (const name of linked) index(name.artist, name.album, item);
   }
 
-  // History names linked to a record by an album mapping
+  // History names linked to a record by an album mapping, and the merged
+  // album each link belongs to: a link on any version of an album decides
+  // its owner, ahead of any name match (two copies can share a title)
   const linkedBySource = new Map<string, CollectionItem>();
+  const linkedByAlbumKey = new Map<string, CollectionItem>();
   for (const m of albumMappings) {
     const item = isCollectionLinked(m)
       ? itemsById.get(m.collectionId)
       : undefined;
-    if (item)
-      linkedBySource.set(albumNameKey(m.historyArtist, m.historyAlbum), item);
+    if (!item) continue;
+    linkedBySource.set(albumNameKey(m.historyArtist, m.historyAlbum), item);
+    const { key } = canonicalize(m.historyArtist, m.historyAlbum);
+    if (!linkedByAlbumKey.has(key)) linkedByAlbumKey.set(key, item);
   }
+
+  // Owned records by merged album, so every version of an album (and every
+  // spelling, including Discogs "(2)" suffixes) shares one owner
+  const byAlbumKey = new Map<string, CollectionItem>();
+  for (const item of collection) {
+    const { key } = canonicalize(item.release.artist, item.release.title);
+    if (!byAlbumKey.has(key)) byAlbumKey.set(key, item);
+  }
+
   const ownedRecord = (
     artist: string,
     album: string,
     mergedArtist: string,
-    mergedAlbum: string
+    mergedAlbum: string,
+    albumKey: string
   ): CollectionItem | undefined => {
     return (
       linkedBySource.get(albumNameKey(artist, album)) ??
+      linkedByAlbumKey.get(albumKey) ??
       byExactKey.get(albumNameKey(artist, album)) ??
       byExactKey.get(albumNameKey(mergedArtist, mergedAlbum)) ??
+      byAlbumKey.get(albumKey) ??
       byFuzzyKey.get(fuzzyKey(artist, album)) ??
       byFuzzyKey.get(fuzzyKey(mergedArtist, mergedAlbum))
     );
   };
+
+  // A merged album is shown by the name its mappings point to, whichever
+  // version a play was scrobbled on
+  const nameByAlbumKey = new Map<string, string>();
+  for (const m of albumMappings) {
+    const { key } = canonicalize(m.historyArtist, m.historyAlbum);
+    if (!nameByAlbumKey.has(key)) nameByAlbumKey.set(key, m.collectionAlbum);
+  }
 
   const albumCache = new Map<string, AlbumIdentity>();
   const album = (artist: string, albumName: string): AlbumIdentity => {
@@ -160,14 +198,14 @@ export function createPlayIdentityResolver(
     const identity: AlbumIdentity = {
       artist,
       artistKey: resolveArtist(artist).toLowerCase(),
-      // A merged album shows under the name its mapping points to
-      album: canonical.mapping ? canonical.album : albumName,
+      album: nameByAlbumKey.get(canonical.key) ?? albumName,
       albumKey: canonical.key,
       collectionItem: ownedRecord(
         artist,
         albumName,
         canonical.artist,
-        canonical.album
+        canonical.album,
+        canonical.key
       ),
     };
     albumCache.set(cacheKey, identity);
@@ -212,6 +250,31 @@ export function createPlayIdentityResolver(
     return identity;
   };
 
+  // Records by artist key: credited first, then linked by a mapping
+  const artistKeyOf = (artist: string) => {
+    const resolved = resolveArtist(artist).toLowerCase();
+    const plain = stripDiscogsSuffix(artist);
+    return plain !== artist && resolved === artist.toLowerCase()
+      ? resolveArtist(plain).toLowerCase()
+      : resolved;
+  };
+  const ownedByKey = new Map<string, CollectionItem[]>();
+  const addOwned = (artist: string, item: CollectionItem) => {
+    const key = artistKeyOf(artist);
+    const items = ownedByKey.get(key) ?? [];
+    if (!items.includes(item)) items.push(item);
+    ownedByKey.set(key, items);
+  };
+  for (const item of collection) addOwned(item.release.artist, item);
+  for (const m of albumMappings) {
+    const item = isCollectionLinked(m)
+      ? itemsById.get(m.collectionId)
+      : undefined;
+    if (item) addOwned(m.historyArtist, item);
+  }
+  const ownedByArtist = (artist: string) =>
+    ownedByKey.get(artistKeyOf(artist)) ?? [];
+
   // Track mappings are looked up by trackMatchKey'd names, under the
   // scrobbled album and then the album an album mapping merges it into
   const plainCanonicalize = createAlbumCanonicalizer(albumMappings);
@@ -230,7 +293,7 @@ export function createPlayIdentityResolver(
         ));
   };
 
-  return { play, album, movesPlaysTo };
+  return { play, album, movesPlaysTo, ownedByArtist };
 }
 
 /**

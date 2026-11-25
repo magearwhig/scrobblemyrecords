@@ -1,8 +1,8 @@
 # One play identity: consistent grouping and ownership everywhere
 
-Status: PRs 1 and 2 implemented 2026-11-24 on branch `feat/play-identity`
-(uncommitted to main). PRs 3 and 4 not started. The interim
-`createTrackRowMapper` fix was replaced by the resolver in PR 2.
+Status: PRs 1-2 merged 2026-11-24 (#33). PRs 3-4 implemented 2026-11-24 on
+branch `feat/play-identity-ownership` as one PR. What's left is the
+record-to-plays direction ("PR 5" below).
 
 ## Problem
 
@@ -121,3 +121,53 @@ unresolved vs a real "Unknown album", deleted collection link.
   the artist they were scrobbled under; artist and album rankings; album
   detail; analytics, Wrapped (already uses `getTopTracks`), crates,
   suggestions.
+
+### PR 3 + 4 (2026-11-24, one PR)
+
+- **History lists** (`/suggestions/history/albums|tracks|artists`) are built by
+  `StatsService.getHistoryAlbums/Tracks/Artists` on the resolver, replacing
+  `ScrobbleHistoryStorage.get*Paginated` (still used by Memory Scrobble's
+  typeahead, which needs raw scrobbled names). Rows carry `collectionItem`;
+  artist rows carry `ownedCount` and `ownedCoverUrl`.
+- **Ownership on the server everywhere**: Forgotten Favorites (recorded while
+  counting), Top Albums, Top Artists (`withArtistOwnership`), dashboard recent
+  albums (`ownedRecordsOf`), artist page albums, track page "appears on",
+  album page. `useCollectionLookup` (browser name matching) is deleted.
+- **Migrated to per-play identity**: artist page totals and albums (plays a
+  track mapping moves to or from the artist count where they land), Top
+  Albums, Top Artists, rankings for artists and albums.
+- **Resolver additions**: `ownedByArtist`; ownership order is linked mapping
+  on the name, linked mapping on the merged album, exact name, exact merged
+  name, merged-album key, fuzzy; a merged album is named by its mapping
+  target; collection items de-duplicated by id.
+- **Caching**: resolvers are reused per rules fingerprint (album mappings,
+  track mappings, aliases, collection content); History rows per index object
+  + last sync + total + rules. Real data: first request ~250 ms, then 6-30 ms.
+- **Lint guard** in `eslint.config.js` with the `PLAY_IDENTITY_NOT_YET_MOVED`
+  allowlist; rules written into `AGENTS.md` (imported by `CLAUDE.md`) and
+  `CONTRIBUTING.md`.
+- Peer review found 3 issues, fixed with tests: cache key ignored collection
+  content, a name match could beat an explicit link, Forgotten Favorites lost
+  ownership after a cross-artist merge.
+
+## Not yet moved ("PR 5": record to plays)
+
+These start from an owned record or a named album and look up its plays,
+the reverse of what the resolver answers. They need a resolved-play read
+model indexed by album key (as the original design proposed):
+
+- `statsService`: album page history (`getAlbumDetail` via
+  `lookupCollectionHistory`), label page, collection ROI, collection coverage
+  (`matchCollectionToHistory`), album listening arc
+- `routes/suggestions.ts`: Release Details history, mapping suggestions
+- `crateAlbumTable`, `albumPlayCountService`, `suggestionService`,
+  `analyticsService` (missing albums/artists), `wrappedService` (collection
+  part), `imageService`, `albumMergeSuggestions` (works on raw names on
+  purpose; may stay)
+
+## Found along the way
+
+- The cached collection pages hold 1,711 items for 1,193 distinct records
+  (page 1 reports 35 pages / 1,711 items). The resolver de-duplicates, but
+  other users of `getAllCachedCollectionItems` may count repeats. Not
+  investigated.

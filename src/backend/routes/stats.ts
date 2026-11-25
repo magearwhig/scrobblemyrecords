@@ -12,7 +12,6 @@ import {
   DashboardTopAlbum,
   DashboardTopArtist,
 } from '../../shared/types';
-import { createCollectionNameResolver } from '../../shared/utils/albumMapping';
 import { getAlbumPlayCounts } from '../services/albumPlayCountService';
 import { AnalyticsService } from '../services/analyticsService';
 import { AuthService } from '../services/authService';
@@ -20,7 +19,6 @@ import { GenreAnalysisService } from '../services/genreAnalysisService';
 import { HistoryIndexMergeService } from '../services/historyIndexMergeService';
 import { ImageService } from '../services/imageService';
 import { MappingService } from '../services/mappingService';
-import { loadAlbumMappings } from '../services/mergedAlbumHistory';
 import { RankingsService } from '../services/rankingsService';
 import { ScrobbleHistoryStorage } from '../services/scrobbleHistoryStorage';
 import { SellerMonitoringService } from '../services/sellerMonitoringService';
@@ -203,31 +201,15 @@ export default function createStatsRouter(
 
           const recentAlbums = await historyStorage.getRecentlyPlayedAlbums(10);
 
-          // Check which albums are in collection using fuzzy matching
+          // The owned record of each album, by play identity
           const collection = username ? await loadCollection(username) : [];
-          const collectionByFuzzyKey = new Map<string, CollectionItem>();
-          // Index each item's own name plus every history album mapped to it
-          const namesFor = createCollectionNameResolver(
-            await loadAlbumMappings(mappingService ?? null)
+          const owned = await statsService.ownedRecordsOf(
+            recentAlbums,
+            collection
           );
-          for (const item of collection) {
-            for (const name of namesFor(
-              item.release.artist,
-              item.release.title
-            )) {
-              collectionByFuzzyKey.set(
-                historyStorage!.fuzzyNormalizeKey(name.artist, name.album),
-                item
-              );
-            }
-          }
 
-          return recentAlbums.map(album => {
-            const fuzzyKey = historyStorage!.fuzzyNormalizeKey(
-              album.artist,
-              album.album
-            );
-            const collectionItem = collectionByFuzzyKey.get(fuzzyKey);
+          return recentAlbums.map((album, i) => {
+            const collectionItem = owned[i];
 
             return {
               artist: album.artist,
@@ -447,10 +429,17 @@ export default function createStatsRouter(
         startDate,
         endDate
       );
+      // Records each artist owns (play identity), for the "N owned" badges
+      const settings = await authService.getUserSettings();
+      const username = settings.discogs.username;
+      const collection = username ? await loadCollection(username) : [];
 
       res.json({
         success: true,
-        data: topArtists,
+        data:
+          collection.length > 0
+            ? await statsService.withArtistOwnership(topArtists, collection)
+            : topArtists,
         period,
         ...(period === 'custom' && { startDate, endDate }),
       });
@@ -836,10 +825,14 @@ export default function createStatsRouter(
         Math.max(1, parseInt(req.query.limit as string) || 100)
       );
 
+      // Each row carries its owned record (play identity)
+      const settings = await authService.getUserSettings();
+      const username = settings.discogs.username;
       const result = await statsService.getForgottenFavorites(
         dormantDays,
         minPlays,
-        limit
+        limit,
+        username ? await loadCollection(username) : []
       );
 
       res.json({

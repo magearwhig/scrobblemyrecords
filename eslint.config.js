@@ -7,6 +7,25 @@ const jsxA11y = require('eslint-plugin-jsx-a11y');
 const importPlugin = require('eslint-plugin-import');
 const prettier = require('eslint-config-prettier');
 
+const PLAY_IDENTITY_MESSAGE =
+  'Group plays and decide ownership with the play identity resolver (src/backend/services/playIdentity); see AGENTS.md.';
+
+// Files that still apply mapping rules themselves; see the play identity
+// block. All are record-to-plays lookups (the plays of an owned record or a
+// named album), which the resolver doesn't answer yet: see "Not yet moved" in
+// .plan/play-identity-plan.md. Delete a line when its file is moved.
+const PLAY_IDENTITY_NOT_YET_MOVED = [
+  'src/backend/routes/suggestions.ts', // release details history, mapping suggestions
+  'src/backend/services/albumMergeSuggestions.ts', // suggests merges from raw names
+  'src/backend/services/albumPlayCountService.ts', // play counts per owned record
+  'src/backend/services/analyticsService.ts', // missing albums/artists
+  'src/backend/services/crateAlbumTable.ts', // crate rows per owned record
+  'src/backend/services/imageService.ts', // covers by owned record
+  'src/backend/services/statsService.ts', // album page, label page, ROI, coverage, listening arc
+  'src/backend/services/suggestionService.ts', // play suggestions per owned record
+  'src/backend/services/wrappedService.ts', // collection part of Wrapped
+];
+
 module.exports = [
   // Base configuration for all files
   {
@@ -181,6 +200,53 @@ module.exports = [
     files: ['src/backend/utils/logger.ts', 'src/renderer/utils/logger.ts'],
     rules: {
       'no-console': 'off',
+    },
+  },
+
+  // Play identity: plays are grouped, counted and matched to owned records
+  // only through src/backend/services/playIdentity (see AGENTS.md). These
+  // helpers apply part of the rules each, which is how pages came to
+  // disagree. PLAY_IDENTITY_NOT_YET_MOVED lists files still using them; it
+  // only shrinks: move a file onto the resolver, then delete its line.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: [
+      // The resolver, and the helpers' own homes
+      'src/backend/services/playIdentity/**',
+      'src/shared/utils/albumMapping.ts',
+      'src/backend/services/trackMappingService.ts',
+      'src/backend/services/scrobbleHistoryStorage.ts',
+      ...PLAY_IDENTITY_NOT_YET_MOVED,
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/shared/utils/albumMapping'],
+              importNames: [
+                'createAlbumCanonicalizer',
+                'createCollectionNameResolver',
+                'createAlbumGroupNameResolver',
+              ],
+              message: PLAY_IDENTITY_MESSAGE,
+            },
+            {
+              group: ['**/trackMappingService'],
+              importNames: ['createTrackMapper'],
+              message: PLAY_IDENTITY_MESSAGE,
+            },
+          ],
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.property.name='fuzzyNormalizeKey']",
+          message: PLAY_IDENTITY_MESSAGE,
+        },
+      ],
     },
   },
 

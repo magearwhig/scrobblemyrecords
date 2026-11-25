@@ -4,18 +4,13 @@ import React from 'react';
 
 import '@testing-library/jest-dom';
 import ForgottenFavoritesTab from '../../../../src/renderer/components/discovery/ForgottenFavoritesTab';
-import { lookupInCollection } from '../../../../src/renderer/hooks/useCollectionLookup';
 import ApiService from '../../../../src/renderer/services/api';
-import { CollectionItem, ForgottenTrack } from '../../../../src/shared/types';
+import { ForgottenTrack } from '../../../../src/shared/types';
 
 jest.mock('../../../../src/renderer/services/api');
 
 jest.mock('../../../../src/renderer/utils/spotifyUtils', () => ({
   playTrackOnSpotify: jest.fn(),
-}));
-
-jest.mock('../../../../src/renderer/hooks/useCollectionLookup', () => ({
-  lookupInCollection: jest.fn().mockReturnValue(undefined),
 }));
 
 jest.mock('../../../../src/renderer/components/ui/Modal', () => ({
@@ -92,26 +87,35 @@ describe('ForgottenFavoritesTab', () => {
     formatDate: mockFormatDate,
     openLink: mockOpenLink,
     api: mockApi,
-    collectionMap: undefined as Map<string, CollectionItem> | undefined,
   });
 
-  it("checks ownership with the page's collection lookup (album mappings included)", () => {
-    const collectionMap = new Map<string, CollectionItem>();
-
+  it("shows In Collection from the server's row", () => {
     render(
       <ForgottenFavoritesTab
         {...getDefaultProps()}
-        forgottenTracks={[makeTrack({ artist: 'Lice', album: 'Lice' })]}
+        forgottenTracks={[
+          makeTrack({
+            artist: 'Lice',
+            album: 'Lice',
+            collectionItem: {
+              id: 24813326,
+              date_added: '',
+              release: {
+                id: 24813326,
+                title: 'Lice',
+                artist: 'Aesop Rock, Homeboy Sandman',
+                format: [],
+                label: [],
+                resource_url: '',
+              },
+            },
+          }),
+        ]}
         forgottenTotalMatching={1}
-        collectionMap={collectionMap}
       />
     );
 
-    expect(lookupInCollection).toHaveBeenCalledWith(
-      collectionMap,
-      'Lice',
-      'Lice'
-    );
+    expect(screen.getByText('In Collection')).toBeInTheDocument();
   });
 
   it('renders the section header', () => {

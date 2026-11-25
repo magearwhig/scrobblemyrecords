@@ -33,7 +33,6 @@ import { StreakCard } from '../components/stats/StreakCard';
 import { TasteSection } from '../components/stats/TasteSection';
 import { Button } from '../components/ui/Button';
 import { StatsPageSkeleton } from '../components/ui/Skeleton';
-import { useCollectionLookup } from '../hooks/useCollectionLookup';
 import { imagesApi, statsApi } from '../services/statsApi';
 import { createLogger } from '../utils/logger';
 
@@ -112,10 +111,6 @@ const StatsSummary: React.FC<{
 };
 
 export const StatsPage: React.FC = () => {
-  // Collection lookup for "Owned" badges in the rankings
-  const { collectionMap, collectionArtistCounts, collectionArtistCovers } =
-    useCollectionLookup();
-
   // Loading states
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -490,11 +485,7 @@ export const StatsPage: React.FC = () => {
       />
 
       {/* Rankings: top albums, labels, artists and tracks */}
-      <StatsRankings
-        collectionMap={collectionMap}
-        collectionArtistCounts={collectionArtistCounts}
-        collectionArtistCovers={collectionArtistCovers}
-      />
+      <StatsRankings />
 
       {/* Activity: the timeline and the year's calendar, beside this day in
           past years */}

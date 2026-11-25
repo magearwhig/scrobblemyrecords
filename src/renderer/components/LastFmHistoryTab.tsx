@@ -3,12 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { CollectionItem } from '../../shared/types';
 import { stripDiscogsSuffix } from '../../shared/utils/albumMapping';
 import { toDisplayName } from '../../shared/utils/displayName';
-import { normalizeForMatching } from '../../shared/utils/trackNormalization';
 import { useApp } from '../context/AppContext';
-import {
-  useCollectionLookup,
-  lookupInCollection,
-} from '../hooks/useCollectionLookup';
 import { navigate, ROUTES } from '../routes';
 import { getApiService } from '../services/api';
 import { imagesApi } from '../services/statsApi';
@@ -36,6 +31,8 @@ interface AlbumHistoryItem {
   playCount: number;
   firstPlayed?: number;
   lastPlayed: number;
+  /** The owned record, decided on the server */
+  collectionItem?: CollectionItem;
 }
 
 interface TrackHistoryItem {
@@ -48,6 +45,8 @@ interface TrackHistoryItem {
   playCount: number;
   firstPlayed?: number;
   lastPlayed: number;
+  /** The owned record, decided on the server */
+  collectionItem?: CollectionItem;
 }
 
 interface ArtistHistoryItem {
@@ -56,6 +55,9 @@ interface ArtistHistoryItem {
   albumCount: number;
   firstPlayed?: number;
   lastPlayed: number;
+  /** Records the artist owns and a cover from one, decided on the server */
+  ownedCount?: number;
+  ownedCoverUrl?: string;
 }
 
 type ViewMode = 'albums' | 'tracks' | 'artists';
@@ -135,9 +137,8 @@ const LastFmHistoryTab: React.FC = () => {
   const { state } = useApp();
   const api = getApiService(state.serverUrl);
 
-  // Collection lookup for "In Collection" badges
-  const { collectionMap, collectionArtistCounts, collectionArtistCovers } =
-    useCollectionLookup();
+  // "Owned" comes on each row from the server (play identity), so it
+  // matches Top Tracks and the rest of the app
 
   // Plays without album info aren't in the Albums view; point to them
   const [unresolvedCount, setUnresolvedCount] = useState(0);
@@ -358,12 +359,13 @@ const LastFmHistoryTab: React.FC = () => {
     const cache = imageCache.current;
     const seq = ++imageRequestSeq.current;
     const missingAlbums = new Map<string, { artist: string; album: string }>();
-    const addAlbum = (artist: string, album: string) => {
+    const addAlbum = (
+      artist: string,
+      album: string,
+      owned: CollectionItem | undefined
+    ) => {
       const key = albumImageKey(artist, album);
-      if (
-        !cache.has(key) &&
-        !lookupInCollection(collectionMap, artist, album)?.release.cover_image
-      ) {
+      if (!cache.has(key) && !owned?.release.cover_image) {
         missingAlbums.set(key, { artist, album });
       }
     };
@@ -372,10 +374,10 @@ const LastFmHistoryTab: React.FC = () => {
       null;
     let requestedKeys: string[] = [];
     if (viewMode === 'albums') {
-      albums.forEach(a => addAlbum(a.artist, a.album));
+      albums.forEach(a => addAlbum(a.artist, a.album, a.collectionItem));
     } else if (viewMode === 'tracks') {
       tracks.forEach(t => {
-        if (!t.albumUnknown) addAlbum(t.artist, t.album);
+        if (!t.albumUnknown) addAlbum(t.artist, t.album, t.collectionItem);
       });
     }
     // Artists use a cover from the collection instead: Last.fm no longer
@@ -403,7 +405,7 @@ const LastFmHistoryTab: React.FC = () => {
         if (seq === imageRequestSeq.current) setImages(new Map(cache));
       })
       .catch(err => logger.warn('Failed to load list images', err));
-  }, [viewMode, albums, tracks, collectionMap]);
+  }, [viewMode, albums, tracks]);
 
   const albumCover = (
     artist: string,
@@ -673,11 +675,7 @@ const LastFmHistoryTab: React.FC = () => {
           <ol className='ranked-list' aria-label={`All-time ${itemType}`}>
             {viewMode === 'albums' &&
               albums.map((album, index) => {
-                const collectionItem = lookupInCollection(
-                  collectionMap,
-                  album.artist,
-                  album.album
-                );
+                const { collectionItem } = album;
                 const albumName = displayAlbum(album.album, collectionItem);
                 return (
                   <RankedRow
@@ -723,11 +721,7 @@ const LastFmHistoryTab: React.FC = () => {
               tracks.map((track, index) => {
                 const collectionItem = track.albumUnknown
                   ? undefined
-                  : lookupInCollection(
-                      collectionMap,
-                      track.artist,
-                      track.album
-                    );
+                  : track.collectionItem;
                 const albumName = track.albumUnknown
                   ? undefined
                   : displayAlbum(track.album, collectionItem);
@@ -797,17 +791,13 @@ const LastFmHistoryTab: React.FC = () => {
 
             {viewMode === 'artists' &&
               artists.map((artist, index) => {
-                const ownedCount = collectionArtistCounts.get(
-                  normalizeForMatching(artist.artist)
-                );
+                const { ownedCount } = artist;
                 return (
                   <RankedRow
                     key={artist.artist}
                     rank={rankOf(index)}
                     imageKind='artist'
-                    imageUrl={collectionArtistCovers.get(
-                      normalizeForMatching(artist.artist)
-                    )}
+                    imageUrl={artist.ownedCoverUrl}
                     imageAlt={artist.artist}
                     title={
                       <ArtistLink

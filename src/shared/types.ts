@@ -362,6 +362,8 @@ export interface ForgottenTrack {
   lastPlayed: number; // Unix timestamp (seconds)
   daysSincePlay: number; // Calculated for display
   firstPlayed?: number; // When first scrobbled (optional)
+  /** The owned record, decided on the server (play identity) */
+  collectionItem?: CollectionItem;
 }
 
 /**
@@ -577,6 +579,10 @@ export interface ArtistPlayCount {
   artist: string;
   playCount: number;
   imageUrl?: string;
+  /** Records the artist owns, decided on the server (play identity) */
+  ownedCount?: number;
+  /** Cover of one owned record, used as the artist's picture */
+  ownedCoverUrl?: string;
 }
 
 export interface NewArtistDetail {
@@ -4509,4 +4515,65 @@ export interface RecordStoreFilingStatus {
   };
   masters: { total: number; cached: number; missing: number };
   job: RecordStoreFilingJobStatus;
+}
+
+// ============================================
+// History lists (Last.fm Listening History tab), grouped by play identity
+// ============================================
+
+export interface HistoryListQuery<SortBy extends string> {
+  page: number;
+  perPage: number;
+  sortBy: SortBy;
+  sortOrder: 'asc' | 'desc';
+  search?: string;
+}
+
+export interface HistoryListPage<Row> {
+  items: Row[];
+  total: number;
+  totalPages: number;
+  page: number;
+  /** Highest play count among all matching items, to scale play bars */
+  maxPlayCount: number;
+}
+
+export interface HistoryTrackRow {
+  artist: string;
+  /** Artist name with display casing, where a mapping provides one */
+  artistName: string;
+  album: string;
+  /** True for plays without album info (album is a placeholder label) */
+  albumUnknown?: boolean;
+  track: string;
+  playCount: number;
+  firstPlayed: number;
+  lastPlayed: number;
+  /** The owned record, decided on the server (play identity) */
+  collectionItem?: CollectionItem;
+}
+
+export interface HistoryAlbumRow {
+  artist: string;
+  /** Artist name with display casing, where a mapping provides one */
+  artistName: string;
+  album: string;
+  playCount: number;
+  firstPlayed: number;
+  lastPlayed: number;
+  /** The owned record, decided on the server (play identity) */
+  collectionItem?: CollectionItem;
+}
+
+export interface HistoryArtistRow {
+  artist: string;
+  playCount: number;
+  /** Albums played, versions joined by album mappings counted once */
+  albumCount: number;
+  firstPlayed: number;
+  lastPlayed: number;
+  /** Records owned by the artist (see PlayIdentityResolver.ownedByArtist) */
+  ownedCount: number;
+  /** Cover of one owned record, used as the artist's picture */
+  ownedCoverUrl?: string;
 }

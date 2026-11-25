@@ -1,9 +1,5 @@
 import { AlbumMapping } from '../../shared/types';
 import {
-  createAlbumCanonicalizer,
-  stripDiscogsSuffix,
-} from '../../shared/utils/albumMapping';
-import {
   TrackSpellings,
   trackMatchKey,
 } from '../../shared/utils/trackNormalization';
@@ -15,7 +11,6 @@ import {
 import { createLogger } from '../utils/logger';
 
 import { ArtistNameResolver } from './artistNameResolver';
-import { loadAlbumMappings } from './mergedAlbumHistory';
 import { buildPlayIdentityResolver } from './playIdentity';
 import { ScrobbleHistoryStorage } from './scrobbleHistoryStorage';
 import { TrackMappingService } from './trackMappingService';
@@ -54,8 +49,12 @@ export class RankingsService {
   private mappingService: {
     getAllAlbumMappings(): Promise<AlbumMapping[]>;
   } | null = null;
-  private artistNameResolver: Pick<ArtistNameResolver, 'resolveArtist'> | null =
-    null;
+  private artistNameResolver:
+    | (Pick<ArtistNameResolver, 'resolveArtist'> &
+        Partial<
+          Pick<ArtistNameResolver, 'resolveArtistMulti' | 'getDisplayName'>
+        >)
+    | null = null;
   private trackMappingService: Pick<
     TrackMappingService,
     'createLookup'
@@ -68,7 +67,8 @@ export class RankingsService {
 
   /** Optional: album rankings group spellings of one artist (see ArtistNameResolver). */
   setArtistNameResolver(
-    resolver: Pick<ArtistNameResolver, 'resolveArtist'>
+    resolver: Pick<ArtistNameResolver, 'resolveArtist'> &
+      Partial<Pick<ArtistNameResolver, 'resolveArtistMulti' | 'getDisplayName'>>
   ): void {
     this.artistNameResolver = resolver;
   }
@@ -122,67 +122,79 @@ export class RankingsService {
       trackKey?: string;
       trackArtist?: string;
       trackAlbum?: string | null;
+      /** Artist rankings: each artist the play counts for (compound credits split) */
+      artistKeys: string[];
     }> = [];
 
     const resolver = this.artistNameResolver;
-    const albumMappings = await loadAlbumMappings(this.mappingService);
-    const canonicalize = createAlbumCanonicalizer(
-      albumMappings,
-      resolver ? name => resolver.resolveArtist(name) : undefined
-    );
-    // Track rankings group by play identity, the same way Top Tracks does:
-    // one row per track on an album, after track mappings and merged versions
-    const identity =
-      type === 'tracks'
-        ? await buildPlayIdentityResolver({
-            mappingService: this.mappingService,
-            trackMappingService: this.trackMappingService,
-            resolveArtist: name =>
-              resolver ? resolver.resolveArtist(name) : name.toLowerCase(),
-            historyStorage: this.historyStorage,
-          })
-        : null;
-    const trackFields = (
+    // Every ranking groups by play identity, the same way Top Tracks, Top
+    // Albums and Top Artists do: track mappings (which can move a play to
+    // another album or artist), merged album versions, artist aliases
+    const identity = await buildPlayIdentityResolver({
+      mappingService: this.mappingService,
+      trackMappingService: this.trackMappingService,
+      resolveArtist: name =>
+        resolver ? resolver.resolveArtist(name) : name.toLowerCase(),
+      historyStorage: this.historyStorage,
+    });
+    // Artist rankings count like Top Artists: aliases are one artist, and a
+    // compound credit counts for each artist it splits into
+    const keysFor = new Map<string, string[]>();
+    const artistKeysOf = (artist: string) => {
+      let keys = keysFor.get(artist);
+      if (!keys) {
+        keys = resolver?.resolveArtistMulti
+          ? resolver.resolveArtistMulti(artist)
+          : [resolver ? resolver.resolveArtist(artist) : artist.toLowerCase()];
+        keysFor.set(artist, keys);
+      }
+      return keys;
+    };
+    const scrobbleOf = (
+      timestamp: number,
       artist: string,
-      album: string | null,
+      historyAlbum: string | null,
       track: string | undefined
     ) => {
-      if (!identity || !track) return { track };
-      const target = identity.play(artist, album, track);
+      if (track) {
+        const target = identity.play(artist, historyAlbum, track);
+        return {
+          timestamp,
+          artist: target.artist,
+          album: target.album ?? UNKNOWN_ALBUM_LABEL,
+          albumArtist: target.artist,
+          albumKey: target.albumKey,
+          track: target.track,
+          trackKey: target.trackKey,
+          trackArtist: target.artist,
+          trackAlbum: target.album,
+          artistKeys: artistKeysOf(target.artist),
+        };
+      }
+      const target =
+        historyAlbum === null ? null : identity.album(artist, historyAlbum);
       return {
-        track: target.track,
-        trackKey: target.trackKey,
-        trackArtist: target.artist,
-        trackAlbum: target.album,
+        timestamp,
+        artist,
+        album: target?.album ?? UNKNOWN_ALBUM_LABEL,
+        albumArtist: artist,
+        albumKey: target?.albumKey ?? null,
+        artistKeys: artistKeysOf(artist),
       };
     };
 
     for (const [albumKey, albumEntry] of Object.entries(index.albums)) {
       const artist = artistFromAlbumKey(albumKey);
       const historyAlbum = albumFromAlbumKey(albumKey);
-      // Merged versions share the canonical album and its artist (index keys
-      // are lowercase); artist rankings still use the scrobble's own artist
-      const canonical = canonicalize(artist, historyAlbum);
-      const album = canonical.mapping
-        ? canonical.album.toLowerCase()
-        : historyAlbum;
-      const albumArtist = canonical.mapping
-        ? stripDiscogsSuffix(canonical.artist).toLowerCase()
-        : artist;
       for (const play of albumEntry.plays) {
         // Convert timestamp from seconds to milliseconds
         const timestampMs = play.timestamp * 1000;
 
         // If no filter, include all scrobbles; otherwise apply date filter
         if (!useFilter || (timestampMs >= start && timestampMs <= end)) {
-          scrobbles.push({
-            timestamp: timestampMs,
-            artist,
-            album,
-            albumArtist,
-            albumKey: canonical.key,
-            ...trackFields(artist, historyAlbum, play.track),
-          });
+          scrobbles.push(
+            scrobbleOf(timestampMs, artist, historyAlbum, play.track)
+          );
         }
       }
     }
@@ -197,14 +209,7 @@ export class RankingsService {
       for (const play of entry.plays) {
         const timestampMs = play.timestamp * 1000;
         if (!useFilter || (timestampMs >= start && timestampMs <= end)) {
-          scrobbles.push({
-            timestamp: timestampMs,
-            artist,
-            album: UNKNOWN_ALBUM_LABEL,
-            albumArtist: artist,
-            albumKey: null,
-            ...trackFields(artist, null, play.track),
-          });
+          scrobbles.push(scrobbleOf(timestampMs, artist, null, play.track));
         }
       }
     }
@@ -285,6 +290,7 @@ export class RankingsService {
       trackKey?: string;
       trackArtist?: string;
       trackAlbum?: string | null;
+      artistKeys: string[];
     }>,
     type: RankingType,
     topN: number
@@ -298,10 +304,27 @@ export class RankingsService {
         album?: string | null;
         /** Tracks: named by the most-played spelling */
         spellings?: TrackSpellings;
+        /** Albums and tracks: shown under the most-played artist */
+        artists?: TrackSpellings;
       }
     >();
 
     for (const scrobble of scrobbles) {
+      if (type === 'artists') {
+        for (const artistKey of scrobble.artistKeys) {
+          const existing = counts.get(artistKey);
+          if (existing) {
+            existing.count++;
+          } else {
+            // The alias display name, else the spelling as scrobbled
+            const name =
+              this.artistNameResolver?.getDisplayName?.(artistKey) ??
+              (scrobble.artistKeys.length === 1 ? scrobble.artist : artistKey);
+            counts.set(artistKey, { count: 1, name });
+          }
+        }
+        continue;
+      }
       let key: string;
       let name: string;
       let artist: string | undefined;
@@ -319,14 +342,11 @@ export class RankingsService {
           artist = scrobble.trackArtist ?? scrobble.artist;
           album = scrobble.trackAlbum;
           break;
-        case 'artists':
-          key = scrobble.artist;
-          name = scrobble.artist;
-          break;
         case 'albums':
           // Unresolved plays have no album to rank
           if (scrobble.albumKey === null) continue;
-          // Group spelling variants together; show the first name seen
+          // Play identity: versions joined by mappings are one album, shown
+          // by the name the mapping points to
           key = scrobble.albumKey;
           name = scrobble.album;
           artist = scrobble.albumArtist;
@@ -337,10 +357,13 @@ export class RankingsService {
       if (existing) {
         existing.count++;
         existing.spellings?.add(name);
+        if (artist) existing.artists?.add(artist);
       } else {
         const spellings = type === 'tracks' ? new TrackSpellings() : undefined;
         spellings?.add(name);
-        counts.set(key, { count: 1, name, artist, album, spellings });
+        const artists = new TrackSpellings();
+        if (artist) artists.add(artist);
+        counts.set(key, { count: 1, name, artist, album, spellings, artists });
       }
     }
 
@@ -352,7 +375,7 @@ export class RankingsService {
     return sorted.map(([key, data], index) => ({
       key,
       name: data.spellings?.best ?? data.name,
-      artist: data.artist,
+      artist: data.artists?.best || data.artist,
       ...(data.album !== undefined && { album: data.album }),
       count: data.count,
       rank: index + 1,

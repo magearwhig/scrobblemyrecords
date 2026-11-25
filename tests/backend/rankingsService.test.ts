@@ -154,7 +154,8 @@ describe('RankingsService', () => {
 
       const rankings = result.snapshots[0].rankings;
       expect(rankings).toHaveLength(2);
-      expect(rankings[0]).toMatchObject({ name: 'album 1', count: 4 });
+      // Shown by the name the mapping points to
+      expect(rankings[0]).toMatchObject({ name: 'Album 1', count: 4 });
     });
 
     it('should rank a mapped version with an unmapped spelling of its Discogs target as one album', async () => {
@@ -187,8 +188,9 @@ describe('RankingsService', () => {
 
       const rankings = result.snapshots[0].rankings;
       expect(rankings).toHaveLength(1);
+      // Shown by the name the mapping points to, under the scrobbled artist
       expect(rankings[0]).toMatchObject({
-        name: 'dog problems',
+        name: 'Dog Problems',
         artist: 'the format',
         count: 3,
       });
