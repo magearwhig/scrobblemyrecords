@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen)](https://nodejs.org/)
 [![Last Commit](https://img.shields.io/github/last-commit/magearwhig/scrobblemyrecords)](https://github.com/magearwhig/scrobblemyrecords/commits/main)
-[![Code Coverage](https://img.shields.io/badge/coverage-7428%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
+[![Code Coverage](https://img.shields.io/badge/coverage-7457%20tests-brightgreen)](https://github.com/magearwhig/scrobblemyrecords)
 
 🎵 **Sync your Discogs vinyl collection to Last.fm automatically!**
 
@@ -279,7 +279,7 @@ Comprehensive listening statistics and visualizations, most-used first:
 - **Overview**: four cards (plays this month, collection coverage, new artists, listening streak) and one line under them with all-time and yearly plays, the next scrobble milestone, estimated listening time (plays times an average track length) and the share scrobbled through this app. Two cards per row on a phone
 - **Rankings**: Top Albums, Labels, Artists and Tracks with one period control for all four (week/month/year/30/90/365 days/all time/custom), cover art, "Owned" badges and Spotify play buttons. On a phone one list shows at a time, picked from a menu. **View all-time** links open the full list on the History page
   - **Top Labels** count like the label page: albums you own by your copies' labels, others by their looked-up label. Each opens its label page
-  - **Rankings over time** (the animated race) sit behind a button and load only when opened
+  - **Rankings over time** (the animated race) sit behind a button and load only when opened. Track rankings count tracks the same way Top Tracks does: per album, after track mappings and merged album versions, with plays that have no album as their own rows. Two tracks with the same name show the album in their label
   - **Plays without album info**: a note links to the Unresolved tab to fix them
 - **Listening Timeline** and **Calendar Heatmap** (daily activity by year, click a day for its albums; on a narrow screen it opens on this week), beside **On This Day**: the two latest years with plays on this date, with "Show all" for the rest. Covers load after the text
 - **Listening Patterns**: hourly polar chart and day-of-week bar chart with personalized insights ("You're an evening listener")
@@ -370,6 +370,7 @@ Surface tracks with high all-time play counts that you haven't listened to recen
 - **Last.fm Links**: Quick access to track pages on Last.fm
 - **Spotify Integration**: Play button for each track
 - **Track Mapping Support**: Manual track mappings ensure accurate matching
+- **Album versions count as one album**: a track played recently on any version joined by an album mapping (e.g. "Dog Problems (Bonus Track Version)") isn't forgotten
 
 #### Dusty Corners
 Albums in your collection you haven't played in 6+ months:
@@ -871,6 +872,7 @@ Protect your user-generated data with manual and automatic backups:
 - Album mappings (Last.fm → Discogs collection, and merged album versions)
 - Dismissed album merge suggestions
 - Track mappings (track names counted as another track, including album page merges)
+- Every list of tracks (Top Tracks, Forgotten Favorites, the artist and track pages, rankings over time) counts a play the same way, through one shared resolver: track mappings first (including ones that move a play to another album or artist), then album mappings on the album it lands on, then artist aliases. A contract test checks these pages agree
 - Compound-artist mappings
 - Labels you set for albums you don't own (label pages)
 - Unresolved history: album assignments for albumless plays, hidden tracks, and excluded artists

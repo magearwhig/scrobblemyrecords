@@ -42,6 +42,46 @@ describe('RankingsRace', () => {
   ];
 
   describe('Empty state', () => {
+    it('shows two tracks with the same name on different albums as two bars', () => {
+      render(
+        <RankingsRace
+          snapshots={[
+            {
+              period: '2024-01',
+              timestamp: 0,
+              rankings: [
+                {
+                  key: 'a',
+                  name: 'Time Bomb',
+                  artist: 'the format',
+                  album: 'Dog Problems',
+                  count: 3,
+                  rank: 1,
+                },
+                {
+                  key: 'b',
+                  name: 'Time Bomb',
+                  artist: 'the format',
+                  album: 'Live',
+                  count: 1,
+                  rank: 2,
+                },
+              ],
+            },
+          ]}
+          type='tracks'
+          topN={10}
+        />
+      );
+
+      expect(
+        screen.getByText(/Time Bomb - The Format \(Dog Problems\)/)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Time Bomb - The Format \(Live\)/)
+      ).toBeInTheDocument();
+    });
+
     it('should show empty message when no snapshots', () => {
       render(<RankingsRace snapshots={[]} type='artists' topN={10} />);
 
