@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  BarChart3,
   Check,
   ExternalLink,
   Package,
@@ -113,6 +114,15 @@ function writeSplitTracks(releaseId: number, split: Set<number>): void {
 const ReleaseDetailsPage: React.FC = () => {
   const { authStatus } = useAuth();
   const { state } = useApp();
+  // Back to the album page when opened from one, else to the collection
+  const [cameFromAlbum] = useState(() => {
+    const hash = window.location.hash;
+    const query = hash.includes('?') ? hash.split('?')[1] : '';
+    return new URLSearchParams(query).get('from') === ROUTES.ALBUM_DETAIL;
+  });
+  const backLabel = cameFromAlbum ? 'Back to Album' : 'Back to Collection';
+  const handleBackClick = () =>
+    navigate(cameFromAlbum ? ROUTES.ALBUM_DETAIL : ROUTES.COLLECTION);
   const [release, setRelease] = useState<DiscogsRelease | null>(null);
   const [loading, setLoading] = useState(true);
   const [scrobbling, setScrobbling] = useState(false);
@@ -132,6 +142,8 @@ const ReleaseDetailsPage: React.FC = () => {
   } | null>(null);
   const [sessionKey, setSessionKey] = useState<string>('');
   const [startTime, setStartTime] = useState<string>('');
+  // Whether startTime came from Auto Timing (not typed or nudged)
+  const [autoTimed, setAutoTimed] = useState(false);
   const [scrobbleProgress, setScrobbleProgress] = useState<{
     current: number;
     total: number;
@@ -677,6 +689,16 @@ const ReleaseDetailsPage: React.FC = () => {
   };
 
   // Navigate to settings with artist pre-filled for mapping
+  /** The album's listening page: plays, arc, merged versions */
+  const handleViewListening = () => {
+    if (!release) return;
+    localStorage.setItem(
+      'selectedAlbum',
+      JSON.stringify({ artist: release.artist, album: release.title })
+    );
+    navigate(`${ROUTES.ALBUM_DETAIL}?from=${ROUTES.RELEASE_DETAILS}`);
+  };
+
   const navigateToMappingWithArtist = (artist: string) => {
     setShowDisambiguationWarning(false);
     navigate(`settings?prefillArtist=${encodeURIComponent(artist)}`);
@@ -815,6 +837,7 @@ const ReleaseDetailsPage: React.FC = () => {
 
     const formattedTime = `${year}-${month}-${day}T${hours}:${minutes}`;
     setStartTime(formattedTime);
+    setAutoTimed(true);
   };
 
   const getLastfmProfileUrl = () => {
@@ -939,226 +962,112 @@ const ReleaseDetailsPage: React.FC = () => {
         </p>
       </Modal>
 
-      <div className='card'>
-        <div className='release-details-header-container'>
-          <h2>Release Details</h2>
-          <Button
-            variant='secondary'
-            size='small'
-            onClick={() => navigate('collection')}
-          >
-            Back to Collection
-          </Button>
-        </div>
+      <div className='detail-page release-details-page'>
+        {/* Back navigation */}
+        <button
+          className='detail-page-back-link'
+          onClick={handleBackClick}
+          aria-label={backLabel}
+        >
+          &larr; {backLabel}
+        </button>
 
-        <div className='release-details-main-content'>
-          <div className='release-details-image-container'>
-            <img
-              src={release.cover_image}
-              alt={release.title}
-              className='release-details-cover-image'
-            />
-          </div>
-
-          <div className='release-details-content'>
-            <h3 className='release-details-title'>{release.title}</h3>
-            <p className='release-details-artist'>
-              <ArtistLink artist={release.artist} />
+        {/* Header: cover, title, artist, release facts, actions */}
+        <div className='detail-page-header album-detail-header'>
+          <img
+            src={release.cover_image}
+            alt={`${release.title} cover`}
+            className='album-detail-cover'
+          />
+          <div className='detail-page-info'>
+            <h1 className='detail-page-title' title={release.title}>
+              {release.title}
+            </h1>
+            <p className='detail-page-meta album-detail-artist-line'>
+              by <ArtistLink artist={release.artist} />
               {artistMapping && artistMapping.hasMapping && (
-                <span
-                  className='release-details-artist-mapping-badge'
-                  title={`This artist will be scrobbled as "${artistMapping.lastfmName}" on Last.fm`}
-                >
-                  → {artistMapping.lastfmName}
+                <span className='release-details-artist-mapping'>
+                  {' '}
+                  &middot; scrobbles as {artistMapping.lastfmName}
                 </span>
               )}
             </p>
-            <p className='release-details-metadata'>
-              {release.year} • {release.format.join(', ')}
-            </p>
-            {release.label && release.label.length > 0 && (
-              <p className='release-details-metadata'>
-                {release.label.map((name, i) => (
-                  <React.Fragment key={`${name}-${i}`}>
-                    {i > 0 && ', '}
-                    <LabelLink label={name} />
-                  </React.Fragment>
-                ))}
-              </p>
-            )}
-            {release.catalog_number && (
-              <p className='release-details-metadata'>
-                Catalog: {release.catalog_number}
-              </p>
-            )}
-
-            {/* Marketplace pricing */}
-            <div className='marketplace-stats-info'>
-              {loadingMarketplaceStats ? (
-                <div className='marketplace-stats-loading'>
-                  Loading marketplace prices...
-                </div>
-              ) : marketplaceStats ? (
-                <div className='marketplace-stats-content'>
-                  <div className='marketplace-stats-prices'>
-                    <span className='marketplace-stats-label'>
-                      Discogs Marketplace:
-                    </span>
-                    {marketplaceStats.lowestPrice !== undefined ? (
-                      <>
-                        <span className='marketplace-stats-range'>
-                          {marketplaceStats.highestPrice !== undefined &&
-                          marketplaceStats.highestPrice !==
-                            marketplaceStats.lowestPrice ? (
-                            <>
-                              {new Intl.NumberFormat('en-US', {
-                                style: 'currency',
-                                currency: marketplaceStats.currency || 'USD',
-                              }).format(marketplaceStats.lowestPrice)}
-                              {' - '}
-                              {new Intl.NumberFormat('en-US', {
-                                style: 'currency',
-                                currency: marketplaceStats.currency || 'USD',
-                              }).format(marketplaceStats.highestPrice)}
-                            </>
-                          ) : (
-                            <>
-                              from{' '}
-                              {new Intl.NumberFormat('en-US', {
-                                style: 'currency',
-                                currency: marketplaceStats.currency || 'USD',
-                              }).format(marketplaceStats.lowestPrice)}
-                            </>
-                          )}
-                        </span>
-                        <span className='marketplace-stats-count'>
-                          ({marketplaceStats.numForSale} for sale)
-                        </span>
-                      </>
-                    ) : (
-                      <span className='marketplace-stats-none'>
-                        No listings
-                      </span>
-                    )}
-                  </div>
-                  {marketplaceStats.priceSuggestions ? (
-                    <div className='marketplace-stats-suggestions'>
-                      <span className='marketplace-stats-suggestion-label'>
-                        Suggested prices by condition:
-                      </span>
-                      <div className='marketplace-stats-condition-list'>
-                        {marketplaceStats.priceSuggestions.nearMint && (
-                          <span className='condition-price'>
-                            NM:{' '}
-                            {new Intl.NumberFormat('en-US', {
-                              style: 'currency',
-                              currency:
-                                marketplaceStats.priceSuggestions.nearMint
-                                  .currency || 'USD',
-                            }).format(
-                              marketplaceStats.priceSuggestions.nearMint.value
-                            )}
-                          </span>
-                        )}
-                        {marketplaceStats.priceSuggestions.veryGoodPlus && (
-                          <span className='condition-price'>
-                            VG+:{' '}
-                            {new Intl.NumberFormat('en-US', {
-                              style: 'currency',
-                              currency:
-                                marketplaceStats.priceSuggestions.veryGoodPlus
-                                  .currency || 'USD',
-                            }).format(
-                              marketplaceStats.priceSuggestions.veryGoodPlus
-                                .value
-                            )}
-                          </span>
-                        )}
-                        {marketplaceStats.priceSuggestions.veryGood && (
-                          <span className='condition-price'>
-                            VG:{' '}
-                            {new Intl.NumberFormat('en-US', {
-                              style: 'currency',
-                              currency:
-                                marketplaceStats.priceSuggestions.veryGood
-                                  .currency || 'USD',
-                            }).format(
-                              marketplaceStats.priceSuggestions.veryGood.value
-                            )}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    marketplaceStats.lowestPrice !== undefined && (
-                      <div className='marketplace-stats-suggestions'>
-                        <span className='marketplace-stats-no-suggestions'>
-                          Seller profile required for price suggestions
-                        </span>
-                      </div>
-                    )
-                  )}
-                </div>
-              ) : (
-                <div className='marketplace-stats-unavailable'>
-                  Marketplace data unavailable
-                </div>
+            <p className='detail-page-meta'>
+              {/* Discogs repeats formats ("Vinyl, Vinyl, All Media") */}
+              {[
+                release.year || null,
+                Array.from(new Set(release.format)).join(', ') || null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+              {release.label && release.label.length > 0 && (
+                <>
+                  {' · '}
+                  {release.label.map((name, i) => (
+                    <React.Fragment key={`${name}-${i}`}>
+                      {i > 0 && ', '}
+                      <LabelLink label={name} />
+                    </React.Fragment>
+                  ))}
+                </>
               )}
-            </div>
+              {release.catalog_number && (
+                <> &middot; Catalog: {release.catalog_number}</>
+              )}
+            </p>
 
-            {/* Play on Spotify / View on Discogs buttons */}
-            <div className='release-details-button-container'>
+            <div className='album-detail-actions'>
               <Button
                 variant='outline'
                 size='small'
-                className='release-details-button-margin-right'
                 onClick={() =>
                   playAlbumOnSpotify(release.artist, release.title)
                 }
+                iconLeft={<Play size={14} aria-hidden='true' />}
                 title='Play on Spotify'
               >
-                <Play size={14} aria-hidden='true' /> Play on Spotify
+                Play on Spotify
               </Button>
               <a
+                className='album-detail-external-link'
                 href={`https://www.discogs.com/release/${release.id}`}
                 target='_blank'
                 rel='noopener noreferrer'
+                title='View on Discogs'
               >
-                <Button variant='outline' size='small' title='View on Discogs'>
-                  <ExternalLink size={14} aria-hidden='true' /> View on Discogs
-                </Button>
+                <ExternalLink size={14} aria-hidden='true' /> View on Discogs
               </a>
-            </div>
-
-            {/* Discard pile button */}
-            {collectionItemId && (
-              <div className='release-details-button-container'>
-                {isInDiscardPile ? (
+              <Button
+                variant='outline'
+                size='small'
+                onClick={handleViewListening}
+                iconLeft={<BarChart3 size={14} aria-hidden='true' />}
+              >
+                Listening stats
+              </Button>
+              {/* Crates and the discard pile hold owned albums only */}
+              {collectionItemId && (
+                <AddToCrateMenu
+                  releaseIds={[collectionItemId]}
+                  albumTitle={release.title}
+                />
+              )}
+              {collectionItemId &&
+                (isInDiscardPile ? (
                   <span className='release-details-discard-indicator'>
                     <Package size={14} aria-hidden='true' /> In Discard Pile
                   </span>
                 ) : (
                   <Button
-                    variant='warning'
+                    variant='outline'
                     size='small'
-                    className='release-details-discard-button'
                     onClick={handleOpenDiscardModal}
+                    iconLeft={<Package size={14} aria-hidden='true' />}
                   >
-                    <Package size={14} aria-hidden='true' /> Add to Discard Pile
+                    Add to Discard Pile
                   </Button>
-                )}
-              </div>
-            )}
-
-            {/* Crates hold owned albums only */}
-            {collectionItemId && (
-              <div className='release-details-button-container'>
-                <AddToCrateMenu
-                  releaseIds={[collectionItemId]}
-                  albumTitle={release.title}
-                />
-              </div>
-            )}
+                ))}
+            </div>
           </div>
         </div>
 
@@ -1169,494 +1078,652 @@ const ReleaseDetailsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Scrobble History Section */}
-        <AlbumScrobbleHistory
-          artist={release.artist}
-          album={release.title}
-          collectionId={collectionItemId}
-        />
-
-        {scrobbleProgress && (
-          <div className='message info release-details-message-margin'>
-            <div className='release-details-progress-header'>
-              <strong>Scrobbling Progress:</strong>
-              <span>
-                {scrobbleProgress.current} / {scrobbleProgress.total}
-              </span>
-            </div>
-            <ProgressBar
-              value={scrobbleProgress.current}
-              max={scrobbleProgress.total}
-              size='small'
-              animated
-            />
-            <div className='release-details-progress-stats'>
-              <Check size={14} aria-hidden='true' /> {scrobbleProgress.success}{' '}
-              successful • <AlertTriangle size={14} aria-hidden='true' />{' '}
-              {scrobbleProgress.ignored} ignored •{' '}
-              <XCircle size={14} aria-hidden='true' /> {scrobbleProgress.failed}{' '}
-              failed
-            </div>
-          </div>
-        )}
-
-        {scrobbleResult && (
-          <div
-            className={`message ${scrobbleResult.failed === 0 && scrobbleResult.ignored === 0 ? 'success' : scrobbleResult.failed > 0 ? 'error' : 'warning'} release-details-message-margin`}
+        <div className='album-detail-content-grid release-details-grid'>
+          {/* Scrobble: the page's main job */}
+          <section
+            className='detail-page-section release-details-scrobble-section'
+            aria-label='Scrobble tracks'
           >
-            <strong>Scrobble Results:</strong>
-            {scrobbleResult.success > 0 && (
-              <span className='text-success'>
-                {' '}
-                {scrobbleResult.success} successful
-              </span>
-            )}
-            {scrobbleResult.ignored > 0 && (
-              <span className='text-warning'>
-                {' '}
-                {scrobbleResult.ignored} ignored
-              </span>
-            )}
-            {scrobbleResult.failed > 0 && (
-              <span className='text-error'>
-                {' '}
-                {scrobbleResult.failed} failed
-              </span>
-            )}
-
-            {scrobbleResult.errors.length > 0 && (
-              <div className='release-details-error-details'>
-                <strong>Details:</strong>
-                <ul className='release-details-error-list'>
-                  {scrobbleResult.errors.map((error, index) => (
-                    <li key={index}>{error}</li>
-                  ))}
-                </ul>
+            {scrobbleProgress && (
+              <div className='message info release-details-message-margin'>
+                <div className='release-details-progress-header'>
+                  <strong>Scrobbling Progress:</strong>
+                  <span>
+                    {scrobbleProgress.current} / {scrobbleProgress.total}
+                  </span>
+                </div>
+                <ProgressBar
+                  value={scrobbleProgress.current}
+                  max={scrobbleProgress.total}
+                  size='small'
+                  animated
+                />
+                <div className='release-details-progress-stats'>
+                  <Check size={14} aria-hidden='true' />{' '}
+                  {scrobbleProgress.success} successful •{' '}
+                  <AlertTriangle size={14} aria-hidden='true' />{' '}
+                  {scrobbleProgress.ignored} ignored •{' '}
+                  <XCircle size={14} aria-hidden='true' />{' '}
+                  {scrobbleProgress.failed} failed
+                </div>
               </div>
             )}
 
-            {scrobbleResult.ignored > 0 && (
-              <div className='release-details-ignored-note'>
-                <strong>Note:</strong> Ignored scrobbles aren&apos;t on Last.fm.
-                The reason for each is listed above; retry them from History
-                once it&apos;s fixed.
-              </div>
-            )}
-
-            {getLastfmProfileUrl() && (
-              <div className='release-details-profile-link'>
-                <a
-                  href={getLastfmProfileUrl()}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  className='button button--primary button--small'
-                >
-                  View on Last.fm
-                </a>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className='release-details-tracks-section'>
-          <div className='release-details-tracks-header'>
-            <h4 className='release-details-tracks-heading'>
-              Tracks ({selectedTracks.size} selected)
-            </h4>
-            <div className='release-details-tracks-buttons'>
-              <Button
-                size='small'
-                onClick={handleSelectAllTracks}
-                disabled={!release.tracklist?.length}
+            {scrobbleResult && (
+              <div
+                className={`message ${scrobbleResult.failed === 0 && scrobbleResult.ignored === 0 ? 'success' : scrobbleResult.failed > 0 ? 'error' : 'warning'} release-details-message-margin`}
               >
-                {selectedTracks.size === getActualTrackIndices().length
-                  ? 'Deselect All'
-                  : 'Select All'}
-              </Button>
+                <strong>Scrobble Results:</strong>
+                {scrobbleResult.success > 0 && (
+                  <span className='text-success'>
+                    {' '}
+                    {scrobbleResult.success} successful
+                  </span>
+                )}
+                {scrobbleResult.ignored > 0 && (
+                  <span className='text-warning'>
+                    {' '}
+                    {scrobbleResult.ignored} ignored
+                  </span>
+                )}
+                {scrobbleResult.failed > 0 && (
+                  <span className='text-error'>
+                    {' '}
+                    {scrobbleResult.failed} failed
+                  </span>
+                )}
 
-              <Button
-                onClick={handleScrobble}
-                disabled={
-                  selectedTracks.size === 0 ||
-                  scrobbling ||
-                  !authStatus.lastfm.authenticated
-                }
-              >
-                {scrobbling
-                  ? 'Scrobbling...'
-                  : `Scrobble ${scrobbleCount} Track${scrobbleCount !== 1 ? 's' : ''}`}
-              </Button>
+                {scrobbleResult.errors.length > 0 && (
+                  <div className='release-details-error-details'>
+                    <strong>Details:</strong>
+                    <ul className='release-details-error-list'>
+                      {scrobbleResult.errors.map((error, index) => (
+                        <li key={index}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {scrobbleResult.ignored > 0 && (
+                  <div className='release-details-ignored-note'>
+                    <strong>Note:</strong> Ignored scrobbles aren&apos;t on
+                    Last.fm. The reason for each is listed above; retry them
+                    from History once it&apos;s fixed.
+                  </div>
+                )}
+
+                {getLastfmProfileUrl() && (
+                  <div className='release-details-profile-link'>
+                    <a
+                      href={getLastfmProfileUrl()}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      className='button button--primary button--small'
+                    >
+                      View on Last.fm
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className='release-details-tracks-header'>
+              <h3 className='release-details-tracks-heading'>
+                Tracks ({selectedTracks.size} selected)
+              </h3>
             </div>
-          </div>
 
-          {/* Side Selection Buttons */}
-          {(() => {
-            const { sides, discs } = parseSides();
-            if (sides.length > 1) {
-              return (
-                <div className='release-details-side-selection'>
-                  <h5 className='release-details-side-heading'>
-                    Select by Side
-                  </h5>
+            {/* Side Selection Buttons */}
+            {(() => {
+              const { sides, discs } = parseSides();
+              if (sides.length > 1) {
+                return (
+                  <div className='release-details-side-selection'>
+                    <h5 className='release-details-side-heading'>
+                      Select by Side
+                    </h5>
 
-                  {/* Disc-level buttons for multi-disc albums */}
-                  {Object.keys(discs).length > 1 && (
-                    <div className='release-details-disc-group'>
+                    {/* Disc-level buttons for multi-disc albums */}
+                    {Object.keys(discs).length > 1 && (
+                      <div className='release-details-disc-group'>
+                        <div className='release-details-selection-label'>
+                          By Disc:
+                        </div>
+                        <div className='release-details-selection-buttons'>
+                          {Object.entries(discs).map(
+                            ([discName, discSides]) => (
+                              <Button
+                                key={discName}
+                                variant='outline'
+                                size='small'
+                                className={`release-details-chip${isDiscSelected(discSides) ? ' release-details-chip--on' : ''}`}
+                                iconLeft={
+                                  isDiscSelected(discSides) ? (
+                                    <Check size={12} aria-hidden='true' />
+                                  ) : undefined
+                                }
+                                onClick={() => handleDiscToggle(discSides)}
+                                aria-pressed={isDiscSelected(discSides)}
+                                aria-label={`${isDiscSelected(discSides) ? 'Deselect' : 'Select'} ${discName} with sides ${discSides.join(' and ')}`}
+                              >
+                                {discName} ({discSides.join('/')})
+                              </Button>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Individual side buttons */}
+                    <div>
                       <div className='release-details-selection-label'>
-                        By Disc:
+                        By Side:
                       </div>
                       <div className='release-details-selection-buttons'>
-                        {Object.entries(discs).map(([discName, discSides]) => (
-                          <Button
-                            key={discName}
-                            variant={
-                              isDiscSelected(discSides) ? 'primary' : 'outline'
-                            }
-                            size='small'
-                            className='button--filter text-muted-sm'
-                            onClick={() => handleDiscToggle(discSides)}
-                            aria-pressed={isDiscSelected(discSides)}
-                            aria-label={`${isDiscSelected(discSides) ? 'Deselect' : 'Select'} ${discName} with sides ${discSides.join(' and ')}`}
-                          >
-                            {discName} ({discSides.join('/')})
-                          </Button>
-                        ))}
+                        {sides.map(side => {
+                          const sideTrackCount =
+                            getSideTrackIndices(side).length;
+                          return (
+                            <Button
+                              key={side}
+                              variant='outline'
+                              size='small'
+                              className={`release-details-chip${isSideSelected(side) ? ' release-details-chip--on' : ''}`}
+                              iconLeft={
+                                isSideSelected(side) ? (
+                                  <Check size={12} aria-hidden='true' />
+                                ) : undefined
+                              }
+                              onClick={() => handleSideToggle(side)}
+                              aria-pressed={isSideSelected(side)}
+                              aria-label={`${isSideSelected(side) ? 'Deselect' : 'Select'} side ${side} with ${sideTrackCount} track${sideTrackCount === 1 ? '' : 's'}`}
+                            >
+                              Side {side} ({sideTrackCount})
+                            </Button>
+                          );
+                        })}
                       </div>
                     </div>
-                  )}
-
-                  {/* Individual side buttons */}
-                  <div>
-                    <div className='release-details-selection-label'>
-                      By Side:
-                    </div>
-                    <div className='release-details-selection-buttons'>
-                      {sides.map(side => {
-                        const sideTrackCount = getSideTrackIndices(side).length;
-                        return (
-                          <Button
-                            key={side}
-                            variant={
-                              isSideSelected(side) ? 'primary' : 'outline'
-                            }
-                            size='small'
-                            className='button--filter text-muted-sm'
-                            onClick={() => handleSideToggle(side)}
-                            aria-pressed={isSideSelected(side)}
-                            aria-label={`${isSideSelected(side) ? 'Deselect' : 'Select'} side ${side} with ${sideTrackCount} track${sideTrackCount === 1 ? '' : 's'}`}
-                          >
-                            Side {side} ({sideTrackCount})
-                          </Button>
-                        );
-                      })}
-                    </div>
                   </div>
-                </div>
-              );
-            }
-            return null;
-          })()}
+                );
+              }
+              return null;
+            })()}
 
-          {selectedTracks.size > 0 && (
-            <div className='release-details-timing-container'>
-              <h5 className='release-details-timing-heading'>
-                Scrobble Timing
-              </h5>
-              <p className='release-details-timing-description'>
-                Set when you started listening to the first track, or leave
-                empty to use realistic timing.
-              </p>
-              <div className='release-details-timing-inputs'>
-                <div className='form-group release-details-form-group'>
-                  <label
-                    htmlFor='start-time-input'
-                    className='form-label release-details-label-small'
+            <div className='release-details-tracklist'>
+              {release.tracklist?.map((track, index) => {
+                if (isTracklistHeading(track)) {
+                  // Render section header as non-selectable informational item
+                  return (
+                    <div key={index} className='release-details-section-header'>
+                      <div className='release-details-section-header-text'>
+                        {track.title}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Render actual track as selectable item
+                const trackStats = getRowStats(track);
+                const parts = track.subTracks ?? [];
+                const isSplit = parts.length > 0 && splitTracks.has(index);
+
+                return (
+                  <div
+                    key={index}
+                    className={`release-details-track-item${selectedTracks.has(index) ? ' release-details-track-item--selected' : ''}`}
+                    onClick={() => handleTrackToggle(index)}
                   >
-                    Start Time:
-                  </label>
-                  <div className='release-details-input-container'>
                     <input
-                      id='start-time-input'
-                      type='datetime-local'
-                      className='form-input release-details-input-small'
-                      value={startTime}
-                      onChange={e => setStartTime(e.target.value)}
+                      type='checkbox'
+                      checked={selectedTracks.has(index)}
+                      onChange={() => handleTrackToggle(index)}
+                      className='release-details-track-checkbox'
+                      aria-label={`Select ${track.position} ${track.title}`}
                     />
-                    {startTime && (
-                      <>
-                        <Button
-                          variant='outline'
-                          size='small'
-                          className='release-details-time-adjust-button'
-                          onClick={() => {
-                            // Parse the datetime-local value and adjust in local time
-                            const [datePart, timePart] = startTime.split('T');
-                            const [year, month, day] = datePart
-                              .split('-')
-                              .map(Number);
-                            const [hours, minutes] = timePart
-                              .split(':')
-                              .map(Number);
 
-                            const date = new Date(
-                              year,
-                              month - 1,
-                              day,
-                              hours,
-                              minutes
-                            );
-                            date.setMinutes(date.getMinutes() - 5);
+                    <div className='release-details-track-content'>
+                      <div className='release-details-track-title'>
+                        {track.position} {track.title}
+                      </div>
+                      {track.artist && track.artist !== release.artist && (
+                        <div className='release-details-track-artist'>
+                          {track.artist}
+                        </div>
+                      )}
+                      {parts.length > 0 && (
+                        <div className='release-details-track-parts'>
+                          {isSplit ? 'Scrobbled as ' : 'Parts: '}
+                          {parts.map(p => p.title).join(' / ')}
+                        </div>
+                      )}
+                      {track.duration && (
+                        <div className='release-details-track-duration'>
+                          {track.duration}
+                        </div>
+                      )}
+                    </div>
 
-                            const newValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-                            setStartTime(newValue);
-                          }}
-                          title='Move back 5 minutes'
-                        >
-                          ← 5m
-                        </Button>
-                        <Button
-                          variant='outline'
-                          size='small'
-                          className='release-details-time-adjust-button'
-                          onClick={() => {
-                            // Parse the datetime-local value and adjust in local time
-                            const [datePart, timePart] = startTime.split('T');
-                            const [year, month, day] = datePart
-                              .split('-')
-                              .map(Number);
-                            const [hours, minutes] = timePart
-                              .split(':')
-                              .map(Number);
-
-                            const date = new Date(
-                              year,
-                              month - 1,
-                              day,
-                              hours,
-                              minutes
-                            );
-                            date.setMinutes(date.getMinutes() + 5);
-
-                            const newValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-                            setStartTime(newValue);
-                          }}
-                          title='Move forward 5 minutes'
-                        >
-                          5m →
-                        </Button>
-                      </>
+                    {parts.length > 0 && (
+                      <Button
+                        variant={isSplit ? 'secondary' : 'ghost'}
+                        size='small'
+                        onClick={e => {
+                          e.stopPropagation();
+                          toggleSplit(index);
+                        }}
+                        aria-pressed={isSplit}
+                        title={
+                          isSplit
+                            ? 'Scrobble as one track'
+                            : `Scrobble as ${parts.length} separate tracks`
+                        }
+                        iconLeft={<Split size={14} aria-hidden='true' />}
+                      >
+                        {isSplit ? `${parts.length} parts` : 'Split'}
+                      </Button>
                     )}
-                  </div>
-                </div>
-                <div className='release-details-auto-timing-buttons'>
-                  <Button
-                    variant='secondary'
-                    size='small'
-                    onClick={handleAutoTiming}
-                    disabled={selectedTracks.size === 0}
-                    title={
-                      selectedTracks.size === 0
-                        ? 'Select tracks first'
-                        : 'Set timing so tracks end at current time'
-                    }
-                  >
-                    Auto Timing (Just Finished)
-                  </Button>
-                  {startTime && (
+
+                    {/* Spotify play button */}
                     <Button
                       variant='outline'
                       size='small'
-                      onClick={() => setStartTime('')}
-                      title='Clear custom timing'
+                      className='release-details-spotify-button-margin'
+                      onClick={e => {
+                        e.stopPropagation();
+                        playTrackOnSpotify(
+                          track.artist || release.artist,
+                          track.title,
+                          release.title
+                        );
+                      }}
+                      title='Play on Spotify'
                     >
-                      Clear
+                      <Play size={14} aria-hidden='true' />
                     </Button>
-                  )}
-                </div>
-              </div>
-              {startTime && (
-                <div className='release-details-timing-display'>
-                  Tracks will be scrobbled starting from:{' '}
-                  {formatLocalTimeClean(new Date(startTime))}
-                </div>
-              )}
-              {!startTime && selectedTracks.size > 0 && (
-                <div className='release-details-timing-display'>
-                  Tracks will be scrobbled with realistic timing (as if you just
-                  finished listening)
-                </div>
-              )}
-              {startTime && selectedTracks.size > 0 && (
-                <div className='release-details-timing-success'>
-                  Auto timing: Tracks will end at current time (as if you just
-                  finished listening)
-                </div>
-              )}
-            </div>
-          )}
 
-          {!authStatus.lastfm.authenticated && (
-            <div className='warning-message release-details-message-margin'>
-              Please authenticate with Last.fm to scrobble tracks.
-              <Button
-                size='small'
-                className='release-details-button-margin-left'
-                onClick={() => navigate('settings?tab=connections')}
-              >
-                Connect Last.fm
-              </Button>
+                    {/* Track scrobble stats; the column stays when empty
+                        so the play buttons line up */}
+                    <div className='release-details-track-stats'>
+                      {trackStats && trackStats.count > 0 && (
+                        <>
+                          <span className='release-details-play-count'>
+                            {trackStats.count}{' '}
+                            {trackStats.count === 1 ? 'play' : 'plays'}
+                          </span>
+                          {trackStats.lastPlayed && (
+                            <span
+                              className='release-details-last-played'
+                              title={formatLocalTimeClean(
+                                trackStats.lastPlayed * 1000
+                              )}
+                            >
+                              {formatRelativeTime(trackStats.lastPlayed)}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          )}
 
-          {authStatus.lastfm.authenticated && (
-            <div className='release-details-tracks-section'>
-              <Button
-                variant='secondary'
-                size='small'
-                className='release-details-button-margin-right'
-                onClick={testLastfmConnection}
-              >
-                Test Last.fm Connection
-              </Button>
-              <Button
-                variant='secondary'
-                size='small'
-                className='release-details-button-margin-right'
-                onClick={getSessionKey}
-              >
-                Get Session Key
-              </Button>
-              {connectionTest && (
-                <div
-                  className={`message ${connectionTest.success ? 'success' : 'warning'}`}
-                >
-                  {connectionTest.message}
-                </div>
-              )}
-              {sessionKey && (
-                <div className='message info release-details-session-key'>
-                  <strong>Session Key:</strong> {sessionKey}
-                  <br />
-                  <small>Use this in the debug script to test scrobbling</small>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+            {selectedTracks.size > 0 && (
+              <div className='release-details-timing-container'>
+                <h5 className='release-details-timing-heading'>
+                  Scrobble Timing
+                </h5>
+                <p className='release-details-timing-description'>
+                  Set when you started listening to the first track, or leave
+                  empty to use realistic timing.
+                </p>
+                <div className='release-details-timing-inputs'>
+                  <div className='form-group release-details-form-group'>
+                    <label
+                      htmlFor='start-time-input'
+                      className='form-label release-details-label-small'
+                    >
+                      Start Time:
+                    </label>
+                    <div className='release-details-input-container'>
+                      <input
+                        id='start-time-input'
+                        type='datetime-local'
+                        className='form-input release-details-input-small'
+                        value={startTime}
+                        onChange={e => {
+                          setStartTime(e.target.value);
+                          setAutoTimed(false);
+                        }}
+                      />
+                      {startTime && (
+                        <>
+                          <Button
+                            variant='outline'
+                            size='small'
+                            className='release-details-time-adjust-button'
+                            onClick={() => {
+                              // Parse the datetime-local value and adjust in local time
+                              const [datePart, timePart] = startTime.split('T');
+                              const [year, month, day] = datePart
+                                .split('-')
+                                .map(Number);
+                              const [hours, minutes] = timePart
+                                .split(':')
+                                .map(Number);
 
-        <div className='release-details-tracklist'>
-          {release.tracklist?.map((track, index) => {
-            if (isTracklistHeading(track)) {
-              // Render section header as non-selectable informational item
-              return (
-                <div key={index} className='release-details-section-header'>
-                  <div className='release-details-section-header-text'>
-                    {track.title}
+                              const date = new Date(
+                                year,
+                                month - 1,
+                                day,
+                                hours,
+                                minutes
+                              );
+                              date.setMinutes(date.getMinutes() - 5);
+
+                              const newValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                              setStartTime(newValue);
+                              setAutoTimed(false);
+                            }}
+                            title='Move back 5 minutes'
+                          >
+                            ← 5m
+                          </Button>
+                          <Button
+                            variant='outline'
+                            size='small'
+                            className='release-details-time-adjust-button'
+                            onClick={() => {
+                              // Parse the datetime-local value and adjust in local time
+                              const [datePart, timePart] = startTime.split('T');
+                              const [year, month, day] = datePart
+                                .split('-')
+                                .map(Number);
+                              const [hours, minutes] = timePart
+                                .split(':')
+                                .map(Number);
+
+                              const date = new Date(
+                                year,
+                                month - 1,
+                                day,
+                                hours,
+                                minutes
+                              );
+                              date.setMinutes(date.getMinutes() + 5);
+
+                              const newValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                              setStartTime(newValue);
+                              setAutoTimed(false);
+                            }}
+                            title='Move forward 5 minutes'
+                          >
+                            5m →
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className='release-details-auto-timing-buttons'>
+                    <Button
+                      variant='outline'
+                      size='small'
+                      onClick={handleAutoTiming}
+                      disabled={selectedTracks.size === 0}
+                      title={
+                        selectedTracks.size === 0
+                          ? 'Select tracks first'
+                          : 'Set timing so tracks end at current time'
+                      }
+                    >
+                      Auto Timing (Just Finished)
+                    </Button>
+                    {startTime && (
+                      <Button
+                        variant='outline'
+                        size='small'
+                        onClick={() => {
+                          setStartTime('');
+                          setAutoTimed(false);
+                        }}
+                        title='Clear custom timing'
+                      >
+                        Clear
+                      </Button>
+                    )}
                   </div>
                 </div>
-              );
-            }
-
-            // Render actual track as selectable item
-            const trackStats = getRowStats(track);
-            const parts = track.subTracks ?? [];
-            const isSplit = parts.length > 0 && splitTracks.has(index);
-
-            return (
-              <div
-                key={index}
-                className={`release-details-track-item${selectedTracks.has(index) ? ' release-details-track-item--selected' : ''}`}
-                onClick={() => handleTrackToggle(index)}
-              >
-                <input
-                  type='checkbox'
-                  checked={selectedTracks.has(index)}
-                  onChange={() => handleTrackToggle(index)}
-                  className='release-details-track-checkbox'
-                />
-
-                <div className='release-details-track-content'>
-                  <div className='release-details-track-title'>
-                    {track.position} {track.title}
+                {startTime && (
+                  <div className='release-details-timing-display'>
+                    Tracks will be scrobbled starting from:{' '}
+                    {formatLocalTimeClean(new Date(startTime))}
                   </div>
-                  {track.artist && track.artist !== release.artist && (
-                    <div className='release-details-track-artist'>
-                      {track.artist}
-                    </div>
-                  )}
-                  {parts.length > 0 && (
-                    <div className='release-details-track-parts'>
-                      {isSplit ? 'Scrobbled as ' : 'Parts: '}
-                      {parts.map(p => p.title).join(' / ')}
-                    </div>
-                  )}
-                  {track.duration && (
-                    <div className='release-details-track-duration'>
-                      {track.duration}
-                    </div>
-                  )}
-                </div>
-
-                {parts.length > 0 && (
-                  <Button
-                    variant={isSplit ? 'secondary' : 'ghost'}
-                    size='small'
-                    onClick={e => {
-                      e.stopPropagation();
-                      toggleSplit(index);
-                    }}
-                    aria-pressed={isSplit}
-                    title={
-                      isSplit
-                        ? 'Scrobble as one track'
-                        : `Scrobble as ${parts.length} separate tracks`
-                    }
-                    iconLeft={<Split size={14} aria-hidden='true' />}
-                  >
-                    {isSplit ? `${parts.length} parts` : 'Split'}
-                  </Button>
                 )}
+                {!startTime && selectedTracks.size > 0 && (
+                  <div className='release-details-timing-display'>
+                    Tracks will be scrobbled with realistic timing (as if you
+                    just finished listening)
+                  </div>
+                )}
+                {startTime && autoTimed && selectedTracks.size > 0 && (
+                  <div className='release-details-timing-success'>
+                    Auto timing: Tracks will end at current time (as if you just
+                    finished listening)
+                  </div>
+                )}
+              </div>
+            )}
 
-                {/* Spotify play button */}
+            {!authStatus.lastfm.authenticated && (
+              <div className='warning-message release-details-message-margin'>
+                Please authenticate with Last.fm to scrobble tracks.
+                <Button
+                  size='small'
+                  className='release-details-button-margin-left'
+                  onClick={() => navigate('settings?tab=connections')}
+                >
+                  Connect Last.fm
+                </Button>
+              </div>
+            )}
+
+            {authStatus.lastfm.authenticated && (
+              <details className='release-details-connection'>
+                <summary>Last.fm connection</summary>
+                <div className='release-details-tracks-section'>
+                  <Button
+                    variant='secondary'
+                    size='small'
+                    className='release-details-button-margin-right'
+                    onClick={testLastfmConnection}
+                  >
+                    Test Last.fm Connection
+                  </Button>
+                  <Button
+                    variant='secondary'
+                    size='small'
+                    className='release-details-button-margin-right'
+                    onClick={getSessionKey}
+                  >
+                    Get Session Key
+                  </Button>
+                  {connectionTest && (
+                    <div
+                      className={`message ${connectionTest.success ? 'success' : 'warning'}`}
+                    >
+                      {connectionTest.message}
+                    </div>
+                  )}
+                  {sessionKey && (
+                    <div className='message info release-details-session-key'>
+                      <strong>Session Key:</strong> {sessionKey}
+                      <br />
+                      <small>
+                        Use this in the debug script to test scrobbling
+                      </small>
+                    </div>
+                  )}
+                </div>
+              </details>
+            )}
+
+            {/* Always in reach while picking tracks further down the list */}
+            <div className='release-details-scrobble-bar'>
+              <span className='release-details-scrobble-count'>
+                {selectedTracks.size} selected
+              </span>
+              <div className='release-details-scrobble-buttons'>
                 <Button
                   variant='outline'
                   size='small'
-                  className='release-details-spotify-button-margin'
-                  onClick={e => {
-                    e.stopPropagation();
-                    playTrackOnSpotify(
-                      track.artist || release.artist,
-                      track.title,
-                      release.title
-                    );
-                  }}
-                  title='Play on Spotify'
+                  onClick={handleSelectAllTracks}
+                  disabled={!release.tracklist?.length}
                 >
-                  <Play size={14} aria-hidden='true' />
+                  {selectedTracks.size === getActualTrackIndices().length
+                    ? 'Deselect All'
+                    : 'Select All'}
                 </Button>
 
-                {/* Track scrobble stats */}
-                {trackStats && trackStats.count > 0 && (
-                  <div className='release-details-track-stats'>
-                    <span className='release-details-play-count'>
-                      {trackStats.count}{' '}
-                      {trackStats.count === 1 ? 'play' : 'plays'}
-                    </span>
-                    {trackStats.lastPlayed && (
-                      <span
-                        className='release-details-last-played'
-                        title={formatLocalTimeClean(
-                          trackStats.lastPlayed * 1000
-                        )}
-                      >
-                        {formatRelativeTime(trackStats.lastPlayed)}
+                <Button
+                  onClick={handleScrobble}
+                  disabled={
+                    selectedTracks.size === 0 ||
+                    scrobbling ||
+                    !authStatus.lastfm.authenticated
+                  }
+                >
+                  {scrobbling
+                    ? 'Scrobbling...'
+                    : `Scrobble ${scrobbleCount} Track${scrobbleCount !== 1 ? 's' : ''}`}
+                </Button>
+              </div>
+            </div>
+          </section>
+
+          {/* Side cards, as on the album page */}
+          <div className='album-detail-mappings-column'>
+            <AlbumScrobbleHistory
+              artist={release.artist}
+              album={release.title}
+              collectionId={collectionItemId}
+            />
+            <div className='detail-page-section'>
+              <h3>Marketplace</h3>
+              <div className='marketplace-stats-info'>
+                {loadingMarketplaceStats ? (
+                  <div className='marketplace-stats-loading'>
+                    Loading marketplace prices...
+                  </div>
+                ) : marketplaceStats ? (
+                  <div className='marketplace-stats-content'>
+                    <div className='marketplace-stats-prices'>
+                      <span className='marketplace-stats-label'>
+                        Discogs Marketplace:
                       </span>
+                      {marketplaceStats.lowestPrice !== undefined ? (
+                        <>
+                          <span className='marketplace-stats-range'>
+                            {marketplaceStats.highestPrice !== undefined &&
+                            marketplaceStats.highestPrice !==
+                              marketplaceStats.lowestPrice ? (
+                              <>
+                                {new Intl.NumberFormat('en-US', {
+                                  style: 'currency',
+                                  currency: marketplaceStats.currency || 'USD',
+                                }).format(marketplaceStats.lowestPrice)}
+                                {' - '}
+                                {new Intl.NumberFormat('en-US', {
+                                  style: 'currency',
+                                  currency: marketplaceStats.currency || 'USD',
+                                }).format(marketplaceStats.highestPrice)}
+                              </>
+                            ) : (
+                              <>
+                                from{' '}
+                                {new Intl.NumberFormat('en-US', {
+                                  style: 'currency',
+                                  currency: marketplaceStats.currency || 'USD',
+                                }).format(marketplaceStats.lowestPrice)}
+                              </>
+                            )}
+                          </span>
+                          <span className='marketplace-stats-count'>
+                            ({marketplaceStats.numForSale} for sale)
+                          </span>
+                        </>
+                      ) : (
+                        <span className='marketplace-stats-none'>
+                          No listings
+                        </span>
+                      )}
+                    </div>
+                    {marketplaceStats.priceSuggestions ? (
+                      <div className='marketplace-stats-suggestions'>
+                        <span className='marketplace-stats-suggestion-label'>
+                          Suggested prices by condition:
+                        </span>
+                        <div className='marketplace-stats-condition-list'>
+                          {marketplaceStats.priceSuggestions.nearMint && (
+                            <span className='condition-price'>
+                              NM:{' '}
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency:
+                                  marketplaceStats.priceSuggestions.nearMint
+                                    .currency || 'USD',
+                              }).format(
+                                marketplaceStats.priceSuggestions.nearMint.value
+                              )}
+                            </span>
+                          )}
+                          {marketplaceStats.priceSuggestions.veryGoodPlus && (
+                            <span className='condition-price'>
+                              VG+:{' '}
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency:
+                                  marketplaceStats.priceSuggestions.veryGoodPlus
+                                    .currency || 'USD',
+                              }).format(
+                                marketplaceStats.priceSuggestions.veryGoodPlus
+                                  .value
+                              )}
+                            </span>
+                          )}
+                          {marketplaceStats.priceSuggestions.veryGood && (
+                            <span className='condition-price'>
+                              VG:{' '}
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency:
+                                  marketplaceStats.priceSuggestions.veryGood
+                                    .currency || 'USD',
+                              }).format(
+                                marketplaceStats.priceSuggestions.veryGood.value
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      marketplaceStats.lowestPrice !== undefined && (
+                        <div className='marketplace-stats-suggestions'>
+                          <span className='marketplace-stats-no-suggestions'>
+                            Seller profile required for price suggestions
+                          </span>
+                        </div>
+                      )
                     )}
+                  </div>
+                ) : (
+                  <div className='marketplace-stats-unavailable'>
+                    Marketplace data unavailable
                   </div>
                 )}
               </div>
-            );
-          })}
+            </div>
+          </div>
         </div>
       </div>
 

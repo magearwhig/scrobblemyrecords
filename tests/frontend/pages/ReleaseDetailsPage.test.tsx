@@ -341,6 +341,15 @@ describe('ReleaseDetailsPage Auto Timing', () => {
     expect(
       screen.getByText(/Auto timing: Tracks will end at current time/)
     ).toBeInTheDocument();
+
+    // A time moved by hand is no longer "ends now"
+    await user.click(screen.getByTitle('Move back 5 minutes'));
+    expect(
+      screen.queryByText(/Auto timing: Tracks will end at current time/)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Tracks will be scrobbled starting from/)
+    ).toBeInTheDocument();
   });
 });
 
@@ -668,16 +677,18 @@ describe('ReleaseDetailsPage Side Selection', () => {
 
     const sideAButton = screen.getByRole('button', { name: /side A/i });
 
-    // Initially selected - should have primary styling
-    expect(sideAButton).toHaveClass('button--primary');
+    // Initially selected: shown as on (accent outline and check), pressed
+    expect(sideAButton).toHaveClass('release-details-chip--on');
+    expect(sideAButton).toHaveAttribute('aria-pressed', 'true');
 
     // Click to deselect
     await user.click(sideAButton);
 
-    // Should now have outline styling
+    // Now off
     await waitFor(() => {
-      expect(sideAButton).toHaveClass('button--outline');
+      expect(sideAButton).not.toHaveClass('release-details-chip--on');
     });
+    expect(sideAButton).toHaveAttribute('aria-pressed', 'false');
   });
 });
 
@@ -1176,13 +1187,48 @@ describe('ReleaseDetailsPage Track Filtering and Interactions', () => {
 
     // Check for detailed release info
     expect(screen.getByText('Test Artist')).toBeInTheDocument();
-    expect(screen.getByText('2023 • Vinyl, LP')).toBeInTheDocument();
+    // Year, formats, labels and catalog number share one line, as on the
+    // album page
     expect(
       screen.getByText(
-        (_, el) => el?.tagName === 'P' && el.textContent === 'Label 1, Label 2'
+        (_, el) =>
+          el?.tagName === 'P' &&
+          el.textContent ===
+            '2023 · Vinyl, LP · Label 1, Label 2 · Catalog: CAT-001'
       )
     ).toBeInTheDocument();
-    expect(screen.getByText('Catalog: CAT-001')).toBeInTheDocument();
+  });
+
+  it('goes back to the album page when opened from it', async () => {
+    window.location.hash = '#release-details?from=album';
+    renderWithProviders(<ReleaseDetailsPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Detailed Album')).toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Back to Album' })
+    );
+
+    expect(window.location.hash).toBe('#album');
+    window.location.hash = '';
+  });
+
+  it("opens the album's listening page from Listening stats", async () => {
+    renderWithProviders(<ReleaseDetailsPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Detailed Album')).toBeInTheDocument();
+    });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /Listening stats/ })
+    );
+
+    expect(mockLocalStorage.getItem('selectedAlbum')).toBe(
+      JSON.stringify({ artist: 'Test Artist', album: 'Detailed Album' })
+    );
+    expect(window.location.hash).toBe('#album?from=release-details');
+    window.location.hash = '';
   });
 
   it('should handle individual track selection and deselection', async () => {

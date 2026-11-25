@@ -77,92 +77,23 @@
   flex-wrap: wrap;
 }
 
-/* Header container */
-.release-details-header-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-/* Main content container */
-.release-details-main-content {
-  display: flex;
-  gap: 2rem;
-  margin-bottom: 2rem;
-}
-
-/* Image container */
-.release-details-image-container {
-  flex-shrink: 0;
-}
-
-/* Cover image */
-.release-details-cover-image {
-  width: 200px;
-  height: 200px;
-  object-fit: cover;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
-}
-
-/* Content container */
-.release-details-content {
-  flex: 1;
-}
-
-/* Title */
-.release-details-title {
-  margin: 0 0 0.5rem 0;
-  font-size: var(--text-2xl);
-  color: var(--text-primary);
-}
-
-/* Artist name */
-.release-details-artist {
-  margin: 0 0 0.5rem 0;
-  font-size: var(--text-lg);
+/* Last.fm name the artist is scrobbled as (artist mapping) */
+.release-details-artist-mapping {
+  font-size: var(--text-sm);
   color: var(--text-secondary);
-}
-
-/* Artist mapping badge */
-.release-details-artist-mapping-badge {
-  margin-left: 0.75rem;
-  font-size: var(--text-base);
-  padding: 0.2rem 0.5rem;
-  background-color: var(--accent-color);
-  color: var(--text-on-fill);
-  border-radius: var(--radius-lg);
-  font-weight: 500;
-}
-
-/* Metadata text */
-.release-details-metadata {
-  margin: 0 0 0.5rem 0;
-  color: var(--text-muted);
-}
-
-/* Button container */
-.release-details-button-container {
-  margin-top: 1rem;
 }
 
 /* Discard pile indicator */
 .release-details-discard-indicator {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: var(--text-base);
-  color: var(--accent-warning);
-  padding: 0.4rem 0.75rem;
-  background-color: var(--bg-tertiary);
-  border-radius: var(--radius-md);
-}
-
-/* Discard pile button */
-.release-details-discard-button {
+  gap: var(--space-1);
   font-size: var(--text-sm);
-  padding: 0.4rem 0.75rem;
+  color: var(--accent-warning);
+  padding: var(--space-1) var(--space-3);
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
 }
 
 /* Message margin */
@@ -235,29 +166,21 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 /* Tracks heading */
 .release-details-tracks-heading {
   margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
   color: var(--text-primary);
-}
-
-/* Tracks button group */
-.release-details-tracks-buttons {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
 }
 
 /* Side selection container */
 .release-details-side-selection {
-  margin-bottom: 1rem;
-  padding: 1rem;
-  background-color: var(--bg-tertiary);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
+  margin-bottom: var(--space-3);
 }
 
 /* Side selection heading */
@@ -294,11 +217,10 @@
 
 /* Timing container */
 .release-details-timing-container {
-  margin-bottom: 1rem;
-  padding: 1rem;
-  background-color: var(--bg-tertiary);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-color);
+  font-size: var(--text-sm);
 }
 
 /* Timing heading */
@@ -317,7 +239,8 @@
 /* Timing inputs container */
 .release-details-timing-inputs {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
   align-items: center;
 }
 
@@ -342,6 +265,7 @@
 .release-details-input-small {
   font-size: var(--text-base);
   flex: 1;
+  max-width: 16rem;
 }
 
 /* Time adjust button */
@@ -388,10 +312,9 @@
 
 /* Tracklist container */
 .release-details-tracklist {
-  max-height: 400px;
-  overflow-y: auto;
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
 /* Section header */
@@ -415,10 +338,15 @@
 .release-details-track-item {
   display: flex;
   align-items: center;
-  padding: 0.75rem;
+  padding: var(--space-2) var(--space-3);
   cursor: pointer;
-  background-color: var(--bg-secondary);
+  background-color: transparent;
   border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.15s ease;
+}
+
+.release-details-track-item:hover {
+  background-color: var(--bg-hover);
 }
 
 .release-details-track-item:last-child {
@@ -426,12 +354,13 @@
 }
 
 .release-details-track-item--selected {
-  background-color: var(--bg-tertiary);
+  box-shadow: inset 3px 0 0 var(--accent-color);
 }
 
 /* Track checkbox */
 .release-details-track-checkbox {
   margin-right: 1rem;
+  accent-color: var(--accent-color);
 }
 
 /* Track content */
@@ -492,13 +421,19 @@
 
 /* Phone: stack the cover over the details and let the timing controls wrap */
 @media (max-width: 768px) {
-  .release-details-main-content {
-    flex-direction: column;
-    gap: var(--space-4);
+  /* Titles get the room; long ones wrap */
+  .release-details-track-content {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
-  .release-details-content {
-    min-width: 0;
+  .release-details-track-checkbox {
+    margin-right: var(--space-2);
+  }
+
+  .release-details-track-stats {
+    min-width: 4.5rem;
+    margin-left: var(--space-2);
   }
 
   .release-details-timing-inputs,
@@ -506,26 +441,88 @@
     flex-wrap: wrap;
   }
 
-  /* The Last.fm name goes on its own line under the artist */
-  .release-details-artist-mapping-badge {
-    display: inline-block;
-    margin: var(--space-1) 0 0;
-    font-size: var(--text-sm);
-  }
-
   /* Heading on one line, the select and scrobble buttons under it */
   .release-details-tracks-header {
     flex-wrap: wrap;
     gap: var(--space-2);
   }
+}
 
-  .release-details-tracks-buttons {
-    flex-wrap: wrap;
-  }
+/* ==========================================================================
+   Layout shared with the album page (.detail-page, .album-detail-*): the
+   pieces that live inside its cards here
+   ========================================================================== */
 
-  /* One scroll for the whole page rather than a box inside it */
-  .release-details-tracklist {
-    max-height: none;
-    overflow-y: visible;
-  }
+/* Scrobble History draws its own card; match the album page's cards */
+.release-details-page .album-history {
+  margin-top: 0;
+  background: var(--card-bg);
+  padding: 1.25rem;
+  box-shadow: var(--card-shadow);
+}
+
+/* Marketplace prices sit in a card already */
+.release-details-page .marketplace-stats-info {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+/* Rarely needed Last.fm checks, out of the way under the tracks */
+.release-details-connection {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.release-details-connection summary {
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.release-details-connection[open] summary {
+  margin-bottom: var(--space-2);
+}
+
+.release-details-connection > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* Disc and side chips: quiet until on; solid accent is kept for Scrobble */
+.release-details-chip.release-details-chip--on {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+  background-color: var(--bg-tertiary);
+}
+
+/* Selected count and the Scrobble button stay in reach while scrolling the
+   tracklist */
+.release-details-scrobble-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-3) 0;
+  background: var(--card-bg);
+  border-top: 1px solid var(--border-color);
+}
+
+.release-details-scrobble-count {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.release-details-scrobble-buttons {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
 }
