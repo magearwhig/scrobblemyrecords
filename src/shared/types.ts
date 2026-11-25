@@ -848,10 +848,12 @@ export interface ArtistDetailResponse {
     playCount: number;
     lastPlayed: number;
   }>;
+  /** Albums played, then records owned but never played (playCount 0) */
   albums: Array<{
     album: string;
     playCount: number;
-    lastPlayed: number;
+    /** null for a record owned but never played */
+    lastPlayed: number | null;
     coverUrl?: string;
     inCollection: boolean;
     collectionReleaseId?: number;

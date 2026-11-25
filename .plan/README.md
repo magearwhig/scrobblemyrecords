@@ -10,7 +10,8 @@ Active plans and feature specs. Completed plans are in `done/`. Cancelled plans 
 | done/mapping-resolution-plan.md | Complete -- Feature 16, all 6 phases implemented |
 | done/ui-audit-report.md | Complete -- All 3 phases (design tokens, visual polish, cleanup) implemented March 2026 |
 | discogs-pressings-catalogue-plan.md | In progress -- 2026-11-14; one Discogs pressings catalogue replacing the versions cache, seller release-matching cache and known-pressings baseline; PR 1 (catalogue, single fetch path, migration) and PR 2 (wishlist reads from it, full fetch when no vinyl or monthly) implemented, uncommitted |
-| play-identity-plan.md | Complete -- 2026-11-25; one shared play identity service: what a play counts as, whether it's owned, and a record's plays, used by every page; PRs 1-4 merged (#33, #34), PR 5 (record-to-plays) on feat/play-identity-records; lint allowlist down to Suggested Album Merges |
+| play-identity-plan.md | Complete -- 2026-11-25; one shared play identity service: what a play counts as, whether it's owned, and a record's plays, used by every page; PRs 1-4 merged (#33, #34), PR 5 (record-to-plays) merged (#35); lint allowlist down to Suggested Album Merges |
+| album-pages-plan.md | In progress -- 2026-11-25; album overview + per-record scrobble screen + one artist page for collection and listening; step 1 (owned unplayed records on the artist page) implemented |
 | tech-debt.md | Active -- 20 open (0 P1, 6 P2, 14 P3), 47 completed; P1 quick wins, M31 and backup mapping files fixed 2026-10-11; dev-tool audit findings added 2026-11-01 |
 | done/wishlist-enhancements-plan.md | Complete -- all 4 enhancements implemented, tested, verified |
 | cancelled/spotify-integration-plan.md | Cancelled -- Spotify genre enrichment for embeddings |
